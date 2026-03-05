@@ -151,7 +151,10 @@ export function VMActions({
         variant="outline"
         size="sm"
         disabled={!isRunning}
-        onClick={() => onOpenConsole(vmid, name, type)}
+        onClick={(e) => {
+          e.stopPropagation()
+          onOpenConsole(vmid, name, type)
+        }}
       >
         {isLXC ? (
           <Terminal className="h-4 w-4 mr-1" />
@@ -165,7 +168,12 @@ export function VMActions({
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="sm" disabled={isLoading}>
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={isLoading}
+            onClick={(e) => e.stopPropagation()}
+          >
             <MoreVertical className="h-4 w-4" />
             <span className="sr-only">{t("resources:actions.openMenu")}</span>
           </Button>
