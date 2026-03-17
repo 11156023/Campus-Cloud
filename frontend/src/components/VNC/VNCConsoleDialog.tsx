@@ -30,6 +30,7 @@ export function VNCConsoleDialog({
   onOpenChange,
 }: VNCConsoleDialogProps) {
   const vncRef = useRef<React.ElementRef<typeof VncScreen>>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
   const [isConnected, setIsConnected] = useState(false)
   const [vncTicket, setVncTicket] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -117,11 +118,10 @@ export function VNCConsoleDialog({
   }
 
   const toggleFullscreen = () => {
-    const container = document.querySelector(".vnc-dialog-container")
-    if (!container) return
+    if (!containerRef.current) return
 
     if (!document.fullscreenElement) {
-      container.requestFullscreen?.()
+      containerRef.current.requestFullscreen?.()
     } else {
       document.exitFullscreen?.()
     }
@@ -140,11 +140,12 @@ export function VNCConsoleDialog({
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent
         className={cn(
-          "vnc-dialog-container w-[98vw] h-[95vh] max-w-[98vw] sm:max-w-[98vw] flex flex-col p-0 gap-0",
+          "w-[98vw] h-[95vh] max-w-[98vw] sm:max-w-[98vw] flex flex-col p-0 gap-0",
           "bg-zinc-900 border-zinc-700 overflow-hidden",
           "[&>button]:hidden",
         )}
       >
+        <div ref={containerRef} className="flex flex-col h-full w-full bg-zinc-900">
         <div className="flex items-center justify-between px-4 py-2 bg-gradient-to-r from-zinc-800 to-zinc-900 border-b border-zinc-700 shrink-0">
           <div className="flex items-center gap-3">
             <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-500/20">
@@ -328,6 +329,7 @@ export function VNCConsoleDialog({
               {t("console.buttons.disconnect")}
             </Button>
           </div>
+        </div>
         </div>
       </DialogContent>
     </Dialog>

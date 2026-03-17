@@ -15,15 +15,16 @@ import SpecificationsTab from "./SpecificationsTab"
 
 interface ResourceDetailPageProps {
   vmid: number
+  backTo?: "/resources" | "/my-resources"
 }
 
-export default function ResourceDetailPage({ vmid }: ResourceDetailPageProps) {
+export default function ResourceDetailPage({ vmid, backTo = "/resources" }: ResourceDetailPageProps) {
   const { t } = useTranslation("resourceDetail")
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState("overview")
 
   const handleBack = () => {
-    navigate({ to: "/resources" })
+    navigate({ to: backTo })
   }
 
   return (

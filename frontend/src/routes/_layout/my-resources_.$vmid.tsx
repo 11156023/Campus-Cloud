@@ -12,7 +12,7 @@ function MyResourceDetailPageRoute() {
 
   return (
     <Suspense fallback={<div>Loading...</div>}>
-      <ResourceDetailPage vmid={Number.parseInt(vmid)} />
+      <ResourceDetailPage vmid={Number.parseInt(vmid)} backTo="/my-resources" />
     </Suspense>
   )
 }
