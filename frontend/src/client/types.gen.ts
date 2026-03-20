@@ -896,7 +896,7 @@ export type VmRequestsReviewVmRequestData = {
     requestId: string;
 };
 
-export type VmRequestsReviewVmRequestResponse = (VMRequestPublic);// --- Group types (manually added) ---
+export type VmRequestsReviewVmRequestResponse = (VMRequestPublic);
 // --- Group types (manually added) ---
 
 export type GroupCreate = {
