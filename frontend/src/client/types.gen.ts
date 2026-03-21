@@ -3,7 +3,7 @@
 /**
  * 審計操作類型
  */
-export type AuditAction = 'spec_change_request' | 'spec_change_apply' | 'snapshot_create' | 'snapshot_delete' | 'snapshot_rollback' | 'config_update' | 'vm_create' | 'lxc_create' | 'resource_start' | 'resource_stop' | 'resource_reboot' | 'resource_shutdown' | 'resource_reset' | 'resource_delete' | 'vm_request_submit' | 'vm_request_review' | 'user_create' | 'user_update' | 'user_delete';
+export type AuditAction = 'spec_change_request' | 'spec_change_apply' | 'snapshot_create' | 'snapshot_delete' | 'snapshot_rollback' | 'config_update' | 'vm_create' | 'lxc_create' | 'resource_start' | 'resource_stop' | 'resource_reboot' | 'resource_shutdown' | 'resource_reset' | 'resource_delete' | 'vm_request_submit' | 'vm_request_review' | 'user_create' | 'user_update' | 'user_delete' | 'group_create' | 'group_delete' | 'group_member_add' | 'group_member_remove' | 'batch_provision_vm' | 'batch_provision_lxc';
 
 /**
  * 公開的審計日誌
@@ -100,6 +100,63 @@ export type DirectSpecUpdateRequest = {
      * Disk size increment (e.g. "+10G")
      */
     disk_size?: (string | null);
+};
+
+/**
+ * 建立群組
+ */
+export type GroupCreate = {
+    name: string;
+    description?: (string | null);
+};
+
+/**
+ * 群組詳情（含成員列表）
+ */
+export type GroupDetailPublic = {
+    id: string;
+    name: string;
+    description?: (string | null);
+    owner_id: string;
+    created_at?: (string | null);
+    members?: Array<GroupMemberPublic>;
+};
+
+/**
+ * 新增群組成員
+ */
+export type GroupMemberAdd = {
+    emails: Array<(string)>;
+};
+
+/**
+ * 群組成員資料
+ */
+export type GroupMemberPublic = {
+    user_id: string;
+    email: string;
+    full_name?: (string | null);
+    added_at?: (string | null);
+};
+
+/**
+ * API 回傳的群組資料
+ */
+export type GroupPublic = {
+    id: string;
+    name: string;
+    description?: (string | null);
+    owner_id: string;
+    created_at?: (string | null);
+    member_count?: number;
+};
+
+/**
+ * 群組列表回應
+ */
+export type GroupsPublic = {
+    data: Array<GroupPublic>;
+    count: number;
 };
 
 export type HTTPValidationError = {
@@ -435,10 +492,6 @@ export type ValidationError = {
     loc: Array<(string | number)>;
     msg: string;
     type: string;
-    input?: unknown;
-    ctx?: {
-        [key: string]: unknown;
-    };
 };
 
 /**
@@ -605,6 +658,40 @@ export type AuditLogsGetResourceAuditLogsData = {
 };
 
 export type AuditLogsGetResourceAuditLogsResponse = (AuditLogsPublic);
+
+export type GroupsListGroupsResponse = (GroupsPublic);
+
+export type GroupsCreateGroupData = {
+    requestBody: GroupCreate;
+};
+
+export type GroupsCreateGroupResponse = (GroupPublic);
+
+export type GroupsGetGroupData = {
+    groupId: string;
+};
+
+export type GroupsGetGroupResponse = (GroupDetailPublic);
+
+export type GroupsDeleteGroupData = {
+    groupId: string;
+};
+
+export type GroupsDeleteGroupResponse = (Message);
+
+export type GroupsAddMembersData = {
+    groupId: string;
+    requestBody: GroupMemberAdd;
+};
+
+export type GroupsAddMembersResponse = (Message);
+
+export type GroupsRemoveMemberData = {
+    groupId: string;
+    userId: string;
+};
+
+export type GroupsRemoveMemberResponse = (Message);
 
 export type LoginLoginAccessTokenData = {
     formData: Body_login_login_access_token;
@@ -897,79 +984,3 @@ export type VmRequestsReviewVmRequestData = {
 };
 
 export type VmRequestsReviewVmRequestResponse = (VMRequestPublic);
-// --- Group types (manually added) ---
-
-export type GroupCreate = {
-    name: string;
-    description?: (string | null);
-};
-
-export type GroupPublic = {
-    id: string;
-    name: string;
-    description?: (string | null);
-    owner_id: string;
-    created_at?: (string | null);
-    member_count?: number;
-};
-
-export type GroupsPublic = {
-    data: Array<GroupPublic>;
-    count: number;
-};
-
-export type GroupMemberPublic = {
-    user_id: string;
-    email: string;
-    full_name?: (string | null);
-    added_at?: (string | null);
-};
-
-export type GroupDetailPublic = {
-    id: string;
-    name: string;
-    description?: (string | null);
-    owner_id: string;
-    created_at?: (string | null);
-    members: Array<GroupMemberPublic>;
-};
-
-export type GroupMemberAdd = {
-    emails: Array<string>;
-};
-
-
-export type GroupsCreateGroupData = {
-    requestBody: GroupCreate;
-};
-
-export type GroupsCreateGroupResponse = (GroupPublic);
-
-export type GroupsListGroupsResponse = (GroupsPublic);
-
-export type GroupsGetGroupData = {
-    groupId: string;
-};
-
-export type GroupsGetGroupResponse = (GroupDetailPublic);
-
-export type GroupsDeleteGroupData = {
-    groupId: string;
-};
-
-export type GroupsDeleteGroupResponse = (Message);
-
-export type GroupsAddMembersData = {
-    groupId: string;
-    requestBody: GroupMemberAdd;
-};
-
-export type GroupsAddMembersResponse = (Message);
-
-export type GroupsRemoveMemberData = {
-    groupId: string;
-    userId: string;
-};
-
-export type GroupsRemoveMemberResponse = (Message);
-

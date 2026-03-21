@@ -1,7 +1,7 @@
 """add instructor role and groups tables
 
 Revision ID: a1b2c3d4e5f6
-Revises: c3f7e9a2b1d4
+Revises: e48bab2b8407
 Create Date: 2026-03-20 00:00:00.000000
 
 """
@@ -11,7 +11,7 @@ import sqlmodel.sql.sqltypes
 
 # revision identifiers, used by Alembic.
 revision = "a1b2c3d4e5f6"
-down_revision = "c3f7e9a2b1d4"
+down_revision = "e48bab2b8407"
 branch_labels = None
 depends_on = None
 
