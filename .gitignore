@@ -20,3 +20,4 @@ vllm-inference/.agents/
 vllm-inference/.agent
 vllm-inference/test_datasets/
 vllm-inference/webapp/frontend/node_modules
+.idea

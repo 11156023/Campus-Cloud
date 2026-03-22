@@ -19,6 +19,8 @@ from .spec_change_request import (
 )
 from .group import Group
 from .group_member import GroupMember
+from .proxmox_config import ProxmoxConfig
+from .proxmox_node import ProxmoxNode
 
 __all__ = [
     # Base
@@ -42,4 +44,8 @@ __all__ = [
     # Groups
     "Group",
     "GroupMember",
+    # Proxmox Config
+    "ProxmoxConfig",
+    # Proxmox Nodes
+    "ProxmoxNode",
 ]

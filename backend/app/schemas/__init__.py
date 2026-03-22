@@ -62,6 +62,11 @@ from .group import (
     GroupPublic,
     GroupsPublic,
 )
+from .proxmox_config import (
+    ProxmoxConfigPublic,
+    ProxmoxConfigUpdate,
+    ProxmoxConnectionTestResult,
+)
 
 __all__ = [
     # Common
@@ -117,4 +122,8 @@ __all__ = [
     "GroupDetailPublic",
     "GroupMemberAdd",
     "GroupMemberPublic",
+    # Proxmox Config
+    "ProxmoxConfigPublic",
+    "ProxmoxConfigUpdate",
+    "ProxmoxConnectionTestResult",
 ]

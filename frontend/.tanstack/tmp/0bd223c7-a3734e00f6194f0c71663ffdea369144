@@ -22,7 +22,6 @@ import { Route as LayoutGroupsRouteImport } from './routes/_layout/groups'
 import { Route as LayoutApprovalsRouteImport } from './routes/_layout/approvals'
 import { Route as LayoutApplicationsRouteImport } from './routes/_layout/applications'
 import { Route as LayoutAdminRouteImport } from './routes/_layout/admin'
-import { Route as LayoutAdminIndexRouteImport } from './routes/_layout/admin.index'
 import { Route as LayoutResourcesVmidRouteImport } from './routes/_layout/resources_.$vmid'
 import { Route as LayoutMyResourcesVmidRouteImport } from './routes/_layout/my-resources_.$vmid'
 import { Route as LayoutGroupsGroupIdRouteImport } from './routes/_layout/groups_.$groupId'
@@ -93,11 +92,6 @@ const LayoutAdminRoute = LayoutAdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => LayoutRoute,
 } as any)
-const LayoutAdminIndexRoute = LayoutAdminIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => LayoutAdminRoute,
-} as any)
 const LayoutResourcesVmidRoute = LayoutResourcesVmidRouteImport.update({
   id: '/resources_/$vmid',
   path: '/resources/$vmid',
@@ -142,13 +136,13 @@ export interface FileRoutesByFullPath {
   '/groups/$groupId': typeof LayoutGroupsGroupIdRoute
   '/my-resources/$vmid': typeof LayoutMyResourcesVmidRoute
   '/resources/$vmid': typeof LayoutResourcesVmidRoute
-  '/admin/': typeof LayoutAdminIndexRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/recover-password': typeof RecoverPasswordRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
+  '/admin': typeof LayoutAdminRouteWithChildren
   '/applications': typeof LayoutApplicationsRoute
   '/approvals': typeof LayoutApprovalsRoute
   '/groups': typeof LayoutGroupsRoute
@@ -161,7 +155,6 @@ export interface FileRoutesByTo {
   '/groups/$groupId': typeof LayoutGroupsGroupIdRoute
   '/my-resources/$vmid': typeof LayoutMyResourcesVmidRoute
   '/resources/$vmid': typeof LayoutResourcesVmidRoute
-  '/admin': typeof LayoutAdminIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -183,7 +176,6 @@ export interface FileRoutesById {
   '/_layout/groups_/$groupId': typeof LayoutGroupsGroupIdRoute
   '/_layout/my-resources_/$vmid': typeof LayoutMyResourcesVmidRoute
   '/_layout/resources_/$vmid': typeof LayoutResourcesVmidRoute
-  '/_layout/admin/': typeof LayoutAdminIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -205,13 +197,13 @@ export interface FileRouteTypes {
     | '/groups/$groupId'
     | '/my-resources/$vmid'
     | '/resources/$vmid'
-    | '/admin/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/login'
     | '/recover-password'
     | '/reset-password'
     | '/signup'
+    | '/admin'
     | '/applications'
     | '/approvals'
     | '/groups'
@@ -224,7 +216,6 @@ export interface FileRouteTypes {
     | '/groups/$groupId'
     | '/my-resources/$vmid'
     | '/resources/$vmid'
-    | '/admin'
   id:
     | '__root__'
     | '/_layout'
@@ -245,7 +236,6 @@ export interface FileRouteTypes {
     | '/_layout/groups_/$groupId'
     | '/_layout/my-resources_/$vmid'
     | '/_layout/resources_/$vmid'
-    | '/_layout/admin/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -349,13 +339,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutAdminRouteImport
       parentRoute: typeof LayoutRoute
     }
-    '/_layout/admin/': {
-      id: '/_layout/admin/'
-      path: '/'
-      fullPath: '/admin/'
-      preLoaderRoute: typeof LayoutAdminIndexRouteImport
-      parentRoute: typeof LayoutAdminRoute
-    }
     '/_layout/resources_/$vmid': {
       id: '/_layout/resources_/$vmid'
       path: '/resources/$vmid'
@@ -397,13 +380,11 @@ declare module '@tanstack/react-router' {
 interface LayoutAdminRouteChildren {
   LayoutAdminAuditLogsRoute: typeof LayoutAdminAuditLogsRoute
   LayoutAdminProxmoxRoute: typeof LayoutAdminProxmoxRoute
-  LayoutAdminIndexRoute: typeof LayoutAdminIndexRoute
 }
 
 const LayoutAdminRouteChildren: LayoutAdminRouteChildren = {
   LayoutAdminAuditLogsRoute: LayoutAdminAuditLogsRoute,
   LayoutAdminProxmoxRoute: LayoutAdminProxmoxRoute,
-  LayoutAdminIndexRoute: LayoutAdminIndexRoute,
 }
 
 const LayoutAdminRouteWithChildren = LayoutAdminRoute._addFileChildren(

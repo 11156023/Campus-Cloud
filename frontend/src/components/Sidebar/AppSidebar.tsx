@@ -4,6 +4,7 @@ import {
   Home,
   Monitor,
   ServerCog,
+  Settings2,
   UsersRound,
   Users,
 } from "lucide-react"
@@ -46,6 +47,7 @@ export function AppSidebar() {
     { icon: ClipboardCheck, title: t("sidebar.approvals"), path: "/approvals" },
     { icon: UsersRound, title: "群組管理", path: "/groups" },
     { icon: Users, title: t("sidebar.admin"), path: "/admin" },
+    { icon: Settings2, title: "PVE 設定", path: "/admin/proxmox" },
   ]
 
   const items = currentUser?.is_superuser

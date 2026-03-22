@@ -3,7 +3,7 @@ import uuid
 
 from sqlmodel import Session
 
-from app.core.config import settings
+from app.core.proxmox import get_proxmox_settings
 from app.core.security import decrypt_value
 from app.exceptions import ProxmoxError
 from app.schemas import (
@@ -35,12 +35,12 @@ def create_lxc(
             "cores": lxc_data.cores,
             "memory": lxc_data.memory,
             "swap": 512,
-            "rootfs": f"{settings.PROXMOX_DATA_STORAGE}:{lxc_data.rootfs_size}",
+            "rootfs": f"{get_proxmox_settings().data_storage}:{lxc_data.rootfs_size}",
             "password": lxc_data.password,
             "net0": "name=eth0,bridge=vmbr0,ip=dhcp,firewall=0",
             "unprivileged": 1,
             "start": 1,
-            "pool": "CampusCloud",
+            "pool": get_proxmox_settings().pool_name,
         }
 
         result = proxmox_service.create_lxc(DEFAULT_NODE, **config)
@@ -87,8 +87,8 @@ def create_vm(
             "newid": new_vmid,
             "name": vm_data.hostname,
             "full": 1,
-            "storage": settings.PROXMOX_DATA_STORAGE,
-            "pool": "CampusCloud",
+            "storage": get_proxmox_settings().data_storage,
+            "pool": get_proxmox_settings().pool_name,
         }
 
         result = proxmox_service.clone_vm(
@@ -161,12 +161,12 @@ def provision_from_request(*, session: Session, db_request) -> int:
             "cores": db_request.cores,
             "memory": db_request.memory,
             "swap": 512,
-            "rootfs": f"{settings.PROXMOX_DATA_STORAGE}:{db_request.rootfs_size or 8}",
+            "rootfs": f"{get_proxmox_settings().data_storage}:{db_request.rootfs_size or 8}",
             "password": plain_password,
             "net0": "name=eth0,bridge=vmbr0,ip=dhcp,firewall=0",
             "unprivileged": 1,
             "start": 1,
-            "pool": "CampusCloud",
+            "pool": get_proxmox_settings().pool_name,
         }
         proxmox_service.create_lxc(DEFAULT_NODE, **config)
 
@@ -183,8 +183,8 @@ def provision_from_request(*, session: Session, db_request) -> int:
             "newid": new_vmid,
             "name": db_request.hostname,
             "full": 1,
-            "storage": settings.PROXMOX_DATA_STORAGE,
-            "pool": "CampusCloud",
+            "storage": get_proxmox_settings().data_storage,
+            "pool": get_proxmox_settings().pool_name,
         }
         proxmox_service.clone_vm(
             DEFAULT_NODE, db_request.template_id, **clone_config
