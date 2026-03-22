@@ -54,6 +54,7 @@ def _verify_server_with_ca(host: str, ca_cert_pem: str, port: int = 8006) -> Non
     改用 ssl.SSLContext(PROTOCOL_TLS_CLIENT) 並手動移除 strict flag。
     """
     ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    ctx.minimum_version = ssl.TLSVersion.TLSv1_2
     ctx.check_hostname = False
     ctx.verify_mode = ssl.CERT_REQUIRED
     ctx.load_verify_locations(cadata=ca_cert_pem)

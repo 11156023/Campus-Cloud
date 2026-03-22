@@ -2,6 +2,11 @@ import { useState, useRef, useEffect } from 'react'
 import { Send, ImageIcon, X, Loader2, Upload, Paperclip, FileText, Video } from 'lucide-react'
 import MessageBubble from './MessageBubble'
 
+const isSafeMediaUrl = (url) => {
+  if (typeof url !== 'string') return false
+  return url.startsWith('blob:') || url.startsWith('data:')
+}
+
 const ChatBox = ({ modelInfo }) => {
   const [message, setMessage] = useState('')
   const [image, setImage] = useState(null)
@@ -448,7 +453,7 @@ const ChatBox = ({ modelInfo }) => {
                 <div className="relative inline-block group shrink-0">
                   <div className="relative rounded-xl overflow-hidden border border-gray-200 w-24 h-24 bg-black">
                     <video
-                      src={videoPreview}
+                      src={isSafeMediaUrl(videoPreview) ? videoPreview : undefined}
                       className="w-full h-full object-cover opacity-80"
                       muted
                       playsInline
@@ -471,7 +476,7 @@ const ChatBox = ({ modelInfo }) => {
                 <div className="relative inline-block group shrink-0">
                   <div className="relative rounded-xl overflow-hidden border border-gray-200 w-24 h-24 bg-gray-100">
                     <img
-                      src={imagePreview}
+                      src={isSafeMediaUrl(imagePreview) ? imagePreview : undefined}
                       alt="Preview"
                       className="w-full h-full object-cover"
                     />
