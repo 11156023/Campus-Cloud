@@ -3,324 +3,544 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>架構推薦助理</title>
+    <title>AI 申請助手</title>
     <style>
       :root {
-        --bg: #f5f5f5;
-        --surface: #ffffff;
-        --text: #2c2c2c;
-        --muted: #6b6b6b;
-        --line: #e0e0e0;
-        --accent: #2c2c2c;
-        --accent-text: #ffffff;
-        --radius: 8px;
-        --shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        --bg: #f3f4f6;
+        --card: #ffffff;
+        --soft: #f8fafc;
+        --line: #d1d5db;
+        --text: #111827;
+        --muted: #6b7280;
+        --dark: #111827;
+        --blue: #dbeafe;
+        --radius: 18px;
+        --shadow: 0 20px 48px rgba(15, 23, 42, 0.08);
       }
 
       * { box-sizing: border-box; }
 
       body {
         margin: 0;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        font-family: "Segoe UI", "Noto Sans TC", sans-serif;
         color: var(--text);
-        background: var(--bg);
-        height: 100vh;
-        display: flex;
-        flex-direction: column;
+        background: linear-gradient(180deg, #eef2ff 0%, var(--bg) 35%, #eef2f7 100%);
       }
 
-      .chat-wrapper {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        max-width: 900px;
+      .page {
+        max-width: 1440px;
         margin: 0 auto;
-        width: 100%;
-        background: var(--surface);
-        border-left: 1px solid var(--line);
-        border-right: 1px solid var(--line);
-      }
-
-      .chat-header {
-        padding: 16px 24px;
-        border-bottom: 1px solid var(--line);
-        background: var(--surface);
-      }
-
-      .chat-header h2 {
-        margin: 0;
-        font-size: 1.2rem;
-        font-weight: 600;
-      }
-
-      .chat-messages {
-        flex: 1;
-        overflow-y: auto;
         padding: 24px;
-        display: flex;
-        flex-direction: column;
-        gap: 24px;
       }
 
-      .message {
-        display: flex;
-        flex-direction: column;
-        max-width: 85%;
+      .hero,
+      .panel {
+        background: rgba(255, 255, 255, 0.9);
+        backdrop-filter: blur(14px);
+        border: 1px solid rgba(255, 255, 255, 0.7);
+        border-radius: 24px;
+        box-shadow: var(--shadow);
       }
 
-      .message.user {
-        align-self: flex-end;
+      .hero {
+        padding: 24px 28px;
+        margin-bottom: 18px;
       }
 
-      .message.assistant {
-        align-self: flex-start;
+      .hero h1 {
+        margin: 0;
+        font-size: 2rem;
       }
 
-      .message-content {
-        padding: 12px 16px;
-        border-radius: var(--radius);
+      .hero p {
+        margin: 10px 0 0;
+        max-width: 840px;
+        color: var(--muted);
+        line-height: 1.7;
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: 1.08fr 0.92fr;
+        gap: 18px;
+        align-items: start;
+      }
+
+      .panel-header {
+        padding: 20px 22px 14px;
+        border-bottom: 1px solid #e5e7eb;
+      }
+
+      .panel-header h2 {
+        margin: 0;
+        font-size: 1.1rem;
+      }
+
+      .sub {
+        margin: 8px 0 0;
+        color: var(--muted);
+        font-size: 0.93rem;
         line-height: 1.6;
-        word-break: break-word;
-        white-space: pre-wrap;
       }
 
-      .message.user .message-content {
-        background: var(--accent);
-        color: var(--accent-text);
-        border-top-right-radius: 2px;
+      .panel-body {
+        padding: 22px;
       }
 
-      .message.assistant .message-content {
-        background: #f1f1f1;
-        color: var(--text);
-        border-top-left-radius: 2px;
-      }
-      
-      .message-time {
-        font-size: 0.75rem;
-        color: var(--muted);
-        margin-top: 4px;
-        align-self: flex-end;
-      }
-
-      .message.assistant .message-time {
-        align-self: flex-start;
-      }
-
-      /* Card Styles inside Chat */
-      .plan-card {
-        margin-top: 12px;
-        border: 1px solid var(--line);
-        border-radius: var(--radius);
-        background: var(--surface);
-        overflow: hidden;
-        white-space: normal; /* Fixes huge gaps caused by template literal newlines */
-      }
-      
-      .plan-header {
-        background: #fafafa;
-        padding: 10px 14px;
-        border-bottom: 1px solid var(--line);
-        font-weight: 600;
-        font-size: 0.95rem;
-      }
-      
-      .plan-body {
-        padding: 14px;
-      }
-
-      .plan-section {
-        margin-bottom: 14px;
-      }
-
-      .plan-section:last-child {
-        margin-bottom: 0;
-      }
-
-      .plan-section-title {
-        font-size: 0.85rem;
-        font-weight: 600;
-        color: var(--muted);
-        margin-bottom: 6px;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-      }
-
-      .machine-row {
-        padding: 10px 12px;
-        border: 1px solid var(--line);
-        border-radius: var(--radius);
-        margin-bottom: 6px;
-        background: #fafafa;
-      }
-
-      .machine-top {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        margin-bottom: 8px;
-      }
-
-      .machine-title {
-        font-weight: 600;
-      }
-      
-      .machine-type {
-        font-size: 0.8rem;
-        padding: 2px 8px;
-        background: #e0e0e0;
-        border-radius: 12px;
-      }
-
+      .tabs,
+      .actions,
+      .plan-actions,
       .machine-specs {
         display: flex;
-        gap: 12px;
-        font-size: 0.85rem;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .tab,
+      .btn {
+        padding: 11px 15px;
+        border-radius: 14px;
+        border: 1px solid var(--line);
+        cursor: pointer;
+        font: inherit;
+      }
+
+      .tab {
+        background: var(--soft);
         color: var(--muted);
-        margin-bottom: 8px;
+        font-weight: 700;
       }
 
-      .machine-reason {
+      .tab.active,
+      .btn.primary {
+        background: var(--dark);
+        border-color: var(--dark);
+        color: #fff;
+      }
+
+      .btn.secondary {
+        background: var(--soft);
+      }
+
+      .btn.ghost {
+        background: transparent;
+        color: var(--muted);
+      }
+
+      .btn:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+      }
+
+      .row {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+        align-items: start;
+      }
+
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .full {
+        grid-column: 1 / -1;
+      }
+
+      label {
         font-size: 0.9rem;
-        line-height: 1.5;
+        font-weight: 600;
       }
 
-      .chat-input-area {
-        padding: 16px 24px;
-        border-top: 1px solid var(--line);
-        background: var(--surface);
+      input,
+      select,
+      textarea {
+        width: 100%;
+        padding: 12px 14px;
+        font: inherit;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: #fff;
       }
 
       textarea {
-        width: 100%;
-        min-height: 80px;
-        padding: 12px;
-        border: 1px solid var(--line);
-        border-radius: var(--radius);
+        min-height: 110px;
         resize: vertical;
-        font-family: inherit;
-        font-size: 1rem;
-        margin-bottom: 12px;
       }
 
+      input:focus,
+      select:focus,
       textarea:focus {
         outline: none;
-        border-color: var(--muted);
+        border-color: #60a5fa;
+        box-shadow: 0 0 0 4px rgba(96, 165, 250, 0.15);
       }
 
-      .chat-actions {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
+      .summary {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+        margin-top: 18px;
       }
 
-      .btn {
-        padding: 10px 20px;
-        border: none;
-        border-radius: var(--radius);
-        font-size: 0.95rem;
-        cursor: pointer;
-        font-family: inherit;
-        transition: all 0.2s;
+      .metric {
+        padding: 14px;
+        border: 1px solid #e5e7eb;
+        border-radius: 16px;
+        background: var(--soft);
       }
 
-      .btn-primary {
-        background: var(--accent);
-        color: var(--accent-text);
-        font-weight: 600;
-      }
-
-      .btn-primary:hover {
-        background: #444;
-      }
-
-      .btn-secondary {
-        background: #f1f1f1;
-        color: var(--text);
-        border: 1px solid var(--line);
-      }
-
-      .btn-secondary:hover {
-        background: #e4e4e4;
-      }
-
-      .metrics-panel {
-        display: flex;
-        justify-content: center;
-        gap: 24px;
-        padding: 8px 16px;
-        background: #fafafa;
-        border-top: 1px solid var(--line);
-        font-size: 0.75rem;
+      .metric .k {
+        margin-bottom: 8px;
+        font-size: 0.78rem;
         color: var(--muted);
-        font-family: monospace;
       }
 
-      .typing-indicator {
+      .metric .v {
+        font-size: 1.08rem;
+        font-weight: 700;
+      }
+
+      .notice {
+        margin-top: 18px;
+        padding: 15px 16px;
+        border: 1px solid #bfdbfe;
+        border-radius: 16px;
+        background: #eff6ff;
+        line-height: 1.65;
+      }
+
+      .hint {
+        color: var(--muted);
+        font-size: 0.82rem;
+      }
+
+      .chat-log {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        min-height: 520px;
+        max-height: 520px;
+        overflow: auto;
+        margin-bottom: 14px;
+        padding-right: 4px;
+      }
+
+      .msg {
+        max-width: 88%;
+      }
+
+      .msg.user {
+        align-self: flex-end;
+      }
+
+      .msg.ai {
+        align-self: flex-start;
+      }
+
+      .bubble {
+        padding: 14px 16px;
+        border-radius: 18px;
+        line-height: 1.65;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+
+      .msg.user .bubble {
+        background: var(--dark);
+        color: #fff;
+        border-top-right-radius: 6px;
+      }
+
+      .msg.ai .bubble {
+        background: var(--soft);
+        border: 1px solid #e5e7eb;
+        border-top-left-radius: 6px;
+      }
+
+      .meta {
+        margin-top: 5px;
+        color: var(--muted);
+        font-size: 0.75rem;
+      }
+
+      .typing {
+        display: none;
+        margin-top: 10px;
         color: var(--muted);
         font-size: 0.9rem;
-        display: none;
-        padding: 0 24px 16px;
+      }
+
+      .plan {
+        margin-top: 18px;
+        border: 1px solid #e5e7eb;
+        border-radius: 20px;
+        background: linear-gradient(180deg, #fff, #f8fafc);
+        overflow: hidden;
+      }
+
+      .plan-top {
+        padding: 15px 16px;
+        border-bottom: 1px solid #e5e7eb;
+        font-weight: 700;
+      }
+
+      .plan-body {
+        padding: 16px;
+      }
+
+      .plan-summary {
+        padding: 13px 14px;
+        border-radius: 15px;
+        border: 1px solid #bfdbfe;
+        background: #eff6ff;
+        line-height: 1.7;
+      }
+
+      .section {
+        margin-top: 16px;
+      }
+
+      .section h3 {
+        margin: 0 0 10px;
+        font-size: 0.85rem;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      .card {
+        padding: 13px;
+        border: 1px solid #e5e7eb;
+        border-radius: 16px;
+        background: #fff;
+      }
+
+      .card + .card {
+        margin-top: 10px;
+      }
+
+      .head {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        align-items: center;
+        margin-bottom: 8px;
+      }
+
+      .name {
+        font-weight: 700;
+      }
+
+      .badge {
+        display: inline-flex;
+        padding: 5px 10px;
+        border-radius: 999px;
+        background: #e5e7eb;
+        color: #374151;
+        font-size: 0.78rem;
+      }
+
+      .hidden {
+        display: none !important;
+      }
+
+      @media (max-width: 1100px) {
+        .layout {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 720px) {
+        .page {
+          padding: 14px;
+        }
+
+        .hero,
+        .panel-header,
+        .panel-body {
+          padding-left: 16px;
+          padding-right: 16px;
+        }
+
+        .row,
+        .summary {
+          grid-template-columns: 1fr;
+        }
       }
     </style>
   </head>
   <body>
-    <div class="chat-wrapper">
-      <div class="chat-header">
-        <h2>架構推薦助理</h2>
-      </div>
-      
-      <div class="chat-messages" id="chat-messages">
-        <div class="message assistant">
-          <div class="message-content">您好！我是基礎設施架構助理。請告訴我您的專案需求（例如：想架設什麼服務、預計多少人使用、是否需要資料庫等），我會引導您完成架構規劃。隨時可以點擊下方按鈕產出架構。</div>
-          <div class="message-time">System</div>
-        </div>
-      </div>
-      
-      <div class="typing-indicator" id="typing-indicator">分析中...</div>
+    <div class="page">
+      <section class="hero">
+        <h1>AI 申請助手</h1>
+        <p>
+          左邊是申請表單，已改成有模板下拉選項。右邊仍可用 AI 對話與產生推薦，之後可直接把主方案與推薦模板導入表單。
+        </p>
+      </section>
 
-      <div class="chat-input-area">
-        <textarea id="user-input" placeholder="請描述您的需求... (Enter 發送, Shift+Enter 換行)"></textarea>
-        <div class="chat-actions">
-          <button id="btn-generate" class="btn btn-secondary" type="button">產出架構配置</button>
-          <button id="btn-send" class="btn btn-primary" type="button">發送</button>
-        </div>
-      </div>
-    </div>
+      <main class="layout">
+        <section class="panel">
+          <div class="panel-header">
+            <h2>申請表單</h2>
+            <p class="sub">LXC 會顯示 `ostemplate` 下拉選項，VM 會顯示 `template_id` 下拉選項。AI 導入時會優先選到對應模板。</p>
+          </div>
+          <div class="panel-body">
+            <div class="tabs">
+              <button class="tab active" type="button" data-type="lxc">LXC 容器</button>
+              <button class="tab" type="button" data-type="vm">VM 虛擬機</button>
+            </div>
 
-    <div class="metrics-panel">
-      <span>Input Tokens: <span id="metric-input">0</span></span>
-      <span>Total Tokens: <span id="metric-total">0</span></span>
-      <span>Time: <span id="metric-time">0.0</span>s</span>
-      <span>Speed: <span id="metric-speed">0.0</span>t/s</span>
+            <form id="request-form">
+              <input id="resource_type" type="hidden" value="lxc" />
+
+              <div class="row">
+                <div class="field">
+                  <label for="hostname">Hostname</label>
+                  <input id="hostname" placeholder="例如 n8n-lab-01" />
+                </div>
+
+                <div class="field">
+                  <label for="storage">Storage</label>
+                  <input id="storage" value="local-lvm" />
+                </div>
+
+                <div class="field vm-only hidden">
+                  <label for="username">Username</label>
+                  <input id="username" placeholder="例如 student" />
+                </div>
+
+                <div class="field">
+                  <label for="os_info">OS / 補充資訊</label>
+                  <input id="os_info" placeholder="例如 Windows GUI for n8n / Ubuntu app host" />
+                </div>
+
+                <div class="field">
+                  <label for="password">Password</label>
+                  <input id="password" type="password" placeholder="至少 8 碼" />
+                </div>
+
+                <div class="field">
+                  <label for="expiry_date">Expiry Date</label>
+                  <input id="expiry_date" type="date" />
+                </div>
+
+                <div class="field">
+                  <label for="cores">CPU Cores</label>
+                  <input id="cores" type="number" min="1" value="2" />
+                </div>
+
+                <div class="field">
+                  <label for="memory">Memory (MB)</label>
+                  <input id="memory" type="number" min="512" step="256" value="2048" />
+                </div>
+
+                <div class="field lxc-only">
+                  <label for="rootfs_size">RootFS Size (GB)</label>
+                  <input id="rootfs_size" type="number" min="8" value="8" />
+                </div>
+
+                <div class="field vm-only hidden">
+                  <label for="disk_size">Disk Size (GB)</label>
+                  <input id="disk_size" type="number" min="20" value="20" />
+                </div>
+
+                <div class="field full lxc-only">
+                  <label for="ostemplate">LXC Template</label>
+                  <select id="ostemplate"></select>
+                  <div class="hint">模板選單放在硬體欄位下方，方便先決定資源，再選擇對應映像。</div>
+                </div>
+
+                <div class="field full vm-only hidden">
+                  <label for="template_id">VM Template</label>
+                  <select id="template_id"></select>
+                  <div class="hint">目前先用 catalog slug 當選項值；之後可再對接 backend 真正的 template id。</div>
+                </div>
+
+                <div class="field full">
+                  <label for="reason">申請原因</label>
+                  <textarea id="reason" placeholder="描述用途、課程背景、是否需要公網、資料庫、Windows 或 GUI。"></textarea>
+                </div>
+              </div>
+            </form>
+
+            <div class="summary">
+              <div class="metric"><div class="k">Type</div><div class="v" id="s-type">LXC</div></div>
+              <div class="metric"><div class="k">CPU</div><div class="v"><span id="s-cpu">2</span> cores</div></div>
+              <div class="metric"><div class="k">Memory</div><div class="v"><span id="s-memory">2048</span> MB</div></div>
+              <div class="metric"><div class="k">Disk</div><div class="v"><span id="s-disk">8</span> GB</div></div>
+            </div>
+
+            <div class="notice" id="ai-note">
+              目前尚未導入 AI 結果。你可以先在右側描述需求，再把推薦主方案與模板帶進這份表單。
+            </div>
+
+            <div class="actions" style="margin-top: 18px">
+              <button class="btn secondary" type="button" id="copy-json">複製表單 JSON</button>
+              <button class="btn ghost" type="button" id="reset-form">重設表單</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <h2>AI 助手</h2>
+            <p class="sub" id="metric-chip">0 tokens</p>
+          </div>
+          <div class="panel-body">
+            <div class="chat-log" id="chat-log">
+              <div class="msg ai">
+                <div class="bubble">先描述需求，例如：我要在 Windows GUI 環境跑 n8n，需要 webhook，未來可能接資料庫。</div>
+                <div class="meta">System</div>
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="chat-input">AI 輸入</label>
+              <textarea id="chat-input" placeholder="請描述目標、是否需要 Windows / GPU / 公網 / 資料庫、預估使用人數與課程背景。"></textarea>
+            </div>
+
+            <div class="actions" style="margin-top: 14px">
+              <button class="btn secondary" type="button" id="send-chat">送出對話</button>
+              <button class="btn primary" type="button" id="gen-plan">產生推薦配置</button>
+              <button class="btn ghost" type="button" id="clear-chat">清空對話</button>
+            </div>
+
+            <div class="typing" id="typing">AI 正在分析需求與生成配置...</div>
+            <div id="plan-root"></div>
+          </div>
+        </section>
+      </main>
     </div>
 
     <script>
-      const chatMessages = document.getElementById("chat-messages");
-      const userInput = document.getElementById("user-input");
-      const btnSend = document.getElementById("btn-send");
-      const btnGenerate = document.getElementById("btn-generate");
-      const typingIndicator = document.getElementById("typing-indicator");
-      
-      const metricInput = document.getElementById("metric-input");
-      const metricTotal = document.getElementById("metric-total");
-      const metricTime = document.getElementById("metric-time");
-      const metricSpeed = document.getElementById("metric-speed");
-
       let apiBaseUrl = "";
       let conversationHistory = [];
-      let isPlanGenerated = false; // 追蹤是否已經產出過架構
+      let latestPlan = null;
+      let catalogItems = [];
 
-      async function loadUiConfig() {
-        try {
-          const response = await fetch("/ui-config");
-          if (!response.ok) throw new Error("config fetch failed");
-          const data = await response.json();
-          apiBaseUrl = (data.api_base_url || "").replace(/\/$/, "");
-        } catch (e) {
-          apiBaseUrl = "";
-        }
-      }
+      const $ = (id) => document.getElementById(id);
+      const fields = [
+        "hostname",
+        "storage",
+        "ostemplate",
+        "template_id",
+        "username",
+        "os_info",
+        "password",
+        "expiry_date",
+        "cores",
+        "memory",
+        "rootfs_size",
+        "disk_size",
+        "reason",
+        "resource_type",
+      ].reduce((acc, id) => {
+        acc[id] = $(id);
+        return acc;
+      }, {});
 
       function escapeHtml(text) {
         return String(text ?? "")
@@ -331,229 +551,326 @@
           .replace(/'/g, "&#039;");
       }
 
-      // Frontend fallback: strip <think>...</think> blocks emitted by the model
       function stripThinkTags(text) {
-        const str = String(text ?? "");
-        const stripped = str.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
-        return stripped || str.trim();
+        const raw = String(text ?? "");
+        const cleaned = raw.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+        if (cleaned) return cleaned;
+        const marker = "</think>";
+        const idx = raw.indexOf(marker);
+        return idx === -1 ? raw.trim() : raw.slice(idx + marker.length).trim();
       }
 
+      function pushHistory(role, content) {
+        conversationHistory.push({ role, content });
+        if (conversationHistory.length > 12) {
+          conversationHistory = conversationHistory.slice(-12);
+        }
+      }
+
+      function addMessage(role, text) {
+        const wrap = document.createElement("div");
+        wrap.className = `msg ${role === "assistant" ? "ai" : "user"}`;
+        wrap.innerHTML = `<div class="bubble">${escapeHtml(text)}</div><div class="meta">${role === "assistant" ? "AI" : "你"}</div>`;
+        $("chat-log").appendChild(wrap);
+        $("chat-log").scrollTop = $("chat-log").scrollHeight;
+      }
+
+      function setLoading(flag, msg = "AI 正在分析需求與生成配置...") {
+        $("typing").style.display = flag ? "block" : "none";
+        $("typing").textContent = msg;
+        $("send-chat").disabled = flag;
+        $("gen-plan").disabled = flag;
+      }
 
       function updateMetrics(metrics) {
-        if (!metrics) return;
-        metricInput.textContent = metrics.prompt_tokens ?? 0;
-        metricTotal.textContent = metrics.total_tokens ?? 0;
-        metricTime.textContent = (metrics.elapsed_seconds ?? 0).toFixed(3);
-        metricSpeed.textContent = (metrics.tokens_per_second ?? 0).toFixed(2);
+        $("metric-chip").textContent = `${metrics?.total_tokens ?? 0} tokens / ${(metrics?.elapsed_seconds ?? 0).toFixed(2)}s`;
       }
 
-      function pushToHistory(role, content) {
-        conversationHistory.push({ role, content });
-        if (conversationHistory.length > 10) {
-          conversationHistory = conversationHistory.slice(-10);
+      function normalizeHostname(value) {
+        return String(value || "")
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/^-+|-+$/g, "")
+          .slice(0, 63) || "ai-generated-host";
+      }
+
+      function setSelectOptions(selectNode, items, placeholder) {
+        selectNode.innerHTML = "";
+
+        const defaultOption = document.createElement("option");
+        defaultOption.value = "";
+        defaultOption.textContent = placeholder;
+        selectNode.appendChild(defaultOption);
+
+        items.forEach((item) => {
+          const option = document.createElement("option");
+          option.value = item.slug;
+          option.textContent = `${item.name} (${item.slug})`;
+          selectNode.appendChild(option);
+        });
+      }
+
+      function refreshTemplateOptions() {
+        const lxcItems = catalogItems.filter((item) => item.type !== "vm");
+        const vmItems = catalogItems.filter((item) => item.type === "vm");
+
+        setSelectOptions(fields.ostemplate, lxcItems, "請選擇 LXC Template");
+        setSelectOptions(fields.template_id, vmItems, "請選擇 VM Template");
+
+        if (!vmItems.length) {
+          const fallback = document.createElement("option");
+          fallback.value = "__manual__";
+          fallback.textContent = "目前 catalog 沒有 VM 類型，之後可改接 backend 真正 template_id";
+          fields.template_id.appendChild(fallback);
         }
       }
 
-      function scrollToBottom() {
-        chatMessages.scrollTop = chatMessages.scrollHeight;
-      }
-
-      function renderMessage(role, contentHtml) {
-        const msgDiv = document.createElement("div");
-        msgDiv.className = `message ${role}`;
-        
-        const contentDiv = document.createElement("div");
-        contentDiv.className = "message-content";
-        contentDiv.innerHTML = contentHtml;
-
-        const timeDiv = document.createElement("div");
-        timeDiv.className = "message-time";
-        const now = new Date();
-        timeDiv.textContent = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
-
-        msgDiv.appendChild(contentDiv);
-        msgDiv.appendChild(timeDiv);
-        chatMessages.appendChild(msgDiv);
-        scrollToBottom();
-      }
-
-      async function sendMessage() {
-        const text = userInput.value.trim();
-        if (!text) return;
-
-        userInput.value = "";
-        userInput.focus();
-
-        renderMessage("user", escapeHtml(text));
-        pushToHistory("user", text);
-
-        if (isPlanGenerated) {
-          await generateArch();
-        } else {
-          await callChatApi();
-        }
-      }
-
-      async function callChatApi() {
-        typingIndicator.style.display = "block";
-        btnSend.disabled = true;
-        btnGenerate.disabled = true;
-
+      async function loadCatalog() {
         try {
-          const res = await fetch(`${apiBaseUrl}/chat`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ messages: conversationHistory })
-          });
-
-          if (!res.ok) throw new Error(await res.text());
-
-          const data = await res.json();
-          
-          updateMetrics({
-            prompt_tokens: data.prompt_tokens,
-            total_tokens: data.total_tokens,
-            elapsed_seconds: data.elapsed_seconds,
-            tokens_per_second: data.tokens_per_second
-          });
-
-          renderMessage("assistant", escapeHtml(stripThinkTags(data.reply)));
-          pushToHistory("assistant", data.reply);
-
-        } catch (err) {
-          renderMessage("assistant", `[系統異常] ${escapeHtml(err.message)}`);
-        } finally {
-          typingIndicator.style.display = "none";
-          btnSend.disabled = false;
-          btnGenerate.disabled = false;
+          const response = await fetch("/api/v1/catalog/preview?limit=500");
+          if (!response.ok) throw new Error("catalog load failed");
+          const data = await response.json();
+          catalogItems = data.items || [];
+        } catch (error) {
+          catalogItems = [];
         }
+        refreshTemplateOptions();
       }
 
-      async function generateArch() {
-        if (conversationHistory.length === 0) {
-          alert("請先描述您的需求再產出架構。");
+      function selectTemplateBySlug(slug, type) {
+        if (!slug) return;
+        const target = type === "vm" ? fields.template_id : fields.ostemplate;
+        const hasExact = Array.from(target.options).some((option) => option.value === slug);
+
+        if (hasExact) {
+          target.value = slug;
           return;
         }
 
-        typingIndicator.style.display = "block";
-        typingIndicator.textContent = "萃取需求與產出架構中...";
-        btnSend.disabled = true;
-        btnGenerate.disabled = true;
+        const fallback = document.createElement("option");
+        fallback.value = slug;
+        fallback.textContent = `${slug} (AI 推薦)`;
+        target.appendChild(fallback);
+        target.value = slug;
+      }
 
+      function switchType(type) {
+        fields.resource_type.value = type;
+        document.querySelectorAll(".tab").forEach((btn) => btn.classList.toggle("active", btn.dataset.type === type));
+        document.querySelectorAll(".lxc-only").forEach((el) => el.classList.toggle("hidden", type !== "lxc"));
+        document.querySelectorAll(".vm-only").forEach((el) => el.classList.toggle("hidden", type !== "vm"));
+        updateSummary();
+      }
+
+      function updateSummary() {
+        $("s-type").textContent = fields.resource_type.value.toUpperCase();
+        $("s-cpu").textContent = fields.cores.value || "0";
+        $("s-memory").textContent = fields.memory.value || "0";
+        $("s-disk").textContent = (fields.resource_type.value === "vm" ? fields.disk_size.value : fields.rootfs_size.value) || "0";
+      }
+
+      async function loadUiConfig() {
         try {
-          const res = await fetch(`${apiBaseUrl}/recommend`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ messages: conversationHistory, top_k: 5, device_nodes: [] })
-          });
-
-          if (!res.ok) throw new Error(await res.text());
-
+          const res = await fetch("/ui-config");
           const data = await res.json();
-          updateMetrics(data.ai_metrics);
-
-          const plan = data.final_plan;
-          
-          let cardHtml = `<div class="plan-card">
-            <div class="plan-header">系統產出架構規劃</div>
-            <div class="plan-body">`;
-          
-          if (plan.overall_config && plan.overall_config.deployment_strategy) {
-            cardHtml += `<div class="plan-section">
-              <div class="plan-section-title">總結原因</div>
-              <div>${escapeHtml(plan.overall_config.deployment_strategy)}</div>
-            </div>`;
-          }
-
-          if (plan.recommended_templates && plan.recommended_templates.length > 0) {
-            cardHtml += `<div class="plan-section">
-              <div class="plan-section-title">核心模板</div>`;
-            plan.recommended_templates.forEach(t => {
-              cardHtml += `
-                <div class="machine-row">
-                  <div class="machine-top">
-                    <span class="machine-title">${escapeHtml(t.name)} <span style="font-weight:normal;color:#666;">(${escapeHtml(t.slug)})</span></span>
-                  </div>
-                  <div class="machine-reason">${escapeHtml(t.why)}</div>
-                </div>
-              `;
-            });
-            cardHtml += `</div>`;
-          }
-
-          if (plan.possible_needed_templates && plan.possible_needed_templates.length > 0) {
-            cardHtml += `<div class="plan-section">
-              <div class="plan-section-title">擴充 / 支援模板</div>`;
-            plan.possible_needed_templates.forEach(t => {
-              cardHtml += `
-                <div class="machine-row">
-                  <div class="machine-top">
-                    <span class="machine-title">${escapeHtml(t.name)} <span style="font-weight:normal;color:#666;">(${escapeHtml(t.slug)})</span></span>
-                  </div>
-                  <div class="machine-reason">${escapeHtml(t.why)}</div>
-                </div>
-              `;
-            });
-            cardHtml += `</div>`;
-          }
-
-          cardHtml += `<div class="plan-section">
-            <div class="plan-section-title">機器配置</div>`;
-            
-          if (plan.machines && plan.machines.length > 0) {
-            plan.machines.forEach(m => {
-              const deployType = String(m.deployment_type||"").toLowerCase() === "vm" ? "VM" : "LXC";
-              cardHtml += `
-                <div class="machine-row">
-                  <div class="machine-top">
-                    <span class="machine-title">${escapeHtml(m.name)} <span style="font-weight:normal;color:#666;">(${escapeHtml(m.template_slug)})</span></span>
-                    <span class="machine-type">${deployType}</span>
-                  </div>
-                  <div class="machine-specs">
-                    <span>CPU: ${m.cpu}</span>
-                    <span>RAM: ${m.memory_mb} MB</span>
-                    <span>Disk: ${m.disk_gb} GB</span>
-                    <span>GPU: ${m.gpu}</span>
-                  </div>
-                  <div class="machine-reason">${escapeHtml(m.why)}</div>
-                </div>
-              `;
-            });
-          } else {
-            cardHtml += `<div class="machine-row"><div class="machine-reason">目前無可顯示的機器配置（可能是 AI 選擇了系統無法辨識的模板名稱）。</div></div>`;
-          }
-          cardHtml += `</div>`;
-
-
-          cardHtml += `</div></div>`;
-
-          renderMessage("assistant", cardHtml);
-
-          // Keep architecture card visible in UI, but do not feed this system summary back
-          // into assistant chat history to avoid contaminating later intent extraction.
-          isPlanGenerated = true; // 狀態標記為已產生架構，後續對話將直接觸發微調
-
-        } catch (err) {
-          renderMessage("assistant", `[產出失敗] ${escapeHtml(err.message)}`);
-        } finally {
-          typingIndicator.style.display = "none";
-          typingIndicator.textContent = "分析中...";
-          btnSend.disabled = false;
-          btnGenerate.disabled = false;
+          apiBaseUrl = (data.api_base_url || "").replace(/\/$/, "");
+        } catch (_) {
+          apiBaseUrl = "";
         }
       }
 
-      btnSend.addEventListener("click", sendMessage);
-      btnGenerate.addEventListener("click", generateArch);
+      async function postJson(path, body) {
+        const res = await fetch(`${apiBaseUrl}${path}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) throw new Error(await res.text());
+        return res.json();
+      }
 
-      userInput.addEventListener("keydown", (e) => {
+      function renderPlan(data) {
+        latestPlan = data;
+        const plan = data?.final_plan;
+        if (!plan) {
+          $("plan-root").innerHTML = "";
+          return;
+        }
+
+        const templates = (plan.recommended_templates || [])
+          .map((item) => `<div class="card"><div class="head"><div class="name">${escapeHtml(item.name || item.slug)}</div><span class="badge">${escapeHtml(item.slug || "")}</span></div><div>${escapeHtml(item.why || "")}</div></div>`)
+          .join("");
+
+        const machines = (plan.machines || [])
+          .map((item) => `<div class="card"><div class="head"><div class="name">${escapeHtml(item.name || "machine")}</div><span class="badge">${escapeHtml((item.deployment_type || "lxc").toUpperCase())}</span></div><div class="machine-specs"><span class="badge">CPU ${escapeHtml(item.cpu)}</span><span class="badge">RAM ${escapeHtml(item.memory_mb)} MB</span><span class="badge">Disk ${escapeHtml(item.disk_gb)} GB</span><span class="badge">GPU ${escapeHtml(item.gpu)}</span><span class="badge">${escapeHtml(item.template_slug || "no-template")}</span></div><div>${escapeHtml(item.why || "")}</div></div>`)
+          .join("");
+
+        $("plan-root").innerHTML = `
+          <div class="plan">
+            <div class="plan-top">AI 推薦配置</div>
+            <div class="plan-body">
+              <div class="plan-summary">${escapeHtml(data.summary || "AI 已產生推薦摘要。")}</div>
+              <div class="section">
+                <h3>核心模板</h3>
+                ${templates || '<div class="card">沒有可顯示的核心模板。</div>'}
+              </div>
+              <div class="section">
+                <h3>機器配置</h3>
+                ${machines || '<div class="card">沒有可顯示的機器配置。</div>'}
+              </div>
+              <div class="plan-actions">
+                <button class="btn primary" type="button" id="import-plan">導入主方案到表單</button>
+                <button class="btn secondary" type="button" id="import-reason">只導入摘要到申請原因</button>
+              </div>
+            </div>
+          </div>
+        `;
+
+        $("import-plan").addEventListener("click", importPlan);
+        $("import-reason").addEventListener("click", importReason);
+      }
+
+      function importReason() {
+        if (!latestPlan) return;
+        const machine = latestPlan.final_plan?.machines?.[0];
+        fields.reason.value = `${latestPlan.summary || ""}${machine ? `\n\nAI 建議主機：${machine.name} / ${machine.deployment_type.toUpperCase()} / ${machine.cpu} CPU / ${machine.memory_mb} MB / ${machine.disk_gb} GB / template=${machine.template_slug}` : ""}`.trim();
+        $("ai-note").textContent = "已把 AI 摘要寫入申請原因欄位，你可以再補課程背景與使用情境。";
+      }
+
+      function importPlan() {
+        const machine = latestPlan?.final_plan?.machines?.[0];
+        if (!machine) return;
+
+        const type = String(machine.deployment_type || "").toLowerCase() === "vm" ? "vm" : "lxc";
+        const templateSlug = machine.template_slug || latestPlan?.final_plan?.recommended_templates?.[0]?.slug || "";
+
+        switchType(type);
+        fields.hostname.value = normalizeHostname(machine.name || templateSlug || "ai-generated-host");
+        fields.cores.value = String(machine.cpu || 2);
+        fields.memory.value = String(machine.memory_mb || 2048);
+        fields.os_info.value = `${templateSlug}${machine.assigned_node ? ` / preferred node: ${machine.assigned_node}` : ""}`.trim();
+
+        if (!fields.reason.value.trim()) {
+          importReason();
+        }
+
+        if (type === "vm") {
+          fields.disk_size.value = String(machine.disk_gb || 20);
+          if (!fields.username.value.trim()) {
+            fields.username.value = "student";
+          }
+          selectTemplateBySlug(templateSlug, "vm");
+        } else {
+          fields.rootfs_size.value = String(machine.disk_gb || 8);
+          selectTemplateBySlug(templateSlug, "lxc");
+        }
+
+        $("ai-note").textContent = `已導入 AI 推薦主機 ${machine.name}，並同步選取推薦模板。若之後接上 backend 真正模板 API，可再把這裡的選項值改成正式 template id。`;
+        updateSummary();
+      }
+
+      async function sendChat() {
+        const text = $("chat-input").value.trim();
+        if (!text) return;
+
+        $("chat-input").value = "";
+        addMessage("user", text);
+        pushHistory("user", text);
+        setLoading(true, "AI 正在回覆你的需求...");
+
+        try {
+          const data = await postJson("/chat", { messages: conversationHistory });
+          const reply = stripThinkTags(data.reply);
+          addMessage("assistant", reply);
+          pushHistory("assistant", reply);
+          updateMetrics(data);
+        } catch (err) {
+          addMessage("assistant", `[系統異常] ${String(err.message || err)}`);
+        } finally {
+          setLoading(false);
+        }
+      }
+
+      async function generatePlan() {
+        if (!conversationHistory.length) {
+          addMessage("assistant", "請先輸入需求，再讓 AI 產生配置。");
+          return;
+        }
+
+        setLoading(true);
+        try {
+          const data = await postJson("/recommend", {
+            messages: conversationHistory,
+            top_k: 5,
+            device_nodes: [],
+          });
+          updateMetrics(data.ai_metrics);
+          renderPlan(data);
+        } catch (err) {
+          addMessage("assistant", `[配置生成失敗] ${String(err.message || err)}`);
+        } finally {
+          setLoading(false);
+        }
+      }
+
+      async function copyJson() {
+        const payload = {
+          reason: fields.reason.value.trim(),
+          resource_type: fields.resource_type.value,
+          hostname: fields.hostname.value.trim(),
+          cores: Number(fields.cores.value || 0),
+          memory: Number(fields.memory.value || 0),
+          password: fields.password.value,
+          storage: fields.storage.value.trim() || "local-lvm",
+          os_info: fields.os_info.value.trim() || null,
+          expiry_date: fields.expiry_date.value || null,
+        };
+
+        if (fields.resource_type.value === "vm") {
+          payload.template_id = fields.template_id.value || null;
+          payload.disk_size = Number(fields.disk_size.value || 0);
+          payload.username = fields.username.value.trim() || null;
+        } else {
+          payload.ostemplate = fields.ostemplate.value || null;
+          payload.rootfs_size = Number(fields.rootfs_size.value || 0);
+        }
+
+        await navigator.clipboard.writeText(JSON.stringify(payload, null, 2));
+        $("ai-note").textContent = "已複製目前表單 JSON。";
+      }
+
+      function resetForm() {
+        $("request-form").reset();
+        fields.storage.value = "local-lvm";
+        refreshTemplateOptions();
+        switchType("lxc");
+        $("ai-note").textContent = "目前尚未導入 AI 結果。你可以先在右側描述需求，再把推薦主方案與模板帶進這份表單。";
+      }
+
+      document.querySelectorAll(".tab").forEach((btn) => btn.addEventListener("click", () => switchType(btn.dataset.type)));
+      ["cores", "memory", "rootfs_size", "disk_size"].forEach((id) => $(id).addEventListener("input", updateSummary));
+
+      $("send-chat").addEventListener("click", sendChat);
+      $("gen-plan").addEventListener("click", generatePlan);
+      $("clear-chat").addEventListener("click", () => {
+        conversationHistory = [];
+        latestPlan = null;
+        $("plan-root").innerHTML = "";
+        $("chat-log").innerHTML = '<div class="msg ai"><div class="bubble">先描述需求，例如：我要在 Windows GUI 環境跑 n8n，需要 webhook，未來可能接資料庫。</div><div class="meta">System</div></div>';
+      });
+      $("copy-json").addEventListener("click", copyJson);
+      $("reset-form").addEventListener("click", resetForm);
+      $("chat-input").addEventListener("keydown", (e) => {
         if (e.key === "Enter" && !e.shiftKey) {
           e.preventDefault();
-          sendMessage();
+          sendChat();
         }
       });
 
-      loadUiConfig();
+      Promise.all([loadUiConfig(), loadCatalog()]).finally(() => {
+        switchType("lxc");
+        updateSummary();
+      });
     </script>
   </body>
 </html>
