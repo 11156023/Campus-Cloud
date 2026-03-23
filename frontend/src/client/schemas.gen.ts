@@ -2,7 +2,7 @@
 
 export const AuditActionSchema = {
     type: 'string',
-    enum: ['spec_change_request', 'spec_change_apply', 'snapshot_create', 'snapshot_delete', 'snapshot_rollback', 'config_update', 'vm_create', 'lxc_create', 'resource_start', 'resource_stop', 'resource_reboot', 'resource_shutdown', 'resource_reset', 'resource_delete', 'vm_request_submit', 'vm_request_review', 'user_create', 'user_update', 'user_delete'],
+    enum: ['spec_change_request', 'spec_change_apply', 'snapshot_create', 'snapshot_delete', 'snapshot_rollback', 'config_update', 'vm_create', 'lxc_create', 'resource_start', 'resource_stop', 'resource_reboot', 'resource_shutdown', 'resource_reset', 'resource_delete', 'vm_request_submit', 'vm_request_review', 'user_create', 'user_update', 'user_delete', 'group_create', 'group_delete', 'group_member_add', 'group_member_remove', 'batch_provision_vm', 'batch_provision_lxc'],
     title: 'AuditAction',
     description: '審計操作類型'
 } as const;
@@ -339,6 +339,217 @@ export const DirectSpecUpdateRequestSchema = {
     type: 'object',
     title: 'DirectSpecUpdateRequest',
     description: '管理員直接調整規格'
+} as const;
+
+export const GroupCreateSchema = {
+    properties: {
+        name: {
+            type: 'string',
+            maxLength: 255,
+            minLength: 1,
+            title: 'Name'
+        },
+        description: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 1000
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Description'
+        }
+    },
+    type: 'object',
+    required: ['name'],
+    title: 'GroupCreate',
+    description: '建立群組'
+} as const;
+
+export const GroupDetailPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        description: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Description'
+        },
+        owner_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Owner Id'
+        },
+        created_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Created At'
+        },
+        members: {
+            items: {
+                '$ref': '#/components/schemas/GroupMemberPublic'
+            },
+            type: 'array',
+            title: 'Members',
+            default: []
+        }
+    },
+    type: 'object',
+    required: ['id', 'name', 'owner_id'],
+    title: 'GroupDetailPublic',
+    description: '群組詳情（含成員列表）'
+} as const;
+
+export const GroupMemberAddSchema = {
+    properties: {
+        emails: {
+            items: {
+                type: 'string',
+                format: 'email'
+            },
+            type: 'array',
+            title: 'Emails'
+        }
+    },
+    type: 'object',
+    required: ['emails'],
+    title: 'GroupMemberAdd',
+    description: '新增群組成員'
+} as const;
+
+export const GroupMemberPublicSchema = {
+    properties: {
+        user_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'User Id'
+        },
+        email: {
+            type: 'string',
+            format: 'email',
+            title: 'Email'
+        },
+        full_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Full Name'
+        },
+        added_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Added At'
+        }
+    },
+    type: 'object',
+    required: ['user_id', 'email'],
+    title: 'GroupMemberPublic',
+    description: '群組成員資料'
+} as const;
+
+export const GroupPublicSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        description: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Description'
+        },
+        owner_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Owner Id'
+        },
+        created_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Created At'
+        },
+        member_count: {
+            type: 'integer',
+            title: 'Member Count',
+            default: 0
+        }
+    },
+    type: 'object',
+    required: ['id', 'name', 'owner_id'],
+    title: 'GroupPublic',
+    description: 'API 回傳的群組資料'
+} as const;
+
+export const GroupsPublicSchema = {
+    properties: {
+        data: {
+            items: {
+                '$ref': '#/components/schemas/GroupPublic'
+            },
+            type: 'array',
+            title: 'Data'
+        },
+        count: {
+            type: 'integer',
+            title: 'Count'
+        }
+    },
+    type: 'object',
+    required: ['data', 'count'],
+    title: 'GroupsPublic',
+    description: '群組列表回應'
 } as const;
 
 export const HTTPValidationErrorSchema = {
@@ -1361,6 +1572,11 @@ export const UserCreateSchema = {
             title: 'Is Superuser',
             default: false
         },
+        is_instructor: {
+            type: 'boolean',
+            title: 'Is Instructor',
+            default: false
+        },
         full_name: {
             anyOf: [
                 {
@@ -1399,6 +1615,11 @@ export const UserPublicSchema = {
         is_superuser: {
             type: 'boolean',
             title: 'Is Superuser'
+        },
+        is_instructor: {
+            type: 'boolean',
+            title: 'Is Instructor',
+            default: false
         },
         full_name: {
             anyOf: [
@@ -1512,6 +1733,17 @@ export const UserUpdateSchema = {
                 }
             ],
             title: 'Is Superuser'
+        },
+        is_instructor: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Is Instructor'
         },
         full_name: {
             anyOf: [
@@ -2304,13 +2536,6 @@ export const ValidationErrorSchema = {
         type: {
             type: 'string',
             title: 'Error Type'
-        },
-        input: {
-            title: 'Input'
-        },
-        ctx: {
-            type: 'object',
-            title: 'Context'
         }
     },
     type: 'object',

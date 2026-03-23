@@ -3,7 +3,7 @@
 import type { CancelablePromise } from './core/CancelablePromise';
 import { OpenAPI } from './core/OpenAPI';
 import { request as __request } from './core/request';
-import type { AuditLogsGetAllAuditLogsData, AuditLogsGetAllAuditLogsResponse, AuditLogsGetMyAuditLogsData, AuditLogsGetMyAuditLogsResponse, AuditLogsGetResourceAuditLogsData, AuditLogsGetResourceAuditLogsResponse, LoginLoginAccessTokenData, LoginLoginAccessTokenResponse, LoginTestTokenResponse, LoginRecoverPasswordData, LoginRecoverPasswordResponse, LoginResetPasswordData, LoginResetPasswordResponse, LoginRecoverPasswordHtmlContentData, LoginRecoverPasswordHtmlContentResponse, LxcGetLxcTerminalData, LxcGetLxcTerminalResponse, LxcGetTemplatesResponse, LxcCreateLxcData, LxcCreateLxcResponse, PrivateCreateUserData, PrivateCreateUserResponse, ResourceDetailsGetCurrentStatsData, ResourceDetailsGetCurrentStatsResponse, ResourceDetailsGetRrdStatsData, ResourceDetailsGetRrdStatsResponse, ResourceDetailsListSnapshotsData, ResourceDetailsListSnapshotsResponse, ResourceDetailsCreateSnapshotData, ResourceDetailsCreateSnapshotResponse, ResourceDetailsDeleteSnapshotData, ResourceDetailsDeleteSnapshotResponse, ResourceDetailsRollbackSnapshotData, ResourceDetailsRollbackSnapshotResponse, ResourceDetailsDirectUpdateSpecData, ResourceDetailsDirectUpdateSpecResponse, ResourcesListNodesResponse, ResourcesListResourcesData, ResourcesListResourcesResponse, ResourcesListMyResourcesResponse, ResourcesGetResourceData, ResourcesGetResourceResponse, ResourcesDeleteResourceData, ResourcesDeleteResourceResponse, ResourcesGetResourceConfigData, ResourcesGetResourceConfigResponse, ResourcesStartResourceData, ResourcesStartResourceResponse, ResourcesStopResourceData, ResourcesStopResourceResponse, ResourcesRebootResourceData, ResourcesRebootResourceResponse, ResourcesShutdownResourceData, ResourcesShutdownResourceResponse, ResourcesResetResourceData, ResourcesResetResourceResponse, SpecChangeRequestsCreateSpecChangeRequestData, SpecChangeRequestsCreateSpecChangeRequestResponse, SpecChangeRequestsGetAllSpecChangeRequestsData, SpecChangeRequestsGetAllSpecChangeRequestsResponse, SpecChangeRequestsGetMySpecChangeRequestsData, SpecChangeRequestsGetMySpecChangeRequestsResponse, SpecChangeRequestsReviewSpecChangeRequestData, SpecChangeRequestsReviewSpecChangeRequestResponse, UsersReadUsersData, UsersReadUsersResponse, UsersCreateUserData, UsersCreateUserResponse, UsersReadUserMeResponse, UsersDeleteUserMeResponse, UsersUpdateUserMeData, UsersUpdateUserMeResponse, UsersUpdatePasswordMeData, UsersUpdatePasswordMeResponse, UsersRegisterUserData, UsersRegisterUserResponse, UsersReadUserByIdData, UsersReadUserByIdResponse, UsersUpdateUserData, UsersUpdateUserResponse, UsersDeleteUserData, UsersDeleteUserResponse, UtilsTestEmailData, UtilsTestEmailResponse, UtilsHealthCheckResponse, VmGetVmConsoleData, VmGetVmConsoleResponse, VmCreateVmData, VmCreateVmResponse, VmGetVmTemplatesResponse, VmRequestsCreateVmRequestData, VmRequestsCreateVmRequestResponse, VmRequestsListAllVmRequestsData, VmRequestsListAllVmRequestsResponse, VmRequestsListMyVmRequestsData, VmRequestsListMyVmRequestsResponse, VmRequestsGetVmRequestData, VmRequestsGetVmRequestResponse, VmRequestsReviewVmRequestData, VmRequestsReviewVmRequestResponse, GroupsCreateGroupData, GroupsCreateGroupResponse, GroupsListGroupsResponse, GroupsGetGroupData, GroupsGetGroupResponse, GroupsDeleteGroupData, GroupsDeleteGroupResponse, GroupsAddMembersData, GroupsAddMembersResponse, GroupsRemoveMemberData, GroupsRemoveMemberResponse } from './types.gen';
+import type { AuditLogsGetAllAuditLogsData, AuditLogsGetAllAuditLogsResponse, AuditLogsGetMyAuditLogsData, AuditLogsGetMyAuditLogsResponse, AuditLogsGetResourceAuditLogsData, AuditLogsGetResourceAuditLogsResponse, GroupsListGroupsResponse, GroupsCreateGroupData, GroupsCreateGroupResponse, GroupsGetGroupData, GroupsGetGroupResponse, GroupsDeleteGroupData, GroupsDeleteGroupResponse, GroupsAddMembersData, GroupsAddMembersResponse, GroupsRemoveMemberData, GroupsRemoveMemberResponse, LoginLoginAccessTokenData, LoginLoginAccessTokenResponse, LoginTestTokenResponse, LoginRecoverPasswordData, LoginRecoverPasswordResponse, LoginResetPasswordData, LoginResetPasswordResponse, LoginRecoverPasswordHtmlContentData, LoginRecoverPasswordHtmlContentResponse, LxcGetLxcTerminalData, LxcGetLxcTerminalResponse, LxcGetTemplatesResponse, LxcCreateLxcData, LxcCreateLxcResponse, PrivateCreateUserData, PrivateCreateUserResponse, ResourceDetailsGetCurrentStatsData, ResourceDetailsGetCurrentStatsResponse, ResourceDetailsGetRrdStatsData, ResourceDetailsGetRrdStatsResponse, ResourceDetailsListSnapshotsData, ResourceDetailsListSnapshotsResponse, ResourceDetailsCreateSnapshotData, ResourceDetailsCreateSnapshotResponse, ResourceDetailsDeleteSnapshotData, ResourceDetailsDeleteSnapshotResponse, ResourceDetailsRollbackSnapshotData, ResourceDetailsRollbackSnapshotResponse, ResourceDetailsDirectUpdateSpecData, ResourceDetailsDirectUpdateSpecResponse, ResourcesListNodesResponse, ResourcesListResourcesData, ResourcesListResourcesResponse, ResourcesListMyResourcesResponse, ResourcesGetResourceData, ResourcesGetResourceResponse, ResourcesDeleteResourceData, ResourcesDeleteResourceResponse, ResourcesGetResourceConfigData, ResourcesGetResourceConfigResponse, ResourcesStartResourceData, ResourcesStartResourceResponse, ResourcesStopResourceData, ResourcesStopResourceResponse, ResourcesRebootResourceData, ResourcesRebootResourceResponse, ResourcesShutdownResourceData, ResourcesShutdownResourceResponse, ResourcesResetResourceData, ResourcesResetResourceResponse, SpecChangeRequestsCreateSpecChangeRequestData, SpecChangeRequestsCreateSpecChangeRequestResponse, SpecChangeRequestsGetAllSpecChangeRequestsData, SpecChangeRequestsGetAllSpecChangeRequestsResponse, SpecChangeRequestsGetMySpecChangeRequestsData, SpecChangeRequestsGetMySpecChangeRequestsResponse, SpecChangeRequestsReviewSpecChangeRequestData, SpecChangeRequestsReviewSpecChangeRequestResponse, UsersReadUsersData, UsersReadUsersResponse, UsersCreateUserData, UsersCreateUserResponse, UsersReadUserMeResponse, UsersDeleteUserMeResponse, UsersUpdateUserMeData, UsersUpdateUserMeResponse, UsersUpdatePasswordMeData, UsersUpdatePasswordMeResponse, UsersRegisterUserData, UsersRegisterUserResponse, UsersReadUserByIdData, UsersReadUserByIdResponse, UsersUpdateUserData, UsersUpdateUserResponse, UsersDeleteUserData, UsersDeleteUserResponse, UtilsTestEmailData, UtilsTestEmailResponse, UtilsHealthCheckResponse, VmGetVmConsoleData, VmGetVmConsoleResponse, VmCreateVmData, VmCreateVmResponse, VmGetVmTemplatesResponse, VmRequestsCreateVmRequestData, VmRequestsCreateVmRequestResponse, VmRequestsListAllVmRequestsData, VmRequestsListAllVmRequestsResponse, VmRequestsListMyVmRequestsData, VmRequestsListMyVmRequestsResponse, VmRequestsGetVmRequestData, VmRequestsGetVmRequestResponse, VmRequestsReviewVmRequestData, VmRequestsReviewVmRequestResponse } from './types.gen';
 
 export class AuditLogsService {
     /**
@@ -75,6 +75,124 @@ export class AuditLogsService {
             query: {
                 skip: data.skip,
                 limit: data.limit
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+}
+
+export class GroupsService {
+    /**
+     * List Groups
+     * @returns GroupsPublic Successful Response
+     * @throws ApiError
+     */
+    public static listGroups(): CancelablePromise<GroupsListGroupsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/groups/'
+        });
+    }
+    
+    /**
+     * Create Group
+     * @param data The data for the request.
+     * @param data.requestBody
+     * @returns GroupPublic Successful Response
+     * @throws ApiError
+     */
+    public static createGroup(data: GroupsCreateGroupData): CancelablePromise<GroupsCreateGroupResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/groups/',
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Get Group
+     * @param data The data for the request.
+     * @param data.groupId
+     * @returns GroupDetailPublic Successful Response
+     * @throws ApiError
+     */
+    public static getGroup(data: GroupsGetGroupData): CancelablePromise<GroupsGetGroupResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/groups/{group_id}',
+            path: {
+                group_id: data.groupId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Delete Group
+     * @param data The data for the request.
+     * @param data.groupId
+     * @returns Message Successful Response
+     * @throws ApiError
+     */
+    public static deleteGroup(data: GroupsDeleteGroupData): CancelablePromise<GroupsDeleteGroupResponse> {
+        return __request(OpenAPI, {
+            method: 'DELETE',
+            url: '/api/v1/groups/{group_id}',
+            path: {
+                group_id: data.groupId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Add Members
+     * @param data The data for the request.
+     * @param data.groupId
+     * @param data.requestBody
+     * @returns Message Successful Response
+     * @throws ApiError
+     */
+    public static addMembers(data: GroupsAddMembersData): CancelablePromise<GroupsAddMembersResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/groups/{group_id}/members',
+            path: {
+                group_id: data.groupId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Remove Member
+     * @param data The data for the request.
+     * @param data.groupId
+     * @param data.userId
+     * @returns Message Successful Response
+     * @throws ApiError
+     */
+    public static removeMember(data: GroupsRemoveMemberData): CancelablePromise<GroupsRemoveMemberResponse> {
+        return __request(OpenAPI, {
+            method: 'DELETE',
+            url: '/api/v1/groups/{group_id}/members/{user_id}',
+            path: {
+                group_id: data.groupId,
+                user_id: data.userId
             },
             errors: {
                 422: 'Validation Error'
