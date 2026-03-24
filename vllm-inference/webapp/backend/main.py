@@ -6,11 +6,14 @@ from __future__ import annotations
 
 import base64
 import json
+import logging
 import os
 import tempfile
 import time
 from pathlib import Path
 from typing import AsyncGenerator
+
+logger = logging.getLogger(__name__)
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -208,7 +211,8 @@ async def chat_stream(request: ChatRequest):
             # 結束標記
             yield "data: [DONE]\n\n"
         except Exception as e:
-            yield f"data: [ERROR] {str(e)}\n\n"
+            logger.exception("聊天流式處理失敗")
+            yield 'data: [ERROR] 處理請求時發生內部錯誤\n\n'
 
     return StreamingResponse(
         event_generator(),
@@ -340,7 +344,8 @@ async def chat_vision_stream(
             yield "data: [DONE]\n\n"
         
         except Exception as e:
-            yield f"data: [ERROR] {str(e)}\n\n"
+            logger.exception("視覺聊天流式處理失敗")
+            yield 'data: [ERROR] 處理請求時發生內部錯誤\n\n'
 
     return StreamingResponse(
         event_generator(),
@@ -374,7 +379,8 @@ async def chat_document_stream(
             result = extract_document(document_bytes, filename=document.filename)
             
             if not result['success']:
-                yield f"data: [ERROR] {result['error']}\n\n"
+                logger.error("文件提取失敗: %s", result['error'])
+                yield 'data: [ERROR] 文件解析失敗，請確認文件格式正確\n\n'
                 return
             
             # 構建 System Prompt（策略 C：System + User 角色分離）
@@ -448,10 +454,8 @@ async def chat_document_stream(
             yield "data: [DONE]\n\n"
         
         except Exception as e:
-            import traceback
-            error_detail = traceback.format_exc()
-            print(f"[ERROR] 文件處理失敗: {error_detail}")
-            yield f"data: [ERROR] {str(e)}\n\n"
+            logger.exception("文件處理失敗")
+            yield 'data: [ERROR] 處理請求時發生內部錯誤\n\n'
 
     return StreamingResponse(
         event_generator(),
@@ -584,9 +588,8 @@ async def chat_video_stream(
             yield "data: [DONE]\n\n"
 
         except Exception as e:
-            import traceback
-            print(f"[ERROR] 影片處理失敗: {traceback.format_exc()}")
-            yield f"data: [ERROR] {str(e)}\n\n"
+            logger.exception("影片處理失敗")
+            yield 'data: [ERROR] 處理請求時發生內部錯誤\n\n'
         finally:
             if tmp_path:
                 try:

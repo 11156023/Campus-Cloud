@@ -62,6 +62,24 @@ from .group import (
     GroupPublic,
     GroupsPublic,
 )
+from .firewall import (
+    ConnectionCreate,
+    ConnectionDelete,
+    FirewallOptionsPublic,
+    FirewallRuleCreate,
+    FirewallRulePublic,
+    FirewallRuleUpdate,
+    LayoutUpdate,
+    PortSpec,
+    TopologyEdge,
+    TopologyNode,
+    TopologyResponse,
+)
+from .proxmox_config import (
+    ProxmoxConfigPublic,
+    ProxmoxConfigUpdate,
+    ProxmoxConnectionTestResult,
+)
 
 __all__ = [
     # Common
@@ -117,4 +135,20 @@ __all__ = [
     "GroupDetailPublic",
     "GroupMemberAdd",
     "GroupMemberPublic",
+    # Firewall
+    "PortSpec",
+    "ConnectionCreate",
+    "ConnectionDelete",
+    "FirewallRuleCreate",
+    "FirewallRuleUpdate",
+    "FirewallRulePublic",
+    "FirewallOptionsPublic",
+    "LayoutUpdate",
+    "TopologyNode",
+    "TopologyEdge",
+    "TopologyResponse",
+    # Proxmox Config
+    "ProxmoxConfigPublic",
+    "ProxmoxConfigUpdate",
+    "ProxmoxConnectionTestResult",
 ]

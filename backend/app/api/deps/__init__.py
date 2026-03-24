@@ -14,6 +14,7 @@ from app.api.deps.proxmox import (
     LxcInfoDep,
     ResourceInfoDep,
     VmInfoDep,
+    check_firewall_access,
     check_resource_ownership,
     get_lxc_info,
     get_resource_info,
@@ -36,6 +37,7 @@ __all__ = [
     "get_ws_current_user",
     # Proxmox (with permission checks built-in)
     "check_resource_ownership",
+    "check_firewall_access",
     "get_vm_info",
     "VmInfoDep",
     "get_lxc_info",

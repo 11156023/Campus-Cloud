@@ -7,7 +7,7 @@ from sqlmodel import Session
 from app.exceptions import BadRequestError, ProxmoxError
 from app.schemas import ResourcePublic
 from app.repositories import resource as resource_repo
-from app.services import audit_service, proxmox_service
+from app.services import audit_service, firewall_service, proxmox_service
 
 logger = logging.getLogger(__name__)
 
@@ -122,6 +122,10 @@ def control(
         resource_type = resource_info["type"]
 
         proxmox_service.control(node, vmid, resource_type, action)
+
+        # 啟動時確保防火牆仍為啟用狀態
+        if action == "start":
+            firewall_service.ensure_firewall_enabled(node, vmid, resource_type)
 
         action_map = {
             "start": "resource_start",

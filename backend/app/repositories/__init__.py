@@ -8,6 +8,7 @@ from .audit_log import (
 from .resource import (
     create_resource,
     delete_resource,
+    get_all_resources,
     get_resource_by_vmid,
     get_resources_by_user,
     update_resource,

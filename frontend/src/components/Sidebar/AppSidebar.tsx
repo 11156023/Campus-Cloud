@@ -4,6 +4,8 @@ import {
   Home,
   Monitor,
   ServerCog,
+  Settings2,
+  Shield,
   UsersRound,
   Users,
 } from "lucide-react"
@@ -29,12 +31,14 @@ export function AppSidebar() {
   const baseItems: Item[] = [
     { icon: Home, title: t("sidebar.dashboard"), path: "/" },
     { icon: ServerCog, title: t("sidebar.myResources"), path: "/my-resources" },
+    { icon: Shield, title: "防火牆", path: "/firewall" },
     { icon: FileText, title: t("sidebar.applications"), path: "/applications" },
   ]
 
   const instructorItems: Item[] = [
     { icon: Home, title: t("sidebar.dashboard"), path: "/" },
     { icon: ServerCog, title: t("sidebar.myResources"), path: "/my-resources" },
+    { icon: Shield, title: "防火牆", path: "/firewall" },
     { icon: FileText, title: t("sidebar.applications"), path: "/applications" },
     { icon: UsersRound, title: "群組管理", path: "/groups" },
   ]
@@ -42,10 +46,12 @@ export function AppSidebar() {
   const adminItems: Item[] = [
     { icon: Home, title: t("sidebar.dashboard"), path: "/" },
     { icon: ServerCog, title: t("sidebar.myResources"), path: "/my-resources" },
+    { icon: Shield, title: "防火牆", path: "/firewall" },
     { icon: Monitor, title: t("sidebar.resources"), path: "/resources" },
     { icon: ClipboardCheck, title: t("sidebar.approvals"), path: "/approvals" },
     { icon: UsersRound, title: "群組管理", path: "/groups" },
     { icon: Users, title: t("sidebar.admin"), path: "/admin" },
+    { icon: Settings2, title: "PVE 設定", path: "/admin/proxmox" },
   ]
 
   const items = currentUser?.is_superuser

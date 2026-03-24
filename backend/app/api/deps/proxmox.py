@@ -85,3 +85,34 @@ def get_resource_info(
 
 
 ResourceInfoDep = Annotated[dict, Depends(get_resource_info)]
+
+
+def check_firewall_access(
+    vmid: int,
+    current_user: CurrentUser,
+    session: SessionDep,
+) -> None:
+    """防火牆權限檢查：允許 superuser、資源擁有者、以及管理該使用者所在群組的老師。"""
+    from app.repositories import group as group_repo
+
+    if current_user.is_superuser:
+        return
+
+    db_resource = resource_repo.get_resource_by_vmid(session=session, vmid=vmid)
+    if not db_resource:
+        raise PermissionDeniedError("您沒有此資源的存取權限")
+
+    # 擁有者
+    if db_resource.user_id == current_user.id:
+        return
+
+    # 老師：檢查資源擁有者是否在其管理的群組中
+    if current_user.is_instructor:
+        if group_repo.is_user_in_any_owned_group(
+            session=session,
+            instructor_id=current_user.id,
+            member_user_id=db_resource.user_id,
+        ):
+            return
+
+    raise PermissionDeniedError("您沒有此資源的存取權限")

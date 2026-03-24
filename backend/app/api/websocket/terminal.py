@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import ssl
 from urllib.parse import quote
 
 import websockets
@@ -8,7 +7,7 @@ from fastapi import WebSocket, WebSocketDisconnect
 
 from app.api.deps.auth import get_ws_current_user
 from app.api.deps.proxmox import check_resource_ownership
-from app.core.config import settings
+from app.core.proxmox import build_ws_ssl_context, get_active_host, get_proxmox_settings
 from app.exceptions import NotFoundError, ProxmoxError
 from app.services import proxmox_service
 
@@ -60,40 +59,48 @@ async def terminal_proxy(websocket: WebSocket, vmid: int, token: str):
         terminal_ticket = console_data["ticket"]
 
         encoded_terminal_ticket = quote(terminal_ticket, safe="")
-        encoded_auth_cookie = quote(pve_auth_cookie, safe="")
 
-        # WebSocket URL for terminal (using vncwebsocket endpoint for termproxy)
+        # WebSocket URL for terminal — 使用 get_active_host() 確保 HA 切換後跟著用正確的節點
+        _cfg = get_proxmox_settings()
+        active_host = get_active_host()
         pve_ws_url = (
-            f"wss://{settings.PROXMOX_HOST}:8006"
+            f"wss://{active_host}:8006"
             f"/api2/json/nodes/{node}/lxc/{vmid}/vncwebsocket"
             f"?port={terminal_port}&vncticket={encoded_terminal_ticket}"
         )
 
-        ssl_context = ssl.create_default_context()
-        if not settings.PROXMOX_VERIFY_SSL:
-            ssl_context.check_hostname = False
-            ssl_context.verify_mode = ssl.CERT_NONE
+        ssl_context = build_ws_ssl_context(_cfg)
 
+        logger.debug(f"Connecting to Proxmox terminal WebSocket: {pve_ws_url}")
         try:
-            # Use Cookie with session ticket (NOT API token!)
+            # Cookie header must NOT be URL-encoded; Proxmox rejects percent-encoded cookies.
+            # Proxmox vncwebsocket requires Sec-WebSocket-Protocol: binary (same as noVNC client).
+            # proxy=None: disable system proxy — Proxmox is on a private network and
+            # going through a proxy (websockets 16 default: proxy=True) breaks the connection.
             pve_websocket = await websockets.connect(
                 pve_ws_url,
                 ssl=ssl_context,
-                additional_headers={"Cookie": f"PVEAuthCookie={encoded_auth_cookie}"},
+                additional_headers={"Cookie": f"PVEAuthCookie={pve_auth_cookie}"},
+                subprotocols=["binary"],
                 max_size=2**20,
+                proxy=None,
             )
             logger.info("Successfully connected to Proxmox WebSocket for terminal")
 
             # Send initial authentication to termproxy
             # Format: username:ticket\n (newline is critical!)
-            auth_message = f"{settings.PROXMOX_USER}:{terminal_ticket}\n"
+            auth_message = f"{_cfg.user}:{terminal_ticket}\n"
             await pve_websocket.send(auth_message)
             logger.info("Sent authentication to termproxy")
 
         except websockets.exceptions.InvalidStatus as e:
             logger.error(
-                f"Proxmox WebSocket connection rejected: HTTP {e.response.status_code}"
+                f"Proxmox WebSocket rejected: HTTP {e.response.status_code} — {e.response.headers}"
             )
+            await websocket.close(code=1008, reason="Proxmox connection failed")
+            return
+        except Exception as e:
+            logger.error(f"Proxmox WebSocket connection failed ({type(e).__name__}): {e}")
             await websocket.close(code=1008, reason="Proxmox connection failed")
             return
 
@@ -138,7 +145,7 @@ async def terminal_proxy(websocket: WebSocket, vmid: int, token: str):
 
     except Exception as e:
         logger.error(f"Failed to establish WebSocket proxy: {e}", exc_info=True)
-        await websocket.close(code=1011, reason=str(e))
+        await websocket.close(code=1011, reason="Internal server error")
     finally:
         if pve_websocket:
             await pve_websocket.close()

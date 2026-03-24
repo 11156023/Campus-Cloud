@@ -10,8 +10,7 @@ from typing import Literal
 
 import httpx
 
-from app.core.config import settings
-from app.core.proxmox import basic_blocking_task_status, get_proxmox_api
+from app.core.proxmox import basic_blocking_task_status, get_active_host, get_proxmox_api, get_proxmox_settings
 from app.exceptions import NotFoundError, ProxmoxError
 
 logger = logging.getLogger(__name__)
@@ -25,28 +24,34 @@ ResourceType = Literal["qemu", "lxc"]
 # Resource lookup
 # ---------------------------------------------------------------------------
 
-def find_resource(vmid: int) -> dict:
-    """Find any resource (qemu or lxc) by VMID in the cluster."""
+def _raw_vms() -> list[dict]:
+    """Return all cluster resources of type vm without pool filtering."""
     proxmox = get_proxmox_api()
-    for r in proxmox.cluster.resources.get(type="vm"):
-        if r["vmid"] == vmid:
+    return proxmox.cluster.resources.get(type="vm")
+
+
+def find_resource(vmid: int) -> dict:
+    """Find any resource (qemu or lxc) by VMID in the configured pool."""
+    pool = get_proxmox_settings().pool_name
+    for r in _raw_vms():
+        if r["vmid"] == vmid and r.get("pool") == pool:
             return r
     raise NotFoundError(f"Resource {vmid} not found")
 
 
 def find_lxc(vmid: int) -> dict:
-    """Find an LXC container by VMID (raises if not found or not lxc)."""
-    proxmox = get_proxmox_api()
-    for r in proxmox.cluster.resources.get(type="vm"):
-        if r["vmid"] == vmid and r["type"] == "lxc":
+    """Find an LXC container by VMID in the configured pool."""
+    pool = get_proxmox_settings().pool_name
+    for r in _raw_vms():
+        if r["vmid"] == vmid and r["type"] == "lxc" and r.get("pool") == pool:
             return r
     raise NotFoundError(f"LXC container {vmid} not found")
 
 
 def list_all_resources() -> list[dict]:
-    """Return all cluster resources of type vm."""
-    proxmox = get_proxmox_api()
-    return proxmox.cluster.resources.get(type="vm")
+    """Return all cluster resources of type vm in the configured pool."""
+    pool = get_proxmox_settings().pool_name
+    return [r for r in _raw_vms() if r.get("pool") == pool]
 
 
 def list_nodes() -> list[dict]:
@@ -268,12 +273,12 @@ def next_vmid() -> int:
 
 def get_lxc_templates(node: str) -> list[dict]:
     proxmox = get_proxmox_api()
-    return proxmox.nodes(node).storage(settings.PROXMOX_ISO_STORAGE).content.get()
+    return proxmox.nodes(node).storage(get_proxmox_settings().iso_storage).content.get()
 
 
 def get_vm_templates() -> list[dict]:
-    """Return all VM templates from the cluster."""
-    return [vm for vm in list_all_resources() if vm.get("template") == 1]
+    """Return all VM templates from the cluster (not filtered by pool)."""
+    return [vm for vm in _raw_vms() if vm.get("template") == 1]
 
 
 # ---------------------------------------------------------------------------
@@ -286,12 +291,27 @@ async def get_session_ticket() -> tuple[str, str]:
     Proxmox WebSocket endpoints (termproxy, vncproxy) require a session
     ticket obtained via password auth; API tokens are not accepted.
     """
-    async with httpx.AsyncClient(verify=settings.PROXMOX_VERIFY_SSL) as client:
+    import ssl as _ssl
+
+    cfg = get_proxmox_settings()
+    if cfg.ca_cert:
+        # Build a custom SSL context that accepts the PVE self-signed CA cert
+        _ctx = _ssl.SSLContext(_ssl.PROTOCOL_TLS_CLIENT)
+        _ctx.check_hostname = False
+        _ctx.verify_mode = _ssl.CERT_REQUIRED
+        _ctx.load_verify_locations(cadata=cfg.ca_cert)
+        if hasattr(_ssl, "VERIFY_X509_STRICT"):
+            _ctx.verify_flags &= ~_ssl.VERIFY_X509_STRICT
+        verify: bool | _ssl.SSLContext = _ctx
+    else:
+        verify = cfg.verify_ssl
+
+    async with httpx.AsyncClient(verify=verify) as client:
         resp = await client.post(
-            f"https://{settings.PROXMOX_HOST}:8006/api2/json/access/ticket",
+            f"https://{get_active_host()}:8006/api2/json/access/ticket",
             data={
-                "username": settings.PROXMOX_USER,
-                "password": settings.PROXMOX_PASSWORD,
+                "username": cfg.user,
+                "password": cfg.password,
             },
         )
         if resp.status_code != 200:

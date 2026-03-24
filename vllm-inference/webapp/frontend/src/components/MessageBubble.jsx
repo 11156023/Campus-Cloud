@@ -6,6 +6,12 @@ import rehypeHighlight from 'rehype-highlight'
 import 'highlight.js/styles/github.css' // Changed to github.css for light theme
 import { useState } from 'react'
 
+const sanitizeMediaUrl = (url) => {
+  if (typeof url !== 'string') return null
+  if (url.startsWith('blob:') || url.startsWith('data:')) return url
+  return null
+}
+
 const MessageBubble = ({ type, text, image, document, video, isStreaming }) => {
   const isUser = type === 'user'
   const [isThinkingExpanded, setIsThinkingExpanded] = useState(false)
@@ -61,7 +67,7 @@ const MessageBubble = ({ type, text, image, document, video, isStreaming }) => {
           {image && (
             <div className="mb-3">
               <img
-                src={image}
+                src={sanitizeMediaUrl(image)}
                 alt="Uploaded"
                 className="max-w-full max-h-64 object-contain rounded-xl"
               />
@@ -72,7 +78,7 @@ const MessageBubble = ({ type, text, image, document, video, isStreaming }) => {
           {video && (
             <div className="mb-3 relative">
               <video
-                src={video}
+                src={sanitizeMediaUrl(video)}
                 controls
                 className="max-w-full max-h-64 rounded-xl object-contain bg-black/10"
                 playsInline

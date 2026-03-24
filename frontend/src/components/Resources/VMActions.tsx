@@ -123,7 +123,7 @@ export function VMActions({
   })
 
   const deleteMutation = useMutation({
-    mutationFn: () => ResourcesService.deleteResource({ vmid }),
+    mutationFn: () => ResourcesService.deleteResource({ vmid, force: isRunning }),
     onSuccess: () => {
       showSuccessToast(t("messages:vm.deleted", { name }))
       queryClient.invalidateQueries({ queryKey: ["resources"] })

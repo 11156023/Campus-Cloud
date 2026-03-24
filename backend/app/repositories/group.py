@@ -125,6 +125,50 @@ def remove_member(
     return True
 
 
+def get_group_member_user_ids_for_instructor(
+    *, session: Session, instructor_id: uuid.UUID
+) -> list[uuid.UUID]:
+    """取得老師所有群組中，學生的 user_id 清單（老師防火牆可見範圍）"""
+    # 取得老師管理的群組
+    groups = list(
+        session.exec(select(Group).where(Group.owner_id == instructor_id)).all()
+    )
+    if not groups:
+        return []
+    group_ids = [g.id for g in groups]
+
+    # 取得這些群組中的所有成員 user_id（排除老師本人）
+    members = list(
+        session.exec(
+            select(GroupMember).where(GroupMember.group_id.in_(group_ids))
+        ).all()
+    )
+    user_ids = [m.user_id for m in members if m.user_id != instructor_id]
+    return list(set(user_ids))
+
+
+def is_user_in_any_owned_group(
+    *,
+    session: Session,
+    instructor_id: uuid.UUID,
+    member_user_id: uuid.UUID,
+) -> bool:
+    """檢查 member_user_id 是否在 instructor_id 管理的任意群組中"""
+    groups = list(
+        session.exec(select(Group).where(Group.owner_id == instructor_id)).all()
+    )
+    if not groups:
+        return False
+    group_ids = [g.id for g in groups]
+    gm = session.exec(
+        select(GroupMember).where(
+            GroupMember.group_id.in_(group_ids),
+            GroupMember.user_id == member_user_id,
+        )
+    ).first()
+    return gm is not None
+
+
 def count_members(*, session: Session, group_id: uuid.UUID) -> int:
     return len(
         session.exec(

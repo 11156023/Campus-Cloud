@@ -122,3 +122,19 @@
     cursor: pointer;
   }
 }
+
+@keyframes page-loading {
+  0% {
+    transform: translateX(-100%);
+  }
+  60% {
+    transform: translateX(-10%);
+  }
+  100% {
+    transform: translateX(0%);
+  }
+}
+
+@theme inline {
+  --animate-page-loading: page-loading 1.2s ease-out forwards;
+}

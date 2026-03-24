@@ -2,10 +2,12 @@ from fastapi import APIRouter
 
 from app.api.routes import (
     audit_logs,
+    firewall,
     groups,
     login,
     lxc,
     private,
+    proxmox_config,
     resource_details,
     resources,
     spec_change_requests,
@@ -28,6 +30,8 @@ api_router.include_router(vm_requests.router)
 api_router.include_router(spec_change_requests.router)
 api_router.include_router(audit_logs.router)
 api_router.include_router(groups.router)
+api_router.include_router(proxmox_config.router)
+api_router.include_router(firewall.router)
 
 
 if settings.ENVIRONMENT == "local":

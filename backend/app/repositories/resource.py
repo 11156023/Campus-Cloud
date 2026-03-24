@@ -36,6 +36,10 @@ def get_resource_by_vmid(*, session: Session, vmid: int) -> Resource | None:
     return session.exec(select(Resource).where(Resource.vmid == vmid)).first()
 
 
+def get_all_resources(*, session: Session) -> list[Resource]:
+    return list(session.exec(select(Resource)).all())
+
+
 def get_resources_by_user(*, session: Session, user_id: uuid.UUID) -> list[Resource]:
     return list(
         session.exec(select(Resource).where(Resource.user_id == user_id)).all()
