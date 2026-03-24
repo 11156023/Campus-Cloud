@@ -210,21 +210,16 @@ def _normalize_text(text: str) -> str:
 
 
 def _goal_mentions_alias(normalized_goal: str, alias: str) -> bool:
-    if alias in normalized_goal:
-        return True
-
     compact_goal_tokens = normalized_goal.split()
     alias_tokens = alias.split()
+    
     if len(alias_tokens) == 1:
         alias_token = alias_tokens[0]
-        if len(alias_token) < 4:
-            return False
-        return any(
-            token.startswith(alias_token) or alias_token.startswith(token)
-            for token in compact_goal_tokens
-            if len(token) >= 4
-        )
+        # Extremely short aliases (like "n8n", "php") must be exact whole-word matches.
+        # We don't want "node" in "node-red" to trigger "nodejs".
+        return alias_token in compact_goal_tokens
 
+    # For multi-token aliases, we do a substring search
     compact_alias = "".join(alias_tokens)
     compact_goal = "".join(compact_goal_tokens)
     return len(compact_alias) >= 6 and compact_alias in compact_goal

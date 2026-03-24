@@ -134,8 +134,11 @@ Your primary objective is to clarify the user's infrastructure deployment needs 
 - **Target Audience**: Users range from complete beginners to experienced computing veterans. Assume they might not know what Virtual Machines (VMs), Docker/LXC Containers, or Linux OS are.
 - **Explanation Style**: When introducing a technical concept (e.g., VM vs. LXC) FOR THE FIRST TIME, use a simple, concrete, and DIVERSE analogy from everyday life (dining, transportation, renting, etc.). Ensure technical terms remain accurate. IMPORTANT: DO NOT re-explain or repeatedly compare VMs and LXC in every single turn if you have already covered it earlier in the chat history. Once a concept is explained, treat it as understood unless the user is confused.
 - **Consulting Flow**: When a user asks for a specific tool or service, first briefly acknowledge it and mention its mainstream usage or common deployment practices. Then, transition seamlessly into helping them plan by asking your targeted clarifying questions.
-- **Platform Scope**: We only provision local on-premise Virtual Machines (VMs) and LXC containers for educational and research workloads. We DO NOT offer or recommend public clouds like AWS/GCP/Azure.
+- **Platform Scope**: (INTERNAL KNOWLEDGE) Our platform provides local on-premise Virtual Machines (VMs) and LXC containers for educational and research workloads. Importantly, our VMs DO support Windows environments. We DO NOT offer or recommend public clouds like AWS/GCP/Azure. 
+  * RULE 1: Do NOT explicitly list out our supported environments (VM/LXC/Windows) or workload types as a disclaimer unless the user specifically asks what we support.
+  * RULE 2: If the user requests public clouds or direct bare-metal Windows deployments, politely inform them we only offer local VMs (which can run Windows) and LXCs.
 - **Interaction Rules**: If the user's request is vague, ask 1 to 3 targeted clarifying questions to guide them smoothly. Do not overwhelm them with a massive wall of questions.
+- **Formatting**: Keep your text layout highly compact, concise, and structured. Avoid unnecessary blank lines or excessive conversational padding (文字版面盡量緊湊，條理分明，避免過多的空行與贅字).
 - **Language Requirement**: Regardless of this prompt being in English, you MUST reply entirely in Traditional Chinese (zh-TW). Your tone should be encouraging, patient, and highly professional.
 - **Reasoning Visibility**: Do not expose chain-of-thought, internal reasoning, scratchpad, or `<think>` content. Return only the final user-facing answer.
 {greeting_instruction}
@@ -360,7 +363,7 @@ Generate a complete deployment recommendation based on the user's intent, availa
 - **Language & Tone**: All natural-language fields MUST be written in Traditional Chinese (zh-TW). Avoid Simplified Chinese. Use a professional yet conversational and approachable tone (口語化、精準且自然的語氣), avoiding overly rigid, dry, or robotic phrasing.
 - **Overall Summary (`summary`)**: This field must comprehensively summarize the entire plan in 3 to 4 sentences (approx. 100-120 chars). Explain *why* this architecture was chosen, how it fulfills the user's specific request, and briefly mention the future scaling or resource strategy. This is the main explanation presented to the user.
 - **Explanation Depth (`why` fields)**: For each `why` field (in recommended_templates, possible_needed_templates, and machines), keep it concise but precise, roughly 1 to 2 sentences (approx. 40-60 chars). Directly explain why this specific template/resource is needed and how its configured CPU/RAM/Disk supports the workload. Do not repeat the general summary here.
-- **Valid Templates**: Use ONLY template slugs from the provided `Template Catalog Bundle`. DO NOT invent templates.
+- **Valid Templates (CRITICAL)**: You MUST extract and use the EXACT `slug` strings provided in the `Template Catalog Bundle`. DO NOT invent new slugs, DO NOT hallucinate template names, and DO NOT modify existing slugs (e.g. do not change "ubuntu22" to "ubuntu-22"). If you choose a template, its `slug` value (in both `recommended_templates` and `machines.template_slug`) must perfectly match one of the slugs in the catalog. 
 - **Template Separation**: `recommended_templates` MUST be highly precise and contain ONLY the strictly necessary core templates directly required to fulfill the user's explicit request. Do not over-recommend here. `possible_needed_templates` MUST proactively anticipate future needs, scaling, and operational maturity. Think expansively and TRY YOUR BEST to recommend up to 3 extensible/support templates (e.g., databases, reverse proxy/NPM, monitoring, secret managers, caching, or backup solutions) that would greatly benefit their architecture. State why they are highly recommended in the `why` field.
 - **Requirement Flags & Context**: You MUST STRICTLY honor request flags and user's specific context derived from the `User Context`.
   * `needs_public_web=true`: include public-entry components (e.g., reverse proxy or web gateway).
@@ -473,10 +476,24 @@ def normalize_ai_result(
         possible_needed_templates.append(normalized)
 
     for machine in list(ai_result.get("machines") or []):
-        slug = str(machine.get("template_slug") or "").strip().lower()
+        slug = str(machine.get("template_slug") or "custom-template").strip().lower()
+        if not slug:
+            slug = "custom-template"
         template = lookup.get(slug)
         if not template:
-            continue
+            # Fallback mock template to prevent dropping the machine completely
+            template = TemplateItem(
+                slug=slug,
+                name=machine.get("name") or slug.capitalize(),
+                description="AI 規劃之客製化規格",
+                categories=[],
+                template_type="vm" if machine.get("deployment_type") == "vm" else "lxc",
+                interface_port=None,
+                website=None,
+                documentation=None,
+                updateable=False,
+                raw={},
+            )
         machines.append(_normalize_machine(machine, template, request_requires_gpu=request.requires_gpu, request_needs_windows=request.needs_windows))
 
     _promote_explicit_templates(
@@ -653,9 +670,16 @@ def _normalize_template_choice(
     fallback_why: str = "AI 依需求選擇此核心模板。",
 ) -> dict[str, Any] | None:
     slug = str(item.get("slug") or "").strip().lower()
+    if not slug:
+        return None
     template = lookup.get(slug)
     if not template:
-        return None
+        # Fallback values to prevent display dropping when AI hallucinates a slug
+        return {
+            "slug": slug,
+            "name": item.get("name") or slug.capitalize(),
+            "why": item.get("why") or fallback_why,
+        }
     return {
         "slug": template.slug,
         "name": template.name,
