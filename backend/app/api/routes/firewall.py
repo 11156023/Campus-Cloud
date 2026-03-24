@@ -134,17 +134,29 @@ def delete_connection(
 ):
     """刪除 VM 間連線"""
     try:
-        check_firewall_access(
-            vmid=conn.source_vmid,
-            current_user=current_user,
-            session=session,
-        )
-        if conn.target_vmid is not None:
+        # 權限檢查：
+        # - 若 source_vmid 為 None（例如 Internet -> VM 入站），
+        #   則以 target_vmid 作為被變更規則的 VM 進行檢查
+        # - 否則先檢查 source_vmid，再檢查（若有的）target_vmid
+        if conn.source_vmid is None:
+            if conn.target_vmid is not None:
+                check_firewall_access(
+                    vmid=conn.target_vmid,
+                    current_user=current_user,
+                    session=session,
+                )
+        else:
             check_firewall_access(
-                vmid=conn.target_vmid,
+                vmid=conn.source_vmid,
                 current_user=current_user,
                 session=session,
             )
+            if conn.target_vmid is not None:
+                check_firewall_access(
+                    vmid=conn.target_vmid,
+                    current_user=current_user,
+                    session=session,
+                )
 
         firewall_service.delete_connection(
             source_vmid=conn.source_vmid,
