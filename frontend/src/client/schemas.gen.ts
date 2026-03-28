@@ -1596,6 +1596,18 @@ export const UserCreateSchema = {
                 }
             ],
             title: 'Full Name'
+        },
+        avatar_url: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 2048
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Avatar Url'
         }
     },
     type: 'object',
@@ -1639,6 +1651,17 @@ export const UserPublicSchema = {
                 }
             ],
             title: 'Full Name'
+        },
+        avatar_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Avatar Url'
         },
         created_at: {
             anyOf: [
@@ -1684,6 +1707,18 @@ export const UserRegisterSchema = {
                 }
             ],
             title: 'Full Name'
+        },
+        avatar_url: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 2048
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Avatar Url'
         }
     },
     type: 'object',
@@ -1765,6 +1800,18 @@ export const UserUpdateSchema = {
                 }
             ],
             title: 'Full Name'
+        },
+        avatar_url: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 2048
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Avatar Url'
         }
     },
     type: 'object',
@@ -1798,6 +1845,18 @@ export const UserUpdateMeSchema = {
                 }
             ],
             title: 'Email'
+        },
+        avatar_url: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 2048
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Avatar Url'
         }
     },
     type: 'object',

@@ -84,6 +84,26 @@ test.describe("Edit user email", () => {
       page.locator("form").getByText(updatedEmail, { exact: true }),
     ).toBeVisible()
   })
+
+  test("Edit user avatar URL with a valid URL", async ({ page }) => {
+    const email = randomEmail()
+    const password = randomPassword()
+    const avatarUrl = "https://example.com/avatar.png"
+
+    await createUser({ email, password })
+    await logInUser(page, email, password)
+    await page.goto("/settings")
+    await page.getByRole("tab", { name: "My profile" }).click()
+
+    await page.getByRole("button", { name: "Edit" }).click()
+    await page.getByLabel("Avatar URL").fill(avatarUrl)
+    await page.getByRole("button", { name: "Save" }).click()
+
+    await expect(page.getByText("User updated successfully")).toBeVisible()
+    await expect(
+      page.locator("form").getByText(avatarUrl, { exact: true }),
+    ).toBeVisible()
+  })
 })
 
 test.describe("Cancel edit actions", () => {

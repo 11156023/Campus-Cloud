@@ -7,6 +7,8 @@ API schemas 已移至 app.schemas 模組。
 
 from sqlmodel import SQLModel
 
+from .ai_api_credential import AIAPICredential
+from .ai_api_request import AIAPIRequest, AIAPIRequestStatus
 from .base import get_datetime_utc
 from .resource import Resource
 from .user import User, UserBase, UserRole
@@ -31,6 +33,9 @@ __all__ = [
     "UserBase",
     "User",
     "UserRole",
+    "AIAPICredential",
+    "AIAPIRequest",
+    "AIAPIRequestStatus",
     # Resource
     "Resource",
     # VM Request

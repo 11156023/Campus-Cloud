@@ -11,6 +11,9 @@
   },
   "profile": {
     "title": "User Information",
+    "avatar": "Avatar",
+    "avatarUrl": "Avatar URL",
+    "avatarHint": "Paste an image URL to update your profile photo. Leave it empty to remove the avatar.",
     "fullName": "Full name",
     "email": "Email",
     "edit": "Edit",

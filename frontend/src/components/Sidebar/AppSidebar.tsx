@@ -1,4 +1,5 @@
 import {
+  Bot,
   ClipboardCheck,
   FileText,
   Home,
@@ -6,8 +7,8 @@ import {
   ServerCog,
   Settings2,
   Shield,
-  UsersRound,
   Users,
+  UsersRound,
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
@@ -33,6 +34,7 @@ export function AppSidebar() {
     { icon: ServerCog, title: t("sidebar.myResources"), path: "/my-resources" },
     { icon: Shield, title: "防火牆", path: "/firewall" },
     { icon: FileText, title: t("sidebar.applications"), path: "/applications" },
+    { icon: Bot, title: "AI API", path: "/ai-api" },
   ]
 
   const adminItems: Item[] = [
@@ -41,6 +43,8 @@ export function AppSidebar() {
     { icon: Shield, title: "防火牆", path: "/firewall" },
     { icon: Monitor, title: t("sidebar.resources"), path: "/resources" },
     { icon: ClipboardCheck, title: t("sidebar.approvals"), path: "/approvals" },
+    { icon: Bot, title: "AI API", path: "/ai-api" },
+    { icon: ClipboardCheck, title: "AI API 審核", path: "/ai-api-approvals" },
     { icon: UsersRound, title: "群組管理", path: "/groups" },
     { icon: Users, title: t("sidebar.admin"), path: "/admin" },
     { icon: Settings2, title: "PVE 設定", path: "/admin/proxmox" },

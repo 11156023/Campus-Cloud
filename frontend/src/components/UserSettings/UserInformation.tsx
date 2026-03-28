@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next"
 import { z } from "zod"
 
 import { UsersService, type UserUpdateMe } from "@/client"
+import UserAvatar from "@/components/Common/UserAvatar"
 import { Button } from "@/components/ui/button"
 import {
   Form,
@@ -34,6 +35,12 @@ const UserInformation = () => {
       z.object({
         full_name: z.string().max(30).optional(),
         email: z.email({ message: t("validation:email.invalid") }),
+        avatar_url: z
+          .union([
+            z.url({ message: t("validation:url.invalid") }),
+            z.literal(""),
+          ])
+          .optional(),
       }),
     [t],
   )
@@ -47,8 +54,16 @@ const UserInformation = () => {
     defaultValues: {
       full_name: currentUser?.full_name ?? undefined,
       email: currentUser?.email,
+      avatar_url: currentUser?.avatar_url ?? "",
     },
   })
+
+  const previewName = editMode
+    ? form.watch("full_name") || currentUser?.full_name
+    : currentUser?.full_name
+  const previewAvatarUrl = editMode
+    ? form.watch("avatar_url") || undefined
+    : currentUser?.avatar_url || undefined
 
   const toggleEditMode = () => {
     setEditMode(!editMode)
@@ -57,13 +72,14 @@ const UserInformation = () => {
   const mutation = useMutation({
     mutationFn: (data: UserUpdateMe) =>
       UsersService.updateUserMe({ requestBody: data }),
-    onSuccess: () => {
+    onSuccess: (updatedUser) => {
+      queryClient.setQueryData(["currentUser"], updatedUser)
       showSuccessToast(t("messages:success.userUpdated"))
       toggleEditMode()
     },
     onError: handleError.bind(showErrorToast),
     onSettled: () => {
-      queryClient.invalidateQueries()
+      queryClient.invalidateQueries({ queryKey: ["currentUser"] })
     },
   })
 
@@ -77,12 +93,21 @@ const UserInformation = () => {
     if (data.email !== currentUser?.email) {
       updateData.email = data.email
     }
+    if (
+      (data.avatar_url || undefined) !== (currentUser?.avatar_url || undefined)
+    ) {
+      updateData.avatar_url = data.avatar_url || null
+    }
 
     mutation.mutate(updateData)
   }
 
   const onCancel = () => {
-    form.reset()
+    form.reset({
+      full_name: currentUser?.full_name ?? undefined,
+      email: currentUser?.email,
+      avatar_url: currentUser?.avatar_url ?? "",
+    })
     toggleEditMode()
   }
 
@@ -96,6 +121,21 @@ const UserInformation = () => {
           onSubmit={form.handleSubmit(onSubmit)}
           className="flex flex-col gap-4"
         >
+          <div className="flex items-start gap-4 rounded-lg border p-4">
+            <UserAvatar
+              avatarUrl={previewAvatarUrl}
+              className="size-16 shrink-0"
+              email={currentUser?.email}
+              fullName={previewName}
+            />
+            <div className="min-w-0">
+              <p className="font-medium">{t("settings:profile.avatar")}</p>
+              <p className="text-sm text-muted-foreground">
+                {t("settings:profile.avatarHint")}
+              </p>
+            </div>
+          </div>
+
           <FormField
             control={form.control}
             name="full_name"
@@ -140,6 +180,39 @@ const UserInformation = () => {
                 <FormItem>
                   <FormLabel>{t("settings:profile.email")}</FormLabel>
                   <p className="py-2 truncate max-w-sm">{field.value}</p>
+                </FormItem>
+              )
+            }
+          />
+
+          <FormField
+            control={form.control}
+            name="avatar_url"
+            render={({ field }) =>
+              editMode ? (
+                <FormItem>
+                  <FormLabel>{t("settings:profile.avatarUrl")}</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="url"
+                      placeholder="https://example.com/avatar.png"
+                      {...field}
+                      value={field.value ?? ""}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              ) : (
+                <FormItem>
+                  <FormLabel>{t("settings:profile.avatarUrl")}</FormLabel>
+                  <p
+                    className={cn(
+                      "py-2 truncate max-w-sm",
+                      !field.value && "text-muted-foreground",
+                    )}
+                  >
+                    {field.value || t("settings:profile.na")}
+                  </p>
                 </FormItem>
               )
             }

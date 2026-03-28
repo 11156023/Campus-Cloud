@@ -1,172 +1,22 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
-from pydantic import AliasChoices, Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
-
-BACKEND_ROOT = Path(__file__).resolve().parents[3]
-PROJECT_ROOT = BACKEND_ROOT.parent
-ENV_FILE = BACKEND_ROOT / ".env.ai.template_recommendation"
+from app.ai.system_config import BACKEND_ROOT, PROJECT_ROOT, system_ai_config, system_ai_env
 
 
-class TemplateRecommendationSettings(BaseSettings):
-    model_config = SettingsConfigDict(
-        env_file=str(ENV_FILE),
-        env_file_encoding="utf-8",
-        env_prefix="TEMPLATE_RECOMMENDATION_",
-        case_sensitive=False,
-        extra="ignore",
-        populate_by_name=True,
-    )
-
-    enabled: bool = Field(
-        default=True,
-        validation_alias=AliasChoices("TEMPLATE_RECOMMENDATION_ENABLED", "ENABLED"),
-    )
-    templates_dir: str = Field(
-        default=str(PROJECT_ROOT / "frontend" / "src" / "json"),
-        validation_alias=AliasChoices(
-            "TEMPLATE_RECOMMENDATION_TEMPLATES_DIR",
-            "TEMPLATES_DIR",
-        ),
-    )
-    backend_node_gpu_map: str = Field(
-        default="{}",
-        validation_alias=AliasChoices(
-            "TEMPLATE_RECOMMENDATION_BACKEND_NODE_GPU_MAP",
-            "BACKEND_NODE_GPU_MAP",
-        ),
-    )
-    vllm_base_url: str = Field(
-        default="http://localhost:8000/v1",
-        validation_alias=AliasChoices(
-            "TEMPLATE_RECOMMENDATION_VLLM_BASE_URL",
-            "VLLM_BASE_URL",
-        ),
-    )
-    vllm_api_key: str = Field(
-        default="vllm-secret-key-change-me",
-        validation_alias=AliasChoices(
-            "TEMPLATE_RECOMMENDATION_VLLM_API_KEY",
-            "VLLM_API_KEY",
-        ),
-    )
-    vllm_model_name: str = Field(
-        default="",
-        validation_alias=AliasChoices(
-            "TEMPLATE_RECOMMENDATION_VLLM_MODEL_NAME",
-            "VLLM_MODEL_NAME",
-        ),
-    )
-    vllm_enable_thinking: bool = Field(
-        default=False,
-        validation_alias=AliasChoices(
-            "TEMPLATE_RECOMMENDATION_VLLM_ENABLE_THINKING",
-            "VLLM_ENABLE_THINKING",
-        ),
-    )
-    vllm_timeout: int = Field(
-        default=30,
-        ge=3,
-        le=300,
-        validation_alias=AliasChoices(
-            "TEMPLATE_RECOMMENDATION_VLLM_TIMEOUT",
-            "VLLM_TIMEOUT",
-        ),
-    )
-    vllm_temperature: float = Field(
-        default=0.6,
-        ge=0.0,
-        le=2.0,
-        validation_alias=AliasChoices(
-            "TEMPLATE_RECOMMENDATION_VLLM_TEMPERATURE",
-            "VLLM_TEMPERATURE",
-        ),
-    )
-    vllm_chat_temperature: float = Field(
-        default=0.9,
-        ge=0.0,
-        le=2.0,
-        validation_alias=AliasChoices(
-            "TEMPLATE_RECOMMENDATION_VLLM_CHAT_TEMPERATURE",
-            "VLLM_CHAT_TEMPERATURE",
-        ),
-    )
-    vllm_top_p: float = Field(
-        default=0.95,
-        ge=0.0,
-        le=1.0,
-        validation_alias=AliasChoices(
-            "TEMPLATE_RECOMMENDATION_VLLM_TOP_P",
-            "VLLM_TOP_P",
-        ),
-    )
-    vllm_top_k: int = Field(
-        default=20,
-        ge=0,
-        le=200,
-        validation_alias=AliasChoices(
-            "TEMPLATE_RECOMMENDATION_VLLM_TOP_K",
-            "VLLM_TOP_K",
-        ),
-    )
-    vllm_min_p: float = Field(
-        default=0.0,
-        ge=0.0,
-        le=1.0,
-        validation_alias=AliasChoices(
-            "TEMPLATE_RECOMMENDATION_VLLM_MIN_P",
-            "VLLM_MIN_P",
-        ),
-    )
-    vllm_max_tokens: int = Field(
-        default=1600,
-        ge=256,
-        le=300000,
-        validation_alias=AliasChoices(
-            "TEMPLATE_RECOMMENDATION_VLLM_MAX_TOKENS",
-            "VLLM_MAX_TOKENS",
-        ),
-    )
-    vllm_chat_max_tokens: int = Field(
-        default=2048,
-        ge=256,
-        le=300000,
-        validation_alias=AliasChoices(
-            "TEMPLATE_RECOMMENDATION_VLLM_CHAT_MAX_TOKENS",
-            "VLLM_CHAT_MAX_TOKENS",
-        ),
-    )
-    vllm_presence_penalty: float = Field(
-        default=0.0,
-        ge=-2.0,
-        le=2.0,
-        validation_alias=AliasChoices(
-            "TEMPLATE_RECOMMENDATION_VLLM_PRESENCE_PENALTY",
-            "VLLM_PRESENCE_PENALTY",
-        ),
-    )
-    vllm_repetition_penalty: float = Field(
-        default=1.0,
-        ge=0.0,
-        le=2.0,
-        validation_alias=AliasChoices(
-            "TEMPLATE_RECOMMENDATION_VLLM_REPETITION_PENALTY",
-            "VLLM_REPETITION_PENALTY",
-        ),
-    )
+class TemplateRecommendationSettings:
+    @property
+    def section(self):
+        return system_ai_config.template_recommendation
 
     @property
     def resolved_templates_dir(self) -> Path:
-        path = Path(self.templates_dir)
+        path = Path(self.section.templates_dir)
         if path.is_absolute():
             return path
 
-        # Relative paths in env files should resolve from backend/, not from the
-        # project root, so `../frontend/src/json` keeps working across launch dirs.
-        backend_relative = (ENV_FILE.parent / path).resolve()
+        backend_relative = (BACKEND_ROOT / path).resolve()
         if backend_relative.exists():
             return backend_relative
 
@@ -174,18 +24,75 @@ class TemplateRecommendationSettings(BaseSettings):
 
     @property
     def parsed_backend_node_gpu_map(self) -> dict[str, int]:
-        try:
-            raw = json.loads(self.backend_node_gpu_map or "{}")
-        except json.JSONDecodeError:
-            return {}
-
         parsed: dict[str, int] = {}
-        for key, value in raw.items():
+        for key, value in self.section.backend_node_gpu_map.items():
             try:
                 parsed[str(key)] = max(int(value), 0)
             except (TypeError, ValueError):
                 continue
         return parsed
+
+    @property
+    def vllm_base_url(self) -> str:
+        return system_ai_env.vllm_base_url
+
+    @property
+    def vllm_api_key(self) -> str:
+        return system_ai_env.vllm_api_key
+
+    @property
+    def resolved_vllm_model_name(self) -> str:
+        return system_ai_env.vllm_model_name.strip()
+
+    @property
+    def vllm_enable_thinking(self) -> bool:
+        return bool(self.section.vllm.enable_thinking)
+
+    @property
+    def vllm_timeout(self) -> int:
+        return int(self.section.vllm.timeout)
+
+    @property
+    def vllm_temperature(self) -> float:
+        return float(self.section.vllm.temperature)
+
+    @property
+    def vllm_chat_temperature(self) -> float:
+        if self.section.vllm.chat_temperature is not None:
+            return float(self.section.vllm.chat_temperature)
+        return self.vllm_temperature
+
+    @property
+    def vllm_top_p(self) -> float:
+        return float(self.section.vllm.top_p)
+
+    @property
+    def vllm_top_k(self) -> int:
+        return int(self.section.vllm.top_k)
+
+    @property
+    def vllm_min_p(self) -> float:
+        return float(self.section.vllm.min_p)
+
+    @property
+    def vllm_max_tokens(self) -> int:
+        return int(self.section.vllm.max_tokens)
+
+    @property
+    def vllm_chat_max_tokens(self) -> int:
+        if self.section.vllm.chat_max_tokens is not None:
+            return int(self.section.vllm.chat_max_tokens)
+        return self.vllm_max_tokens
+
+    @property
+    def vllm_presence_penalty(self) -> float:
+        if self.section.vllm.presence_penalty is not None:
+            return float(self.section.vllm.presence_penalty)
+        return 0.0
+
+    @property
+    def vllm_repetition_penalty(self) -> float:
+        return float(self.section.vllm.repetition_penalty)
 
 
 settings = TemplateRecommendationSettings()

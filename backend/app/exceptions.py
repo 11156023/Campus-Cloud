@@ -38,3 +38,13 @@ class ProvisioningError(AppError):
 class ProxmoxError(AppError):
     def __init__(self, message: str = "Proxmox operation failed"):
         super().__init__(message, 502)
+
+
+class UpstreamServiceError(AppError):
+    def __init__(self, message: str = "Upstream service failed"):
+        super().__init__(message, 502)
+
+
+class GatewayTimeoutError(AppError):
+    def __init__(self, message: str = "Upstream service timed out"):
+        super().__init__(message, 504)

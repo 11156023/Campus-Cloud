@@ -51,8 +51,12 @@ def _apply_thinking_control(payload: dict[str, Any]) -> dict[str, Any]:
 @router.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest, current_user: CurrentUser) -> ChatResponse:
     del current_user
-    if not settings.vllm_model_name:
-        raise HTTPException(status_code=503, detail="VLLM_MODEL_NAME is required for AI chat.")
+    model_name = settings.resolved_vllm_model_name
+    if not model_name:
+        raise HTTPException(
+            status_code=503,
+            detail="AI model binding is missing in config/system-ai.json.",
+        )
 
     catalog = get_catalog()
     is_first_turn = len(request.messages) <= 1
@@ -72,7 +76,7 @@ async def chat(request: ChatRequest, current_user: CurrentUser) -> ChatResponse:
 
     payload = _apply_thinking_control(
         {
-            "model": settings.vllm_model_name,
+            "model": model_name,
             "messages": messages,
             "max_tokens": settings.vllm_chat_max_tokens,
             "temperature": settings.vllm_chat_temperature,
@@ -145,4 +149,3 @@ async def recommend(request: ChatRequest, current_user: CurrentUser) -> dict[str
     result["ai_metrics"] = ai_metrics
     result["resource_options"] = resource_options
     return result
-

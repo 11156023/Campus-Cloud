@@ -141,12 +141,13 @@ async def generate_recommendation(
     )
     current_status = _build_current_status(node_capacities)
 
-    if not settings.vllm_model_name.strip():
+    model_name = settings.resolved_vllm_model_name
+    if not model_name:
         return _build_response_from_plan(
             plan=rule_based_plan,
             current_status=current_status,
             ai_used=False,
-            warning="VLLM_MODEL_NAME 未設定，因此使用基本容量規則決定。",
+            warning="AI model binding is missing in config/system-ai.json.",
         )
 
     try:
@@ -175,7 +176,7 @@ async def generate_recommendation(
             plan=ai_plan,
             current_status=current_status,
             ai_used=True,
-            model=settings.vllm_model_name,
+            model=model_name,
             ai_metrics=metrics,
             reply_override=str(ai_decision.get("reply") or "").strip() or None,
         )
@@ -198,7 +199,7 @@ async def _generate_ai_decision(
 ) -> tuple[dict[str, Any], AiMetrics]:
     payload = _apply_thinking_control(
         {
-            "model": settings.vllm_model_name,
+            "model": settings.resolved_vllm_model_name,
             "messages": [
                 {"role": "system", "content": build_advisor_system_prompt()},
                 {

@@ -1,0 +1,120 @@
+import type { CancelablePromise } from "@/client"
+import { OpenAPI } from "@/client"
+import { request as __request } from "@/client/core/request"
+
+export type AiApiRequestStatus = "pending" | "approved" | "rejected"
+
+export type AiApiRequestPublic = {
+  id: string
+  user_id: string
+  user_email?: string | null
+  user_full_name?: string | null
+  purpose: string
+  status: AiApiRequestStatus
+  reviewer_id?: string | null
+  reviewer_email?: string | null
+  review_comment?: string | null
+  reviewed_at?: string | null
+  created_at: string
+}
+
+export type AiApiRequestsPublic = {
+  data: AiApiRequestPublic[]
+  count: number
+}
+
+export type AiApiCredentialPublic = {
+  id: string
+  request_id: string
+  base_url: string
+  api_key: string
+  api_key_prefix: string
+  expires_at?: string | null
+  revoked_at?: string | null
+  created_at: string
+}
+
+export type AiApiCredentialsPublic = {
+  data: AiApiCredentialPublic[]
+  count: number
+}
+
+export const AiApiService = {
+  createRequest(data: {
+    requestBody: { purpose: string }
+  }): CancelablePromise<AiApiRequestPublic> {
+    return __request(OpenAPI, {
+      method: "POST",
+      url: "/api/v1/ai-api/requests",
+      body: data.requestBody,
+      mediaType: "application/json",
+      errors: { 422: "Validation Error" },
+    })
+  },
+
+  listMyRequests(): CancelablePromise<AiApiRequestsPublic> {
+    return __request(OpenAPI, {
+      method: "GET",
+      url: "/api/v1/ai-api/requests/my",
+      errors: { 422: "Validation Error" },
+    })
+  },
+
+  listAllRequests(data?: {
+    status?: AiApiRequestStatus | null
+  }): CancelablePromise<AiApiRequestsPublic> {
+    return __request(OpenAPI, {
+      method: "GET",
+      url: "/api/v1/ai-api/requests",
+      query: data?.status ? { status: data.status } : undefined,
+      errors: { 422: "Validation Error" },
+    })
+  },
+
+  reviewRequest(data: {
+    requestId: string
+    requestBody: {
+      status: AiApiRequestStatus
+      review_comment?: string | null
+    }
+  }): CancelablePromise<AiApiRequestPublic> {
+    return __request(OpenAPI, {
+      method: "POST",
+      url: "/api/v1/ai-api/requests/{request_id}/review",
+      path: { request_id: data.requestId },
+      body: data.requestBody,
+      mediaType: "application/json",
+      errors: { 422: "Validation Error" },
+    })
+  },
+
+  listMyCredentials(): CancelablePromise<AiApiCredentialsPublic> {
+    return __request(OpenAPI, {
+      method: "GET",
+      url: "/api/v1/ai-api/credentials/my",
+      errors: { 422: "Validation Error" },
+    })
+  },
+
+  rotateCredential(data: {
+    credentialId: string
+  }): CancelablePromise<AiApiCredentialPublic> {
+    return __request(OpenAPI, {
+      method: "POST",
+      url: "/api/v1/ai-api/credentials/{credential_id}/rotate",
+      path: { credential_id: data.credentialId },
+      errors: { 422: "Validation Error" },
+    })
+  },
+
+  deleteCredential(data: {
+    credentialId: string
+  }): CancelablePromise<{ message: string }> {
+    return __request(OpenAPI, {
+      method: "DELETE",
+      url: "/api/v1/ai-api/credentials/{credential_id}",
+      path: { credential_id: data.credentialId },
+      errors: { 422: "Validation Error" },
+    })
+  },
+}

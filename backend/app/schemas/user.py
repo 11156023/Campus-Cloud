@@ -20,6 +20,7 @@ class UserCreate(BaseModel):
     role: UserRole = UserRole.student
     is_superuser: bool = False
     full_name: str | None = Field(default=None, max_length=255)
+    avatar_url: str | None = Field(default=None, max_length=2048)
 
 
 class UserRegister(BaseModel):
@@ -28,6 +29,7 @@ class UserRegister(BaseModel):
     email: EmailStr = Field(max_length=255)
     password: str = Field(min_length=8, max_length=128)
     full_name: str | None = Field(default=None, max_length=255)
+    avatar_url: str | None = Field(default=None, max_length=2048)
 
 
 class UserUpdate(BaseModel):
@@ -39,6 +41,7 @@ class UserUpdate(BaseModel):
     role: UserRole | None = None
     is_superuser: bool | None = None
     full_name: str | None = Field(default=None, max_length=255)
+    avatar_url: str | None = Field(default=None, max_length=2048)
 
 
 class UserUpdateMe(BaseModel):
@@ -46,6 +49,7 @@ class UserUpdateMe(BaseModel):
 
     full_name: str | None = Field(default=None, max_length=255)
     email: EmailStr | None = Field(default=None, max_length=255)
+    avatar_url: str | None = Field(default=None, max_length=2048)
 
 
 class UpdatePassword(BaseModel):
@@ -69,6 +73,7 @@ class UserPublic(BaseModel):
     role: UserRole
     is_superuser: bool
     full_name: str | None = None
+    avatar_url: str | None = None
     created_at: datetime | None = None
 
 

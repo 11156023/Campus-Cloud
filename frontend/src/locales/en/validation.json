@@ -3,6 +3,9 @@
     "required": "Email is required",
     "invalid": "Invalid email address"
   },
+  "url": {
+    "invalid": "Invalid URL"
+  },
   "password": {
     "required": "Password is required",
     "minLength": "Password must be at least {{count}} characters",

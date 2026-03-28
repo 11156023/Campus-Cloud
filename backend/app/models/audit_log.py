@@ -42,6 +42,8 @@ class AuditAction(str, enum.Enum):
     # VM 申請
     vm_request_submit = "vm_request_submit"
     vm_request_review = "vm_request_review"
+    ai_api_request_submit = "ai_api_request_submit"
+    ai_api_request_review = "ai_api_request_review"
 
     # 用戶管理
     user_create = "user_create"

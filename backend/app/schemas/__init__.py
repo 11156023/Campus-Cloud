@@ -10,6 +10,14 @@ API 請求/回應 schemas，按領域分檔：
 - audit_log: 審計日誌 schemas
 """
 
+from .ai_api import (
+    AIAPICredentialPublic,
+    AIAPICredentialsPublic,
+    AIAPIRequestCreate,
+    AIAPIRequestPublic,
+    AIAPIRequestReview,
+    AIAPIRequestsPublic,
+)
 from .audit_log import AuditLogPublic, AuditLogsPublic
 from .common import Message, NewPassword, Token, TokenPayload
 from .resource import (
@@ -87,6 +95,12 @@ __all__ = [
     "Token",
     "TokenPayload",
     "NewPassword",
+    "AIAPIRequestCreate",
+    "AIAPIRequestReview",
+    "AIAPIRequestPublic",
+    "AIAPIRequestsPublic",
+    "AIAPICredentialPublic",
+    "AIAPICredentialsPublic",
     # User
     "UserCreate",
     "UserRegister",

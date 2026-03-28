@@ -11,6 +11,9 @@
   },
   "profile": {
     "title": "使用者資訊",
+    "avatar": "頭像",
+    "avatarUrl": "頭像網址",
+    "avatarHint": "貼上圖片網址即可更新頭像，留空則會移除頭像。",
     "fullName": "全名",
     "email": "電子郵件",
     "edit": "編輯",

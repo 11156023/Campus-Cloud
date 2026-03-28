@@ -3,6 +3,9 @@
     "required": "電子郵件為必填項",
     "invalid": "無效的電子郵件地址"
   },
+  "url": {
+    "invalid": "無效的網址"
+  },
   "password": {
     "required": "密碼為必填項",
     "minLength": "密碼至少需要 {{count}} 個字符",

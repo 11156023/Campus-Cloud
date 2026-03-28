@@ -8,6 +8,8 @@ from app.core.config import settings
 from app.core.db import engine, init_db
 from app.main import app
 from app.models import (
+    AIAPICredential,
+    AIAPIRequest,
     AuditLog,
     FirewallLayout,
     Group,
@@ -29,6 +31,8 @@ def db() -> Generator[Session, None, None]:
         cleanup_models = (
             FirewallLayout,
             AuditLog,
+            AIAPICredential,
+            AIAPIRequest,
             GroupMember,
             Group,
             Resource,

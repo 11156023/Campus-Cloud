@@ -436,6 +436,7 @@ export type UserCreate = {
     role?: ('student' | 'teacher' | 'admin');
     is_superuser?: boolean;
     full_name?: (string | null);
+    avatar_url?: (string | null);
 };
 
 /**
@@ -448,6 +449,7 @@ export type UserPublic = {
     role: ('student' | 'teacher' | 'admin');
     is_superuser: boolean;
     full_name?: (string | null);
+    avatar_url?: (string | null);
     created_at?: (string | null);
 };
 
@@ -458,6 +460,7 @@ export type UserRegister = {
     email: string;
     password: string;
     full_name?: (string | null);
+    avatar_url?: (string | null);
 };
 
 /**
@@ -478,6 +481,7 @@ export type UserUpdate = {
     role?: ('student' | 'teacher' | 'admin' | null);
     is_superuser?: (boolean | null);
     full_name?: (string | null);
+    avatar_url?: (string | null);
 };
 
 /**
@@ -486,6 +490,7 @@ export type UserUpdate = {
 export type UserUpdateMe = {
     full_name?: (string | null);
     email?: (string | null);
+    avatar_url?: (string | null);
 };
 
 export type ValidationError = {

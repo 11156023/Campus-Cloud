@@ -204,7 +204,8 @@ def test_update_user_me(
 ) -> None:
     full_name = "Updated Name"
     email = random_email()
-    data = {"full_name": full_name, "email": email}
+    avatar_url = "https://example.com/avatar.png"
+    data = {"full_name": full_name, "email": email, "avatar_url": avatar_url}
     r = client.patch(
         f"{settings.API_V1_STR}/users/me",
         headers=normal_user_token_headers,
@@ -214,12 +215,14 @@ def test_update_user_me(
     updated_user = r.json()
     assert updated_user["email"] == email
     assert updated_user["full_name"] == full_name
+    assert updated_user["avatar_url"] == avatar_url
 
     user_query = select(User).where(User.email == email)
     user_db = db.exec(user_query).first()
     assert user_db
     assert user_db.email == email
     assert user_db.full_name == full_name
+    assert user_db.avatar_url == avatar_url
 
 
 def test_update_password_me(
@@ -321,7 +324,13 @@ def test_register_user(client: TestClient, db: Session) -> None:
     username = random_email()
     password = random_lower_string()
     full_name = random_lower_string()
-    data = {"email": username, "password": password, "full_name": full_name}
+    avatar_url = "https://example.com/register-avatar.png"
+    data = {
+        "email": username,
+        "password": password,
+        "full_name": full_name,
+        "avatar_url": avatar_url,
+    }
     r = client.post(
         f"{settings.API_V1_STR}/users/signup",
         json=data,
@@ -330,12 +339,14 @@ def test_register_user(client: TestClient, db: Session) -> None:
     created_user = r.json()
     assert created_user["email"] == username
     assert created_user["full_name"] == full_name
+    assert created_user["avatar_url"] == avatar_url
 
     user_query = select(User).where(User.email == username)
     user_db = db.exec(user_query).first()
     assert user_db
     assert user_db.email == username
     assert user_db.full_name == full_name
+    assert user_db.avatar_url == avatar_url
     verified, _ = verify_password(password, user_db.hashed_password)
     assert verified
 

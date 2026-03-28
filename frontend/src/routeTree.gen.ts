@@ -24,6 +24,8 @@ import { Route as LayoutFirewallRouteImport } from './routes/_layout/firewall'
 import { Route as LayoutApprovalsRouteImport } from './routes/_layout/approvals'
 import { Route as LayoutApplicationsCreateRouteImport } from './routes/_layout/applications-create'
 import { Route as LayoutApplicationsRouteImport } from './routes/_layout/applications'
+import { Route as LayoutAiApiApprovalsRouteImport } from './routes/_layout/ai-api-approvals'
+import { Route as LayoutAiApiRouteImport } from './routes/_layout/ai-api'
 import { Route as LayoutAdminRouteImport } from './routes/_layout/admin'
 import { Route as LayoutAdminIndexRouteImport } from './routes/_layout/admin.index'
 import { Route as LayoutResourcesVmidRouteImport } from './routes/_layout/resources_.$vmid'
@@ -107,6 +109,16 @@ const LayoutApplicationsRoute = LayoutApplicationsRouteImport.update({
   path: '/applications',
   getParentRoute: () => LayoutRoute,
 } as any)
+const LayoutAiApiApprovalsRoute = LayoutAiApiApprovalsRouteImport.update({
+  id: '/ai-api-approvals',
+  path: '/ai-api-approvals',
+  getParentRoute: () => LayoutRoute,
+} as any)
+const LayoutAiApiRoute = LayoutAiApiRouteImport.update({
+  id: '/ai-api',
+  path: '/ai-api',
+  getParentRoute: () => LayoutRoute,
+} as any)
 const LayoutAdminRoute = LayoutAdminRouteImport.update({
   id: '/admin',
   path: '/admin',
@@ -150,6 +162,8 @@ export interface FileRoutesByFullPath {
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/admin': typeof LayoutAdminRouteWithChildren
+  '/ai-api': typeof LayoutAiApiRoute
+  '/ai-api-approvals': typeof LayoutAiApiApprovalsRoute
   '/applications': typeof LayoutApplicationsRoute
   '/applications-create': typeof LayoutApplicationsCreateRoute
   '/approvals': typeof LayoutApprovalsRoute
@@ -171,6 +185,8 @@ export interface FileRoutesByTo {
   '/recover-password': typeof RecoverPasswordRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
+  '/ai-api': typeof LayoutAiApiRoute
+  '/ai-api-approvals': typeof LayoutAiApiApprovalsRoute
   '/applications': typeof LayoutApplicationsRoute
   '/applications-create': typeof LayoutApplicationsCreateRoute
   '/approvals': typeof LayoutApprovalsRoute
@@ -196,6 +212,8 @@ export interface FileRoutesById {
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/_layout/admin': typeof LayoutAdminRouteWithChildren
+  '/_layout/ai-api': typeof LayoutAiApiRoute
+  '/_layout/ai-api-approvals': typeof LayoutAiApiApprovalsRoute
   '/_layout/applications': typeof LayoutApplicationsRoute
   '/_layout/applications-create': typeof LayoutApplicationsCreateRoute
   '/_layout/approvals': typeof LayoutApprovalsRoute
@@ -222,6 +240,8 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/signup'
     | '/admin'
+    | '/ai-api'
+    | '/ai-api-approvals'
     | '/applications'
     | '/applications-create'
     | '/approvals'
@@ -243,6 +263,8 @@ export interface FileRouteTypes {
     | '/recover-password'
     | '/reset-password'
     | '/signup'
+    | '/ai-api'
+    | '/ai-api-approvals'
     | '/applications'
     | '/applications-create'
     | '/approvals'
@@ -267,6 +289,8 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/signup'
     | '/_layout/admin'
+    | '/_layout/ai-api'
+    | '/_layout/ai-api-approvals'
     | '/_layout/applications'
     | '/_layout/applications-create'
     | '/_layout/approvals'
@@ -400,6 +424,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutApplicationsRouteImport
       parentRoute: typeof LayoutRoute
     }
+    '/_layout/ai-api-approvals': {
+      id: '/_layout/ai-api-approvals'
+      path: '/ai-api-approvals'
+      fullPath: '/ai-api-approvals'
+      preLoaderRoute: typeof LayoutAiApiApprovalsRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/ai-api': {
+      id: '/_layout/ai-api'
+      path: '/ai-api'
+      fullPath: '/ai-api'
+      preLoaderRoute: typeof LayoutAiApiRouteImport
+      parentRoute: typeof LayoutRoute
+    }
     '/_layout/admin': {
       id: '/_layout/admin'
       path: '/admin'
@@ -470,6 +508,8 @@ const LayoutAdminRouteWithChildren = LayoutAdminRoute._addFileChildren(
 
 interface LayoutRouteChildren {
   LayoutAdminRoute: typeof LayoutAdminRouteWithChildren
+  LayoutAiApiRoute: typeof LayoutAiApiRoute
+  LayoutAiApiApprovalsRoute: typeof LayoutAiApiApprovalsRoute
   LayoutApplicationsRoute: typeof LayoutApplicationsRoute
   LayoutApplicationsCreateRoute: typeof LayoutApplicationsCreateRoute
   LayoutApprovalsRoute: typeof LayoutApprovalsRoute
@@ -487,6 +527,8 @@ interface LayoutRouteChildren {
 
 const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutAdminRoute: LayoutAdminRouteWithChildren,
+  LayoutAiApiRoute: LayoutAiApiRoute,
+  LayoutAiApiApprovalsRoute: LayoutAiApiApprovalsRoute,
   LayoutApplicationsRoute: LayoutApplicationsRoute,
   LayoutApplicationsCreateRoute: LayoutApplicationsCreateRoute,
   LayoutApprovalsRoute: LayoutApprovalsRoute,

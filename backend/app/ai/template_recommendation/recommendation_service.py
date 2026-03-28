@@ -89,8 +89,12 @@ def _build_submission_reason(
 
 
 async def extract_intent_from_chat(request: ChatRequest) -> ExtractedIntent:
-    if not settings.vllm_model_name:
-        raise HTTPException(status_code=503, detail="VLLM_MODEL_NAME is required for AI planning.")
+    model_name = settings.resolved_vllm_model_name
+    if not model_name:
+        raise HTTPException(
+            status_code=503,
+            detail="AI model binding is missing in config/system-ai.json.",
+        )
 
     recent_messages = request.messages[-10:]
     user_messages: list[str] = []
@@ -111,7 +115,7 @@ async def extract_intent_from_chat(request: ChatRequest) -> ExtractedIntent:
     )
     payload = _apply_thinking_control(
         {
-            "model": settings.vllm_model_name,
+            "model": model_name,
             "messages": [{"role": "user", "content": prompt}],
             "max_tokens": 1024,
             "temperature": 0.1,
@@ -134,8 +138,12 @@ async def generate_ai_plan(
     *,
     resource_options: dict[str, Any] | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
-    if not settings.vllm_model_name:
-        raise HTTPException(status_code=503, detail="VLLM_MODEL_NAME is required for AI planning.")
+    model_name = settings.resolved_vllm_model_name
+    if not model_name:
+        raise HTTPException(
+            status_code=503,
+            detail="AI model binding is missing in config/system-ai.json.",
+        )
 
     del chat_history
 
@@ -213,7 +221,7 @@ async def generate_ai_plan(
     }
     payload = _apply_thinking_control(
         {
-            "model": settings.vllm_model_name,
+            "model": model_name,
             "messages": [
                 {
                     "role": "user",
