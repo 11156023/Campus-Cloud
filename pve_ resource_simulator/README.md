@@ -25,8 +25,7 @@ The simulator currently separates three layers:
 
 For live placement, the simulator currently uses:
 
-- Hour-specific `hourly[*].cpu_ratio` and `hourly[*].memory_ratio` first.
-- Fallback to profile `average_cpu_ratio` and `average_memory_ratio`.
+- The highest of hour-specific `hourly[*]`, profile `trend_*`, and profile `average_*` for CPU and RAM baseline sizing.
 - Peak guard from hour-specific `peak_*`, then profile `peak_*`.
 
 Effective requested resources are calculated conservatively:
@@ -40,9 +39,25 @@ Server choice is based on the lowest projected score after placement:
 - weighted dominant share across CPU, RAM, Disk, and optional GPU
 - contention penalty for CPU and Disk
 - hard overflow penalty for RAM
+- soft penalty for elevated host `loadavg`
 - tie-breakers: average weighted share, physical CPU share, placement count, server name
 
 If no node fits directly and `allow_rebalance=true`, the simulator searches a local rebalance of up to 2 moves and applies a migration cost when scoring move targets.
+
+## Parameter Tuning Notes
+
+Not every constant here should be treated as a machine-learned hyperparameter.
+
+As a practical rule:
+
+- Keep structural constants stable first: `EPSILON`, margins, floors, peak margins, rebalance move limit, migration cost.
+- Only calibrate policy constants later: CPU overcommit, RAM usable ratio, safe/max share thresholds, loadavg thresholds, and share weights.
+
+Plain-language version:
+
+- Some numbers define the shape of the simulator itself, so changing them too early just makes behavior harder to reason about.
+- The numbers most worth tuning are the ones that reflect campus operating policy, such as how aggressive CPU overcommit should be or how much host loadavg should lower placement priority.
+- If you want to optimize them in the future, replay historical data first and use offline evaluation or search-based tuning before considering AI-driven optimization.
 
 ## Run
 

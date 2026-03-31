@@ -2,290 +2,375 @@
 
 ## 目的
 
-這份文件說明目前 `pve_ resource_simulator` 的實際放置與計算方式，內容以現在程式行為為準，不是早期設計稿。
+`pve_ resource_simulator` 用來模擬「如果現在要把一批 VM 放進叢集，系統大概會怎麼選 host」。
 
-目前這版 simulator 的核心目標是：
+它不是在做理論上的全域最佳化，而是在做一個夠實用、夠容易理解、也夠接近真實 PVE 管理情境的 placement 模型。
 
-- 以目前叢集狀態為起點做 placement 模擬
-- 用同規格 VM 的歷史資料估算「有效需求」
-- 用 weighted dominant share 挑選最不容易失衡的 node
-- 在必要時嘗試小範圍 rebalance，而不是直接宣告放不下
+這份文件分成兩層說明：
 
-## 資料來源
+- 規則層：程式實際怎麼算
+- 白話層：為什麼要這樣算
 
-模擬器有兩種常見輸入來源：
+## 整體流程
 
-1. 使用者直接輸入 servers 與 VM templates
-2. 由 monthly analytics 轉成 live scenario
+每個小時的模擬大致分成這幾步：
 
-live scenario 目前只會使用：
+1. 先找出這個時段有哪些 VM reservation 真的在啟用
+2. 如果有歷史資料，就把 request 規格換成較接近真實使用量的 effective demand
+3. 依序嘗試把 VM 放到最適合的 server
+4. 如果沒有直接可放的 host，而且允許 rebalance，就嘗試做少量搬移
+5. placement 完成後，再額外評估 peak risk
 
-- `status == "online"` 的 node
-- 有完整 CPU / RAM / Disk 容量資訊的 node
+白話講：
 
-並把 Proxmox 即時使用量轉成 simulator 的初始已用量：
+- 不是只看表單寫幾顆 CPU、幾 GB RAM
+- 也不是只看現在哪台最空
+- 而是先估這台 VM「通常真的會吃多少」，再看「放上去之後哪台最不容易變糟」
 
-- `cpu_used`
-- `memory_used_gb`
-- `disk_used_gb`
+## 歷史訊號
 
-## 歷史分析資料的語意
+monthly analytics 會整理三類訊號：
 
-monthly analytics 現在會輸出三組不同語意的指標：
+- `average_*`: 整個月的加權平均
+- `trend_*`: 最近一段時間的趨勢值，使用 EWMA
+- `peak_*`: 高峰值，使用加權 P95
 
-- `average_*`: weighted mean
-- `trend_*`: 依時間順序計算的 EWMA
-- `peak_*`: weighted P95
+另外還有每小時的 `hourly[*]`：
 
-其中 simulator 目前的 placement 還沒有直接使用 `trend_*`，它主要保留給 UI 或後續 admission policy。
+- `hourly[*].cpu_ratio`
+- `hourly[*].memory_ratio`
+- `hourly[*].disk_ratio`
+- `hourly[*].peak_cpu_ratio`
+- `hourly[*].peak_memory_ratio`
+- `hourly[*].peak_disk_ratio`
+- `hourly[*].loadavg_1`
 
-### hourly 欄位的語意
+白話講：
 
-每個 `hourly[*]` 目前代表：
+- `average_*` 是「平常大概這樣」
+- `trend_*` 是「最近有沒有變忙」
+- `peak_*` 是「忙起來最容易衝到哪」
+- `hourly[*]` 是「上午 9 點跟晚上 11 點，其實可能完全不是同一種負載」
 
-- `cpu_ratio / memory_ratio / disk_ratio`: 同時段 weighted mean
-- `peak_cpu_ratio / peak_memory_ratio / peak_disk_ratio`: 同時段 weighted P95
+## Effective Demand
 
-所以現在的資料語意是：
+### CPU / RAM baseline
 
-- `average_*` = 全月平均負載
-- `trend_*` = 最近趨勢
-- `peak_*` = 全月高分位負載
-- `hourly[*].*_ratio` = 同時段平均
-- `hourly[*].peak_*` = 同時段高分位
+如果某個 VM type 有對應的歷史 profile，系統不會直接拿 request 值去算，而是先估一個 baseline。
 
-## 模擬時怎麼決定一台 VM 的有效需求
-
-目前 simulator 會先找同規格歷史 profile：
-
-- 規格鍵值是 `configured_cpu_cores + configured_memory_gb`
-- 例如 `2 vCPU / 4 GiB`
-
-如果找到同規格 profile，會優先拿「當前 hour 的 hourly baseline」；如果該小時沒有資料，再退回 profile 的 `average_*`。
-
-### CPU baseline
+CPU：
 
 ```text
 effective_cpu = min(requested_cpu, max(requested_cpu * cpu_ratio * 1.4, requested_cpu * 0.35))
 ```
 
-目前常數：
-
-- `CPU_MARGIN = 1.4`
-- `CPU_FLOOR_RATIO = 0.35`
-
-語意是：
-
-- 先用歷史 CPU ratio 估算常態需求
-- 再乘上安全 margin
-- 但至少保留原始申請 CPU 的 35%
-- 最後不超過原始申請值
-
-### RAM baseline
+RAM：
 
 ```text
 effective_ram = min(requested_ram, max(requested_ram * memory_ratio * 1.15, requested_ram * 0.5))
 ```
 
-目前常數：
+目前 `cpu_ratio` / `memory_ratio` 的選法是：
 
-- `RAM_MARGIN = 1.15`
-- `RAM_FLOOR_RATIO = 0.5`
+```text
+max(hourly_ratio, trend_ratio, average_ratio)
+```
 
-語意和 CPU 相同，但 RAM floor 更高，避免過度樂觀。
+也就是：
+
+- 優先吃到這個時段的歷史行為
+- 同時考慮最近有沒有升溫
+- 避免只看 average 對近期變化太遲鈍
+
+白話講：
+
+- 如果歷史上這類 VM 通常只吃 30% CPU，就不用每台都當成滿載去算
+- 但也不能太樂觀，所以還是會乘上一點 margin
+- 同時設 floor，避免把「很少用」誤判成「幾乎不用」
 
 ### Peak guard
 
-peak 不是直接拿最大值，而是：
+placement 完之後，還會再估這台 VM 如果碰到高峰，大概會到哪裡。
 
-- 先看 `hourly[*].peak_*`
-- 沒有 hourly peak 時，退回 profile `peak_*`
-- 如果連 profile peak 都沒有，就退回 baseline
-
-peak demand 的估算方式：
+CPU：
 
 ```text
 peak_cpu = min(requested_cpu, max(requested_cpu * peak_cpu_ratio * 1.1, effective_cpu))
+```
+
+RAM：
+
+```text
 peak_ram = min(requested_ram, max(requested_ram * peak_memory_ratio * 1.05, effective_ram))
 ```
 
-目前常數：
+白話講：
 
-- `CPU_PEAK_MARGIN = 1.1`
-- `RAM_PEAK_MARGIN = 1.05`
+- baseline 是拿來決定「平常放不放得下」
+- peak guard 是拿來提醒「平常放得下，不代表尖峰也舒服」
 
-### Disk 與 GPU
+### Disk / GPU
 
-目前不使用歷史 profile 縮小：
+目前 disk 與 GPU 仍直接使用 request 值，不做歷史縮放。
 
-- Disk 直接用 requested value
-- GPU 直接用 requested value
+白話講：
 
-## 可放置判斷
+- CPU / RAM 比較像彈性使用量
+- Disk / GPU 更像明確配額，所以先不要縮
 
-一台 VM 能不能放進某台 server，先看 hard fit：
+## Hard Fit
 
-- CPU 以 overcommit 後的 schedulable capacity 判斷
-- RAM 以 safety buffer 後的 schedulable capacity 判斷
-- Disk 必須真的有空間
-- GPU 必須真的有空間
+一台 host 必須先通過 hard fit，才會進入 scoring。
 
-目前常數：
+條件如下：
+
+- CPU 用 overcommit 後的 schedulable capacity 判斷
+- RAM 用 safety buffer 後的 schedulable capacity 判斷
+- Disk 不能超過實體剩餘
+- GPU 不能超過實體剩餘
+
+公式：
+
+```text
+cpu_schedulable_capacity = total_cpu * CPU_OVERCOMMIT_RATIO
+memory_schedulable_capacity = total_memory * RAM_USABLE_RATIO
+```
+
+預設：
 
 - `CPU_OVERCOMMIT_RATIO = 4.0`
 - `RAM_USABLE_RATIO = 0.9`
 
-也就是：
+白話講：
 
-- CPU 排程容量 = `total_cpu * 4.0`
-- RAM 排程容量 = `total_memory * 0.9`
+- CPU 允許超賣，因為大多數 VM 不會同時滿載
+- RAM 比較保守，因為記憶體爆掉的代價比 CPU contention 更難受
 
-這代表 CPU 是 soft limit，RAM 比較接近 hard reservation。
+## Placement Score
 
-## Server 選擇規則
+通過 hard fit 的 host，會再用 score 排序。分數越低越好。
 
-如果多台 server 都放得下，模擬器會比較「放進去之後哪一台最穩」。
+排序核心：
 
-### 1. 先算 projected weighted share
+1. `projected_dominant_share + resource_penalty + migration_cost`
+2. projected average weighted share
+3. projected physical CPU share
+4. 目前已放 VM 數量
+5. server name
 
-每台 server 都會計算放入後的 share：
+### Weighted dominant share
+
+先算放上去之後的各種 share：
 
 - CPU share = `(used_cpu + vm_cpu) / cpu_schedulable_capacity`
 - RAM share = `(used_memory + vm_memory) / memory_schedulable_capacity`
 - Disk share = `(used_disk + vm_disk) / total_disk`
 - GPU share = `(used_gpu + vm_gpu) / total_gpu`
 
-再乘上權重：
+再套權重：
 
 - `CPU_SHARE_WEIGHT = 1.0`
 - `MEMORY_SHARE_WEIGHT = 1.2`
 - `DISK_SHARE_WEIGHT = 1.5`
 - `GPU_SHARE_WEIGHT = 3.0`
 
-weighted dominant share 定義為：
+最後取最大值：
 
 ```text
-max(weighted_cpu_share, weighted_memory_share, weighted_disk_share, weighted_gpu_share)
+dominant_share = max(weighted_cpu, weighted_memory, weighted_disk, weighted_gpu)
 ```
 
-這表示：
+白話講：
 
-- RAM 比 CPU 更敏感
-- Disk 比 RAM 更敏感
-- GPU 最敏感
+- 不是看平均空不空
+- 是看「最痛的那個資源」痛到什麼程度
+- 哪台放上去後最不容易出現單點瓶頸，就先選哪台
 
-### 2. 再加 contention penalty
+## Resource Penalty
 
-除了 weighted share，本版還會對過高 share 額外加 penalty。
+### CPU contention penalty
 
-#### CPU penalty
+CPU 另外會看實體核心壓力：
 
 - `CPU_SAFE_SHARE = 0.7`
 - `CPU_MAX_SHARE = 1.2`
-
-當 projected physical CPU share：
-
-- 小於等於 `0.7` 時，penalty = `0`
-- 大於等於 `1.2` 時，penalty = `1`
-- 中間線性增加
-
-再乘上：
-
 - `CPU_CONTENTION_WEIGHT = 2.0`
 
-#### RAM penalty
+意思是：
 
-RAM policy share 如果大於 `1.0`，直接加 hard overflow penalty：
+- 小於 `0.7` 幾乎不罰
+- 大於 `1.2` 罰滿
+- 中間線性增加
+
+白話講：
+
+- 即使 policy 上允許 CPU overcommit
+- 也不代表實體 CPU 已經很擠時還要繼續無腦堆
+
+### RAM overflow penalty
 
 - `MEMORY_OVERFLOW_WEIGHT = 5.0`
 
-因為 RAM 不希望靠 overcommit 撐過去。
+如果 RAM policy share 超過 `1.0`，就直接給很重的 penalty。
 
-#### Disk penalty
+白話講：
+
+- CPU 擠一點，通常只是變慢
+- RAM 爆掉，體感通常更差，所以這邊故意比較兇
+
+### Disk contention penalty
 
 - `DISK_SAFE_SHARE = 0.75`
 - `DISK_MAX_SHARE = 0.95`
 - `DISK_CONTENTION_WEIGHT = 1.5`
 
-share 越接近滿盤，分數越差。
+白話講：
 
-### 3. 最終排序鍵
+- 磁碟快滿時，延遲和維運壓力都會上來
+- 所以不是等到 100% 才覺得危險
 
-目前放置排序鍵是：
+### Loadavg soft penalty
 
-1. `projected_dominant_share + resource_penalty + migration_cost`
-2. projected average weighted share
-3. projected physical CPU share
-4. 目前已放置 VM 數量
-5. server name
+loadavg 不做 hard reject，而是 soft penalty。
 
-所以它不只是「dominant share 最低」，而是：
+目前使用：
 
-`weighted dominant share + contention penalty 最低`
+- `LOADAVG_WARN_PER_CORE = 0.8`
+- `LOADAVG_MAX_PER_CORE = 1.5`
+- `LOADAVG_PENALTY_WEIGHT = 0.9`
 
-## Local rebalance
+系統會先算：
 
-如果一台新 VM 沒有任何 server 可以直接放入，而且 `allow_rebalance = true`，模擬器會嘗試 local rebalance。
+```text
+loadavg_per_core = max(current_loadavg_1, average_loadavg_1) / total_cpu
+```
 
-目前規則：
+再把這個值轉成 penalty。
 
-- 最多遞迴搜尋 `LOCAL_REBALANCE_MAX_MOVES = 2`
-- 先從最緊的 server 開始找移動來源
-- 優先移動較重的 VM
-- 移動目標仍然用同一套 placement score
-- move target 會額外加上 `MIGRATION_COST = 0.15`
+白話講：
 
-這代表 rebalance 是：
+- 某台 host 規格看起來夠，不代表它現在就適合再塞新東西
+- loadavg 是在補足「當下這台真的很忙」這種 average 不一定看得出的情況
+- 但它只是降權，不是一票否決
 
-- 小範圍
-- 有成本
-- 只在直接放不下時才觸發
+## Local Rebalance
 
-不是全域最佳化，也不是大規模重排。
+如果沒有 host 能直接放下來，而且 `allow_rebalance = true`，系統會嘗試做少量搬移。
 
-## Peak risk 判斷
+目前上限：
 
-placement 完成後，每筆 calculation row 還會做 peak risk 評估。
+- `LOCAL_REBALANCE_MAX_MOVES = 2`
+- `MIGRATION_COST = 0.15`
 
-它會把該 VM 的 baseline demand 換成 peak demand，再看放上去後的 CPU / RAM share。
+做法是：
 
-目前門檻：
+1. 先找最值得搬的 VM
+2. 找搬過去分數最好的目標 host
+3. 看搬 1 台或 2 台後，是否能把新 VM 放進來
 
-- CPU warning/high: `0.7 / 1.2`
-- RAM warning/high: `0.8 / 0.85`
+白話講：
 
-輸出結果：
+- 這不是在做複雜的全域最佳化
+- 只是想模擬管理者常做的那種「挪一兩台，就能把新申請塞進來」的操作
+
+## Peak Risk
+
+placement 完成後，每筆 calculation row 會再標記 peak risk：
 
 - `safe`
 - `guarded`
 - `high`
 
-這個欄位目前主要是風險提示，不是 admission hard reject。
+判斷門檻：
 
-## 目前版本最重要的設計選擇
+- CPU warning/high: `0.7 / 1.2`
+- RAM warning/high: `0.8 / 0.85`
 
-### 已經做到的
+白話講：
 
-- CPU 可 overcommit，但會有 contention penalty
-- RAM 保留 safety buffer，不靠大量 overcommit
-- baseline、trend、peak 三種語意已分開
-- average 與 peak 都保留 `0`，不再把 idle VM 當缺值
-- hourly peak 已可用於 same-hour risk / sizing
-- direct fit 失敗後，會先做小範圍 rebalance
+- 這不是 admission hard reject
+- 是在提醒「平常 OK，但高峰時可能開始不舒服」
 
-### 還沒有做到的
+## 參數怎麼看
 
-- 用 `trend_*` 直接驅動 placement
-- weighted percentile interpolation
-- host loadavg 直接參與 fit gate
-- NUMA / affinity / anti-affinity
-- HA reserve
-- IOPS / latency-aware storage policy
-- ballooning / memory reclaim
-- global optimal rebalance
+這些常數不要全部當成需要 AI 訓練的超參數。
 
-## 一句話總結
+比較好的分類方式是：
 
-目前這版的實際策略是：
+### 1. 幾乎固定的工程常數
 
-`先用同規格 VM 的同時段 weighted mean 估 baseline，用 P95 當 peak guard，再把新 VM 放到 weighted dominant share 與 contention score 最低的 node；若直接放不下，就只做最多 2 步的 local rebalance。`
+這類先不要亂調：
+
+- `EPSILON`
+- `CPU_MARGIN`
+- `RAM_MARGIN`
+- `CPU_FLOOR_RATIO`
+- `RAM_FLOOR_RATIO`
+- `CPU_PEAK_MARGIN`
+- `RAM_PEAK_MARGIN`
+- `LOCAL_REBALANCE_MAX_MOVES`
+- `MIGRATION_COST`
+
+白話講：
+
+- 這些比較像「模型骨架」
+- 調了會影響整體邏輯風格，不是一般營運微調
+
+### 2. 值得校準的 policy 參數
+
+這類才值得之後慢慢調：
+
+- `CPU_OVERCOMMIT_RATIO`
+- `RAM_USABLE_RATIO`
+- `CPU_SAFE_SHARE`
+- `CPU_MAX_SHARE`
+- `DISK_SAFE_SHARE`
+- `DISK_MAX_SHARE`
+- `LOADAVG_WARN_PER_CORE`
+- `LOADAVG_PENALTY_WEIGHT`
+- `CPU_SHARE_WEIGHT`
+- `MEMORY_SHARE_WEIGHT`
+- `DISK_SHARE_WEIGHT`
+- `GPU_SHARE_WEIGHT`
+
+白話講：
+
+- 這些比較像營運 policy
+- 學校環境、host 等級、使用習慣不同，合理值也可能不同
+
+## 要不要用 AI 訓練這些參數
+
+目前不建議直接用 AI 去「訓練」這些常數。
+
+原因很簡單：
+
+- 這些大多是 rule-based policy，不是語言模型擅長直接學的東西
+- 如果沒有明確標註目標，例如「placement 後是否卡頓」、「是否爆 RAM」、「是否使用者抱怨」，模型其實不知道該往哪裡調
+- 太早讓 AI 直接優化，很容易只是 overfit 模擬器
+
+比較務實的做法是：
+
+1. 先把高影響參數做成 config
+2. 收集真實營運資料
+3. 用 replay 或 simulator 做離線評估
+4. 再用 grid search 或 Bayesian optimization 微調少數 policy 參數
+
+白話講：
+
+- 先別急著讓 AI 幫你調數字
+- 先知道哪些數字真的會影響結果
+- 等有真實資料，再去校準，會比現在直接訓練更可靠
+
+## 總結
+
+這套 simulator 的核心精神是：
+
+- CPU 可以超賣，但不能假裝實體壓力不存在
+- RAM 要保守，避免 placement 看起來成功、實際體感很差
+- average、trend、peak 要一起看，不能只看單一指標
+- loadavg 用來補足「這台 host 現在其實很忙」的現場資訊
+- rebalance 只做小範圍，追求實用而不是數學上的最優解
+
+一句話版：
+
+「先用歷史資料把 request 變得比較像真實需求，再挑那台放上去後最不容易變成瓶頸的 host；如果 host 當下很忙，就降權，但不急著直接拒絕。」

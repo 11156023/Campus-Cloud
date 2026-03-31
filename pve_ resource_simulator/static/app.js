@@ -438,6 +438,16 @@ function renderServerBoard() {
     ? currentHourResult.states[state.currentStep]?.servers
     : state.servers.map((server) => ({
         name: server.name,
+        total: {
+          cpu_cores: Number(server.cpu_cores || 0),
+          memory_gb: Number(server.memory_gb || 0),
+          disk_gb: Number(server.disk_gb || 0),
+        },
+        used: {
+          cpu_cores: Number(server.cpu_used || 0),
+          memory_gb: Number(server.memory_used_gb || 0),
+          disk_gb: Number(server.disk_used_gb || 0),
+        },
         remaining: {
           cpu_cores: Number(server.cpu_cores) - Number(server.cpu_used || 0),
           memory_gb: Number(server.memory_gb) - Number(server.memory_used_gb || 0),
@@ -458,16 +468,32 @@ function renderServerBoard() {
           </div>
           <div class="server-footer">
             <h3>${escapeHtml(server.name)}</h3>
-            <p class="server-meta">
-              CPU ${formatCompact(server.remaining?.cpu_cores)} schedulable ·
-              RAM ${formatCompact(server.remaining?.memory_gb)} safe ·
-              Disk ${formatCompact(server.remaining?.disk_gb)} free
-            </p>
+            <p class="server-meta">${escapeHtml(formatServerMeta(server))}</p>
           </div>
         </article>
       `,
     )
     .join("");
+}
+
+function formatServerMeta(server) {
+  const cpuPhysicalFree = Math.max(
+    Number(server.total?.cpu_cores || 0) - Number(server.used?.cpu_cores || 0),
+    0,
+  );
+  const memoryPhysicalFree = Math.max(
+    Number(server.total?.memory_gb || 0) - Number(server.used?.memory_gb || 0),
+    0,
+  );
+  const cpuPolicyFree = Math.max(Number(server.remaining?.cpu_cores || 0), 0);
+  const memoryPolicyFree = Math.max(Number(server.remaining?.memory_gb || 0), 0);
+  const diskFree = Math.max(Number(server.remaining?.disk_gb || 0), 0);
+
+  return [
+    `CPU ${formatCompact(cpuPhysicalFree)} physical free / ${formatCompact(cpuPolicyFree)} policy`,
+    `RAM ${formatCompact(memoryPhysicalFree)} physical free / ${formatCompact(memoryPolicyFree)} safe`,
+    `Disk ${formatCompact(diskFree)} free`,
+  ].join(" | ");
 }
 
 function syncSlider() {

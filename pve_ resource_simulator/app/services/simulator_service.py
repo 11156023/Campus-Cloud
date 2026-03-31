@@ -27,32 +27,35 @@ from app.schemas import (
 from app.services import proxmox_analytics_service
 
 
-EPSILON = 1e-9
-CPU_OVERCOMMIT_RATIO = 4.0
-RAM_USABLE_RATIO = 0.9
-CPU_SAFE_SHARE = 0.7
-CPU_MAX_SHARE = 1.2
-DISK_SAFE_SHARE = 0.75
-DISK_MAX_SHARE = 0.95
-CPU_SHARE_WEIGHT = 1.0
-MEMORY_SHARE_WEIGHT = 1.2
-DISK_SHARE_WEIGHT = 1.5
-GPU_SHARE_WEIGHT = 3.0
-CPU_CONTENTION_WEIGHT = 2.0
-MEMORY_OVERFLOW_WEIGHT = 5.0
-DISK_CONTENTION_WEIGHT = 1.5
-MIGRATION_COST = 0.15
-LOCAL_REBALANCE_MAX_MOVES = 2
-CPU_MARGIN = 1.4
-RAM_MARGIN = 1.15
-CPU_FLOOR_RATIO = 0.35
-RAM_FLOOR_RATIO = 0.5
-CPU_PEAK_MARGIN = 1.1
-RAM_PEAK_MARGIN = 1.05
-CPU_PEAK_WARN_SHARE = CPU_SAFE_SHARE
-CPU_PEAK_HIGH_SHARE = CPU_MAX_SHARE
-RAM_PEAK_WARN_SHARE = 0.8
-RAM_PEAK_HIGH_SHARE = 0.85
+EPSILON = 1e-9  # 浮點數比較用的極小容忍值，避免邊界誤差。
+CPU_OVERCOMMIT_RATIO = 2.0  # CPU 的 policy 容量 = 實體 CPU * 這個倍率；代表 placement 允許 CPU overcommit。
+RAM_USABLE_RATIO = 0.9  # 只有這個比例的實體 RAM 會被視為可分配，保留一部分安全緩衝。
+CPU_SAFE_SHARE = 0.7  # 實體 CPU share 低於這個值時，不加 CPU contention penalty。
+CPU_MAX_SHARE = 1.2  # 實體 CPU share 高於這個值時，CPU contention penalty 視為滿額。
+DISK_SAFE_SHARE = 0.75  # Disk share 低於這個值時，不加 disk contention penalty。
+DISK_MAX_SHARE = 0.95  # Disk share 高於這個值時，disk contention penalty 視為滿額。
+CPU_SHARE_WEIGHT = 1.0  # CPU share 在 dominant-share scoring 裡的權重。
+MEMORY_SHARE_WEIGHT = 1.2  # RAM share 的權重；記憶體壓力比 CPU 更敏感，所以略高。
+DISK_SHARE_WEIGHT = 1.5  # Disk share 的權重；磁碟越接近滿載，應越早降低優先權。
+GPU_SHARE_WEIGHT = 3.0  # GPU share 的權重；GPU 稀缺，所以不平衡要重罰。
+CPU_CONTENTION_WEIGHT = 2.0  # CPU contention penalty 在最終 placement score 裡的倍率。
+MEMORY_OVERFLOW_WEIGHT = 5.0  # RAM 超過 policy 容量時的重罰倍率。
+DISK_CONTENTION_WEIGHT = 1.5  # Disk contention penalty 在最終 placement score 裡的倍率。
+MIGRATION_COST = 0.15  # rebalance 搬移時額外加上的成本，表示搬移有代價但不是完全不能做。
+LOCAL_REBALANCE_MAX_MOVES = 2  # local rebalance 最多只搜尋這麼多次搬移，保持小範圍且可解釋。
+CPU_MARGIN = 1.4  # 用歷史 CPU ratio 估 baseline demand 時乘上的安全倍率。
+RAM_MARGIN = 1.15  # 用歷史 RAM ratio 估 baseline demand 時乘上的安全倍率。
+CPU_FLOOR_RATIO = 0.35  # baseline CPU demand 最低不會低於申請 CPU 的這個比例。
+RAM_FLOOR_RATIO = 0.5  # baseline RAM demand 最低不會低於申請 RAM 的這個比例。
+CPU_PEAK_MARGIN = 1.1  # 用歷史 peak CPU ratio 估 peak risk 時再加上的保守倍率。
+RAM_PEAK_MARGIN = 1.05  # 用歷史 peak RAM ratio 估 peak risk 時再加上的保守倍率。
+CPU_PEAK_WARN_SHARE = CPU_SAFE_SHARE  # CPU peak-risk 的 warning 門檻。
+CPU_PEAK_HIGH_SHARE = CPU_MAX_SHARE  # CPU peak-risk 的 high 門檻。
+RAM_PEAK_WARN_SHARE = 0.8  # RAM peak-risk 的 warning 門檻。
+RAM_PEAK_HIGH_SHARE = 0.85  # RAM peak-risk 的 high 門檻。
+LOADAVG_WARN_PER_CORE = 0.8  # 每核心 loadavg 到這個程度後，host 會開始被降權。
+LOADAVG_MAX_PER_CORE = 1.5  # 每核心 loadavg 到這個程度後，loadavg penalty 視為滿額。
+LOADAVG_PENALTY_WEIGHT = 0.9  # loadavg soft penalty 的倍率；只降低優先權，不直接 hard reject。
 
 
 @dataclass
@@ -72,6 +75,8 @@ class _WorkingServer:
     used_memory: float
     used_disk: float
     used_gpu: float
+    current_loadavg_1: float | None = None
+    average_loadavg_1: float | None = None
     placed_vms: list[_PlacedVm] = field(default_factory=list)
 
     @property
@@ -142,6 +147,8 @@ async def build_live_scenario() -> DefaultScenarioResponse:
             memory_used_gb=(node.total_memory_gb or 0.0) * (node.current_memory_ratio or 0.0),
             disk_used_gb=(node.total_disk_gb or 0.0) * (node.current_disk_ratio or 0.0),
             gpu_used=0,
+            current_loadavg_1=(node.current_loadavg[0] if node.current_loadavg else None),
+            average_loadavg_1=node.average_loadavg_1,
         )
         for node in analytics.nodes
         if node.status == "online"
@@ -303,6 +310,7 @@ def _run_hour_simulation(
                 reason=_build_rebalance_reason(
                     template=template,
                     server_name=server_name,
+                    server=_server_by_name(servers, server_name),
                     previous_assignments=previous_assignments,
                     current_assignments=assignment_map,
                 ),
@@ -439,6 +447,8 @@ def _to_working_server(server: ServerInput) -> _WorkingServer:
         used_memory=float(server.memory_used_gb),
         used_disk=float(server.disk_used_gb),
         used_gpu=float(server.gpu_used),
+        current_loadavg_1=server.current_loadavg_1,
+        average_loadavg_1=server.average_loadavg_1,
     )
 
 
@@ -483,11 +493,15 @@ def _effective_template_for_hour(
         }
 
     hour_point = next((item for item in profile.hourly if item.hour == hour), None)
-    cpu_ratio = hour_point.cpu_ratio if hour_point and hour_point.cpu_ratio is not None else profile.average_cpu_ratio
-    memory_ratio = (
-        hour_point.memory_ratio
-        if hour_point and hour_point.memory_ratio is not None
-        else profile.average_memory_ratio
+    cpu_ratio = _select_effective_ratio(
+        hourly_ratio=hour_point.cpu_ratio if hour_point else None,
+        trend_ratio=profile.trend_cpu_ratio,
+        average_ratio=profile.average_cpu_ratio,
+    )
+    memory_ratio = _select_effective_ratio(
+        hourly_ratio=hour_point.memory_ratio if hour_point else None,
+        trend_ratio=profile.trend_memory_ratio,
+        average_ratio=profile.average_memory_ratio,
     )
     peak_cpu_ratio = (
         hour_point.peak_cpu_ratio
@@ -559,6 +573,18 @@ def _effective_template_for_hour(
         "cpu_ratio": cpu_ratio,
         "memory_ratio": memory_ratio,
     }
+
+
+def _select_effective_ratio(
+    *,
+    hourly_ratio: float | None,
+    trend_ratio: float | None,
+    average_ratio: float | None,
+) -> float | None:
+    candidates = [value for value in (hourly_ratio, trend_ratio, average_ratio) if value is not None]
+    if not candidates:
+        return None
+    return max(candidates)
 
 
 def _effective_requested_value(
@@ -791,6 +817,8 @@ def _snapshot_server(server: _WorkingServer) -> ServerSnapshot:
         dominant_share=round(_dominant_share(server), 4),
         average_share=round(_average_share(server), 4),
         placement_count=server.placement_count,
+        current_loadavg_1=server.current_loadavg_1,
+        average_loadavg_1=server.average_loadavg_1,
         placed_vms=[item.template.name for item in server.placed_vms],
         vm_stack=[
             VmStackItem(name=name, count=count)
@@ -946,10 +974,12 @@ def _resource_penalty(server: _WorkingServer, template: VMTemplate) -> float:
     cpu_penalty = _cpu_contention_penalty(projected_cpu_share)
     memory_penalty = 1.0 if projected_memory_share > 1.0 + EPSILON else 0.0
     disk_penalty = _disk_latency_penalty(projected_disk_share)
+    loadavg_penalty = _loadavg_penalty(_server_loadavg_per_core(server))
     return (
         (cpu_penalty * CPU_CONTENTION_WEIGHT)
         + (memory_penalty * MEMORY_OVERFLOW_WEIGHT)
         + (disk_penalty * DISK_CONTENTION_WEIGHT)
+        + (loadavg_penalty * LOADAVG_PENALTY_WEIGHT)
     )
 
 
@@ -967,6 +997,41 @@ def _disk_latency_penalty(share: float) -> float:
     if share >= DISK_MAX_SHARE:
         return 1.0
     return (share - DISK_SAFE_SHARE) / (DISK_MAX_SHARE - DISK_SAFE_SHARE)
+
+
+def _loadavg_penalty(loadavg_per_core: float | None) -> float:
+    if loadavg_per_core is None or loadavg_per_core <= LOADAVG_WARN_PER_CORE:
+        return 0.0
+    if loadavg_per_core >= LOADAVG_MAX_PER_CORE:
+        return 1.0
+    return (loadavg_per_core - LOADAVG_WARN_PER_CORE) / (LOADAVG_MAX_PER_CORE - LOADAVG_WARN_PER_CORE)
+
+
+def _server_reference_loadavg_1(server: _WorkingServer | ServerSnapshot) -> float | None:
+    candidates = [
+        value
+        for value in (
+            getattr(server, "current_loadavg_1", None),
+            getattr(server, "average_loadavg_1", None),
+        )
+        if value is not None
+    ]
+    if not candidates:
+        return None
+    return max(candidates)
+
+
+def _server_loadavg_per_core(server: _WorkingServer | ServerSnapshot) -> float | None:
+    total_cpu = getattr(server, "total_cpu", None)
+    if total_cpu is None:
+        total = getattr(server, "total", None)
+        total_cpu = getattr(total, "cpu_cores", None)
+    if total_cpu is None or total_cpu <= EPSILON:
+        return None
+    loadavg_1 = _server_reference_loadavg_1(server)
+    if loadavg_1 is None:
+        return None
+    return loadavg_1 / total_cpu
 
 
 def _projected_physical_cpu_share(server: _WorkingServer, template: VMTemplate) -> float:
@@ -996,6 +1061,8 @@ def _clone_servers(servers: list[_WorkingServer]) -> list[_WorkingServer]:
             used_memory=server.used_memory,
             used_disk=server.used_disk,
             used_gpu=server.used_gpu,
+            current_loadavg_1=server.current_loadavg_1,
+            average_loadavg_1=server.average_loadavg_1,
             placed_vms=[
                 _PlacedVm(
                     template_id=item.template_id,
@@ -1107,6 +1174,7 @@ def _build_rebalance_reason(
     *,
     template: VMTemplate,
     server_name: str,
+    server: _WorkingServer,
     previous_assignments: dict[str, str],
     current_assignments: dict[str, str],
 ) -> str:
@@ -1115,12 +1183,28 @@ def _build_rebalance_reason(
         for template_id, previous_server in previous_assignments.items()
         if current_assignments.get(template_id) != previous_server
     ]
+    load_text = _server_load_warning_text(server)
     if moved:
         return (
             f"Placed {template.name} on {server_name}. "
             f"Auto-rebalanced {len(moved)} existing VM(s) across the cluster to free space."
+            f"{load_text}"
         )
-    return f"Placed {template.name} on {server_name} using the current cluster balance."
+    return (
+        f"Placed {template.name} on {server_name} using the current cluster balance."
+        f"{load_text}"
+    )
+
+
+def _server_load_warning_text(server: _WorkingServer | ServerSnapshot) -> str:
+    loadavg_1 = _server_reference_loadavg_1(server)
+    loadavg_per_core = _server_loadavg_per_core(server)
+    if loadavg_1 is None or loadavg_per_core is None or loadavg_per_core < LOADAVG_WARN_PER_CORE:
+        return ""
+    return (
+        f" Host loadavg is elevated at {loadavg_1:.2f} "
+        f"({loadavg_per_core:.2f} per core), so a soft penalty was applied instead of blocking placement."
+    )
 
 
 def _build_summary(
@@ -1193,6 +1277,15 @@ def _build_summary(
                 else "No node state is available."
             )
         )
+        load_warnings = [
+            f"{server.name} ({_server_reference_loadavg_1(server):.2f}, {_server_loadavg_per_core(server):.2f} per core)"
+            for server in final_servers
+            if _server_reference_loadavg_1(server) is not None
+            and _server_loadavg_per_core(server) is not None
+            and _server_loadavg_per_core(server) >= LOADAVG_WARN_PER_CORE
+        ]
+        if load_warnings:
+            narrative += " Loadavg penalty is active for: " + ", ".join(load_warnings) + "."
     return SimulationSummary(
         selected_vm_name=single_template.name if single_template else None,
         requested_vm_count=len(requested_templates),

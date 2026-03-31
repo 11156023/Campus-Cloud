@@ -42,6 +42,8 @@ class ServerInput(BaseModel):
     memory_used_gb: float = Field(default=0.0, ge=0.0)
     disk_used_gb: float = Field(default=0.0, ge=0.0)
     gpu_used: float = Field(default=0.0, ge=0.0)
+    current_loadavg_1: float | None = Field(default=None, ge=0.0)
+    average_loadavg_1: float | None = Field(default=None, ge=0.0)
 
     @model_validator(mode="after")
     def validate_usage(self) -> "ServerInput":
@@ -113,6 +115,8 @@ class ServerSnapshot(BaseModel):
     dominant_share: float = Field(default=0.0, ge=0.0)
     average_share: float = Field(default=0.0, ge=0.0)
     placement_count: int = Field(default=0, ge=0)
+    current_loadavg_1: float | None = Field(default=None, ge=0.0)
+    average_loadavg_1: float | None = Field(default=None, ge=0.0)
     placed_vms: list[str] = Field(default_factory=list)
     vm_stack: list[VmStackItem] = Field(default_factory=list)
 
