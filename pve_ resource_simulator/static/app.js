@@ -17,6 +17,7 @@ const state = {
 const elements = {
   form: document.querySelector("#vm-form"),
   name: document.querySelector("#vm-name"),
+  resourceType: document.querySelector("#vm-resource-type"),
   cpu: document.querySelector("#vm-cpu"),
   ram: document.querySelector("#vm-ram"),
   disk: document.querySelector("#vm-disk"),
@@ -144,6 +145,7 @@ function renderRangeSelects() {
 async function addVmFromForm() {
   clearError();
 
+  const resourceType = String(elements.resourceType?.value || "qemu");
   const cpu = Number(elements.cpu?.value || 0);
   const ram = Number(elements.ram?.value || 0);
   const disk = Number(elements.disk?.value || 0);
@@ -171,6 +173,7 @@ async function addVmFromForm() {
   state.vmList.push({
     id: `vm-${Date.now()}-${state.vmList.length + 1}`,
     name,
+    resource_type: resourceType,
     cpu_cores: cpu,
     memory_gb: ram,
     disk_gb: disk,
@@ -181,6 +184,7 @@ async function addVmFromForm() {
   });
 
   if (elements.name) elements.name.value = "";
+  if (elements.resourceType) elements.resourceType.value = "qemu";
   if (elements.cpu) elements.cpu.value = "2";
   if (elements.ram) elements.ram.value = "4";
   if (elements.disk) elements.disk.value = "40";
@@ -251,7 +255,7 @@ function renderVmList() {
         <article class="vm-item">
           <div class="vm-main">
             <p class="vm-name">${escapeHtml(vm.name)}</p>
-            <p class="vm-spec">CPU ${formatCompact(vm.cpu_cores)} · RAM ${formatCompact(vm.memory_gb)} GB · Disk ${formatCompact(vm.disk_gb)} GB</p>
+            <p class="vm-spec">${formatResourceType(vm.resource_type)} · CPU ${formatCompact(vm.cpu_cores)} · RAM ${formatCompact(vm.memory_gb)} GB · Disk ${formatCompact(vm.disk_gb)} GB</p>
             <p class="vm-slot-line">${escapeHtml(formatHoursAsSingleRange(vm.active_hours || []))}</p>
             <p class="vm-slot-line">${escapeHtml(historyHint)}</p>
           </div>
@@ -270,10 +274,14 @@ function renderVmList() {
 
 function findProfileHint(vm) {
   const match = state.historicalProfiles.find((profile) =>
-    Number(profile.configured_cpu_cores) === Number(vm.cpu_cores)
+    profile.resource_type === (vm.resource_type || "qemu")
+    && Number(profile.configured_cpu_cores) === Number(vm.cpu_cores)
     && Number(profile.configured_memory_gb) === Number(vm.memory_gb),
   );
   if (!match) {
+    if ((vm.resource_type || "qemu") === "lxc") {
+      return "No matching LXC history: use LXC baseline fallback.";
+    }
     return "No matching history: use conservative requested CPU / RAM.";
   }
   return `Historical type match: ${match.type_label} from ${match.guest_count} real guest(s).`;
@@ -321,28 +329,44 @@ function renderDayCalendar() {
   const counts = Array.from({ length: HOURS_IN_DAY }, (_, hour) => Number(reservations[String(hour)] || 0));
   const peakCount = Math.max(...counts, 0);
   const useHistoricalPeak = peakCount === 0 && state.historicalPeakHours.length > 0;
+  const historicalPeakAnalysis = useHistoricalPeak
+    ? buildHistoricalPeakAnalysis({
+        valuesByHour: state.historicalHourlyPeaks,
+        primaryPeakHours: state.historicalPeakHours,
+      })
+    : null;
 
   elements.dayCalendar.innerHTML = Array.from({ length: HOURS_IN_DAY }, (_, hour) => {
     const count = counts[hour];
     const selected = state.currentHour === hour;
     const busy = count > 0;
     const historicalPeakValue = state.historicalHourlyPeaks[String(hour)];
+    const historicalPeakTier = useHistoricalPeak
+      ? historicalPeakAnalysis?.tiers?.[hour] || "none"
+      : "none";
     const isPeak = useHistoricalPeak
-      ? state.historicalPeakHours.includes(hour)
+      ? historicalPeakTier === "peak"
       : peakCount > 0 && count === peakCount;
+    const historicalPeakClass = useHistoricalPeak
+      ? historicalPeakTierClass(historicalPeakTier)
+      : "";
     const peakTitle = useHistoricalPeak
-      ? "Historical PVE peak hour."
+      ? historicalPeakTitle(historicalPeakTier, historicalPeakValue)
       : `Peak hour with ${count} active VM reservation(s).`;
+    const peakPill = useHistoricalPeak
+      ? historicalPeakPill(historicalPeakTier)
+      : (isPeak ? { label: "PEAK", className: "" } : null);
+
     return `
       <button
-        class="calendar-hour ${selected ? "selected" : ""} ${busy ? "busy" : ""} ${isPeak ? "peak" : ""}"
+        class="calendar-hour ${selected ? "selected" : ""} ${busy ? "busy" : ""} ${isPeak ? "peak" : ""} ${historicalPeakClass}"
         type="button"
         data-hour-select="${hour}"
-        title="${isPeak ? peakTitle : `${count} active VM reservation(s).`}"
+        title="${peakPill ? peakTitle : `${count} active VM reservation(s).`}"
       >
         <span class="calendar-label-row">
           <span class="calendar-label">${formatHour(hour)}</span>
-          ${isPeak ? `<span class="calendar-peak-pill">${useHistoricalPeak ? "PVE PEAK" : "PEAK"}</span>` : ""}
+          ${peakPill ? `<span class="calendar-peak-pill ${peakPill.className}">${peakPill.label}</span>` : ""}
         </span>
         <span class="calendar-value-row">
           <span class="calendar-count">${count}</span>
@@ -486,6 +510,87 @@ function renderServerBoard() {
     .join("");
 }
 
+function buildHistoricalPeakAnalysis({ valuesByHour, primaryPeakHours }) {
+  const entries = Array.from({ length: HOURS_IN_DAY }, (_, hour) => ({
+    hour,
+    value: Number(valuesByHour?.[String(hour)] || 0),
+  }));
+  const positiveEntries = entries.filter((entry) => Number.isFinite(entry.value) && entry.value > 0);
+  if (!positiveEntries.length) {
+    return { tiers: {} };
+  }
+
+  const maxValue = Math.max(...positiveEntries.map((entry) => entry.value));
+  const closeToPeakCutoff = maxValue * 0.985;
+  const broadPeakCutoff = maxValue * 0.9;
+  const topFewPeakHours = positiveEntries
+    .slice()
+    .sort((left, right) => right.value - left.value || left.hour - right.hour)
+    .slice(0, 4)
+    .filter((entry) => entry.value >= broadPeakCutoff)
+    .map((entry) => entry.hour);
+
+  const peakHours = new Set([
+    ...primaryPeakHours,
+    ...positiveEntries
+      .filter((entry) => entry.value >= closeToPeakCutoff)
+      .map((entry) => entry.hour),
+    ...topFewPeakHours,
+  ]);
+  const tiers = {};
+
+  for (const entry of entries) {
+    if (peakHours.has(entry.hour)) {
+      tiers[entry.hour] = "peak";
+      continue;
+    }
+
+    if (entry.value >= maxValue * 0.6) {
+      tiers[entry.hour] = "high";
+      continue;
+    }
+
+    if (entry.value >= maxValue * 0.25) {
+      tiers[entry.hour] = "elevated";
+    }
+  }
+
+  return { tiers };
+}
+
+function historicalPeakTierClass(tier) {
+  if (tier === "high") return "historical-high";
+  if (tier === "elevated") return "historical-elevated";
+  return "";
+}
+
+function historicalPeakPill(tier) {
+  if (tier === "peak") {
+    return { label: "PVE PEAK", className: "is-peak" };
+  }
+  if (tier === "high") {
+    return { label: "PVE HIGH", className: "is-high" };
+  }
+  if (tier === "elevated") {
+    return { label: "PVE ELEV", className: "is-elevated" };
+  }
+  return null;
+}
+
+function historicalPeakTitle(tier, value) {
+  const formattedValue = formatCalendarPeakValue(value);
+  if (tier === "peak") {
+    return `Historical peak hour after nearby-hour smoothing. ${formattedValue}.`;
+  }
+  if (tier === "high") {
+    return `Historical near-peak hour after nearby-hour smoothing. ${formattedValue}.`;
+  }
+  if (tier === "elevated") {
+    return `Historical elevated hour after nearby-hour smoothing. ${formattedValue}.`;
+  }
+  return `Historical hour. ${formattedValue}.`;
+}
+
 function formatServerMeta(server) {
   const cpuPhysicalFree = Math.max(
     Number(server.total?.cpu_cores || 0) - Number(server.used?.cpu_cores || 0),
@@ -596,6 +701,10 @@ function formatHoursAsSingleRange(hours) {
 function formatCompact(value) {
   const numeric = Number(value || 0);
   return numeric % 1 === 0 ? String(numeric) : numeric.toFixed(1);
+}
+
+function formatResourceType(resourceType) {
+  return resourceType === "lxc" ? "LXC" : "VM";
 }
 
 function formatRatioSource(value, source) {

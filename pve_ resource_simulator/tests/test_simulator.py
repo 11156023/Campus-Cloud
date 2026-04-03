@@ -339,7 +339,7 @@ def test_historical_profile_reduces_effective_cpu_and_memory_when_available() ->
         ],
         historical_profiles=[
             HistoricalProfile(
-                type_label="2 vCPU / 2 GiB",
+                type_label="VM 2 vCPU / 2 GiB",
                 configured_cpu_cores=2,
                 configured_memory_gb=2,
                 guest_count=3,
@@ -374,7 +374,7 @@ def test_trend_ratio_participates_in_effective_baseline() -> None:
         ],
         historical_profiles=[
             HistoricalProfile(
-                type_label="2 vCPU / 4 GiB",
+                type_label="VM 2 vCPU / 4 GiB",
                 configured_cpu_cores=2,
                 configured_memory_gb=4,
                 guest_count=3,
@@ -394,6 +394,79 @@ def test_trend_ratio_participates_in_effective_baseline() -> None:
 
     assert calculation.effective_cpu_cores == pytest.approx(1.68)
     assert calculation.effective_memory_gb == pytest.approx(3.22)
+
+
+def test_lxc_without_history_uses_type_default_baseline() -> None:
+    request = SimulationRequest(
+        servers=[ServerInput(name="pve-a", cpu_cores=8, memory_gb=16, disk_gb=200)],
+        vm_templates=[
+            VMTemplate(
+                id="ct-1",
+                name="CT 1",
+                resource_type="lxc",
+                cpu_cores=2,
+                memory_gb=4,
+                disk_gb=20,
+                active_hours=[9],
+            ),
+        ],
+    )
+
+    result = run_simulation(request)
+    calculation = result.hours[9].calculations[0]
+
+    assert calculation.source == "type-default"
+    assert calculation.profile_label == "LXC baseline fallback"
+    assert calculation.effective_cpu_cores == pytest.approx(1.08)
+    assert calculation.effective_memory_gb == pytest.approx(2.31)
+
+
+def test_historical_profile_match_is_resource_type_aware() -> None:
+    request = SimulationRequest(
+        servers=[ServerInput(name="pve-a", cpu_cores=8, memory_gb=16, disk_gb=200)],
+        vm_templates=[
+            VMTemplate(
+                id="vm-1",
+                name="VM 1",
+                resource_type="qemu",
+                cpu_cores=2,
+                memory_gb=2,
+                disk_gb=20,
+                active_hours=[9],
+            ),
+            VMTemplate(
+                id="ct-1",
+                name="CT 1",
+                resource_type="lxc",
+                cpu_cores=2,
+                memory_gb=2,
+                disk_gb=20,
+                active_hours=[9],
+            ),
+        ],
+        historical_profiles=[
+            HistoricalProfile(
+                type_label="LXC 2 vCPU / 2 GiB",
+                resource_type="lxc",
+                configured_cpu_cores=2,
+                configured_memory_gb=2,
+                guest_count=3,
+                average_cpu_ratio=0.35,
+                average_memory_ratio=0.5,
+                peak_cpu_ratio=0.8,
+                peak_memory_ratio=0.9,
+                hourly=[],
+            )
+        ],
+    )
+
+    result = run_simulation(request)
+    calculations = {item.vm_name: item for item in result.hours[9].calculations}
+
+    assert calculations["VM 1"].source == "requested"
+    assert calculations["VM 1"].profile_label is None
+    assert calculations["CT 1"].source == "historical"
+    assert calculations["CT 1"].profile_label == "LXC 2 vCPU / 2 GiB"
 
 
 def test_cpu_overcommit_allows_placement_beyond_physical_core_count() -> None:
@@ -538,7 +611,7 @@ def test_peak_guard_marks_high_risk_when_peak_pushes_node_near_limit() -> None:
         ],
         historical_profiles=[
             HistoricalProfile(
-                type_label="2 vCPU / 2 GiB",
+                type_label="VM 2 vCPU / 2 GiB",
                 configured_cpu_cores=2,
                 configured_memory_gb=2,
                 guest_count=3,
@@ -577,7 +650,7 @@ def test_hourly_peak_ratio_overrides_profile_peak_for_same_hour() -> None:
         ],
         historical_profiles=[
             HistoricalProfile(
-                type_label="2 vCPU / 2 GiB",
+                type_label="VM 2 vCPU / 2 GiB",
                 configured_cpu_cores=2,
                 configured_memory_gb=2,
                 guest_count=3,
@@ -650,7 +723,7 @@ def test_build_live_scenario_uses_online_nodes_and_profiles(monkeypatch) -> None
             ],
             guest_types=[
                 GuestTypeUsageSummary(
-                    type_label="2 vCPU / 2 GiB",
+                    type_label="VM 2 vCPU / 2 GiB",
                     configured_cpu_cores=2,
                     configured_memory_gb=2,
                     guest_count=2,
@@ -676,7 +749,33 @@ def test_build_live_scenario_uses_online_nodes_and_profiles(monkeypatch) -> None
     assert scenario.servers[0].cpu_used == 15
     assert len(scenario.historical_profiles) == 1
     assert scenario.historical_peak_hours == [9]
-    assert scenario.historical_hourly_peaks["8"] == pytest.approx(0.4)
-    assert scenario.historical_hourly_peaks["9"] == pytest.approx(0.8)
+    assert scenario.historical_hourly_peaks["8"] == pytest.approx(0.755)
+    assert scenario.historical_hourly_peaks["9"] == pytest.approx(1.0)
     assert scenario.servers[0].current_loadavg_1 == pytest.approx(6.0)
     assert scenario.servers[0].average_loadavg_1 == pytest.approx(4.5)
+
+
+def test_cluster_peak_hours_keeps_multiple_near_equal_peaks() -> None:
+    hours = simulator_service._cluster_peak_hours(
+        [
+            HourlyUsagePoint(hour=2, label="02:00", peak_cpu_ratio=0.8),
+            HourlyUsagePoint(hour=8, label="08:00", peak_cpu_ratio=0.798),
+            HourlyUsagePoint(hour=14, label="14:00", peak_cpu_ratio=0.797),
+            HourlyUsagePoint(hour=20, label="20:00", peak_cpu_ratio=0.796),
+        ]
+    )
+
+    assert hours == [2, 8, 14, 20]
+
+
+def test_cluster_hourly_peak_values_spreads_peak_to_neighbor_hours() -> None:
+    values = simulator_service._cluster_hourly_peak_values(
+        [
+            HourlyUsagePoint(hour=9, label="09:00", peak_cpu_ratio=0.8),
+            HourlyUsagePoint(hour=10, label="10:00", peak_cpu_ratio=0.0),
+            HourlyUsagePoint(hour=11, label="11:00", peak_cpu_ratio=0.0),
+        ]
+    )
+
+    assert values["9"] == pytest.approx(0.8)
+    assert values["10"] == pytest.approx(0.28)

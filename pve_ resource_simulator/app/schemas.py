@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field, model_validator
 
 
 HOURS_IN_DAY = 24
+ResourceType = Literal["qemu", "lxc"]
 
 
 class ResourceUsage(BaseModel):
@@ -59,6 +60,7 @@ class ServerInput(BaseModel):
 class VMTemplate(BaseModel):
     id: str = Field(min_length=1, max_length=60)
     name: str = Field(min_length=1, max_length=60)
+    resource_type: ResourceType = "qemu"
     cpu_cores: float = Field(gt=0.0, le=512.0)
     memory_gb: float = Field(gt=0.0, le=4096.0)
     disk_gb: float = Field(gt=0.0, le=65536.0)
@@ -85,6 +87,7 @@ class VMTemplate(BaseModel):
 
 class HistoricalProfile(BaseModel):
     type_label: str
+    resource_type: ResourceType = "qemu"
     configured_cpu_cores: float | None = Field(default=None, ge=0.0)
     configured_memory_gb: float | None = Field(default=None, ge=0.0)
     guest_count: int = Field(default=0, ge=0)
@@ -298,6 +301,7 @@ class GuestUsageSummary(BaseModel):
 
 class GuestTypeUsageSummary(BaseModel):
     type_label: str
+    resource_type: ResourceType = "qemu"
     configured_cpu_cores: float | None = Field(default=None, ge=0.0)
     configured_memory_gb: float | None = Field(default=None, ge=0.0)
     guest_count: int = Field(default=0, ge=0)

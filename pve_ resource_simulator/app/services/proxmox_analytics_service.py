@@ -780,27 +780,31 @@ def _read_env_file(path: Path) -> dict[str, str]:
 
 
 def _build_guest_type_summaries(guests: list[GuestUsageSummary]) -> list[GuestTypeUsageSummary]:
-    grouped: dict[tuple[float | None, float | None], list[GuestUsageSummary]] = {}
+    grouped: dict[tuple[str, float | None, float | None], list[GuestUsageSummary]] = {}
     for guest in guests:
         key = (
+            guest.resource_type,
             _round_group_value(guest.configured_cpu_cores),
             _round_group_value(guest.configured_memory_gb),
         )
         grouped.setdefault(key, []).append(guest)
 
     results: list[GuestTypeUsageSummary] = []
-    for (cpu, memory), items in sorted(
+    for (resource_type, cpu, memory), items in sorted(
         grouped.items(),
         key=lambda item: (
+            item[0][0],
             item[0][0] is None,
-            item[0][0] or 0.0,
             item[0][1] is None,
             item[0][1] or 0.0,
+            item[0][2] is None,
+            item[0][2] or 0.0,
         ),
     ):
         results.append(
             GuestTypeUsageSummary(
-                type_label=_format_guest_type_label(cpu, memory),
+                type_label=_format_guest_type_label(resource_type, cpu, memory),
+                resource_type=resource_type,
                 configured_cpu_cores=cpu,
                 configured_memory_gb=memory,
                 guest_count=len(items),
@@ -836,6 +840,7 @@ def build_historical_profiles(guest_types: list[GuestTypeUsageSummary]) -> list[
     return [
         HistoricalProfile(
             type_label=item.type_label,
+            resource_type=item.resource_type,
             configured_cpu_cores=item.configured_cpu_cores,
             configured_memory_gb=item.configured_memory_gb,
             guest_count=item.guest_count,
@@ -892,10 +897,11 @@ def _round_group_value(value: float | None) -> float | None:
     return round(value, 2)
 
 
-def _format_guest_type_label(cpu: float | None, memory: float | None) -> str:
+def _format_guest_type_label(resource_type: str, cpu: float | None, memory: float | None) -> str:
+    prefix = "LXC" if resource_type == "lxc" else "VM"
     if cpu is None or memory is None:
-        return "Unknown config"
-    return f"{_format_number(cpu)} vCPU / {_format_number(memory)} GiB"
+        return f"{prefix} Unknown config"
+    return f"{prefix} {_format_number(cpu)} vCPU / {_format_number(memory)} GiB"
 
 
 def _format_number(value: float) -> str:

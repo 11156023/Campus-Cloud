@@ -276,8 +276,8 @@ def test_build_monthly_analytics_groups_guests_by_cpu_and_memory() -> None:
         },
     )
 
-    group_2_2 = next(item for item in payload.guest_types if item.type_label == "2 vCPU / 2 GiB")
-    group_4_2 = next(item for item in payload.guest_types if item.type_label == "4 vCPU / 2 GiB")
+    group_2_2 = next(item for item in payload.guest_types if item.type_label == "VM 2 vCPU / 2 GiB")
+    group_4_2 = next(item for item in payload.guest_types if item.type_label == "VM 4 vCPU / 2 GiB")
 
     assert group_2_2.guest_count == 2
     assert group_2_2.current_cpu_ratio == pytest.approx(0.3)
@@ -344,7 +344,7 @@ def test_guest_type_averages_include_zero_ratios() -> None:
         },
     )
 
-    guest_type = next(item for item in payload.guest_types if item.type_label == "2 vCPU / 2 GiB")
+    guest_type = next(item for item in payload.guest_types if item.type_label == "VM 2 vCPU / 2 GiB")
     assert guest_type.average_cpu_ratio == pytest.approx(0.2)
     assert guest_type.average_memory_ratio == pytest.approx(0.25)
     assert guest_type.average_disk_ratio == pytest.approx(0.1)
@@ -352,3 +352,55 @@ def test_guest_type_averages_include_zero_ratios() -> None:
     assert guest_type.trend_memory_ratio == pytest.approx(0.25)
     assert guest_type.hourly[9].cpu_ratio == pytest.approx(0.2)
     assert guest_type.hourly[9].memory_ratio == pytest.approx(0.25)
+
+
+def test_build_monthly_analytics_splits_vm_and_lxc_guest_types() -> None:
+    zone = ZoneInfo("Asia/Taipei")
+    now = datetime(2026, 3, 30, 12, 0, tzinfo=zone)
+
+    payload = build_monthly_analytics(
+        host="192.168.100.2",
+        timezone_name="Asia/Taipei",
+        now=now,
+        nodes_payload=[],
+        resources_payload=[
+            {
+                "vmid": 101,
+                "name": "vm-a",
+                "node": "pve",
+                "type": "qemu",
+                "maxcpu": 2,
+                "maxmem": 2 * 1024 ** 3,
+                "maxdisk": 20 * 1024 ** 3,
+            },
+            {
+                "vmid": 102,
+                "name": "ct-a",
+                "node": "pve",
+                "type": "lxc",
+                "maxcpu": 2,
+                "maxmem": 2 * 1024 ** 3,
+                "maxdisk": 20 * 1024 ** 3,
+            },
+        ],
+        node_status_map={},
+        node_rrd_map={},
+        guest_status_map={
+            "qemu:pve:101": {"status": "running", "cpu": 0.3, "mem": 0.5 * 1024 ** 3, "maxmem": 2 * 1024 ** 3},
+            "lxc:pve:102": {"status": "running", "cpu": 0.2, "mem": 0.4 * 1024 ** 3, "maxmem": 2 * 1024 ** 3},
+        },
+        guest_rrd_map={
+            "qemu:pve:101": [],
+            "lxc:pve:102": [],
+        },
+    )
+
+    assert len(payload.guest_types) == 2
+
+    vm_group = next(item for item in payload.guest_types if item.type_label == "VM 2 vCPU / 2 GiB")
+    lxc_group = next(item for item in payload.guest_types if item.type_label == "LXC 2 vCPU / 2 GiB")
+
+    assert vm_group.resource_type == "qemu"
+    assert lxc_group.resource_type == "lxc"
+    assert vm_group.guest_count == 1
+    assert lxc_group.guest_count == 1

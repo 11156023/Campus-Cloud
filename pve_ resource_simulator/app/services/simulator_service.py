@@ -57,6 +57,15 @@ LOADAVG_WARN_PER_CORE = 0.8  # 每核心 loadavg 到這個程度後，host 會�
 LOADAVG_MAX_PER_CORE = 1.5  # 每核心 loadavg 到這個程度後，loadavg penalty 視為滿額。
 LOADAVG_PENALTY_WEIGHT = 0.9  # loadavg soft penalty 的倍率；只降低優先權，不直接 hard reject。
 
+LXC_DEFAULT_CPU_RATIO = 0.45
+LXC_DEFAULT_MEMORY_RATIO = 0.55
+LXC_CPU_MARGIN = 1.2
+LXC_RAM_MARGIN = 1.05
+LXC_CPU_FLOOR_RATIO = 0.25
+LXC_RAM_FLOOR_RATIO = 0.35
+LXC_CPU_PEAK_MARGIN = 1.05
+LXC_RAM_PEAK_MARGIN = 1.02
+
 
 @dataclass
 class _PlacedVm:
@@ -411,33 +420,63 @@ def _build_daily_summary(
 
 
 def _cluster_peak_hours(hourly_points: list) -> list[int]:
-    peak_score = 0.0
-    peak_hours: list[int] = []
-    for point in hourly_points:
-        score = max(
-            point.peak_cpu_ratio or point.cpu_ratio or 0.0,
-            point.peak_memory_ratio or point.memory_ratio or 0.0,
-            point.peak_disk_ratio or point.disk_ratio or 0.0,
-        )
-        if score <= 0:
-            continue
-        if score > peak_score:
-            peak_score = score
-            peak_hours = [point.hour]
-        elif abs(score - peak_score) < EPSILON:
-            peak_hours.append(point.hour)
-    return peak_hours
+    smoothed_scores = _smoothed_cluster_peak_scores(hourly_points)
+    scored_points = [
+        (hour, score)
+        for hour, score in smoothed_scores.items()
+        if score > 0
+    ]
+    if not scored_points:
+        return []
+
+    peak_score = max(score for _, score in scored_points)
+    peak_hours = {
+        hour
+        for hour, score in scored_points
+        if score >= peak_score * 0.985
+    }
+    for hour, score in sorted(scored_points, key=lambda item: (-item[1], item[0]))[:4]:
+        if score >= peak_score * 0.9:
+            peak_hours.add(hour)
+    return sorted(peak_hours)
 
 
 def _cluster_hourly_peak_values(hourly_points: list) -> dict[str, float | None]:
     return {
-        str(point.hour): max(
-            point.peak_cpu_ratio or point.cpu_ratio or 0.0,
-            point.peak_memory_ratio or point.memory_ratio or 0.0,
-            point.peak_disk_ratio or point.disk_ratio or 0.0,
-        )
+        str(hour): score
+        for hour, score in _smoothed_cluster_peak_scores(hourly_points).items()
+    }
+
+
+def _hourly_peak_score(point) -> float:
+    return max(
+        point.peak_cpu_ratio or point.cpu_ratio or 0.0,
+        point.peak_memory_ratio or point.memory_ratio or 0.0,
+        point.peak_disk_ratio or point.disk_ratio or 0.0,
+    )
+
+
+def _smoothed_cluster_peak_scores(hourly_points: list) -> dict[int, float]:
+    raw_scores = {
+        point.hour: _hourly_peak_score(point)
         for point in hourly_points
     }
+    if not raw_scores:
+        return {}
+
+    smoothed_scores: dict[int, float] = {}
+    for hour in raw_scores:
+        prev_1 = raw_scores.get((hour - 1) % HOURS_IN_DAY, 0.0)
+        next_1 = raw_scores.get((hour + 1) % HOURS_IN_DAY, 0.0)
+        prev_2 = raw_scores.get((hour - 2) % HOURS_IN_DAY, 0.0)
+        next_2 = raw_scores.get((hour + 2) % HOURS_IN_DAY, 0.0)
+        score = (
+            raw_scores.get(hour, 0.0)
+            + (prev_1 + next_1) * 0.35
+            + (prev_2 + next_2) * 0.15
+        )
+        smoothed_scores[hour] = min(score, 1.0)
+    return smoothed_scores
 
 
 def _to_working_server(server: ServerInput) -> _WorkingServer:
@@ -519,15 +558,32 @@ def _effective_template_for_hour(
 ) -> dict[str, object]:
     profile = _match_historical_profile(template, historical_profiles)
     if profile is None:
-        return {
-            "requested": template,
-            "template": template.model_copy(deep=True),
-            "peak_template": template.model_copy(deep=True),
-            "source": "requested",
-            "profile_label": None,
-            "cpu_ratio": None,
-            "memory_ratio": None,
-        }
+        fallback = _type_default_profile(template)
+        if fallback is None:
+            return {
+                "requested": template,
+                "template": template.model_copy(deep=True),
+                "peak_template": template.model_copy(deep=True),
+                "source": "requested",
+                "profile_label": None,
+                "cpu_ratio": None,
+                "memory_ratio": None,
+            }
+        return _build_effective_template_result(
+            template=template,
+            profile_label=fallback["profile_label"],
+            source="type-default",
+            cpu_ratio=fallback["cpu_ratio"],
+            memory_ratio=fallback["memory_ratio"],
+            peak_cpu_ratio=fallback["peak_cpu_ratio"],
+            peak_memory_ratio=fallback["peak_memory_ratio"],
+            cpu_margin=fallback["cpu_margin"],
+            ram_margin=fallback["ram_margin"],
+            cpu_floor_ratio=fallback["cpu_floor_ratio"],
+            ram_floor_ratio=fallback["ram_floor_ratio"],
+            cpu_peak_margin=fallback["cpu_peak_margin"],
+            ram_peak_margin=fallback["ram_peak_margin"],
+        )
 
     hour_point = next((item for item in profile.hourly if item.hour == hour), None)
     cpu_ratio = _select_effective_ratio(
@@ -550,6 +606,39 @@ def _effective_template_for_hour(
         if hour_point and hour_point.peak_memory_ratio is not None
         else profile.peak_memory_ratio
     )
+    return _build_effective_template_result(
+        template=template,
+        profile_label=profile.type_label,
+        source="historical",
+        cpu_ratio=cpu_ratio,
+        memory_ratio=memory_ratio,
+        peak_cpu_ratio=peak_cpu_ratio,
+        peak_memory_ratio=peak_memory_ratio,
+        cpu_margin=CPU_MARGIN,
+        ram_margin=RAM_MARGIN,
+        cpu_floor_ratio=CPU_FLOOR_RATIO,
+        ram_floor_ratio=RAM_FLOOR_RATIO,
+        cpu_peak_margin=CPU_PEAK_MARGIN,
+        ram_peak_margin=RAM_PEAK_MARGIN,
+    )
+
+
+def _build_effective_template_result(
+    *,
+    template: VMTemplate,
+    profile_label: str | None,
+    source: str,
+    cpu_ratio: float | None,
+    memory_ratio: float | None,
+    peak_cpu_ratio: float | None,
+    peak_memory_ratio: float | None,
+    cpu_margin: float,
+    ram_margin: float,
+    cpu_floor_ratio: float,
+    ram_floor_ratio: float,
+    cpu_peak_margin: float,
+    ram_peak_margin: float,
+) -> dict[str, object]:
     if peak_cpu_ratio is None:
         peak_cpu_ratio = cpu_ratio
     if peak_memory_ratio is None:
@@ -558,14 +647,14 @@ def _effective_template_for_hour(
     effective_cpu = _effective_requested_value(
         requested=template.cpu_cores,
         ratio=cpu_ratio,
-        margin=CPU_MARGIN,
-        floor_ratio=CPU_FLOOR_RATIO,
+        margin=cpu_margin,
+        floor_ratio=cpu_floor_ratio,
     )
     effective_memory = _effective_requested_value(
         requested=template.memory_gb,
         ratio=memory_ratio,
-        margin=RAM_MARGIN,
-        floor_ratio=RAM_FLOOR_RATIO,
+        margin=ram_margin,
+        floor_ratio=ram_floor_ratio,
     )
     peak_cpu = min(
         template.cpu_cores,
@@ -573,7 +662,7 @@ def _effective_template_for_hour(
             _scaled_requested_value(
                 requested=template.cpu_cores,
                 ratio=peak_cpu_ratio,
-                margin=CPU_PEAK_MARGIN,
+                margin=cpu_peak_margin,
             ),
             effective_cpu,
         ),
@@ -584,7 +673,7 @@ def _effective_template_for_hour(
             _scaled_requested_value(
                 requested=template.memory_gb,
                 ratio=peak_memory_ratio,
-                margin=RAM_PEAK_MARGIN,
+                margin=ram_peak_margin,
             ),
             effective_memory,
         ),
@@ -605,10 +694,28 @@ def _effective_template_for_hour(
             },
             deep=True,
         ),
-        "source": "historical",
-        "profile_label": profile.type_label,
+        "source": source,
+        "profile_label": profile_label,
         "cpu_ratio": cpu_ratio,
         "memory_ratio": memory_ratio,
+    }
+
+
+def _type_default_profile(template: VMTemplate) -> dict[str, float | str] | None:
+    if template.resource_type != "lxc":
+        return None
+    return {
+        "profile_label": "LXC baseline fallback",
+        "cpu_ratio": LXC_DEFAULT_CPU_RATIO,
+        "memory_ratio": LXC_DEFAULT_MEMORY_RATIO,
+        "peak_cpu_ratio": LXC_DEFAULT_CPU_RATIO,
+        "peak_memory_ratio": LXC_DEFAULT_MEMORY_RATIO,
+        "cpu_margin": LXC_CPU_MARGIN,
+        "ram_margin": LXC_RAM_MARGIN,
+        "cpu_floor_ratio": LXC_CPU_FLOOR_RATIO,
+        "ram_floor_ratio": LXC_RAM_FLOOR_RATIO,
+        "cpu_peak_margin": LXC_CPU_PEAK_MARGIN,
+        "ram_peak_margin": LXC_RAM_PEAK_MARGIN,
     }
 
 
@@ -657,6 +764,8 @@ def _match_historical_profile(
     template_memory = round(template.memory_gb, 2)
     for profile in historical_profiles:
         if profile.configured_cpu_cores is None or profile.configured_memory_gb is None:
+            continue
+        if profile.resource_type != template.resource_type:
             continue
         if round(profile.configured_cpu_cores, 2) == template_cpu and round(profile.configured_memory_gb, 2) == template_memory:
             return profile

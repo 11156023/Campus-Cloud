@@ -259,7 +259,23 @@ select {
   background: linear-gradient(180deg, rgba(255, 248, 228, 0.88) 0%, rgba(255, 255, 255, 0.82) 100%);
 }
 
+.calendar-hour.historical-high {
+  border-color: #e4c77a;
+  background: linear-gradient(180deg, rgba(255, 250, 236, 0.86) 0%, rgba(255, 255, 255, 0.82) 100%);
+}
+
+.calendar-hour.historical-elevated {
+  border-color: #d7d7c4;
+  background: linear-gradient(180deg, rgba(248, 247, 238, 0.84) 0%, rgba(255, 255, 255, 0.82) 100%);
+}
+
 .calendar-hour.selected.peak {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.calendar-hour.selected.historical-high,
+.calendar-hour.selected.historical-elevated {
   border-color: var(--accent);
   background: var(--accent);
 }
@@ -274,6 +290,16 @@ select {
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.05em;
+}
+
+.calendar-peak-pill.is-high {
+  background: #f0e7b9;
+  color: #7a6516;
+}
+
+.calendar-peak-pill.is-elevated {
+  background: #eef0e1;
+  color: #66704f;
 }
 
 .calendar-hour.selected .calendar-peak-pill {
