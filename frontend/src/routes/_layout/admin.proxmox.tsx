@@ -556,7 +556,7 @@ function AdminProxmoxPage() {
 
   const { data: nodes, isLoading: nodesLoading } = useQuery({
     queryKey: ["proxmoxNodes"],
-    queryFn: ProxmoxConfigService.checkNodes,
+    queryFn: ProxmoxConfigService.getNodes,
   })
 
   const form = useForm<ConfigFormData>({
