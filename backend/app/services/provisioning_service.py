@@ -28,21 +28,33 @@ def _to_punycode_hostname(hostname: str) -> str:
             "Expected str for hostname, got %s: %r", type(hostname).__name__, hostname
         )
         raise TypeError(f"hostname must be str, got {type(hostname).__name__!r}: {hostname!r}")
+
     result_labels = []
     for label in hostname.split("."):
+        if not label:
+            raise ValueError("Hostname labels must not be empty")
         try:
             label.encode("ascii")
-            result_labels.append(label)  # 純 ASCII，無需轉換
+            ace = label  # 純 ASCII，無需轉換
         except UnicodeEncodeError:
             # 使用 punycode codec 編碼非 ASCII 字元
             try:
                 ace = "xn--" + label.encode("punycode").decode("ascii")
-                result_labels.append(ace)
             except Exception as e:
                 raise ValueError(f"Cannot encode hostname label '{label}' to Punycode: {e}") from e
-    return ".".join(result_labels)
 
+        if len(ace) > 63:
+            raise ValueError(
+                f"Encoded hostname label '{label}' exceeds 63 characters after Punycode conversion"
+            )
+        result_labels.append(ace)
 
+    encoded_hostname = ".".join(result_labels)
+    if len(encoded_hostname) > 253:
+        raise ValueError(
+            "Encoded hostname exceeds 253 characters after Punycode conversion"
+        )
+    return encoded_hostname
 def _cleanup_failed_resource(node: str, vmid: int, resource_type: str) -> None:
     """Best-effort cleanup for a partially provisioned resource."""
     try:
