@@ -34,6 +34,7 @@ def upgrade() -> None:
         sa.Column("speed_tier", sa.String(length=20), nullable=False, server_default="unknown"),
         sa.Column("user_priority", sa.Integer(), nullable=False, server_default="5"),
         sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("node_name", "storage", name="uq_proxmox_storages_node_name_storage"),
     )
 
 
