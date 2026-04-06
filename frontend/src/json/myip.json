@@ -12,6 +12,8 @@
   "website": "https://ipcheck.ing/",
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/myip.webp",
   "description": "The best IP Toolbox. Easy to check what's your IPs, IP geolocation, check for DNS leaks, examine WebRTC connections, speed test, ping test, MTR test, check website availability, whois search and more!",
+  "description_zh": "最佳的 IP 工具箱。易於檢查您的 IP、IP 地理位置、檢查 DNS 洩漏、檢查 WebRTC 連線、速度測試、ping 測試、MTR 測試、檢查網站可用性、whois 搜尋等！",
+  "description_ja": "最高の IP ツールボックス。IP アドレス、IP ジオロケーション、DNS リークの確認、WebRTC 接続の検査、速度テスト、ping テスト、MTR テスト、ウェブサイトの可用性確認、whois 検索などを簡単に確認できます。",
   "install_methods": [
     {
       "type": "default",
@@ -29,5 +31,7 @@
     "username": null,
     "password": null
   },
-  "notes": []
+  "notes": [],
+  "notes_zh": [],
+  "notes_ja": []
 }

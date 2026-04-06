@@ -30,6 +30,18 @@ def login_google(session: SessionDep, body: GoogleLoginRequest) -> Token:
     return auth_service.google_login(session=session, id_token=body.id_token)
 
 
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str
+
+
+@router.post("/login/refresh-token")
+def refresh_token(session: SessionDep, body: RefreshTokenRequest) -> Token:
+    """Use a refresh token to get a new access + refresh token pair."""
+    return auth_service.refresh_access_token(
+        session=session, refresh_token=body.refresh_token
+    )
+
+
 @router.post("/login/test-token", response_model=UserPublic)
 def test_token(current_user: CurrentUser) -> Any:
     return current_user

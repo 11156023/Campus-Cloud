@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/inventree.webp",
   "config_path": "/etc/inventree/",
   "description": "InvenTree is an open-source inventory management system which provides intuitive parts management and stock control. It is designed to be lightweight and easy to use for SME or hobbyist applications.",
+  "description_zh": "InvenTree 是一個開源庫存管理系統，提供直觀的零件管理和庫存控制。它設計為輕量級且易於使用於中小企業或業餘愛好者應用程式。",
+  "description_ja": "InvenTree は、直感的なパーツ管理と在庫管理を提供するオープンソースの在庫管理システムです。これは SME またはホビイストアプリケーション向けに軽量で使いやすいように設計されています。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,8 @@
   "notes": [
     {
       "text": "Please read the documentation for your configuration needs.",
+      "text_zh": "請閱讀文檔以了解您的組態需求。",
+      "text_ja": "構成のニーズについては、ドキュメントをお読みください。",
       "type": "info"
     }
   ]

@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/hev.webp",
   "config_path": "/opt/hivemq/conf/config.xml",
   "description": "HevSocks5Server is a simple, lightweight socks5 server.",
+  "description_zh": "HevSocks5Server 是一個簡單、輕量級的 SOCKS5 伺服器。",
+  "description_ja": "HevSocks5Server は、シンプルで軽量の SOCKS5 サーバーです。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,18 @@
   "notes": [
     {
       "text": "Default credentials: `cat /root/hev.creds`",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "預設認證：`cat /root/hev.creds`",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "デフォルト認証：`cat /root/hev.creds`",
       "type": "info"
     }
   ]

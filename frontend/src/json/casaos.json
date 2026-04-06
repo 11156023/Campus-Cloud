@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/casaos.webp",
   "config_path": "",
   "description": "CasaOS is a software that aims to make it easy for users to create a personal cloud system at home. It uses the Docker ecosystem to provide a simple, user-friendly experience for managing various applications and services.",
+  "description_zh": "CasaOS 是一個旨在讓用戶輕鬆在家創建個人雲端系統的軟體。它使用 Docker 生態系統為管理各種應用程式和服務提供簡單、使用者友善的體驗。",
+  "description_ja": "CasaOS は、ユーザーが自宅で個人用クラウド システムを簡単に作成できるようにすることを目的としたソフトウェアです。Docker エコシステムを使用して、さまざまなアプリケーションとサービスを管理するためのシンプルなユーザーフレンドリーなエクスペリエンスを提供します。",
   "install_methods": [
     {
       "type": "default",
@@ -36,6 +38,26 @@
     },
     {
       "text": "WARNING: Installation sources scripts outside of Community Scripts repo. Please check the source before installing.",
+      "type": "warning"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "如果 LXC 以特權方式創建，腳本將自動設置 USB 傳遞。",
+      "type": "warning"
+    },
+    {
+      "text": "警告：安裝源腳本來自社區腳本存儲庫之外。安裝前請檢查來源。",
+      "type": "warning"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "LXC が特権で作成された場合、スクリプトは USB パススルーを自動的にセットアップします。",
+      "type": "warning"
+    },
+    {
+      "text": "警告: インストール ソースは Community Scripts リポジトリの外部のスクリプトを取得しています。インストール前にソースを確認してください。",
       "type": "warning"
     }
   ]

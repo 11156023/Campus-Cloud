@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/wazuh.webp",
   "config_path": "",
   "description": "Wazuh is an open-source security monitoring solution that provides endpoint protection, network monitoring, and log analysis capabilities.",
+  "description_zh": "Wazuh 是一個開源安全監控解決方案，提供端點保護、網路監控和日誌分析功能。",
+  "description_ja": "Wazuhはオープンソースのセキュリティ監視ソリューションで、エンドポイント保護、ネットワーク監視、ログ分析機能を提供します。",
   "install_methods": [
     {
       "type": "default",
@@ -32,10 +34,14 @@
   "notes": [
     {
       "text": "WARNING: Installation sources scripts outside of Community Scripts repo. Please check the source before installing.",
+      "text_zh": "警告：安裝從 Community Scripts 儲存庫外部取得指令碼。安裝前請檢查來源。",
+      "text_ja": "警告：インストールスクリプトはCommunity Scriptsリポジトリの外部から取得されています。インストール前にソースを確認してください。",
       "type": "warning"
     },
     {
       "text": "Show password: `cat ~/wazuh.creds`",
+      "text_zh": "顯示密碼：`cat ~/wazuh.creds`",
+      "text_ja": "パスワード表示：`cat ~/wazuh.creds`",
       "type": "info"
     }
   ]

@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/hivemq.webp",
   "config_path": "/opt/hivemq/conf/config.xml",
   "description": "HiveMQ CE is a Java-based open source MQTT broker that fully supports MQTT 3.x and MQTT 5.",
+  "description_zh": "HiveMQ CE 是基於 Java 的開源 MQTT 代理，完全支援 MQTT 3.x 和 MQTT 5。",
+  "description_ja": "HiveMQ CE は Java ベースのオープンソース MQTT ブローカーで、MQTT 3.x と MQTT 5 を完全にサポートしています。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,18 @@
   "notes": [
     {
       "text": "To check if HiveMQ is listening to the default port for MQTT `lsof -i :1883`",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "檢查 HiveMQ 是否正在監聽 MQTT 的預設連接埠 `lsof -i :1883`",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "HiveMQ が MQTT のデフォルトポート `lsof -i :1883` でリッスンしているかどうかを確認します",
       "type": "info"
     }
   ]

@@ -12,6 +12,8 @@
   "website": "https://github.com/influxdata/telegraf",
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/telegraf.webp",
   "description": "Telegraf collects and sends time series data from databases, systems, and IoT sensors. It has no external dependencies, is easy to install, and requires minimal memory.",
+  "description_zh": "Telegraf 從資料庫、系統和物聯網感應器收集並傳送時間序列資料。它沒有外部相依性，易於安裝，並且需要最少的記憶體。",
+  "description_ja": "Telegrafはデータベース、システム、およびIoTセンサーから時系列データを収集して送信します。外部依存関係がなく、インストールが簡単で、メモリ要件が最小限です。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,18 @@
   "notes": [
     {
       "text": "Make sure to configure an output for the telegraf config and start the service with `systemctl start telegraf`.",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "確保為 telegraf 組態配置輸出，並使用 `systemctl start telegraf` 啟動服務。",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "telegraf設定の出力を構成し、`systemctl start telegraf`でサービスを開始してください。",
       "type": "info"
     }
   ]

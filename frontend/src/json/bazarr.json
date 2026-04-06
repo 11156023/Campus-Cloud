@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/bazarr.webp",
   "config_path": "/opt/bazarr/data/config/config.yaml",
   "description": "Bazarr is a companion application to Sonarr and Radarr that manages and downloads subtitles based on your requirements.",
+  "description_zh": "Bazarr 是 Sonarr 和 Radarr 的配套應用程式，根據您的需求管理和下載字幕。",
+  "description_ja": "Bazarr は Sonarr と Radarr のコンパニオンアプリケーションで、要件に基づいて字幕を管理およびダウンロードします。",
   "install_methods": [
     {
       "type": "default",

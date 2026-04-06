@@ -20,9 +20,52 @@ OpenAPI.TOKEN = async () => {
   return localStorage.getItem("access_token") || ""
 }
 
-const handleApiError = (error: Error) => {
-  if (error instanceof ApiError && [401, 403].includes(error.status)) {
+let isRefreshing = false
+let refreshPromise: Promise<boolean> | null = null
+
+async function tryRefreshToken(): Promise<boolean> {
+  const refreshToken = localStorage.getItem("refresh_token")
+  if (!refreshToken) return false
+
+  if (isRefreshing && refreshPromise) return refreshPromise
+
+  isRefreshing = true
+  refreshPromise = (async () => {
+    try {
+      const apiBase = import.meta.env.VITE_API_URL ?? ""
+      const response = await fetch(`${apiBase}/api/v1/login/refresh-token`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      })
+      if (!response.ok) return false
+      const data = await response.json()
+      localStorage.setItem("access_token", data.access_token)
+      if (data.refresh_token) {
+        localStorage.setItem("refresh_token", data.refresh_token)
+      }
+      return true
+    } catch {
+      return false
+    } finally {
+      isRefreshing = false
+      refreshPromise = null
+    }
+  })()
+  return refreshPromise
+}
+
+const handleApiError = async (error: Error) => {
+  if (error instanceof ApiError && error.status === 401) {
+    const refreshed = await tryRefreshToken()
+    if (!refreshed) {
+      localStorage.removeItem("access_token")
+      localStorage.removeItem("refresh_token")
+      window.location.href = "/login"
+    }
+  } else if (error instanceof ApiError && error.status === 403) {
     localStorage.removeItem("access_token")
+    localStorage.removeItem("refresh_token")
     window.location.href = "/login"
   }
 }

@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/nextcloud.webp",
   "config_path": "",
   "description": "NextCloudPi is a popular self-hosted solution for file collaboration and data storage. It is built on the NextCloud software, which is an open-source platform for data management.",
+  "description_zh": "NextCloudPi 是一個流行的自託管檔案協作和資料儲存解決方案。它建立在 NextCloud 軟體上，這是一個用於資料管理的開源平台。",
+  "description_ja": "NextCloudPi は、ファイル コラボレーションとデータ ストレージのための一般的な自己ホスト型ソリューションです。NextCloud ソフトウェア上に構築されており、これはデータ管理用のオープンソース プラットフォームです。",
   "install_methods": [
     {
       "type": "default",
@@ -47,6 +49,26 @@
     },
     {
       "text": "WARNING: Installation sources scripts outside of Community Scripts repo. Please check the source before installing.",
+      "type": "warning"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "僅限 Alpine：要取得使用者名稱和密碼，請在 LXC shell 中再次執行指令碼。",
+      "type": "warning"
+    },
+    {
+      "text": "警告：安裝源指令碼在社群指令碼存放庫外。安裝前請檢查來源。",
+      "type": "warning"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "Alpine のみ: ユーザー名とパスワードを取得するには、LXC シェル内でスクリプトを再度実行してください。",
+      "type": "warning"
+    },
+    {
+      "text": "警告: インストール ソース スクリプトはコミュニティ スクリプト リポジトリの外にあります。インストール前に必ずソースを確認してください。",
       "type": "warning"
     }
   ]

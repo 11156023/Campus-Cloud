@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/zitadel.webp",
   "config_path": "/opt/zitadel/config.yaml",
   "description": "Zitadel is an open-source identity and access management (IAM) solution designed to provide secure authentication, authorization, and user management for modern applications and services. Built with a focus on flexibility, scalability, and security, Zitadel offers a comprehensive set of features for developers and organizations looking to implement robust identity management.",
+  "description_zh": "Zitadel 是一個開源身份和存取管理 (IAM) 解決方案，設計用於為現代應用程式和服務提供安全的驗證、授權和使用者管理。Zitadel 以靈活性、可擴展性和安全性為重點構建，為尋求實施強大身份管理的開發人員和組織提供全面的功能集。",
+  "description_ja": "Zitadelはオープンソースの身元およびアクセス管理（IAM）ソリューションで、最新のアプリケーションとサービスに対する安全な認証、認可、ユーザー管理を提供するように設計されています。柔軟性、スケーラビリティ、セキュリティに重点を置いて構築されたZitadelは、堅牢なアイデンティティ管理の実装を探している開発者と組織向けの包括的な機能セットを提供します。",
   "install_methods": [
     {
       "type": "default",
@@ -32,10 +34,14 @@
   "notes": [
     {
       "text": "Application credentials: `cat ~/zitadel.creds`",
+      "text_zh": "應用程式認證：`cat ~/zitadel.creds`",
+      "text_ja": "アプリケーション認証情報：`cat ~/zitadel.creds`",
       "type": "info"
     },
     {
       "text": "Change the ExternalDomain value in `/opt/zitadel/config.yaml` to your domain/hostname/IP and run `bash zitadel-rerun.sh`",
+      "text_zh": "將 `/opt/zitadel/config.yaml` 中的 ExternalDomain 值變更為您的網域/主機名稱/IP，並執行 `bash zitadel-rerun.sh`",
+      "text_ja": "`/opt/zitadel/config.yaml` 内のExternalDomain値をドメイン/ホスト名/IPに変更し、`bash zitadel-rerun.sh` を実行してください",
       "type": "info"
     }
   ]

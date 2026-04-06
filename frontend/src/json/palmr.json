@@ -13,6 +13,8 @@
   "website": "https://palmr.kyantech.com.br/",
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/palmr.webp",
   "description": "Palmr is a fast and secure platform for sharing files, built with performance and privacy in mind.",
+  "description_zh": "Palmr 是一個快速安全的檔案共用平台，考慮到效能和隱私而構建。",
+  "description_ja": "Palmr は、パフォーマンスとプライバシーを念頭に置いて構築された、ファイル共有のための高速で安全なプラットフォームです。",
   "install_methods": [
     {
       "type": "default",
@@ -37,6 +39,26 @@
     },
     {
       "text": "To use Palmr with a reverse proxy, uncomment `SECURE_SITE` in `/opt/palmr/apps/server/.env`",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "要將繫結掛載用於存儲，請在 `/opt/palmr_data` 中為 `uploads` 和 `temp-uploads` 建立符號連結，並取消註釋 `CUSTOM_PATH` 以新增繫結掛載的路徑",
+      "type": "info"
+    },
+    {
+      "text": "若要使用 Palmr 搭配反向代理，請取消註釋 `/opt/palmr/apps/server/.env` 中的 `SECURE_SITE`",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "ストレージ用のバインド マウントを使用するには、`/opt/palmr_data` に `uploads` と `temp-uploads` の両方のシンボリック リンクを作成し、バインド マウントへのパスを追加するために `CUSTOM_PATH` をコメント解除します",
+      "type": "info"
+    },
+    {
+      "text": "リバース プロキシで Palmr を使用するには、`/opt/palmr/apps/server/.env` で `SECURE_SITE` をコメント解除してください",
       "type": "info"
     }
   ]

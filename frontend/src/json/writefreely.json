@@ -12,6 +12,8 @@
   "website": "https://writefreely.org/",
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/writefreely-light.webp",
   "description": "WriteFreely is free and open source software for easily publishing writing on the web with support for the ActivityPub protocol. Use it to start a personal blog — or an entire community.",
+  "description_zh": "WriteFreely 是免費的開源軟體，可輕鬆在網上發佈寫作，支援 ActivityPub 協定。使用它開始個人部落格 — 或整個社群。",
+  "description_ja": "WriteFreelyは、ActivityPubプロトコルのサポートにより、Webで簡単に執筆を公開するための無料のオープンソースソフトウェアです。これを使用して個人ブログを開始するか、コミュニティ全体を開始します。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,8 @@
   "notes": [
     {
       "text": "After installation execute `writefreely user create --admin <username>:<password>` to create your user.",
+      "text_zh": "安裝後執行 `writefreely user create --admin <username>:<password>` 來建立您的使用者。",
+      "text_ja": "インストール後に `writefreely user create --admin <username>:<password>` を実行してユーザーを作成してください。",
       "type": "info"
     }
   ]

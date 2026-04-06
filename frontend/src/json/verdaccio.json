@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/verdaccio.webp",
   "config_path": "/opt/verdaccio/config/config.yaml",
   "description": "Verdaccio is a lightweight private npm proxy registry built with Node.js. It allows you to host your own npm registry with minimal configuration, providing a private npm repository for your projects. Verdaccio supports npm, yarn, and pnpm, and can cache packages from the public npm registry, allowing for faster installs and protection against npm registry outages. It includes a web interface for browsing packages, authentication and authorization features, and can be easily integrated into your development workflow.",
+  "description_zh": "Verdaccio 是一個用 Node.js 構建的輕量級私人 npm 代理登錄檔。它允許您以最少的設定託管自己的 npm 登錄檔，為您的專案提供私人 npm 儲存庫。Verdaccio 支援 npm、yarn 和 pnpm，並可快取來自公開 npm 登錄檔的套件，實現更快速的安裝和防止 npm 登錄檔中斷。它包括用於瀏覽套件的網頁介面、驗證和授權功能，並可輕鬆整合到您的開發工作流程中。",
+  "description_ja": "Verdaccioは、Node.jsで構築された軽量なプライベートnpmプロキシレジストリです。最小限の設定で独自のnpmレジストリをホストでき、プロジェクト用のプライベートnpmリポジトリを提供します。Verdaccioはnpm、yarn、pnpmをサポートし、パブリックnpmレジストリからパッケージをキャッシュでき、より高速なインストールとnpmレジストリの停止に対する保護を実現できます。パッケージを参照するためのWebインターフェース、認証および認可機能を含み、開発ワークフローに簡単に統合できます。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,8 @@
   "notes": [
     {
       "text": "To create the first user, run: npm adduser --registry http://<container-ip>:4873",
+      "text_zh": "若要建立第一個使用者，執行：npm adduser --registry http://<container-ip>:4873",
+      "text_ja": "最初のユーザーを作成するには、次を実行します：npm adduser --registry http://<container-ip>:4873",
       "type": "info"
     }
   ]

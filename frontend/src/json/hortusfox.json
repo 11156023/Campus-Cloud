@@ -12,6 +12,8 @@
   "website": "https://www.hortusfox.com/",
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/hortusfox.webp",
   "description": "HortusFox is a collaborative plant management system for plant enthusiasts. Manage, document and track your entire plant collection – self-hosted and privacy-friendly.",
+  "description_zh": "HortusFox 是一個為植物愛好者設計的協作植物管理系統。管理、記錄和追蹤您的整個植物收藏 – 自架設和隱私友好的。",
+  "description_ja": "HortusFox は植物愛好家向けの協調型植物管理システムです。植物コレクション全体を管理、記録、追跡してください - 自己ホストされ、プライバシーに優しい。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,8 @@
   "notes": [
     {
       "text": "Login Credentials : `cat ~/hortusfox.creds`",
+      "text_zh": "登入憑證：`cat ~/hortusfox.creds`",
+      "text_ja": "ログイン認証情報：`cat ~/hortusfox.creds`",
       "type": "info"
     }
   ]

@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/forgejo.webp",
   "config_path": "/etc/forgejo/app.ini",
   "description": "Forgejo is an open-source, self-hosted Git service that allows individuals and teams to manage their code repositories.",
+  "description_zh": "Forgejo 是一個開源、自託管的 Git 服務，允許個人和團隊管理其代碼存儲庫。",
+  "description_ja": "Forgejo はオープンソースの自己ホスト型 Git サービスで、個人やチームがコード リポジトリを管理できます。",
   "install_methods": [
     {
       "type": "default",

@@ -48,6 +48,7 @@ class User(UserBase, table=True):
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     hashed_password: str
+    token_version: int = Field(default=0, description="令牌版本，修改密碼時遞增以失效舊令牌")
     created_at: datetime | None = Field(
         default_factory=get_datetime_utc,
         sa_type=DateTime(timezone=True),

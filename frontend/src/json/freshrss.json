@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/freshrss.webp",
   "config_path": "/opt/freshrss/data/config.php",
   "description": "FreshRSS is a self-hosted RSS and Atom feed aggregator that lets users collect, organize, and read from multiple sources in one place. It is lightweight, easy to work with, powerful, and customizable.",
+  "description_zh": "FreshRSS 是一個自託管的 RSS 和 Atom 源聚合器，讓用戶在一個地方收集、組織和閱讀多個來源。它是輕量級的、易於使用、強大且可自訂的。",
+  "description_ja": "FreshRSS は自己ホスト型の RSS および Atom フィード アグリゲーターで、ユーザーが複数のソースを 1 つの場所で収集、整理、読み込みできます。軽量で使いやすく、強力でカスタマイズ可能です。",
   "install_methods": [
     {
       "type": "default",
@@ -36,6 +38,26 @@
     },
     {
       "text": "Per FreshRSS documentation, a cron job to actualize FreshRSS will be setup at `/etc/cron.d/freshrss-actualize`. This can be adjusted as needed",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "數據庫認證：`cat ~/freshrss.creds`",
+      "type": "info"
+    },
+    {
+      "text": "根據 FreshRSS 文檔，cron 作業以更新 FreshRSS 將在 `/etc/cron.d/freshrss-actualize` 中設置。可根據需要進行調整",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "データベース認証情報: `cat ~/freshrss.creds`",
+      "type": "info"
+    },
+    {
+      "text": "FreshRSS ドキュメントに従い、FreshRSS を実現するための cron ジョブが `/etc/cron.d/freshrss-actualize` にセットアップされます。必要に応じて調整できます",
       "type": "info"
     }
   ]

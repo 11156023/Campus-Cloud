@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/uptime-kuma.webp",
   "config_path": "",
   "description": "Uptime Kuma is a monitoring and alerting system that tracks the availability and performance of servers, websites, and other internet-connected devices. It can be self-hosted and is open-source, offering a visually appealing interface for monitoring and receiving notifications about downtime events.",
+  "description_zh": "Uptime Kuma 是一個監控和告警系統，可追蹤伺服器、網站和其他網際網路連接裝置的可用性和效能。它可自主託管且開源，提供視覺上吸引人的監控介面和停機事件通知。",
+  "description_ja": "Uptime Kumaは、サーバー、Webサイト、およびその他のインターネット接続デバイスの可用性とパフォーマンスを追跡する監視およびアラートシステムです。自己ホスト可能でオープンソースであり、ダウンタイムイベントの監視と通知を受け取るための視覚的に魅力的なインターフェースを提供します。",
   "install_methods": [
     {
       "type": "default",

@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/gatus.webp",
   "config_path": "/opt/gatus/config/config.yaml",
   "description": "Gatus is a developer-oriented health dashboard that gives you the ability to monitor your services using HTTP, ICMP, TCP, and even DNS queries as well as evaluate the result of said queries by using a list of conditions on values like the status code, the response time, the certificate expiration, the body and many others. The icing on top is that each of these health checks can be paired with alerting via Slack, Teams, PagerDuty, Discord, Twilio and many more.",
+  "description_zh": "Gatus 是一個面向開發人員的健康儀表板，使您能夠使用 HTTP、ICMP、TCP 甚至 DNS 查詢監控您的服務，以及通過對狀態代碼、響應時間、憑證到期、正文等值使用一系列條件來評估查詢結果。錦上添花的是，這些健康檢查中的每一個都可以與 Slack、Teams、PagerDuty、Discord、Twilio 等進行警報配對。",
+  "description_ja": "Gatus は開発者向けの健康ダッシュボードで、HTTP、ICMP、TCP、さらには DNS クエリを使用してサービスを監視し、ステータス コード、応答時間、証明書の有効期限、本文など、値のコンディション リストを使用してクエリの結果を評価できます。その上、これらの各ヘルス チェックは、Slack、Teams、PagerDuty、Discord、Twilio などを使用したアラートと組み合わせることができます。",
   "install_methods": [
     {
       "type": "default",

@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/hyperion.webp",
   "config_path": "",
   "description": "Hyperion is an opensource Ambient Lighting implementation. It supports many LED devices and video grabbers.",
+  "description_zh": "Hyperion 是一個開源環境光實現。它支持許多 LED 設備和視訊擷取器。",
+  "description_ja": "Hyperion はオープンソースのアンビエントライティング実装です。多くの LED デバイスとビデオグラバーをサポートしています。",
   "install_methods": [
     {
       "type": "default",

@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/slskd.webp",
   "config_path": "/opt/slskd/config/slskd.yml",
   "description": "A modern client-server application for the Soulseek file sharing network. ",
+  "description_zh": "Soulseek 檔案共享網路的現代客戶端-伺服器應用程式。",
+  "description_ja": "Soulseekファイル共有ネットワーク用のモダンなクライアント-サーバーアプリケーション。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,18 @@
   "notes": [
     {
       "text": "See /opt/slskd/config/slskd.yml to add your Soulseek credentials",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "查看 /opt/slskd/config/slskd.yml 以新增你的 Soulseek 認證資料",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "/opt/slskd/config/slskd.ymlを参照してSoulseek認証情報を追加してください",
       "type": "info"
     }
   ]

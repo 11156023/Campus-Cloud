@@ -12,6 +12,8 @@
   "website": "https://www.splunk.com/en_us/download/splunk-enterprise.html",
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/splunk-light.webp",
   "description": "Platform for searching, monitoring, and analyzing machine-generated data at scale for operational intelligence and security.",
+  "description_zh": "用於大規模搜尋、監控和分析機器生成資料以進行營運情報和安全性的平台。",
+  "description_ja": "運用インテリジェンスとセキュリティのための大規模なマシン生成データを検索、監視、分析するためのプラットフォーム。",
   "install_methods": [
     {
       "type": "default",
@@ -40,6 +42,34 @@
     },
     {
       "text": "About Splunk Free License: https://help.splunk.com/en/splunk-enterprise/administer/admin-manual/10.0/configure-splunk-licenses/about-splunk-free",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "登入認證資料可在 splunk.creds 中找到。",
+      "type": "info"
+    },
+    {
+      "text": "試用授權允許每天索引 500 MB。60 天後，你可以轉換為永久免費授權或購買 Splunk Enterprise 授權以繼續使用為企業規模部署設計的擴展功能。",
+      "type": "warning"
+    },
+    {
+      "text": "關於 Splunk 免費授權：https://help.splunk.com/en/splunk-enterprise/administer/admin-manual/10.0/configure-splunk-licenses/about-splunk-free",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "ログイン認証情報はsplunk.credsで確認できます。",
+      "type": "info"
+    },
+    {
+      "text": "試用ライセンスは1日あたり500MBのインデックスを許可します。60日後、永続的な無料ライセンスに変換するか、エンタープライズ規模のデプロイメント向けに設計された拡張機能を継続して使用するためにSplunk Enterpriseライセンスを購入できます。",
+      "type": "warning"
+    },
+    {
+      "text": "Splunk無料ライセンスについて：https://help.splunk.com/en/splunk-enterprise/administer/admin-manual/10.0/configure-splunk-licenses/about-splunk-free",
       "type": "info"
     }
   ]

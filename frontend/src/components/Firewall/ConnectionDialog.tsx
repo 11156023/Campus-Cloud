@@ -1,4 +1,14 @@
-import { Plus, Trash2 } from "lucide-react"
+import { useQuery } from "@tanstack/react-query"
+import {
+  AlertTriangle,
+  Globe,
+  Info,
+  Plug,
+  Plus,
+  Shield,
+  Trash2,
+  Zap,
+} from "lucide-react"
 import { useState } from "react"
 import { toast } from "sonner"
 
@@ -19,6 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { GatewayApiService } from "@/services/gateway"
 
 // PVE 支援的所有協定
 const PVE_PROTOCOLS = [
@@ -41,9 +52,12 @@ const PROTOCOLS_WITH_PORT = new Set(
   PVE_PROTOCOLS.filter((p) => p.hasPort).map((p) => p.value),
 )
 
-type PortSpec = {
+export type PortSpec = {
   port: number
   protocol: string
+  external_port?: number | null
+  domain?: string | null
+  enable_https?: boolean
 }
 
 type Props = {
@@ -56,6 +70,15 @@ type Props = {
   onClose: () => void
 }
 
+// PVE 保留 port（前端提示用）
+const RESERVED_PORTS = new Set([
+  22, 80, 443, 3128, 4007, 4008, 5900, 5901, 5902, 5903, 5904, 5905, 6789,
+  6800, 6801, 6802, 6803, 8006, 8007, 111,
+])
+
+// 入站存取模式
+type InboundMode = "domain" | "port" | "firewall"
+
 export function ConnectionDialog({
   open,
   sourceVmid,
@@ -65,60 +88,131 @@ export function ConnectionDialog({
   onConfirm,
   onClose,
 }: Props) {
-  const [ports, setPorts] = useState<PortSpec[]>([
-    { port: 80, protocol: "tcp" },
-  ])
+  const isGateway = targetVmid === null
+  const isInbound = sourceVmid === null
+
+  // ─── 入站模式狀態 ────────────────────────────────────────────────────────
+  const [inboundMode, setInboundMode] = useState<InboundMode>("domain")
+
+  // 🌐 網域模式
+  const [domain, setDomain] = useState("")
+  const [domainPort, setDomainPort] = useState(80)
+  const [enableHttps, setEnableHttps] = useState(true)
+
+  // 🔌 Port 轉發模式
+  const [portPairs, setPortPairs] = useState<
+    { external: number; internal: number; protocol: string }[]
+  >([{ external: 8080, internal: 80, protocol: "tcp" }])
+
+  // 🔓 僅開放模式 & 非入站通用
+  const [ports, setPorts] = useState<
+    { port: number; protocol: string }[]
+  >([{ port: 80, protocol: "tcp" }])
+
   const [direction, setDirection] = useState<"one_way" | "bidirectional">(
     "one_way",
   )
 
-  const isGateway = targetVmid === null
-  const isInbound = sourceVmid === null // Internet → VM 入站
+  // Gateway VM 狀態查詢
+  const { data: gatewayConfig } = useQuery({
+    queryKey: ["gateway-config-conn"],
+    queryFn: GatewayApiService.getConfig,
+    enabled: isInbound,
+    staleTime: 30_000,
+  })
+  const isGatewayConfigured = gatewayConfig?.is_configured ?? false
+  const needsGateway = isInbound && (inboundMode === "domain" || inboundMode === "port")
 
-  const addPort = () => {
-    setPorts([...ports, { port: 443, protocol: "tcp" }])
-  }
-
-  const removePort = (index: number) => {
-    setPorts(ports.filter((_, i) => i !== index))
-  }
-
-  const updatePort = (
-    index: number,
-    field: "port" | "protocol",
-    value: string | number,
-  ) => {
-    const updated = [...ports]
-    updated[index] = { ...updated[index], [field]: value }
-    setPorts(updated)
-  }
-
+  // ─── 確認送出 ────────────────────────────────────────────────────────────
   const handleConfirm = () => {
-    const validPorts = ports
-      .filter((p) => {
-        if (PROTOCOLS_WITH_PORT.has(p.protocol)) {
-          return p.port >= 1 && p.port <= 65535
+    let result: PortSpec[]
+
+    if (isInbound) {
+      switch (inboundMode) {
+        case "domain": {
+          const d = domain.trim().toLowerCase()
+          if (!d) {
+            toast.error("請輸入網域名稱")
+            return
+          }
+          if (domainPort < 1 || domainPort > 65535) {
+            toast.error("請輸入有效的 port (1-65535)")
+            return
+          }
+          result = [
+            {
+              port: domainPort,
+              protocol: "tcp",
+              domain: d,
+              enable_https: enableHttps,
+            },
+          ]
+          break
         }
-        return true // 無端口協定直接通過
-      })
-      .map((p) => ({
-        // 無端口協定統一 port=0 傳給後端
+        case "port": {
+          const valid = portPairs.filter(
+            (p) =>
+              p.external >= 1 &&
+              p.external <= 65535 &&
+              p.internal >= 1 &&
+              p.internal <= 65535,
+          )
+          if (valid.length === 0) {
+            toast.error("請輸入有效的 port")
+            return
+          }
+          result = valid.map((p) => ({
+            port: p.internal,
+            protocol: p.protocol,
+            external_port: p.external,
+          }))
+          break
+        }
+        case "firewall":
+        default: {
+          const valid = ports.filter((p) =>
+            PROTOCOLS_WITH_PORT.has(p.protocol) ? p.port >= 1 && p.port <= 65535 : true,
+          )
+          if (valid.length === 0) {
+            toast.error("請輸入有效的設定")
+            return
+          }
+          result = valid.map((p) => ({
+            port: PROTOCOLS_WITH_PORT.has(p.protocol) ? p.port : 0,
+            protocol: p.protocol,
+          }))
+          break
+        }
+      }
+    } else {
+      // 非入站（VM→Gateway / VM→VM）
+      const valid = ports.filter((p) =>
+        PROTOCOLS_WITH_PORT.has(p.protocol) ? p.port >= 1 && p.port <= 65535 : true,
+      )
+      if (valid.length === 0) {
+        toast.error("請輸入有效的設定")
+        return
+      }
+      result = valid.map((p) => ({
         port: PROTOCOLS_WITH_PORT.has(p.protocol) ? p.port : 0,
         protocol: p.protocol,
       }))
-    if (validPorts.length === 0) {
-      toast.error("請輸入有效的設定")
-      return
     }
-    onConfirm(validPorts, direction)
-    // 重置狀態
+
+    onConfirm(result, direction)
+    // 重置
+    setDomain("")
+    setDomainPort(80)
+    setEnableHttps(true)
+    setPortPairs([{ external: 8080, internal: 80, protocol: "tcp" }])
     setPorts([{ port: 80, protocol: "tcp" }])
     setDirection("one_way")
+    setInboundMode("domain")
   }
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="bg-[#1a1a1a] border-[#2e2e2e] text-gray-100 sm:max-w-md">
+      <DialogContent className="bg-[#1a1a1a] border-[#2e2e2e] text-gray-100 sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="text-gray-100">設定連線規則</DialogTitle>
         </DialogHeader>
@@ -139,10 +233,7 @@ export function ConnectionDialog({
                   {sourceName}
                 </span>
                 {isGateway ? (
-                  <span className="text-gray-400">
-                    {" "}
-                    → 連到 Internet（上網）
-                  </span>
+                  <span className="text-gray-400"> → 連到 Internet（上網）</span>
                 ) : (
                   <>
                     <span className="text-gray-500"> → </span>
@@ -155,67 +246,300 @@ export function ConnectionDialog({
             )}
           </div>
 
-          {/* 端口設定 */}
-          <div className="space-y-2">
-            <Label className="text-gray-300 text-sm">允許端口</Label>
-            {ports.map((port, index) => (
-              <div key={index} className="flex items-center gap-2">
-                {PROTOCOLS_WITH_PORT.has(port.protocol) ? (
+          {/* ── 入站模式選擇器 ──────────────────────────────────────────── */}
+          {isInbound && (
+            <>
+              <div className="space-y-2">
+                <Label className="text-gray-300 text-sm">
+                  你想怎麼從外面連到這台 VM？
+                </Label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(
+                    [
+                      {
+                        mode: "domain" as InboundMode,
+                        icon: Globe,
+                        label: "用網域名稱",
+                        desc: "設定網域 → VM",
+                      },
+                      {
+                        mode: "port" as InboundMode,
+                        icon: Plug,
+                        label: "用 Port 號",
+                        desc: "外網 Port → VM",
+                      },
+                      {
+                        mode: "firewall" as InboundMode,
+                        icon: Shield,
+                        label: "僅開放防火牆",
+                        desc: "只開放 Port",
+                      },
+                    ] as const
+                  ).map(({ mode, icon: Icon, label, desc }) => (
+                    <button
+                      key={mode}
+                      onClick={() => setInboundMode(mode)}
+                      className={`flex flex-col items-center gap-1.5 px-3 py-3 rounded-lg text-xs transition-all ${
+                        inboundMode === mode
+                          ? "bg-emerald-950/60 border-2 border-emerald-600 text-emerald-300"
+                          : "bg-[#111] border border-[#2e2e2e] text-gray-400 hover:border-[#3e3e3e]"
+                      }`}
+                    >
+                      <Icon className="w-4 h-4" />
+                      <span className="font-medium">{label}</span>
+                      <span className="text-[10px] text-gray-500">
+                        {desc}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* ── 情境提示 ──────────────────────────────────────────── */}
+              {needsGateway && !isGatewayConfigured && (
+                <div className="flex gap-2 items-start bg-orange-950/40 border border-orange-700/60 rounded-lg px-3 py-2.5 text-xs text-orange-300">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                  <span>
+                    <span className="font-medium">Gateway VM 尚未設定</span>
+                    ，請先至「Gateway VM 管理」設定後再使用此功能。
+                  </span>
+                </div>
+              )}
+              {needsGateway && isGatewayConfigured && (
+                <div className="flex gap-2 items-start bg-emerald-950/40 border border-emerald-700/60 rounded-lg px-3 py-2.5 text-xs text-emerald-300">
+                  <Zap className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                  <span>
+                    建立後將同時更新 <span className="font-medium">PVE 防火牆 + Gateway VM</span>（立即生效）
+                  </span>
+                </div>
+              )}
+              {inboundMode === "firewall" && (
+                <div className="flex gap-2 items-start bg-blue-950/30 border border-blue-700/40 rounded-lg px-3 py-2.5 text-xs text-blue-300">
+                  <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                  <span>
+                    僅在 PVE 防火牆開放此 Port，不設定外部存取路徑。適合同網段內的 VM 互連使用。
+                  </span>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* ── 🌐 網域模式 ────────────────────────────────────────── */}
+          {isInbound && inboundMode === "domain" && (
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label className="text-gray-400 text-xs">網域名稱</Label>
+                <Input
+                  value={domain}
+                  onChange={(e) => setDomain(e.target.value)}
+                  placeholder="mysite.campus.edu"
+                  className="bg-[#111] border-[#2e2e2e] text-gray-100 h-9"
+                />
+              </div>
+              <div className="flex gap-4 items-end">
+                <div className="space-y-1.5">
+                  <Label className="text-gray-400 text-xs">VM 內部 Port</Label>
                   <Input
                     type="number"
                     min={1}
                     max={65535}
-                    value={port.port}
+                    value={domainPort}
                     onChange={(e) =>
-                      updatePort(
-                        index,
-                        "port",
-                        parseInt(e.target.value, 10) || 80,
-                      )
+                      setDomainPort(parseInt(e.target.value, 10) || 80)
                     }
-                    className="bg-[#111] border-[#2e2e2e] text-gray-100 w-24 h-8 text-sm"
-                    placeholder="80"
+                    className="bg-[#111] border-[#2e2e2e] text-gray-100 h-9 w-28"
                   />
-                ) : (
-                  <div className="w-24 h-8 flex items-center px-2 text-xs text-gray-500 bg-[#111] border border-[#2e2e2e] rounded-md">
-                    無端口
-                  </div>
-                )}
-                <Select
-                  value={port.protocol}
-                  onValueChange={(v) => updatePort(index, "protocol", v)}
-                >
-                  <SelectTrigger className="bg-[#111] border-[#2e2e2e] text-gray-100 w-24 h-8 text-sm">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="bg-[#1a1a1a] border-[#2e2e2e] text-gray-100">
-                    {PVE_PROTOCOLS.map((p) => (
-                      <SelectItem key={p.value} value={p.value}>
-                        {p.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {ports.length > 1 && (
-                  <button
-                    onClick={() => removePort(index)}
-                    className="p-1 hover:text-red-400 text-gray-500 transition-colors"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                )}
+                </div>
+                <label className="flex items-center gap-2 text-xs text-gray-400 pb-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={enableHttps}
+                    onChange={(e) => setEnableHttps(e.target.checked)}
+                    className="rounded border-[#2e2e2e] bg-[#111] text-emerald-600 focus:ring-emerald-600"
+                  />
+                  啟用 HTTPS（自動申請 Let's Encrypt）
+                </label>
               </div>
-            ))}
-            <button
-              onClick={addPort}
-              className="flex items-center gap-1 text-xs text-emerald-400 hover:text-emerald-300 transition-colors"
-            >
-              <Plus className="w-3 h-3" />
-              新增端口
-            </button>
-          </div>
+              {domain.trim() && (
+                <p className="text-xs text-gray-500">
+                  設定後可透過{" "}
+                  <span className="text-emerald-400 font-mono">
+                    {enableHttps ? "https" : "http"}://{domain.trim().toLowerCase()}
+                  </span>{" "}
+                  存取你的 VM port {domainPort}
+                </p>
+              )}
+            </div>
+          )}
 
-          {/* 方向設定（VM 間連線才顯示，入站連線永遠單向） */}
+          {/* ── 🔌 Port 轉發模式 ──────────────────────────────────── */}
+          {isInbound && inboundMode === "port" && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-xs text-gray-500 px-1">
+                <span className="w-24">外網 Port</span>
+                <span className="text-gray-600">→</span>
+                <span className="w-24">內部 Port</span>
+                <span className="w-24">協定</span>
+              </div>
+              {portPairs.map((pair, i) => {
+                const extWarning = RESERVED_PORTS.has(pair.external)
+                return (
+                  <div key={i} className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        min={1}
+                        max={65535}
+                        value={pair.external}
+                        onChange={(e) => {
+                          const updated = [...portPairs]
+                          updated[i] = {
+                            ...updated[i],
+                            external: parseInt(e.target.value, 10) || 0,
+                          }
+                          setPortPairs(updated)
+                        }}
+                        className={`bg-[#111] border-[#2e2e2e] text-gray-100 w-24 h-8 text-sm ${extWarning ? "border-yellow-600" : ""}`}
+                      />
+                      <span className="text-gray-500 text-sm">→</span>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={65535}
+                        value={pair.internal}
+                        onChange={(e) => {
+                          const updated = [...portPairs]
+                          updated[i] = {
+                            ...updated[i],
+                            internal: parseInt(e.target.value, 10) || 0,
+                          }
+                          setPortPairs(updated)
+                        }}
+                        className="bg-[#111] border-[#2e2e2e] text-gray-100 w-24 h-8 text-sm"
+                      />
+                      <Select
+                        value={pair.protocol}
+                        onValueChange={(v) => {
+                          const updated = [...portPairs]
+                          updated[i] = { ...updated[i], protocol: v }
+                          setPortPairs(updated)
+                        }}
+                      >
+                        <SelectTrigger className="bg-[#111] border-[#2e2e2e] text-gray-100 w-24 h-8 text-sm">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="bg-[#1a1a1a] border-[#2e2e2e] text-gray-100">
+                          <SelectItem value="tcp">TCP</SelectItem>
+                          <SelectItem value="udp">UDP</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {portPairs.length > 1 && (
+                        <button
+                          onClick={() =>
+                            setPortPairs(portPairs.filter((_, j) => j !== i))
+                          }
+                          className="p-1 hover:text-red-400 text-gray-500 transition-colors"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                    {extWarning && (
+                      <p className="text-xs text-yellow-500 pl-1">
+                        Port {pair.external} 為系統保留 port，可能無法使用
+                      </p>
+                    )}
+                  </div>
+                )
+              })}
+              <button
+                onClick={() =>
+                  setPortPairs([
+                    ...portPairs,
+                    { external: 0, internal: 0, protocol: "tcp" },
+                  ])
+                }
+                className="flex items-center gap-1 text-xs text-emerald-400 hover:text-emerald-300 transition-colors"
+              >
+                <Plus className="w-3 h-3" />
+                新增端口
+              </button>
+            </div>
+          )}
+
+          {/* ── 🔓 僅開放模式（入站）/ 通用端口設定（非入站） ──────── */}
+          {(isInbound ? inboundMode === "firewall" : true) &&
+            !(isInbound && inboundMode !== "firewall") && (
+              <div className="space-y-2">
+                <Label className="text-gray-300 text-sm">允許端口</Label>
+                {ports.map((port, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    {PROTOCOLS_WITH_PORT.has(port.protocol) ? (
+                      <Input
+                        type="number"
+                        min={1}
+                        max={65535}
+                        value={port.port}
+                        onChange={(e) => {
+                          const updated = [...ports]
+                          updated[index] = {
+                            ...updated[index],
+                            port: parseInt(e.target.value, 10) || 80,
+                          }
+                          setPorts(updated)
+                        }}
+                        className="bg-[#111] border-[#2e2e2e] text-gray-100 w-24 h-8 text-sm"
+                        placeholder="80"
+                      />
+                    ) : (
+                      <div className="w-24 h-8 flex items-center px-2 text-xs text-gray-500 bg-[#111] border border-[#2e2e2e] rounded-md">
+                        無端口
+                      </div>
+                    )}
+                    <Select
+                      value={port.protocol}
+                      onValueChange={(v) => {
+                        const updated = [...ports]
+                        updated[index] = { ...updated[index], protocol: v }
+                        setPorts(updated)
+                      }}
+                    >
+                      <SelectTrigger className="bg-[#111] border-[#2e2e2e] text-gray-100 w-24 h-8 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-[#1a1a1a] border-[#2e2e2e] text-gray-100">
+                        {PVE_PROTOCOLS.map((p) => (
+                          <SelectItem key={p.value} value={p.value}>
+                            {p.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {ports.length > 1 && (
+                      <button
+                        onClick={() =>
+                          setPorts(ports.filter((_, i) => i !== index))
+                        }
+                        className="p-1 hover:text-red-400 text-gray-500 transition-colors"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+                <button
+                  onClick={() =>
+                    setPorts([...ports, { port: 443, protocol: "tcp" }])
+                  }
+                  className="flex items-center gap-1 text-xs text-emerald-400 hover:text-emerald-300 transition-colors"
+                >
+                  <Plus className="w-3 h-3" />
+                  新增端口
+                </button>
+              </div>
+            )}
+
+          {/* 方向設定（VM 間連線才顯示） */}
           {!isGateway && !isInbound && (
             <div className="space-y-2">
               <Label className="text-gray-300 text-sm">連線方向</Label>
@@ -224,14 +548,11 @@ export function ConnectionDialog({
                   <button
                     key={dir}
                     onClick={() => setDirection(dir)}
-                    className={`
-                      px-3 py-1.5 rounded-md text-xs font-medium transition-colors
-                      ${
-                        direction === dir
-                          ? "bg-emerald-900/50 border border-emerald-600 text-emerald-400"
-                          : "bg-[#111] border border-[#2e2e2e] text-gray-400 hover:border-[#3e3e3e]"
-                      }
-                    `}
+                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                      direction === dir
+                        ? "bg-emerald-900/50 border border-emerald-600 text-emerald-400"
+                        : "bg-[#111] border border-[#2e2e2e] text-gray-400 hover:border-[#3e3e3e]"
+                    }`}
                   >
                     {dir === "one_way" ? "→ 單向" : "↔ 雙向"}
                   </button>
@@ -251,7 +572,8 @@ export function ConnectionDialog({
           </Button>
           <Button
             onClick={handleConfirm}
-            className="bg-emerald-700 hover:bg-emerald-600 text-white"
+            disabled={needsGateway && !isGatewayConfigured}
+            className="bg-emerald-700 hover:bg-emerald-600 text-white disabled:opacity-40"
           >
             建立連線
           </Button>

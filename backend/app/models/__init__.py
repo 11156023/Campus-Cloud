@@ -27,6 +27,9 @@ from .proxmox_config import ProxmoxConfig
 from .proxmox_node import ProxmoxNode
 from .proxmox_storage import ProxmoxStorage
 from .firewall_layout import FirewallLayout
+from .nat_rule import NatRule
+from .gateway_config import GatewayConfig
+from .reverse_proxy_rule import ReverseProxyRule
 
 __all__ = [
     # Base
@@ -65,4 +68,10 @@ __all__ = [
     "ProxmoxStorage",
     # Firewall Layout
     "FirewallLayout",
+    # NAT Rules
+    "NatRule",
+    # Gateway Config
+    "GatewayConfig",
+    # Reverse Proxy Rules
+    "ReverseProxyRule",
 ]

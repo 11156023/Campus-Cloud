@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/yunohost.webp",
   "config_path": "",
   "description": "YunoHost is an operating system aiming for the simplest administration of a server, and therefore democratize self-hosting, while making sure it stays reliable, secure, ethical and lightweight.",
+  "description_zh": "YunoHost 是一個作業系統，目旨於最簡單的伺服器管理，因此民主化自主託管，同時確保它保持可靠、安全、道德和輕量級。",
+  "description_ja": "YunoHostはサーバーの最も単純な管理を目的とした、したがって自己ホストを民主化するオペレーティングシステムであり、信頼性、セキュリティ、倫理性、軽量性を確保しています。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,8 @@
   "notes": [
     {
       "text": "WARNING: Installation sources scripts outside of Community Scripts repo. Please check the source before installing.",
+      "text_zh": "警告：安裝從 Community Scripts 儲存庫外部取得指令碼。安裝前請檢查來源。",
+      "text_ja": "警告：インストールスクリプトはCommunity Scriptsリポジトリの外部から取得されています。インストール前にソースを確認してください。",
       "type": "warning"
     }
   ]

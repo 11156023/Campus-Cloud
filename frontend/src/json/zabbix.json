@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/zabbix.webp",
   "config_path": "/etc/zabbix/zabbix_server.conf",
   "description": "Zabbix is an all-in-one monitoring solution with a variety of enterprise-grade features available right out of the box.",
+  "description_zh": "Zabbix 是一個一體化監控解決方案，開箱即用具有各種企業級功能。",
+  "description_ja": "Zabbixは、箱から出てすぐに利用可能なエンタープライズグレード機能の多様性を備えたオールインワン監視ソリューションです。",
   "install_methods": [
     {
       "type": "default",
@@ -32,18 +34,26 @@
   "notes": [
     {
       "text": "Database credentials: `cat ~/zabbix.creds`",
+      "text_zh": "資料庫認證：`cat ~/zabbix.creds`",
+      "text_ja": "データベース認証情報：`cat ~/zabbix.creds`",
       "type": "info"
     },
     {
       "text": "You can choose between Zabbix agent (classic) and agent2 (modern) during installation",
+      "text_zh": "安裝期間，您可以在 Zabbix agent（經典）和 agent2（現代）之間進行選擇。",
+      "text_ja": "インストール中に、Zabbixエージェント（クラシック）とagent2（モダン）の間を選択できます",
       "type": "info"
     },
     {
       "text": "For agent2 the PostgreSQL plugin is installed by default; all plugins are optional",
+      "text_zh": "對於 agent2，PostgreSQL 外掛程式預設會安裝；所有外掛程式是可選的。",
+      "text_ja": "agent2の場合、PostgreSQLプラグインがデフォルトでインストールされます。すべてのプラグインはオプションです",
       "type": "info"
     },
     {
       "text": "If agent2 with NVIDIA plugin is installed in an environment without GPU, the installer disables it automatically",
+      "text_zh": "如果在沒有 GPU 的環境中安裝帶有 NVIDIA 外掛程式的 agent2，安裝程式會自動停用它。",
+      "text_ja": "GPUのない環境にNVIDIAプラグイン付きagent2がインストールされた場合、インストーラーは自動的にそれを無効にします",
       "type": "info"
     }
   ]

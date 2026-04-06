@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/silverbullet.webp",
   "config_path": "",
   "description": "SilverBullet is a note-taking application optimized for people with a hacker mindset.",
+  "description_zh": "SilverBullet 是一個為具有駭客思維的人最佳化的筆記應用程式。",
+  "description_ja": "SilverBulletは、ハッカーの考え方を持つ人々に最適化されたメモ取得アプリケーションです。",
   "install_methods": [
     {
       "type": "default",

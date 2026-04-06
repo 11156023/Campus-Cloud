@@ -12,6 +12,8 @@
   "website": "https://github.com/favonia/cloudflare-ddns",
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/cloudflare.webp",
   "description": "A feature-rich and robust Cloudflare DDNS updater with a small footprint. The program will detect your machine’s public IP addresses and update DNS records using the Cloudflare API",
+  "description_zh": "一個功能豐富、強大的 Cloudflare DDNS 更新程式，佔用空間小。該程式將檢測您機器的公開 IP 位址並使用 Cloudflare API 更新 DNS 記錄",
+  "description_ja": "フットプリントが小さい、機能が豊富で堅牢な Cloudflare DDNS アップデータ。プログラムはマシンのパブリック IP アドレスを検出し、Cloudflare API を使用して DNS レコードを更新します",
   "install_methods": [
     {
       "type": "default",
@@ -36,6 +38,26 @@
     },
     {
       "text": "To update the configuration edit `/etc/systemd/system/cloudflare-ddns.service`. After edit please restart with `systemctl restart cloudflare-ddns`",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "要設置更新程式，您必須擁有 Cloudflare Token 和域名，請閱讀 Github 文檔 `https://github.com/favonia/cloudflare-ddns?tab=readme-ov-file#-step-1-updating-the-compose-file`（僅可展開部分）",
+      "type": "warning"
+    },
+    {
+      "text": "要更新配置，請編輯 `/etc/systemd/system/cloudflare-ddns.service`。編輯後，請使用 `systemctl restart cloudflare-ddns` 重新啟動",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "アップデータをセットアップするには、Cloudflare トークンとドメインが必要です。Github ドキュメント `https://github.com/favonia/cloudflare-ddns?tab=readme-ov-file#-step-1-updating-the-compose-file` を読んでください（展開可能なセクションのみ）",
+      "type": "warning"
+    },
+    {
+      "text": "設定を更新するには、`/etc/systemd/system/cloudflare-ddns.service` を編集します。編集後、`systemctl restart cloudflare-ddns` で再起動してください",
       "type": "info"
     }
   ]

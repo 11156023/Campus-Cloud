@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/ubiquiti-unifi.webp",
   "config_path": "",
   "description": "Unifi OS Server is the operating system that powers Ubiquiti's UniFi line of network devices. It provides a centralized platform for managing and monitoring UniFi access points, switches, and security gateways, offering features such as network configuration, device provisioning, and performance analytics.",
+  "description_zh": "Unifi OS Server 是為 Ubiquiti 的 UniFi 網路裝置系列提供動力的作業系統。它提供了一個集中式平台，用於管理和監控 UniFi 無線存取點、交換器和安全閘道，提供網路設定、裝置佈建和效能分析等功能。",
+  "description_ja": "Unifi OS Serverは、UbiquitiのUniFiネットワークデバイスラインに電力を供給するオペレーティングシステムです。UniFiアクセスポイント、スイッチ、セキュリティゲートウェイの管理と監視のための集中化されたプラットフォームを提供し、ネットワーク構成、デバイスプロビジョニング、パフォーマンス分析などの機能を提供します。",
   "install_methods": [
     {
       "type": "default",

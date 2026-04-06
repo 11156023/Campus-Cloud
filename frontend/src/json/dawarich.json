@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/dawarich.webp",
   "config_path": "/opt/dawarich/.env",
   "description": "Dawarich is a self-hosted alternative to Google Timeline (Google Maps Location History). It allows you to import your location history from Google Maps Timeline and Owntracks, view it on a map, and analyze your location data with statistics and visualizations.",
+  "description_zh": "Dawarich 是 Google Timeline（Google 地圖位置歷史記錄）的自託管替代品。它允許您從 Google 地圖時間軸和 Owntracks 導入位置歷史記錄，在地圖上查看它，並通過統計數據和可視化分析您的位置數據。",
+  "description_ja": "Dawarich は Google Timeline（Google Maps ロケーション履歴）の自己ホスト型代替手段です。Google Maps Timeline と Owntracks からロケーション履歴をインポートし、地図で表示し、統計情報と可視化を使用してロケーション データを分析できます。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,18 @@
   "notes": [
     {
       "text": "Default credentials: demo@dawarich.app / password - Change after first login!",
+      "type": "warning"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "預設認證：demo@dawarich.app / password - 首次登入後更改！",
+      "type": "warning"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "デフォルト認証: demo@dawarich.app / password - 初回ログイン後に変更してください！",
       "type": "warning"
     }
   ]

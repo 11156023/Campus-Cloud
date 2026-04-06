@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/reactive-resume.webp",
   "config_path": "/opt/reactive-resume/.env",
   "description": "A one-of-a-kind resume builder that keeps your privacy in mind. Completely secure, customizable, portable, open-source and free forever.",
+  "description_zh": "一個獨一無二的履歷建構工具，牢記你的隱私。完全安全、可自訂、可攜帶、開源且永遠免費。",
+  "description_ja": "あなたのプライバシーを念頭に置いた唯一無二の履歴書ビルダー。完全にセキュア、カスタマイズ可能、ポータブル、オープンソース、永遠に無料です。",
   "install_methods": [
     {
       "type": "default",

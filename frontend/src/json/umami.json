@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/umami.webp",
   "config_path": "/opt/umami/.env",
   "description": "Umami makes it easy to collect, analyze, and understand your web data while maintaining visitor privacy and data ownership.",
+  "description_zh": "Umami 使你能輕鬆收集、分析和理解網路資料，同時保持訪客隱私和資料擁有權。",
+  "description_ja": "Umamiは、訪問者のプライバシーとデータの所有権を維持しながら、Webデータを簡単に収集、分析、理解できるようにします。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,18 @@
   "notes": [
     {
       "text": "To view the database credentials : `cat umami.creds`",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "檢視資料庫憑證：`cat umami.creds`",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "データベース認証情報を表示するには：`cat umami.creds`",
       "type": "info"
     }
   ]

@@ -12,6 +12,8 @@
   "website": "https://dokploy.com/",
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons/png/dokploy.png",
   "description": "Dokploy is a free, self-hostable Platform as a Service (PaaS) that simplifies the deployment and management of applications and databases. Built with Docker and Traefik, it offers features like automatic SSL, Docker Compose support, database backups, and a real-time monitoring dashboard.",
+  "description_zh": "Dokploy 是一個免費、可自託管的平台即服務（PaaS），可簡化應用程式和數據庫的部署和管理。使用 Docker 和 Traefik 構建，它提供自動 SSL、Docker Compose 支持、數據庫備份和實時監控儀表板等功能。",
+  "description_ja": "Dokploy は、アプリケーションとデータベースのデプロイメントと管理を簡素化する無料の自己ホスト型プラットフォーム サービス (PaaS) です。Docker と Traefik で構築され、自動 SSL、Docker Compose サポート、データベース バックアップ、リアルタイム監視ダッシュボードなどの機能を提供します。",
   "install_methods": [
     {
       "type": "default",
@@ -40,6 +42,34 @@
     },
     {
       "text": "This container uses Docker-in-Docker (nesting) for application deployments.",
+      "type": "warning"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "初始設置將通過首次訪問時的網頁界面完成。",
+      "type": "info"
+    },
+    {
+      "text": "Dokploy 通過網頁界面具有內置自動更新。",
+      "type": "info"
+    },
+    {
+      "text": "此容器使用 Docker-in-Docker（嵌套）進行應用程式部署。",
+      "type": "warning"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "初期セットアップは最初のアクセス時に Web インターフェース経由で行われます。",
+      "type": "info"
+    },
+    {
+      "text": "Dokploy は Web インターフェース経由で自動更新が組み込まれています。",
+      "type": "info"
+    },
+    {
+      "text": "このコンテナーはアプリケーション デプロイメント用に Docker-in-Docker（ネスティング）を使用します。",
       "type": "warning"
     }
   ]

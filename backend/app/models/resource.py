@@ -21,6 +21,12 @@ class Resource(SQLModel, table=True):
         description="環境類型，例如：Web開發標準版、LLM微調環境等"
     )
     os_info: str | None = Field(default=None, description="作業系統資訊")
+    ip_address: str | None = Field(default=None, max_length=64, description="VM 最後已知 IP 位址（快取）")
+    ip_address_cached_at: datetime | None = Field(
+        sa_column=Column(DateTime(timezone=True), nullable=True),
+        default=None,
+        description="IP 位址最後快取時間",
+    )
     expiry_date: date | None = Field(default=None, description="到期日，None表示無期限")
     template_id: int | None = Field(
         default=None, description="使用的模板ID（如果是從模板創建）"

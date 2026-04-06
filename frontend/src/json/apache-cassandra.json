@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/apache-cassandra.webp",
   "config_path": "/etc/cassandra/cassandra.yaml",
   "description": "Apache-Cassandra is an open source NoSQL distributed database trusted by thousands of companies for scalability and high availability without compromising performance.",
+  "description_zh": "Apache-Cassandra 是一個開源 NoSQL 分佈式數據庫，被數千家公司信任，用於可擴展性和高可用性，同時不損害性能。",
+  "description_ja": "Apache-Cassandra は、スケーラビリティと高可用性のために数千の企業に信頼されているオープンソース NoSQL 分散データベースで、パフォーマンスを損なわないようになっています。",
   "install_methods": [
     {
       "type": "default",

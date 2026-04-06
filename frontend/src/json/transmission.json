@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/transmission.webp",
   "config_path": "Debian `/etc/transmission-daemon/settings.json` | Alpine `/var/lib/transmission/config/settings.json`",
   "description": "Transmission is a free, open-source BitTorrent client known for its fast download speeds and ease of use. It supports various platforms such as Windows, Linux, and macOS and has features like web interface, peer exchange, and encrypted transfers.",
+  "description_zh": "Transmission 是一個免費的開源 BitTorrent 用戶端，以快速下載速度和易用性著稱。它支援 Windows、Linux 和 macOS 等各種平台，並具有網路介面、對等交換和加密傳輸等功能。",
+  "description_ja": "Transmissionは高速ダウンロード速度と使いやすさで知られるフリーのオープンソースBitTorrentクライアントです。Windows、Linux、macOSなど様々なプラットフォームをサポートし、Webインターフェース、ピア交換、暗号化転送などの機能を備えています。",
   "install_methods": [
     {
       "type": "default",
@@ -48,6 +50,26 @@
     {
       "type": "info",
       "text": "Alpine script sets initial disk size to 1GB. Please adjust for your needs after installation ends."
+    }
+  ],
+  "notes_zh": [
+    {
+      "type": "info",
+      "text": "腳本預設停用白名單。變更組態以符合你的需要。"
+    },
+    {
+      "type": "info",
+      "text": "Alpine 腳本將初始磁碟大小設定為 1GB。安裝完成後，請根據你的需要進行調整。"
+    }
+  ],
+  "notes_ja": [
+    {
+      "type": "info",
+      "text": "スクリプトはデフォルトでホワイトリストを無効にします。ニーズに応じて設定を変更してください。"
+    },
+    {
+      "type": "info",
+      "text": "Alpineスクリプトは初期ディスクサイズを1GBに設定します。インストール後、必要に応じて調整してください。"
     }
   ]
 }

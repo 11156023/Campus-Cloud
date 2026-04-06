@@ -12,6 +12,8 @@
   "website": "https://scanopy.net",
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/scanopy.webp",
   "description": "Automatically discover and visually document network infrastructure",
+  "description_zh": "自動發現並以視覺方式記錄網路基礎設施",
+  "description_ja": "ネットワークインフラを自動発見し、視覚的に文書化します",
   "install_methods": [
     {
       "type": "default",
@@ -36,6 +38,26 @@
     },
     {
       "text": "The integrated daemon config is located at `/root/.config/daemon/`",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "安裝完成後，若要配置整合式精靈程式，請在 UI 中使用「建立精靈程式」功能表並按照指示操作",
+      "type": "info"
+    },
+    {
+      "text": "整合式精靈程式組態位於 `/root/.config/daemon/`",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "インストール完了後、統合デーモンを構成するには、UIの「デーモン作成」メニューを使用し、指示に従ってください",
+      "type": "info"
+    },
+    {
+      "text": "統合デーモン構成は`/root/.config/daemon/`にあります",
       "type": "info"
     }
   ]

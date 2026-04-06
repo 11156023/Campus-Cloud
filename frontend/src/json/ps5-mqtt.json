@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/ps5-mqtt.webp",
   "config_path": "/opt/.config/ps5-mqtt/config.json",
   "description": "Integrate your Sony Playstation 5 devices with Home Assistant using MQTT.",
+  "description_zh": "使用 MQTT 將您的 Sony Playstation 5 裝置與 Home Assistant 整合。",
+  "description_ja": "MQTTを使用してSony Playstation 5デバイスをHome Assistantと統合します。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,18 @@
   "notes": [
     {
       "text": "After installation, the MQTT endpoint must be configured. The configuration file is located within the LXC container at: `/opt/.config/ps5-mqtt/config.json`",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "安裝後，必須設定 MQTT 端點。設定檔案位於 LXC 容器內的：`/opt/.config/ps5-mqtt/config.json`",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "インストール後、MQTTエンドポイントを構成する必要があります。設定ファイルはLXCコンテナ内の`/opt/.config/ps5-mqtt/config.json`にあります",
       "type": "info"
     }
   ]

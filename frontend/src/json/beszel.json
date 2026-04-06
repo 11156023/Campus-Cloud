@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/beszel.webp",
   "config_path": "",
   "description": "A lightweight server monitoring platform that provides Docker statistics, historical data, and alert functions\n    ",
+  "description_zh": "一個輕量級伺服器監控平台，提供 Docker 統計數據、歷史數據和警報功能\n    ",
+  "description_ja": "Docker 統計、履歴データ、およびアラート機能を提供する軽量サーバー監視プラットフォーム\n    ",
   "install_methods": [
     {
       "type": "default",

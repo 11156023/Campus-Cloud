@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/pi-hole.webp",
   "config_path": "/etc/pihole/pihole.toml",
   "description": "Pi-hole is a free, open-source network-level advertisement and Internet tracker blocking application. It runs on a Raspberry Pi or other Linux-based systems and acts as a DNS sinkhole, blocking unwanted traffic before it reaches a user's device. Pi-hole can also function as a DHCP server, providing IP addresses and other network configuration information to devices on a network. The software is highly configurable and supports a wide range of customizations, such as allowing or blocking specific domains, setting up blocklists and whitelists, and customizing the appearance of the web-based interface. The main purpose of Pi-hole is to protect users' privacy and security by blocking unwanted and potentially malicious content, such as ads, trackers, and malware. It is designed to be easy to set up and use, and can be configured through a web-based interface or through a terminal-based command-line interface.",
+  "description_zh": "Pi-hole 是一個免費的開源網路級廣告和網際網路追蹤器封鎖應用程式。它在 Raspberry Pi 或其他基於 Linux 的系統上執行，並作為 DNS 歸宿地，在不想要的流量到達使用者裝置之前將其封鎖。Pi-hole 也可以作為 DHCP 伺服器運作，向網路上的裝置提供 IP 位址和其他網路設定資訊。該軟體高度可設定，支援多種自訂選項，例如允許或封鎖特定網域、設定封鎖清單和白名單，以及自訂網頁介面的外觀。Pi-hole 的主要目的是透過封鎖廣告、追蹤器和惡意軟體等不想要的內容來保護使用者的隱私和安全。它設計成易於設定和使用，可透過網頁介面或終端型命令行介面進行設定。",
+  "description_ja": "Pi-holeは、無料のオープンソースネットワークレベルの広告およびインターネットトラッカーブロッキングアプリケーションです。Raspberry Piまたは他のLinuxベースのシステムで実行され、DNSシンクホールとして機能し、不要なトラフィックがユーザーのデバイスに到達する前にブロックします。Pi-holeはDHCPサーバーとしても機能でき、ネットワーク上のデバイスにIPアドレスおよび他のネットワーク構成情報を提供できます。このソフトウェアは高度に構成可能で、特定のドメインの許可またはブロック、ブロックリストとホワイトリストの設定、Webベースのインターフェースの外観のカスタマイズなど、さまざまなカスタマイズをサポートしています。Pi-holeの主な目的は、広告、トラッカー、マルウェアなどの不要で潜在的に悪意のあるコンテンツをブロックすることにより、ユーザーのプライバシーとセキュリティを保護することです。セットアップと使用が簡単になるように設計されており、Webベースのインターフェースまたはターミナルベースのコマンドラインインターフェースで構成できます。",
   "install_methods": [
     {
       "type": "default",
@@ -44,6 +46,42 @@
     },
     {
       "text": "WARNING: Installation sources scripts outside of Community Scripts repo. Please check the source before installing.",
+      "type": "warning"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "若要設定您的密碼，請登入容器並輸入下列內容：`pihole setpassword`",
+      "type": "info"
+    },
+    {
+      "text": "具有新增 Unbound 的選項",
+      "type": "info"
+    },
+    {
+      "text": "具有設定 Unbound 作為轉送 DNS 伺服器（使用 DNS-over-TLS (DoT)）而不是遞迴 DNS 伺服器的選項",
+      "type": "info"
+    },
+    {
+      "text": "警告：安裝來源指令碼位於 Community Scripts 儲存庫外。安裝前請檢查來源。",
+      "type": "warning"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "パスワードを設定するには、コンテナにログインして、以下を入力してください：`pihole setpassword`",
+      "type": "info"
+    },
+    {
+      "text": "Unboundを追加するオプション付き",
+      "type": "info"
+    },
+    {
+      "text": "Unboundを再帰的DNSサーバーではなく転送DNSサーバー（DNS-over-TLS（DoT）を使用）として構成するオプション付き",
+      "type": "info"
+    },
+    {
+      "text": "警告：インストールはCommunity Scriptsリポジトリ外のスクリプトをソースします。インストール前にソースを確認してください。",
       "type": "warning"
     }
   ]

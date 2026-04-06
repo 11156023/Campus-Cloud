@@ -12,6 +12,8 @@
   "website": "https://qdrant.tech/",
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/qdrant.webp",
   "description": "Qdrant is a vector search engine and vector database that allows you to store, search, and manage high-dimensional vectors efficiently.",
+  "description_zh": "Qdrant 是一個向量搜尋引擎和向量資料庫，讓你能有效地儲存、搜尋和管理高維向量。",
+  "description_ja": "Qdrantはベクトル検索エンジンおよびベクトルデータベースであり、高次元ベクトルを効率的に保存、検索、管理できます。",
   "install_methods": [
     {
       "type": "default",

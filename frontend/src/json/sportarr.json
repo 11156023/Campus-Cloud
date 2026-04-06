@@ -12,6 +12,8 @@
   "website": "https://sportarr.net/",
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/sportarr.webp",
   "description": "Sportarr is an automated media management application for all sports. It works similar to Sonarr and Radarr but specifically designed for combat sports, basketball, football, hockey, motorsports, and hundreds of other sports worldwide.",
+  "description_zh": "Sportarr 是一個用於所有運動的自動化媒體管理應用程式。它的工作方式與 Sonarr 和 Radarr 類似，但專門為格鬥運動、籃球、足球、冰球、賽車和全球數百項其他運動而設計。",
+  "description_ja": "Sportarrはすべてのスポーツ向けの自動化メディア管理アプリケーションです。SonarrおよびRadarrと同様に機能しますが、格闘技、バスケットボール、フットボール、ホッケー、モータースポーツ、および世界中の数百の他のスポーツ向けに特別に設計されています。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,18 @@
   "notes": [
     {
       "text": "The resources assigned to LXC are considered baseline. Please adjust to match your workload.",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "分配給 LXC 的資源被視為基準。請調整以符合你的工作負載。",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "LXCに割り当てられたリソースはベースラインと見なされます。ワークロードに合わせて調整してください。",
       "type": "info"
     }
   ]

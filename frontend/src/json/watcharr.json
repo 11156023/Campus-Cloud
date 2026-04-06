@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/watcharr.webp",
   "config_path": "",
   "description": "Open source, self-hostable watched list for all your content with user authentication, modern and clean UI and a very simple setup.",
+  "description_zh": "開源的自主可託管觀看列表，適用於您的所有內容，具有使用者驗證、現代簡潔的使用者介面和非常簡單的設定。",
+  "description_ja": "オープンソースの自己ホスト可能なウォッチリストで、すべてのコンテンツに対応し、ユーザー認証、モダンでクリーンなUI、非常にシンプルなセットアップを備えています。",
   "install_methods": [
     {
       "type": "default",

@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/privatebin.webp",
   "config_path": "/opt/privatebin/cfg/conf.php",
   "description": "PrivateBin is a minimalist, open-source pastebin where the server has zero knowledge of pasted data. Data is encrypted/decrypted in the browser using 256-bit AES.",
+  "description_zh": "PrivateBin 是一個極簡的開源 pastebin，其中伺服器對貼上的資料一無所知。資料使用 256 位元 AES 在瀏覽器中進行加密/解密。",
+  "description_ja": "PrivateBinは、サーバーが貼り付けられたデータについて何も知らない最小限のオープンソースPastebinです。データはブラウザで256ビットAESを使用して暗号化/復号化されます。",
   "install_methods": [
     {
       "type": "default",

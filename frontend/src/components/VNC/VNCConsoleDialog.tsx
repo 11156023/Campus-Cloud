@@ -33,6 +33,7 @@ export function VNCConsoleDialog({
   const containerRef = useRef<HTMLDivElement>(null)
   const [isConnected, setIsConnected] = useState(false)
   const [vncTicket, setVncTicket] = useState<string | null>(null)
+  const [vncPort, setVncPort] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
@@ -43,6 +44,7 @@ export function VNCConsoleDialog({
       setIsLoading(true)
       setError(null)
       setVncTicket(null)
+      setVncPort(null)
 
       const token = localStorage.getItem("access_token")
       const apiBase = import.meta.env.VITE_API_URL || ""
@@ -60,6 +62,7 @@ export function VNCConsoleDialog({
         .then((data) => {
           if (data.ticket) {
             setVncTicket(data.ticket)
+            setVncPort(data.port ?? null)
           } else {
             setError(t("console.vnc.ticketError"))
           }
@@ -72,6 +75,7 @@ export function VNCConsoleDialog({
         })
     } else {
       setVncTicket(null)
+      setVncPort(null)
       setError(null)
     }
   }, [open, vmid, t])
@@ -87,12 +91,10 @@ export function VNCConsoleDialog({
 
   const handleConnect = useCallback(() => {
     setIsConnected(true)
-    console.log("✅ VNC connected")
   }, [])
 
   const handleDisconnect = useCallback(() => {
     setIsConnected(false)
-    console.log("VNC disconnected")
   }, [])
 
   const handleClose = () => {
@@ -102,6 +104,7 @@ export function VNCConsoleDialog({
     onOpenChange(false)
     setIsConnected(false)
     setVncTicket(null)
+    setVncPort(null)
   }
 
   const sendCtrlAltDel = () => {
@@ -139,9 +142,10 @@ export function VNCConsoleDialog({
     typeof window !== "undefined"
       ? localStorage.getItem("access_token") || ""
       : ""
-  const wsUrl = vmid
-    ? `${protocol}//${apiUrl.host}/ws/vnc/${vmid}?token=${encodeURIComponent(accessToken)}`
-    : ""
+  const wsUrl =
+    vmid && vncTicket
+      ? `${protocol}//${apiUrl.host}/ws/vnc/${vmid}?token=${encodeURIComponent(accessToken)}&vnc_ticket=${encodeURIComponent(vncTicket)}${vncPort ? `&vnc_port=${encodeURIComponent(vncPort)}` : ""}`
+      : ""
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>

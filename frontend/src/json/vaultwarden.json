@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/vaultwarden.webp",
   "config_path": "/opt/vaultwarden/.env",
   "description": "Vaultwarden is a self-hosted password manager which provides secure and encrypted password storage. It uses client-side encryption and provides access to passwords through a web interface and mobile apps.",
+  "description_zh": "Vaultwarden 是一個自主託管的密碼管理員，提供安全加密的密碼儲存。它使用用戶端側加密，並透過網頁介面和行動應用程式提供對密碼的存取。",
+  "description_ja": "Vaultwardenは、安全で暗号化されたパスワードストレージを提供するセルフホストされたパスワードマネージャーです。クライアント側の暗号化を使用し、Webインターフェースとモバイルアプリを通じてパスワードへのアクセスを提供します。",
   "install_methods": [
     {
       "type": "default",
@@ -43,10 +45,14 @@
   "notes": [
     {
       "text": "Application uses self-signed certificate for HTTPS to work and is enabled by default. If you need a different setup, please read the documentation.",
+      "text_zh": "應用程式使用自簽憑證使 HTTPS 正常運作，預設為啟用。如果您需要不同的設定，請閱讀文件。",
+      "text_ja": "アプリケーションはHTTPSが機能するための自己署名証明書を使用しており、デフォルトで有効になっています。異なるセットアップが必要な場合は、ドキュメントをお読みください。",
       "type": "warning"
     },
     {
       "text": "To set the Admin Token, run the command below (or type update) in the LXC Console.",
+      "text_zh": "若要設定管理員權杖，請在 LXC 控制台中執行以下命令（或輸入 update）。",
+      "text_ja": "管理者トークンを設定するには、LXCコンソールで以下のコマンドを実行してください（またはupdateと入力）。",
       "type": "info"
     }
   ]

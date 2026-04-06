@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/speedtest-tracker.webp",
   "config_path": "/opt/speedtest-tracker/.env",
   "description": "Speedtest Tracker is a self-hosted application that runs scheduled speed tests using the Ookla Speedtest CLI and saves the results to a database for historical tracking and visualization.",
+  "description_zh": "Speedtest Tracker 是一個自主託管應用程式，使用 Ookla Speedtest CLI 執行排定的速度測試，並將結果儲存到資料庫以供歷史追蹤和可視化。",
+  "description_ja": "Speedtest TrackerはOokla Speedtest CLIを使用してスケジュール化されたスピードテストを実行し、結果をデータベースに保存して履歴追跡と可視化を行う自己ホスト型アプリケーションです。",
   "install_methods": [
     {
       "type": "default",

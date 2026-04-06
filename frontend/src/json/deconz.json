@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/phoscon.webp",
   "config_path": "",
   "description": "deCONZ is a software for managing and controlling Zigbee-based smart home devices. It allows for setting up, configuring and visualizing the status of connected devices, as well as for triggering actions and automations. It works as a bridge between the Zigbee network and other home automation systems and can be used as a standalone solution or integrated into existing setups.",
+  "description_zh": "deCONZ 是一個用於管理和控制基於 Zigbee 的智能家居設備的軟體。它允許設置、配置和可視化連接設備的狀態，以及觸發操作和自動化。它作為 Zigbee 網路和其他家庭自動化系統之間的橋樑，可作為獨立解決方案使用或集成到現有設置中。",
+  "description_ja": "deCONZ は、Zigbee ベースのスマート ホーム デバイスを管理および制御するためのソフトウェアです。接続されたデバイスのセットアップ、構成、ステータスの視覚化、およびアクションとオートメーションのトリガーが可能です。Zigbee ネットワークと他のホーム オートメーション システムの間の橋として機能し、スタンドアロン ソリューションとして使用することも、既存のセットアップに統合することもできます。",
   "install_methods": [
     {
       "type": "default",

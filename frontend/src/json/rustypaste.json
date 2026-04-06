@@ -12,6 +12,8 @@
   "website": "https://github.com/orhun/rustypaste",
   "logo": "https://github.com/orhun/rustypaste/raw/master/img/rustypaste_logo.png",
   "description": "Rustypaste is a minimal file upload/pastebin service.",
+  "description_zh": "Rustypaste 是一個最小化的檔案上傳/貼文箱服務。",
+  "description_ja": "Rustypaste は、最小限のファイルアップロード / パスビンサービスです。",
   "install_methods": [
     {
       "type": "default",
@@ -43,6 +45,18 @@
   "notes": [
     {
       "text": "When updating the script it will backup the whole project including all the uploaded files, make sure to extract it to a safe location or remove",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "更新腳本時，它會備份整個專案（包括所有上傳的檔案），請確保將其提取到安全位置或移除",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "スクリプトを更新する際、アップロードされたすべてのファイルを含むプロジェクト全体がバックアップされます。安全な場所に抽出するか削除してください",
       "type": "info"
     }
   ]

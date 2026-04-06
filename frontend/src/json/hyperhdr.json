@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/hyperhdr.webp",
   "config_path": "",
   "description": "HyperHDR is a highly optimized open source ambient lighting implementation based on modern digital video and audio stream analysis.",
+  "description_zh": "HyperHDR 是一個高度最佳化的開源環境光實現，基於現代數位視訊和音訊串流分析。",
+  "description_ja": "HyperHDR は、最新のデジタルビデオおよびオーディオストリーム分析に基づいた、高度に最適化されたオープンソースのアンビエントライティング実装です。",
   "install_methods": [
     {
       "type": "default",

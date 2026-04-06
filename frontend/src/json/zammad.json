@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/zammad.webp",
   "config_path": "/etc/nginx/sites-available/zammad.conf",
   "description": "Zammad is a web based open source helpdesk/customer support system with many features to manage customer communication via several channels like telephone, facebook, twitter, chat and emails. It is distributed under version 3 of the GNU AFFERO General Public License (GNU AGPLv3).",
+  "description_zh": "Zammad 是一個基於網頁的開源服務台/客戶支援系統，具有許多功能來管理透過電話、Facebook、Twitter、聊天和電子郵件等多個管道的客戶溝通。它根據 GNU AFFERO 通用公共授權第 3 版 (GNU AGPLv3) 分發。",
+  "description_ja": "Zammadは、電話、Facebook、Twitter、チャット、電子メールなど、複数のチャネルを介した顧客通信を管理する多くの機能を備えたWebベースのオープンソースヘルプデスク/カスタマーサポートシステムです。GNU AFFERO General Public License version 3 (GNU AGPLv3) の下で配布されています。",
   "install_methods": [
     {
       "type": "default",

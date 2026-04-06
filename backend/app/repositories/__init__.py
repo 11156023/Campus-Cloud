@@ -1,4 +1,4 @@
-from . import group
+from . import gateway_config, group, reverse_proxy
 from .audit_log import (
     create_audit_log,
     get_audit_logs,

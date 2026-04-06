@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/cosmos-server.webp",
   "config_path": "/etc/sysconfig/CosmosCloud",
   "description": "Cosmos Cloud is a self-hosting platform that automates maintenance and security. It offers an app marketplace, reverse proxy management, container control, VPN integration, real-time monitoring, and disk management. Security features include SSO, anti-DDoS, and encryption. It simplifies self-hosting for all users.",
+  "description_zh": "Cosmos Cloud 是一個自託管平台，可自動進行維護和安全。它提供應用程式市場、反向代理管理、容器控制、VPN 整合、即時監控和磁碟管理。安全功能包括 SSO、反 DDoS 和加密。它為所有用戶簡化了自託管。",
+  "description_ja": "Cosmos Cloud は、メンテナンスとセキュリティを自動化する自己ホスト型プラットフォームです。アプリ マーケットプレイス、リバース プロキシ管理、コンテナー制御、VPN 統合、リアルタイム監視、ディスク管理を提供します。セキュリティ機能には SSO、アンチ DDoS、暗号化が含まれます。すべてのユーザーの自己ホスティングを簡素化します。",
   "install_methods": [
     {
       "type": "default",
@@ -37,6 +39,26 @@
     {
       "type": "warning",
       "text": "Requires FUSE support for mergerfs functionality. FUSE is enabled by default during installation."
+    }
+  ],
+  "notes_zh": [
+    {
+      "type": "info",
+      "text": "文件 `/etc/sysconfig/CosmosCloud` 是可選的。如果您需要自訂設置，可以自己建立。"
+    },
+    {
+      "type": "warning",
+      "text": "需要 FUSE 支持以實現 mergerfs 功能。FUSE 在安裝期間預設啟用。"
+    }
+  ],
+  "notes_ja": [
+    {
+      "type": "info",
+      "text": "ファイル `/etc/sysconfig/CosmosCloud` はオプションです。カスタム設定が必要な場合は、自分で作成できます。"
+    },
+    {
+      "type": "warning",
+      "text": "mergerfs 機能には FUSE サポートが必要です。FUSE はインストール中にデフォルトで有効になります。"
     }
   ]
 }

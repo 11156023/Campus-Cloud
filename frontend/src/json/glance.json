@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/glance.webp",
   "config_path": "/opt/glance/glance.yml",
   "description": "A self-hosted dashboard that puts all your feeds in one place",
+  "description_zh": "一個自託管的儀表板，將所有源聚合在一個地方",
+  "description_ja": "すべてのフィードを1つの場所に配置する自己ホスト型ダッシュボード",
   "install_methods": [
     {
       "type": "default",

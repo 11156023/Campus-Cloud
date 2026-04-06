@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/couchdb.webp",
   "config_path": "etc/default.ini",
   "description": "Apache CouchDB Seamless multi-master sync, that scales from Big Data to Mobile, with an Intuitive HTTP/JSON API and designed for Reliability.",
+  "description_zh": "Apache CouchDB 無縫多主機同步，可從大數據擴展到移動設備，具有直觀的 HTTP/JSON API 並為可靠性而設計。",
+  "description_ja": "Apache CouchDB はシームレスなマルチマスター同期を備えており、ビッグデータからモバイルまでスケーリングでき、直感的な HTTP/JSON API を備え、信頼性を念頭に設計されています。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,18 @@
   "notes": [
     {
       "text": "Login Credentials: `cat ~/couchdb.creds`",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "登錄認證：`cat ~/couchdb.creds`",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "ログイン認証：`cat ~/couchdb.creds`",
       "type": "info"
     }
   ]

@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/readeck.webp",
   "config_path": "/opt/readeck/config.toml",
   "description": "Readeck helps you keep all that web content you want to revisit in an hour, tomorrow, or in 20 years.",
+  "description_zh": "Readeck 幫助你保存所有想要在一小時後、明天或 20 年後重新查看的網路內容。",
+  "description_ja": "Readeckは、1時間後、明日、または20年後に再度確認したいすべてのWebコンテンツを保持するのに役立ちます。",
   "install_methods": [
     {
       "type": "default",

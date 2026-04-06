@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/outline.webp",
   "config_path": "/opt/outline/.env",
   "description": "The fastest knowledge base for growing teams. Beautiful, realtime collaborative, feature packed, and markdown compatible. It’s time to get your team’s knowledge organized.",
+  "description_zh": "適合成長中團隊的最快知識庫。美觀、實時協作、功能豐富且 Markdown 相容。是時候組織您的團隊知識了。",
+  "description_ja": "成長中のチーム向けの最速ナレッジベース。美しくリアルタイムコラボレーション、機能豊富で Markdown 互換。チームの知識を整理する時が来ました。",
   "install_methods": [
     {
       "type": "default",
@@ -36,6 +38,26 @@
     },
     {
       "text": "Configuration file is at: `/opt/outline/.env`. Modify to suit your environment.",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "安裝完成後，應用程式將進行資料庫遷移，因此網頁 UI 可能會無法使用一兩分鐘。此外，您需要手動新增身份驗證和/或啟用 HTTPS。",
+      "type": "info"
+    },
+    {
+      "text": "設定檔位置：`/opt/outline/.env`。根據您的環境修改。",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "インストール完了後、アプリケーションはデータベースマイグレーションを実行するため、Web UI は 1 ～ 2 分間利用できない場合があります。また、認証を手動で追加するか HTTPS を有効にする必要があります。",
+      "type": "info"
+    },
+    {
+      "text": "設定ファイルの位置: `/opt/outline/.env`。環境に合わせて修正してください。",
       "type": "info"
     }
   ]

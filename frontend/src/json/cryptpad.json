@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/cryptpad.webp",
   "config_path": "/opt/cryptpad/config/config.js",
   "description": "CryptPad is a collaboration suite that is end-to-end encrypted and open-source. It is designed to facilitate collaboration by synchronizing changes to documents in real time. Since all the user data is encrypted, in the event of a breach, attackers have no way of accessing the stored content",
+  "description_zh": "CryptPad 是一個端到端加密且開源的協作套件。它旨在通過實時同步文檔的變更來促進協作。由於所有用戶數據都是加密的，一旦發生洩露，攻擊者無法存取儲存的內容",
+  "description_ja": "CryptPad は、エンドツーエンド暗号化とオープンソースのコラボレーション スイートです。ドキュメント変更をリアルタイムで同期することで、コラボレーションを促進するように設計されています。すべてのユーザー データが暗号化されているため、漏洩が発生した場合、攻撃者は保存されたコンテンツにアクセスできません",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,18 @@
   "notes": [
     {
       "text": "After installation finishes, `systemctl status cryptpad.service` to get token URL which you can use to create admin account",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "安裝完成後，`systemctl status cryptpad.service` 以取得令牌 URL，您可以使用它來建立管理員帳戶",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "インストール完了後、`systemctl status cryptpad.service` でトークン URL を取得し、それを使用して管理者アカウントを作成できます",
       "type": "info"
     }
   ]

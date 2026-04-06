@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/odoo.webp",
   "config_path": "/etc/odoo/odoo.conf",
   "description": "Odoo is a comprehensive open-source business platform made up of modular apps that cover key areas such as CRM, accounting, inventory, sales, project management, HR, helpdesk, and e-commerce. All modules are tightly integrated, allowing businesses to fully digitize and automate their workflows. Its modular design makes it suitable for both small companies and large enterprises, with flexibility to adapt to different industries. Odoo combines user-friendliness with powerful functionality, offering a unified solution for managing a wide range of business operations.",
+  "description_zh": "Odoo 是一個全面的開源商業平台，由涵蓋 CRM、會計、庫存、銷售、專案管理、HR、服務台和電子商務等關鍵領域的模組化應用程式組成。所有模組緊密整合，讓企業能夠完全數位化並自動化其工作流程。其模組化設計使其適用於小公司和大型企業，具有適應不同行業的靈活性。Odoo 結合了使用者友善性與強大功能，提供了管理各種業務營運的統一解決方案。",
+  "description_ja": "Odoo は、CRM、会計、在庫、営業、プロジェクト管理、HR、ヘルプデスク、電子商取引などの主要な領域をカバーするモジュール型アプリで構成される包括的なオープンソース ビジネス プラットフォームです。すべてのモジュールが緊密に統合されており、企業は業務フローを完全にデジタル化および自動化できます。そのモジュール設計により、小規模企業から大規模企業まで適切で、異なる業界に適応する柔軟性があります。Odoo はユーザーフレンドリー性と強力な機能を組み合わせ、幅広いビジネス運用を管理するための統一ソリューションを提供します。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,18 @@
   "notes": [
     {
       "text": "Database Credentials: `cat ~/odoo.creds`",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "資料庫認證：`cat ~/odoo.creds`",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "データベース認証情報: `cat ~/odoo.creds`",
       "type": "info"
     }
   ]

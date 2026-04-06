@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/tandoor-recipes.webp",
   "config_path": "/opt/tandoor/.env",
   "description": "Tandoor Recipes is an application for managing recipes, planning meals, building shopping lists and much much more!",
+  "description_zh": "Tandoor Recipes 是用於管理食譜、規劃餐飲、建立購物清單等的應用程式！",
+  "description_ja": "Tandoor Recipesはレシピの管理、食事計画、買い物リストの作成などのアプリケーションです！",
   "install_methods": [
     {
       "type": "default",

@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/open-webui.webp",
   "config_path": "/root/.env",
   "description": "OpenWebUI is a self-hosted, web-based interface that allows you to run AI models entirely offline. It integrates with various LLM runners, such as OpenAI and Ollama, and supports features like markdown and LaTeX rendering, model management, and voice/video calls. It also offers multilingual support and the ability to generate images using APIs like DALL-E or ComfyUI",
+  "description_zh": "OpenWebUI 是一個自託管的基於網頁的介面，允許您完全離線執行 AI 模型。它與各種 LLM 運行器整合，如 OpenAI 和 Ollama，並支援 Markdown 和 LaTeX 呈現、模型管理以及語音/視訊通話等功能。它還提供多語言支援和使用 DALL-E 或 ComfyUI 等 API 生成影像的能力。",
+  "description_ja": "OpenWebUI は、AI モデルを完全にオフラインで実行できるセルフホスト型の Web ベースインターフェースです。OpenAI や Ollama などのさまざまな LLM ランナーと統合でき、Markdown LaTeX レンダリング、モデル管理、音声/ビデオ通話などの機能をサポートしています。また、多言語サポートと DALL-E または ComfyUI などの API を使用した画像生成の機能も提供しています。",
   "install_methods": [
     {
       "type": "default",
@@ -36,6 +38,26 @@
     },
     {
       "text": "Initial run of the application/container can take some time, depending on your host speed, as the application is installed/updated at runtime. Please be patient!",
+      "type": "warning"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "腳本包含 Ollama 的選擇性安裝。",
+      "type": "info"
+    },
+    {
+      "text": "應用程式/容器的初始執行可能需要一些時間，具體取決於您的主機速度，因為應用程式在執行時期間進行安裝/更新。請耐心等待！",
+      "type": "warning"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "スクリプトには Ollama のオプション インストールが含まれています。",
+      "type": "info"
+    },
+    {
+      "text": "アプリケーション/コンテナの初回実行は、ホストの速度によって異なる場合があります。アプリケーションは実行時にインストール/更新されるためです。お待ちください。",
       "type": "warning"
     }
   ]

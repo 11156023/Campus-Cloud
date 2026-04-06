@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/podman.webp",
   "config_path": "",
   "description": "Podman is an open-source, daemonless, and portable container engine that allows users to manage containers on Linux systems without the need for a daemon or system service to be running in the background. It provides an API and a command-line interface that can be used to create, run, and manage containers and their associated networks, volumes, and images. It is built on top of the Open Container Initiative (OCI) runtime specification, making it compatible with other OCI-compliant container engines.",
+  "description_zh": "Podman 是一個開源、無守護程式且可攜式的容器引擎，允許使用者在 Linux 系統上管理容器，無需後台執行守護程式或系統服務。它提供可用於建立、執行和管理容器及其相關聯網路、磁碟區和映像的 API 和命令行介面。它建立在開放容器計劃 (OCI) 執行時規範之上，使其與其他符合 OCI 的容器引擎相容。",
+  "description_ja": "Podmanは、ユーザーがバックグラウンドでデーモンやシステムサービスを実行する必要なく、Linuxシステム上でコンテナを管理できるオープンソースのデーモンレスで移植可能なコンテナエンジンです。コンテナとその関連ネットワーク、ボリューム、イメージを作成、実行、管理するために使用できるAPIおよびコマンドラインインターフェースを提供します。Open Container Initiative（OCI）ランタイム仕様の上に構築されており、他のOCI準拠のコンテナエンジンとの互換性があります。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,18 @@
   "notes": [
     {
       "text": "Options to Install Portainer or Portainer Agent",
+      "type": "warning"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "安裝 Portainer 或 Portainer Agent 的選項",
+      "type": "warning"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "PortainerまたはPortainer Agentをインストールするオプション",
       "type": "warning"
     }
   ]

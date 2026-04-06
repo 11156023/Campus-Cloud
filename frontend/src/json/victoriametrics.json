@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/victoriametrics.webp",
   "config_path": "",
   "description": "VictoriaMetrics is a fast, cost-saving, and scalable solution for monitoring and managing time series data. It delivers high performance and reliability, making it an ideal choice for businesses of all sizes.",
+  "description_zh": "VictoriaMetrics 是一個快速、經濟高效且可擴展的時間序列資料監控和管理解決方案。它提供高效能和可靠性，是各種規模企業的理想選擇。",
+  "description_ja": "VictoriaMetricsは、時系列データの監視と管理のための高速で費用効率的でスケーラブルなソリューションです。高性能と信頼性を提供し、あらゆる規模のビジネスに理想的な選択肢となります。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,8 @@
   "notes": [
     {
       "text": "Included option to install VictoriaLogs.",
+      "text_zh": "包含安裝 VictoriaLogs 的選項。",
+      "text_ja": "VictoriaLogsをインストールするオプションが含まれています。",
       "type": "info"
     }
   ]

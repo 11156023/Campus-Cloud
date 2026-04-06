@@ -12,6 +12,8 @@
   "website": "https://valkey.io/",
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/valkey.webp",
   "description": "Valkey is an open source (BSD) high-performance key/value datastore that supports a variety of workloads such as caching, message queues, and can act as a primary database. The project is backed by the Linux Foundation, ensuring it will remain open source forever.",
+  "description_zh": "Valkey 是一個開源 (BSD) 高效能鍵值資料存放區，支援各種工作負載，例如快取、訊息佇列，並可作為主要資料庫。該專案受到 Linux Foundation 的支援，確保它將永遠保持開源。",
+  "description_ja": "Valkeyはオープンソース（BSD）の高性能キー/バリューデータストアで、キャッシング、メッセージキュー、プライマリデータベースなど、さまざまなワークロードをサポートしています。このプロジェクトはLinux Foundationが支援しており、永遠にオープンソースであり続けることが保証されています。",
   "install_methods": [
     {
       "type": "default",
@@ -43,10 +45,14 @@
   "notes": [
     {
       "text": "Show Login Credentials, type `cat ~/valkey.creds` in the LXC console",
+      "text_zh": "顯示登入認證，在 LXC 控制台中輸入 `cat ~/valkey.creds`",
+      "text_ja": "ログイン認証情報を表示するには、LXCコンソールで `cat ~/valkey.creds` を入力してください",
       "type": "info"
     },
     {
       "text": "Alpines Valkey package is compiled without TLS support. For TLS, use the Debian-based valkey script instead.",
+      "text_zh": "Alpine 的 Valkey 套件編譯時不支援 TLS。若需要 TLS，請改用基於 Debian 的 valkey 指令碼。",
+      "text_ja": "AlpineのValkeyパッケージはTLSサポートなしでコンパイルされています。TLSの場合は、代わりにDebian ベースのvalkeyスクリプトを使用してください。",
       "type": "info"
     }
   ]

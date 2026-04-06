@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/wiki-js.webp",
   "config_path": "/opt/wikijs/config.yml",
   "description": "Wiki.js is a free, open-source, and modern wiki application built using Node.js. It is designed to be fast, easy to use, and flexible, with a range of features for collaboration, knowledge management, and content creation. Wiki.js supports Markdown syntax for editing pages, and includes features such as version control, page history, and access control, making it easy to manage content and collaborate with others. The software is fully customizable, with a range of themes and extensions available, and can be deployed on a local server or in the cloud, making it an ideal choice for small teams and organizations looking to create and manage a wiki. Wiki.js provides a modern, user-friendly interface, and supports a range of data sources, including local file systems, databases, and cloud storage services.",
+  "description_zh": "Wiki.js 是一個使用 Node.js 構建的免費、開源、現代化的維基應用程式。它設計快速、易於使用和靈活，具有協作、知識管理和內容建立的功能。Wiki.js 支援 Markdown 語法用於編輯頁面，並包括版本控制、頁面歷史和存取控制等功能，使內容管理和與他人協作變得容易。該軟體完全可自訂，提供各種主題和擴充功能，並可在本地伺服器或雲端部署，是小團隊和組織建立和管理維基的理想選擇。Wiki.js 提供現代、使用者友善的介面，並支援各種資料來源，包括本地檔案系統、資料庫和雲端儲存服務。",
+  "description_ja": "Wiki.jsはNode.jsを使用して構築された無料、オープンソース、最新のwikiアプリケーションです。高速、使いやすく、柔軟性があり、コラボレーション、知識管理、コンテンツ作成のための一連の機能を備えています。Wiki.jsはページ編集用のMarkdown構文をサポートし、バージョン管理、ページ履歴、アクセス制御などの機能を備えており、コンテンツ管理と他のユーザーとの協力が容易になります。ソフトウェアは完全にカスタマイズ可能で、さまざまなテーマと拡張機能があり、ローカルサーバーまたはクラウドにデプロイできるため、小規模なチームおよび組織がwikiを作成および管理する場合に最適です。Wiki.jsは最新のユーザーフレンドリーなインターフェースを提供し、ローカルファイルシステム、データベース、クラウドストレージサービスを含むさまざまなデータソースをサポートしています。",
   "install_methods": [
     {
       "type": "default",

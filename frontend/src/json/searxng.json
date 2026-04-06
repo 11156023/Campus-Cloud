@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/searxng.webp",
   "config_path": "/etc/searxng/settings.yml",
   "description": "SearXNG is a free internet metasearch engine which aggregates results from up to 215 search services. Users are neither tracked nor profiled. Additionally, SearXNG can be used over Tor for online anonymity.",
+  "description_zh": "SearXNG 是一個免費的網際網路中繼搜尋引擎，彙總最多 215 個搜尋服務的結果。使用者既不被追蹤也不被分析。此外，SearXNG 可以透過 Tor 用於線上匿名。",
+  "description_ja": "SearXNGは、最大215の検索サービスからの結果を集約する無料のインターネットメタサーチエンジンです。ユーザーは追跡されたり、プロファイリングされたりしません。また、SearXNGはTor経由でオンライン匿名に使用できます。",
   "install_methods": [
     {
       "type": "default",

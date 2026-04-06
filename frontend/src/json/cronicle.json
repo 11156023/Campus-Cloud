@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/chronicle.webp",
   "config_path": "/opt/cronicle/conf/config.json",
   "description": "Cronicle is a task scheduling and management software that allows users to schedule and run tasks automatically on multiple servers. It has a web-based user interface that provides a convenient and centralized way to manage tasks and view their execution status. With Cronicle, users can schedule tasks to run at specific times, or on demand, and assign tasks to specific worker servers. The software provides real-time statistics and a live log viewer to help users monitor the progress of tasks. Cronicle is designed for use in large-scale environments, making it a valuable tool for automation and management of complex and time-sensitive tasks.",
+  "description_zh": "Cronicle 是一個任務調度和管理軟體，允許用戶在多個伺服器上自動調度和運行任務。它具有網頁用戶界面，提供方便且集中的方式來管理任務和查看其執行狀態。通過 Cronicle，用戶可以安排任務在特定時間或按需運行，並將任務分配給特定的工作伺服器。該軟體提供實時統計數據和實時日誌查看器，幫助用戶監控任務的進度。Cronicle 旨在用於大型環境，是用於自動化和管理複雜且時間敏感任務的寶貴工具。",
+  "description_ja": "Cronicle は、複数のサーバー上で自動的にタスクをスケジュール実行できるタスク スケジューリングおよび管理ソフトウェアです。タスク管理とその実行状態の表示をするための便利で一元化された方法を提供する Web ベースのユーザー インターフェースを備えています。Cronicle を使用すると、特定の時間またはオンデマンドでタスクを実行するようスケジュール設定でき、特定のワーカー サーバーにタスクを割り当てることができます。ソフトウェアはリアルタイム統計とライブ ログ ビューアーを提供し、ユーザーがタスクの進捗を監視するのに役立ちます。Cronicle は大規模環境での使用を想定して設計されており、複雑で時間に敏感なタスクの自動化と管理のための貴重なツールとなります。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,18 @@
   "notes": [
     {
       "text": "Primary and Worker Private Keys Must Match in the config file",
+      "type": "warning"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "主伺服器和工作伺服器的私密金鑰必須在配置文件中匹配",
+      "type": "warning"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "プライマリおよびワーカーの秘密キーは構成ファイルで一致する必要があります",
       "type": "warning"
     }
   ]

@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/nightscout.webp",
   "config_path": "/opt/nightscout/my.env",
   "description": "Nightscout is an open source, DIY project that allows real time access to a CGM data via personal website, smartwatch watchers, or apps and widgets available for smartphones.",
+  "description_zh": "Nightscout 是一個開源的自助專案，允許透過個人網站、智慧手錶監視程式或適用於智慧型手機的應用程式和小工具即時存取 CGM 資料。",
+  "description_ja": "Nightscout はオープンソースの自作プロジェクトで、個人のウェブサイト、スマートウォッチ ウォッチャー、またはスマートフォン向けのアプリとウィジェットを介して CGM データにリアルタイムでアクセスできます。",
   "install_methods": [
     {
       "type": "default",
@@ -44,6 +46,42 @@
     },
     {
       "text": "Nightscout requires HTTPS for many features (security, tokens, PWA). Usage of a reverse proxy (e.g. Nginx Proxy Manager, Traefik, Caddy) is highly recommended.",
+      "type": "warning"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "Nightscout 需要使用您的 Mongo 連接字串設定 `my.env`。API_SECRET 已產生並儲存到 `~/nightscout.creds`。",
+      "type": "info"
+    },
+    {
+      "text": "編輯 `/opt/nightscout/my.env` 以設定 CGM 來源 (Dexcom/CareLink)。然後執行：`systemctl restart nightscout`",
+      "type": "info"
+    },
+    {
+      "text": "官方設定指南：https://nightscout.github.io/nightscout/setup_variables/",
+      "type": "info"
+    },
+    {
+      "text": "Nightscout 需要 HTTPS 才能使用許多功能（安全性、權杖、PWA）。強烈建議使用反向代理（例如 Nginx Proxy Manager、Traefik、Caddy）。",
+      "type": "warning"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "Nightscout では、Mongo 接続文字列を使用して `my.env` を構成する必要があります。API_SECRET が生成され、`~/nightscout.creds` に保存されました。",
+      "type": "info"
+    },
+    {
+      "text": "`/opt/nightscout/my.env` を編集して CGM ソース (Dexcom/CareLink) を構成してください。その後、`systemctl restart nightscout` を実行してください",
+      "type": "info"
+    },
+    {
+      "text": "公式設定ガイド: https://nightscout.github.io/nightscout/setup_variables/",
+      "type": "info"
+    },
+    {
+      "text": "Nightscout は、多くの機能 (セキュリティ、トークン、PWA) に HTTPS が必要です。リバース プロキシ (Nginx Proxy Manager、Traefik、Caddy など) の使用を強くお勧めします。",
       "type": "warning"
     }
   ]

@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/prometheus.webp",
   "config_path": "/etc/alertmanager/alertmanager.yml",
   "description": "Alerting with Prometheus is separated into two parts. Alerting rules in Prometheus servers send alerts to an Alertmanager. The Alertmanager then manages those alerts, including silencing, inhibition, aggregation and sending out notifications via methods such as email, on-call notification systems, and chat platforms.",
+  "description_zh": "Prometheus 的警報分為兩個部分。Prometheus 伺服器中的警報規則將警報傳送至 Alertmanager。然後 Alertmanager 管理這些警報，包括靜音、抑制、聚合以及透過電子郵件、待命通知系統和聊天平台等方式傳送通知。",
+  "description_ja": "Prometheusでのアラートは2つの部分に分かれています。PrometheusサーバーのアラートルールはアラートをAlertmanagerに送信します。Alertmanagerはこれらのアラートを管理し、電子メール、オンコール通知システム、チャットプラットフォームなどの方法による、サイレンシング、抑止、集約、および通知の送信を行います。",
   "install_methods": [
     {
       "type": "default",

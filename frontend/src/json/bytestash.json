@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/bytestash.webp",
   "config_path": "",
   "description": "ByteStash is a self-hosted web application designed to store, organise, and manage your code snippets efficiently. With support for creating, editing, and filtering snippets, ByteStash helps you keep track of your code in one secure place.",
+  "description_zh": "ByteStash 是一個自託管網頁應用程式，旨在有效地存儲、組織和管理您的程式碼片段。通過支持創建、編輯和篩選代碼片段，ByteStash 幫助您在一個安全的地方追蹤您的代碼。",
+  "description_ja": "ByteStash は、コード スニペットを効率的に保存、整理、管理するために設計された自己ホスト型 Web アプリケーションです。スニペットの作成、編集、フィルタリングをサポートしており、ByteStash はコードを 1 つの安全な場所で追跡するのに役立ちます。",
   "install_methods": [
     {
       "type": "default",

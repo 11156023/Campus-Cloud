@@ -12,6 +12,8 @@
   "website": "https://github.com/javedh-dev/tracktor",
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/tracktor.webp",
   "description": "Tracktor is an open-source web application for comprehensive vehicle management.\nEasily track fuel consumption, maintenance, insurance, and regulatory documents for all your vehicles in one place.",
+  "description_zh": "Tracktor 是一個開源網路應用程式，用於全面的車輛管理。\n在一個地方輕鬆追蹤所有車輛的燃油消耗、維護、保險和監管文件。",
+  "description_ja": "Tracktorは包括的な車両管理用のオープンソースWebアプリケーションです。\nすべての車両の燃費、メンテナンス、保険、規制文書を1か所で簡単に追跡します。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,18 @@
   "notes": [
     {
       "text": "Please check and update the '/opt/tracktor.env' file if using behind reverse proxy.",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "如果使用反向代理，請檢查並更新 '/opt/tracktor.env' 檔案。",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "リバースプロキシの背後で使用している場合は、'/opt/tracktor.env'ファイルを確認して更新してください。",
       "type": "info"
     }
   ]

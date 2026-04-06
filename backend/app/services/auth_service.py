@@ -16,18 +16,28 @@ from app.utils import (
 )
 
 
+def _create_token_pair(user) -> Token:
+    """Create access + refresh token pair for a user."""
+    access_token = security.create_access_token(
+        user.id,
+        expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
+        token_version=user.token_version,
+    )
+    refresh_token = security.create_refresh_token(
+        user.id,
+        expires_delta=timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
+        token_version=user.token_version,
+    )
+    return Token(access_token=access_token, refresh_token=refresh_token)
+
+
 def login(*, session: Session, email: str, password: str) -> Token:
     user = user_repo.authenticate(session=session, email=email, password=password)
     if not user:
         raise BadRequestError("Incorrect email or password")
     if not user.is_active:
         raise BadRequestError("Inactive user")
-    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    return Token(
-        access_token=security.create_access_token(
-            user.id, expires_delta=access_token_expires
-        )
-    )
+    return _create_token_pair(user)
 
 
 def google_login(*, session: Session, id_token: str) -> Token:
@@ -38,7 +48,6 @@ def google_login(*, session: Session, id_token: str) -> Token:
                 params={"id_token": id_token},
             )
     except httpx.RequestError as exc:
-        # Ensure network/timeout issues become deterministic application errors
         raise BadRequestError("Unable to verify Google token") from exc
     if r.status_code != 200:
         raise BadRequestError("Invalid Google token")
@@ -62,12 +71,37 @@ def google_login(*, session: Session, id_token: str) -> Token:
         raise BadRequestError("Invalid Google token")
     if not user.is_active:
         raise BadRequestError("Inactive user")
-    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    return Token(
-        access_token=security.create_access_token(
-            user.id, expires_delta=access_token_expires
+    return _create_token_pair(user)
+
+
+def refresh_access_token(*, session: Session, refresh_token: str) -> Token:
+    """Validate a refresh token and return a new access + refresh token pair."""
+    import jwt
+    from jwt.exceptions import InvalidTokenError
+    from pydantic import ValidationError
+    from app.models import User
+    from app.schemas import TokenPayload
+
+    try:
+        payload = jwt.decode(
+            refresh_token, settings.SECRET_KEY, algorithms=[security.ALGORITHM]
         )
-    )
+        token_data = TokenPayload(**payload)
+    except (InvalidTokenError, ValidationError):
+        raise BadRequestError("Invalid refresh token")
+
+    if token_data.type != "refresh":
+        raise BadRequestError("Invalid token type")
+
+    user = session.get(User, token_data.sub)
+    if not user:
+        raise BadRequestError("Invalid refresh token")
+    if not user.is_active:
+        raise BadRequestError("Inactive user")
+    if user.token_version != token_data.ver:
+        raise BadRequestError("Token has been revoked")
+
+    return _create_token_pair(user)
 
 
 def recover_password(*, session: Session, email: str) -> None:
@@ -96,6 +130,9 @@ def reset_password(*, session: Session, token: str, new_password: str) -> None:
     user_repo.update_user(
         session=session, db_user=user, user_in=UserUpdate(password=new_password)
     )
+    # Invalidate all existing tokens by incrementing version
+    user.token_version += 1
+    session.add(user)
     session.commit()
 
 

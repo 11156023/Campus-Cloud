@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/typesense.webp",
   "config_path": "/etc/typesense/typesense-server.ini",
   "description": "Typesense is an open-source, fast, and lightweight search engine optimized for delivering instant, relevant, and typo-tolerant search results. Designed for ease of use and high performance, it offers features like real-time indexing, fuzzy matching, customizable relevance ranking, and a simple API for integration. Typesense is particularly well-suited for applications requiring instant search capabilities, such as e-commerce, documentation, or any content-rich websites. It is often compared to tools like Elasticsearch but is more developer-friendly and less resource-intensive.",
+  "description_zh": "Typesense 是一個開源、快速且輕量的搜尋引擎，針對提供即時、相關且容錯的搜尋結果進行最佳化。為方便使用和高性能而設計，它提供了實時索引、模糊匹配、可自訂的相關性排名和簡單 API 整合等功能。Typesense 特別適合需要即時搜尋功能的應用程式，如電子商務、文件或任何內容豐富的網站。它經常與 Elasticsearch 等工具進行比較，但更易開發人員使用且資源消耗少。",
+  "description_ja": "Typesenseはオープンソースで高速、軽量な検索エンジンであり、即座で関連性があり、タイプミスに寛容な検索結果を提供するように最適化されています。使いやすさと高パフォーマンスのために設計され、リアルタイムインデックス、ファジーマッチング、カスタマイズ可能な関連性ランキング、および統合用のシンプルAPIなどの機能を提供します。Typesenseは、eコマース、ドキュメント、またはコンテンツが豊富なWebサイトなど、即座の検索機能を必要とするアプリケーションに特に適しています。Elasticsearchなどのツールと比較されることが多いですが、開発者にとってより使いやすく、リソース集約的ではありません。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,18 @@
   "notes": [
     {
       "text": "This script requires some extra steps after the installation, Please checkout the 'documentation' Button",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "此腳本在安裝後需要一些額外的步驟。請查看「文件」按鈕",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "このスクリプトはインストール後にいくつかの追加手順が必要です。「ドキュメント」ボタンをご確認ください",
       "type": "info"
     }
   ]

@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/mongodb.webp",
   "config_path": "",
   "description": "MongoDB is a NoSQL database that uses a document-oriented data model, storing data in JSON-like documents with dynamic schemas. This design offers flexibility and scalability, making it ideal for handling large volumes of data. MongoDB supports indexing, replication, and load balancing, ensuring high performance and availability, and can distribute data across multiple servers, making it well-suited for big data applications.",
+  "description_zh": "MongoDB 是一個 NoSQL 資料庫，使用文件導向的資料模型，以具有動態架構的類 JSON 文件儲存資料。此設計提供了靈活性和可擴充性，非常適合處理大量資料。MongoDB 支援索引、複製和負載平衡，確保高效能和可用性，可以跨多個伺服器分發資料，非常適合大資料應用程式。",
+  "description_ja": "MongoDB は NoSQL データベースで、ドキュメント指向のデータ モデルを使用し、動的スキーマを備えた JSON のようなドキュメントにデータを格納します。この設計は柔軟性とスケーラビリティを提供し、大量のデータ処理に理想的です。MongoDB はインデックス作成、レプリケーション、ロード バランシングをサポートし、高いパフォーマンスと可用性を保証し、複数のサーバー間でデータを分散できるため、ビッグ データ アプリケーションに非常に適しています。",
   "install_methods": [
     {
       "type": "default",
@@ -29,5 +31,7 @@
     "username": null,
     "password": null
   },
-  "notes": []
+  "notes": [],
+  "notes_zh": [],
+  "notes_ja": []
 }

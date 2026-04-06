@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/linux.webp",
   "config_path": "/etc/apt-cacher-ng/acng.conf",
   "description": "Apt-Cacher-NG is a caching proxy. Specialized for package files from Linux distributors, primarily for Debian (and Debian based) distributions.",
+  "description_zh": "Apt-Cacher-NG 是一個緩存代理。專門為來自 Linux 發行商的包文件而設計，主要用於 Debian（及基於 Debian 的）發行版。",
+  "description_ja": "Apt-Cacher-NG は、キャッシング プロキシです。Linux ディストリビュータから提供されるパッケージ ファイルに特化しており、主に Debian（および Debian ベース）のディストリビューションに対応しています。",
   "install_methods": [
     {
       "type": "default",

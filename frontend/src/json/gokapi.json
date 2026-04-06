@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/gokapi.webp",
   "config_path": "/opt/gokapi/config",
   "description": "Gokapi is a lightweight server to share files, which expire after a set amount of downloads or days.",
+  "description_zh": "Gokapi 是一個輕量級文件共享服務器，文件在設定的下載次數或天數後過期。",
+  "description_ja": "Gokapi は軽量ファイル共有サーバーで、設定した日数またはダウンロード数後にファイルが期限切れになります。",
   "install_methods": [
     {
       "type": "default",

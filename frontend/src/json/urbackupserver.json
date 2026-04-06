@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/urbackup.webp",
   "config_path": "",
   "description": "URBackup is an open-source backup software designed for creating reliable and efficient backups of both files and system images. It supports client-server architecture, allowing you to back up multiple computers to a central server. It offers features such as incremental backups, real-time file backup, and scheduling, ensuring minimal data loss and quick recovery",
+  "description_zh": "URBackup 是一款開源備份軟體，設計用於建立檔案和系統映像的可靠高效備份。它支援用戶端-伺服器架構，讓您可以將多部電腦備份到中央伺服器。它提供遞增式備份、實時檔案備份和排程等功能，確保資料損失最少和快速復原。",
+  "description_ja": "URBackupはファイルとシステムイメージの信頼性が高く効率的なバックアップを作成するために設計されたオープンソースバックアップソフトウェアです。クライアント-サーバーアーキテクチャをサポートし、複数のコンピューターを中央サーバーにバックアップできます。増分バックアップ、リアルタイムファイルバックアップ、スケジューリングなどの機能を提供し、データ損失を最小限に抑え、迅速な復旧を確保します。",
   "install_methods": [
     {
       "type": "default",
@@ -32,10 +34,14 @@
   "notes": [
     {
       "text": "You probably want to drastically extend the storage space to fit whatever clients you want to back up",
+      "text_zh": "您可能希望大幅擴展儲存空間以容納您想要備份的任何用戶端。",
+      "text_ja": "バックアップするクライアントに対応するため、ストレージスペースを大幅に拡張することをお勧めします。",
       "type": "info"
     },
     {
       "text": "Directory `/opt/urbackup/backups` is set as initial backup path. Change it to your liking",
+      "text_zh": "目錄 `/opt/urbackup/backups` 設定為初始備份路徑。根據您的喜好進行變更。",
+      "text_ja": "ディレクトリ `/opt/urbackup/backups` が初期バックアップパスとして設定されています。お好みに応じて変更してください。",
       "type": "info"
     }
   ]

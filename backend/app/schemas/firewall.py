@@ -1,5 +1,7 @@
 """防火牆相關 API schemas"""
 
+import uuid
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -9,10 +11,31 @@ from pydantic import BaseModel, Field
 
 
 class PortSpec(BaseModel):
-    """端口規格（port=0 表示無端口協定，如 icmp/esp 等）"""
+    """端口規格（port=0 表示無端口協定，如 icmp/esp 等）
+
+    三種入站存取模式：
+    - domain 有值 → 反向代理（Traefik）
+    - external_port 有值 → Port 轉發（haproxy）
+    - 兩者皆無 → 僅開放防火牆
+    """
 
     port: int = Field(ge=0, le=65535, description="端口號；0 表示無端口協定")
     protocol: str = Field(default="tcp", description="協定 (tcp/udp/icmp/esp/ah/...)")
+    external_port: int | None = Field(
+        default=None,
+        ge=1,
+        le=65535,
+        description="外網入站 port（Port 轉發用）",
+    )
+    domain: str | None = Field(
+        default=None,
+        max_length=255,
+        description="對外網域名稱（反向代理用）",
+    )
+    enable_https: bool = Field(
+        default=True,
+        description="反向代理是否啟用 HTTPS（Let's Encrypt）",
+    )
 
 
 # ─── 連線管理 ──────────────────────────────────────────────────────────────────
@@ -151,6 +174,35 @@ class TopologyResponse(BaseModel):
     edges: list[TopologyEdge]
 
 
+# ─── NAT 規則 ──────────────────────────────────────────────────────────────────
+
+
+class NATRulePublic(BaseModel):
+    """NAT 端口轉發規則（回應）"""
+
+    id: uuid.UUID
+    ssh_host: str
+    vmid: int
+    vm_ip: str
+    external_port: int
+    internal_port: int
+    protocol: str
+    created_at: datetime
+
+
+class ReverseProxyRulePublic(BaseModel):
+    """反向代理規則（回應）"""
+
+    id: uuid.UUID
+    vmid: int
+    vm_ip: str
+    domain: str
+    internal_port: int
+    enable_https: bool
+    dns_provider: str
+    created_at: datetime
+
+
 __all__ = [
     "PortSpec",
     "ConnectionCreate",
@@ -164,4 +216,6 @@ __all__ = [
     "TopologyNode",
     "TopologyEdge",
     "TopologyResponse",
+    "NATRulePublic",
+    "ReverseProxyRulePublic",
 ]

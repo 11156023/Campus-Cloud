@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/channels-dvr.webp",
   "config_path": "",
   "description": "Channels DVR Server runs on your computer or NAS device at home. There's no cloud to worry about. Your tv shows and movies will always be available.",
+  "description_zh": "Channels DVR Server 在您家中的電腦或 NAS 設備上運行。無需擔心雲端。您的電視節目和電影將始終可用。",
+  "description_ja": "Channels DVR Server は、自宅のコンピューターまたは NAS デバイスで実行されます。心配なクラウドはありません。TV 番組と映画は常に利用可能になります。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,18 @@
   "notes": [
     {
       "text": "WARNING: Installation sources scripts outside of Community Scripts repo. Please check the source before installing.",
+      "type": "warning"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "警告：安裝源腳本來自社區腳本存儲庫之外。安裝前請檢查來源。",
+      "type": "warning"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "警告: インストール ソースは Community Scripts リポジトリの外部のスクリプトを取得しています。インストール前にソースを確認してください。",
       "type": "warning"
     }
   ]

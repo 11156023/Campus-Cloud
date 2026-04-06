@@ -18,14 +18,16 @@ depends_on = None
 
 
 def upgrade():
-    op.add_column('ai_api_requests', sa.Column('duration', sqlmodel.sql.sqltypes.AutoString(length=20), nullable=False, server_default="never"))
-    # The user might have already added api_key_name manually, so we check first or just execute wrapped.
-    # To avoid failures if the user already added it via pgadmin:
     connection = op.get_bind()
     from sqlalchemy import inspect
     inspector = inspect(connection)
-    columns = [col['name'] for col in inspector.get_columns('ai_api_credentials')]
-    if 'api_key_name' not in columns:
+
+    ai_api_requests_cols = [col['name'] for col in inspector.get_columns('ai_api_requests')]
+    if 'duration' not in ai_api_requests_cols:
+        op.add_column('ai_api_requests', sa.Column('duration', sqlmodel.sql.sqltypes.AutoString(length=20), nullable=False, server_default="never"))
+
+    ai_api_credentials_cols = [col['name'] for col in inspector.get_columns('ai_api_credentials')]
+    if 'api_key_name' not in ai_api_credentials_cols:
         op.add_column('ai_api_credentials', sa.Column('api_key_name', sqlmodel.sql.sqltypes.AutoString(length=20), nullable=False, server_default="test"))
 
 def downgrade():

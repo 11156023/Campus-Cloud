@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/stirling-pdf.webp",
   "config_path": "/opt/Stirling-PDF/.env",
   "description": "Stirling-PDF is a powerful locally hosted web based PDF manipulation tool that allows you to perform various operations on PDF files, such as splitting merging, converting, reorganizing, adding images, rotating, compressing, and more.",
+  "description_zh": "Stirling-PDF 是一個強大的本地託管網路 PDF 操作工具，可讓你在 PDF 檔案上執行各種操作，例如分割、合併、轉換、重組、新增影像、旋轉、壓縮等。",
+  "description_ja": "Stirling-PDFは、分割、マージング、変換、再整理、画像の追加、回転、圧縮など、PDFファイルに対する様々な操作を実行できる強力なローカルホスト型Webベースのツールです。",
   "install_methods": [
     {
       "type": "default",

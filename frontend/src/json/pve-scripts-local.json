@@ -12,6 +12,8 @@
   "website": "https://community-scripts.github.io/ProxmoxVE",
   "logo": "https://raw.githubusercontent.com/community-scripts/ProxmoxVE-Local/refs/heads/main/.github/logo.png",
   "description": "A modern web-based management interface for Proxmox VE (PVE) helper scripts. This tool provides a user-friendly way to discover, download, and execute community-sourced Proxmox scripts locally with real-time terminal output streaming.",
+  "description_zh": "用於 Proxmox VE (PVE) 輔助指令碼的現代網頁型管理介面。此工具提供了使用者友善的方式來探索、下載和執行社群提供的 Proxmox 指令碼，並具有即時終端機輸出串流。",
+  "description_ja": "Proxmox VE（PVE）ヘルパースクリプトの最新のWebベース管理インターフェース。このツールは、リアルタイムターミナル出力ストリーミング機能を備えて、コミュニティが提供するProxmoxスクリプトを検出、ダウンロード、実行するためのユーザーフレンドリーな方法を提供します。",
   "install_methods": [
     {
       "type": "default",

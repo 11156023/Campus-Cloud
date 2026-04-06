@@ -12,6 +12,8 @@
   "website": "https://donetick.com",
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/donetick.webp",
   "description": "Donetick an open-source, user-friendly app for managing tasks and chores, featuring customizable options to help you and others stay organized",
+  "description_zh": "Donetick 是一個開源、使用者友善的應用程式，用於管理任務和家務，具有可自訂選項，幫助您和其他人保持組織。",
+  "description_ja": "Donetick は、タスクと家事を管理するためのオープンソースでユーザーフレンドリーなアプリケーション。カスタマイズ可能なオプションがあり、あなたと他のユーザーが整理された状態を保つのに役立ちます。",
   "install_methods": [
     {
       "type": "default",

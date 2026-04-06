@@ -12,6 +12,8 @@
   "website": "https://github.com/librespeed/speedtest-rust",
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/librespeed.webp",
   "description": "Librespeed is a no flash, no java, no websocket speedtest server. This community script deploys the rust version for simplicity and low resource usage.",
+  "description_zh": "Librespeed 是一個沒有 Flash、沒有 Java、沒有 WebSocket 的速度測試伺服器。這個社區指令碼部署了 Rust 版本以實現簡單性和低資源使用。",
+  "description_ja": "Librespeed は、Flash なし、Java なし、WebSocket なしのスピードテスト サーバーです。このコミュニティ スクリプトは、シンプルさと低いリソース使用のために Rust バージョンをデプロイします。",
   "install_methods": [
     {
       "type": "default",

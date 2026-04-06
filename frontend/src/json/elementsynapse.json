@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/element.webp",
   "config_path": "/etc/matrix-synapse/homeserver.yaml",
   "description": "Synapse is an open source Matrix homeserver implementation, written and maintained by Element. Matrix is the open standard for secure and interoperable real time communications. You can directly run and manage the source code in this repository, available under an AGPL license. There is no support provided from Element unless you have a subscription.",
+  "description_zh": "Synapse 是一個開源 Matrix 主伺服器實現，由 Element 編寫和維護。Matrix 是安全和可互操作的即時通信的開放標準。您可以直接運行和管理此存儲庫中的源代碼，可根據 AGPL 許可證獲得。除非您有訂閱，否則 Element 不提供支持。",
+  "description_ja": "Synapse は、Element によって作成および保守されているオープンソース Matrix ホームサーバー実装です。Matrix は、安全で相互運用可能なリアルタイム通信のオープン標準です。このリポジトリのソース コードを直接実行して管理できます。AGPL ライセンスで利用可能です。サブスクリプションがない限り、Element からのサポートはありません。",
   "install_methods": [
     {
       "type": "default",
@@ -41,6 +43,34 @@
     {
       "type": "info",
       "text": "For bridges Installation methods (WhatsApp, Signal, Discord, etc.), see: ´https://docs.mau.fi/bridges/go/setup.html´"
+    }
+  ],
+  "notes_zh": [
+    {
+      "type": "info",
+      "text": "輸入 `cat ~/matrix.creds` 以查看管理員用戶名/密碼。"
+    },
+    {
+      "type": "info",
+      "text": "Synapse-Admin 在連接埠 5173 上運行"
+    },
+    {
+      "type": "info",
+      "text": "有關橋接安裝方法（WhatsApp、Signal、Discord 等），請參閱：´https://docs.mau.fi/bridges/go/setup.html´"
+    }
+  ],
+  "notes_ja": [
+    {
+      "type": "info",
+      "text": "`cat ~/matrix.creds` を入力して、管理者ユーザー名/パスワードを確認します。"
+    },
+    {
+      "type": "info",
+      "text": "Synapse-Admin はポート 5173 で実行されています"
+    },
+    {
+      "type": "info",
+      "text": "ブリッジのインストール方法（WhatsApp、Signal、Discord など）については、´https://docs.mau.fi/bridges/go/setup.html´ を参照してください"
     }
   ]
 }

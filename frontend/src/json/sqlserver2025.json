@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/microsoft-sql-server.webp",
   "config_path": "",
   "description": "Script to automatically set up a SQL Server 2025 installation with Ubuntu 24.04 support.",
+  "description_zh": "用於自動設定 SQL Server 2025 安裝的腳本，支援 Ubuntu 24.04。",
+  "description_ja": "Ubuntu 24.04サポート付きSQL Server 2025インストールを自動的にセットアップするスクリプト。",
   "install_methods": [
     {
       "type": "default",
@@ -48,6 +50,50 @@
     },
     {
       "text": "Ubuntu 24.04 support requires SQL Server 2025 CU1 or later",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "SQL Server (2025) SQLPAL 與 Proxmox VE 9（核心 6.12+）在 LXC 容器中不相容。改用 VM 或 SQL-Server 2022 LXC。",
+      "type": "warning"
+    },
+    {
+      "text": "如果你選擇不執行安裝設定，請在 LXC shell 中執行：`/opt/mssql/bin/mssql-conf setup`。",
+      "type": "info"
+    },
+    {
+      "text": "你可以在安裝期間設定管理員帳戶 'SA'",
+      "type": "info"
+    },
+    {
+      "text": "如果你打算在生產環境中使用，請務必停用 SA 帳戶！",
+      "type": "warning"
+    },
+    {
+      "text": "Ubuntu 24.04 支援需要 SQL Server 2025 CU1 或更新版本",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "SQL Server（2025）SQLPALはProxmox VE 9（Kernel 6.12+）のLXCコンテナと互換性がありません。代わりにVMまたはSQL-Server 2022 LXCを使用してください。",
+      "type": "warning"
+    },
+    {
+      "text": "インストール設定を実行しないことを選択した場合、LXCシェルで`/opt/mssql/bin/mssql-conf setup`を実行します。",
+      "type": "info"
+    },
+    {
+      "text": "インストール中に管理者アカウント 'SA' を設定できます",
+      "type": "info"
+    },
+    {
+      "text": "本番環境でこれを使用する場合は、必ずSAアカウントを無効にしてください！",
+      "type": "warning"
+    },
+    {
+      "text": "Ubuntu 24.04サポートにはSQL Server 2025 CU1以降が必要です",
       "type": "info"
     }
   ]

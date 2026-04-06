@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/agent-dvr.webp",
   "config_path": "/opt/agentdvr/agent/Media/XML/config.json",
   "description": "AgentDVR a new video surveillance solution for the Internet Of Things.",
+  "description_zh": "AgentDVR 是物聯網的新型視訊監控解決方案。",
+  "description_ja": "AgentDVRはモノのインターネット向けの新しいビデオ監視ソリューションです。",
   "install_methods": [
     {
       "type": "default",

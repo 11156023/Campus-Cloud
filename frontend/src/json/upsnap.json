@@ -12,6 +12,8 @@
   "website": "https://github.com/seriousm4x/UpSnap",
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/upsnap.webp",
   "description": "UpSnap is a self-hosted web app that lets you wake up, manage and monitor devices on your network with ease. Built with SvelteKit, Go and PocketBase, it offers a clean dashboard, scheduled wake-ups, device discovery and secure user management.",
+  "description_zh": "UpSnap 是一個自主託管的網頁應用程式，讓您輕鬆喚醒、管理和監控網路上的裝置。使用 SvelteKit、Go 和 PocketBase 構建，提供簡潔的儀表板、排程喚醒、裝置發現和安全使用者管理。",
+  "description_ja": "UpSnapは、ネットワーク上のデバイスを簡単に唤起、管理、監視できるセルフホストされたWebアプリです。SvelteKit、Go、PocketBaseで構築され、クリーンなダッシュボード、スケジュール設定された唤起、デバイス検出、安全なユーザー管理を提供します。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,8 @@
   "notes": [
     {
       "text": "The first user you register will be the admin user.",
+      "text_zh": "您註冊的第一個使用者將成為管理員使用者。",
+      "text_ja": "登録した最初のユーザーが管理者ユーザーになります。",
       "type": "info"
     }
   ]

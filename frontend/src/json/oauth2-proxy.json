@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/oauth2-proxy.webp",
   "config_path": "/opt/oauth2-proxy/config.toml",
   "description": "A reverse proxy that provides authentication with Google, Azure, OpenID Connect and many more identity providers.",
+  "description_zh": "一個反向代理，提供與 Google、Azure、OpenID Connect 和許多其他身份提供者的身份驗證。",
+  "description_ja": "Google、Azure、OpenID Connect などの多くのアイデンティティ プロバイダーとの認証を提供するリバース プロキシ。",
   "install_methods": [
     {
       "type": "default",
@@ -36,6 +38,26 @@
     },
     {
       "text": "After changing the config restart OAuth2-Proxy with: `systemctl restart oauth2-proxy`",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "由於可用配置選項範圍廣泛，此應用程式預設包含空的設定檔。我們建議參考官方文檔以獲得指導：`https://oauth2-proxy.github.io/oauth2-proxy/configuration/overview`。您可以根據需要製作 config.toml 檔案。",
+      "type": "info"
+    },
+    {
+      "text": "更改設定後，使用以下命令重新啟動 OAuth2-Proxy：`systemctl restart oauth2-proxy`",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "このアプリケーションは、利用可能な設定オプションの範囲が広いため、デフォルトで空の設定ファイルが含まれています。ガイダンスについては、公式ドキュメントを参照することをお勧めします: `https://oauth2-proxy.github.io/oauth2-proxy/configuration/overview`。これにより、必要に応じて config.toml ファイルを作成できます。",
+      "type": "info"
+    },
+    {
+      "text": "設定を変更した後、次のコマンドで OAuth2-Proxy を再起動してください: `systemctl restart oauth2-proxy`",
       "type": "info"
     }
   ]

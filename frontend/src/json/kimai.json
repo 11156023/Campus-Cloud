@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/kimai.webp",
   "config_path": "/opt/kimai/.env",
   "description": "Kimai is an open-source time-tracking software designed for freelancers, small teams, and businesses to efficiently track, manage, and analyze work hours. This web-based tool enables users to log their work time with ease, associating entries with specific clients, projects, and tasks.",
+  "description_zh": "Kimai 是一個開源時間追蹤軟體，為自由工作者、小型團隊和企業設計，以有效追蹤、管理和分析工作時數。此基於網路的工具使使用者能夠輕鬆記錄其工作時間，並將項目與特定客戶端、專案和工作相關聯。",
+  "description_ja": "Kimai は、フリーランサー、小規模チーム、企業向けに設計されたオープンソース時間追跡ソフトウェアで、勤務時間を効率的に追跡、管理、分析できます。この Web ベースのツールにより、ユーザーは特定のクライアント、プロジェクト、タスクと関連付けて、作業時間を簡単に記録できます。",
   "install_methods": [
     {
       "type": "default",

@@ -32,8 +32,8 @@ class Settings(BaseSettings):
     )
     API_V1_STR: str = "/api/v1"
     SECRET_KEY: str = secrets.token_urlsafe(32)
-    # 60 minutes * 24 hours * 8 days = 8 days
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 8
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30  # 30 minutes
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7  # 7 days
     FRONTEND_HOST: str = "http://localhost:5173"
     ENVIRONMENT: Literal["local", "staging", "production"] = "local"
 
@@ -115,6 +115,21 @@ class Settings(BaseSettings):
                 warnings.warn(message, stacklevel=1)
             else:
                 raise ValueError(message)
+
+    @model_validator(mode="after")
+    def _validate_cors_origins(self) -> Self:
+        if self.ENVIRONMENT == "production" and self.BACKEND_CORS_ORIGINS:
+            origins = (
+                [self.BACKEND_CORS_ORIGINS]
+                if isinstance(self.BACKEND_CORS_ORIGINS, str)
+                else self.BACKEND_CORS_ORIGINS
+            )
+            if any(str(o).strip() == "*" for o in origins):
+                raise ValueError(
+                    "Wildcard '*' CORS origin is not allowed in production. "
+                    "Please specify explicit origins."
+                )
+        return self
 
     @model_validator(mode="after")
     def _enforce_non_default_secrets(self) -> Self:

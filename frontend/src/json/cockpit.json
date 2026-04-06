@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/cockpit.webp",
   "config_path": "/etc/cockpit/cockpit.conf",
   "description": "Cockpit is a web-based graphical interface for managing Linux servers. It allows users to perform tasks like configuring networks, managing storage, and monitoring system performance directly through a web browser. It integrates with existing system tools, making it suitable for both beginners and experienced admins.",
+  "description_zh": "Cockpit 是一個基於網頁的圖形界面，用於管理 Linux 伺服器。它允許用戶通過網頁瀏覽器直接執行配置網路、管理儲存和監控系統效能等任務。它與現有系統工具集成，適合初學者和經驗豐富的管理員。",
+  "description_ja": "Cockpit は、Linux サーバーを管理するための Web ベースのグラフィカル インターフェースです。ユーザーは Web ブラウザーを通じてネットワークの構成、ストレージの管理、システム パフォーマンスの監視などのタスクを直接実行できます。既存のシステム ツールと統合されており、初心者と経験豊富な管理者の両方に適しています。",
   "install_methods": [
     {
       "type": "default",
@@ -36,6 +38,26 @@
     },
     {
       "text": "If you plan on using 45Drives extension with NFS, you must setup LXC as privileged. Some features of 45Drives don't work on Debian 13, so Debian 12 must be used.",
+      "type": "warning"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "如果使用自動登入，請設置 root 密碼。這將是 Cockpit 密碼。若要設置 root 密碼，請執行 `sudo passwd root`",
+      "type": "info"
+    },
+    {
+      "text": "如果計劃對 NFS 使用 45Drives 擴展，必須將 LXC 設置為特權。45Drives 的某些功能在 Debian 13 上不適用，因此必須使用 Debian 12。",
+      "type": "warning"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "自動ログインを使用する場合は、root パスワードを設定します。これが Cockpit パスワードになります。root パスワードを設定するには、`sudo passwd root` を実行します",
+      "type": "info"
+    },
+    {
+      "text": "NFS で 45Drives 拡張を使用する予定がある場合は、LXC を特権として設定する必要があります。45Drives の一部の機能は Debian 13 では機能しないため、Debian 12 を使用する必要があります。",
       "type": "warning"
     }
   ]

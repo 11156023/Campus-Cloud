@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/draw-io.webp",
   "config_path": "",
   "description": "draw.io is a configurable diagramming and whiteboarding application, jointly owned and developed by draw.io Ltd (previously named JGraph) and draw.io AG.",
+  "description_zh": "draw.io 是一個可配置的圖表和白板應用程式，由 draw.io Ltd（以前名為 JGraph）和 draw.io AG 共同擁有和開發。",
+  "description_ja": "draw.io は、draw.io Ltd (以前は JGraph という名前) と draw.io AG によって共同で所有および開発された、カスタマイズ可能な図とホワイトボード アプリケーションです。",
   "install_methods": [
     {
       "type": "default",

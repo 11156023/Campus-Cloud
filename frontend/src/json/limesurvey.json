@@ -11,7 +11,9 @@
   "config_path": "",
   "website": "https://community.limesurvey.org/",
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/limesurvey.webp",
-  "description": "LimeSurvey is the simple, quick and anonymous online survey tool that's bursting with juicy insights. Calling students, professionals and enterprises: design a survey and get the best insights, it’s free and as easy as squeezing a lime. Make a free online survey now!",
+  "description": "LimeSurvey is the simple, quick and anonymous online survey tool that’s bursting with juicy insights. Calling students, professionals and enterprises: design a survey and get the best insights, it’s free and as easy as squeezing a lime. Make a free online survey now!",
+  "description_zh": "LimeSurvey 是一個簡單、快速和匿名的線上調查工具，充滿有價值的見解。號召學生、專業人士和企業：設計調查並獲取最佳見解，它是免費的，就像擠檸檬一樣簡單。立即進行免費線上調查！",
+  "description_ja": "LimeSurvey は、貴重な洞察に満ちたシンプルで高速で匿名のオンライン調査ツールです。学生、専門家、企業に呼びかける：調査を設計して最良の洞察を得てください。それは無料で、レモンを絞るのと同じくらい簡単です。今すぐ無料のオンライン調査を行ってください！",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,8 @@
   "notes": [
     {
       "text": "You will need to input database credentials into LimeSurvey installer. Use `cat ~/limesurvey.creds` inside LXC.",
+      "text_zh": "您需要將資料庫認證輸入到 LimeSurvey 安裝程式中。在 LXC 內使用 `cat ~/limesurvey.creds`。",
+      "text_ja": "LimeSurvey インストーラーにデータベース認証情報を入力する必要があります。LXC 内で `cat ~/limesurvey.creds` を使用してください。",
       "type": "info"
     }
   ]

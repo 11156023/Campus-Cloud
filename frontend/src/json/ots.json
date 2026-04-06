@@ -12,6 +12,8 @@
   "website": "https://github.com/Luzifer/ots",
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/ots.webp",
   "description": "One-Time-Secret sharing platform with a symmetric 256bit AES encryption in the browser.",
+  "description_zh": "具有瀏覽器中對稱 256 位 AES 加密的一次性秘密分享平台。",
+  "description_ja": "ブラウザで対称 256 ビット AES 暗号化を備えたワンタイム シークレット共有プラットフォーム。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,18 @@
   "notes": [
     {
       "text": "When it is in used external please use it behind reverse proxy or create your own certificates",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "在外部使用時，請將其放在反向代理後方或建立自己的憑證",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "外部で使用する場合は、リバース プロキシの背後に配置するか、独自の証明書を作成してください",
       "type": "info"
     }
   ]

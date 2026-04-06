@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/the-lounge.webp",
   "config_path": "/etc/thelounge/config.js",
   "description": "Modern web IRC client designed for self-hosting ",
+  "description_zh": "為自主託管設計的現代網路 IRC 用戶端",
+  "description_ja": "自己ホストに設計されたモダンなWeb IRCクライアント",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,18 @@
   "notes": [
     {
       "text": "The Lounge is running in private mode. Use `runuser -u thelounge -- thelounge add usernamehere` to create users.",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "The Lounge 在私人模式中執行。使用 `runuser -u thelounge -- thelounge add usernamehere` 建立使用者。",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "The Loungeはプライベートモードで実行中です。`runuser -u thelounge -- thelounge add usernamehere`を使用してユーザーを作成します。",
       "type": "info"
     }
   ]

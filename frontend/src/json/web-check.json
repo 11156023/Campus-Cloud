@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/web-check.webp",
   "config_path": "/opt/web-check/.env",
   "description": "Get an insight into the inner-workings of a given website: uncover potential attack vectors, analyse server architecture, view security configurations, and learn what technologies a site is using.",
+  "description_zh": "深入了解給定網站的內部運作：揭示潛在的攻擊向量、分析伺服器架構、查看安全設定和了解網站使用的技術。",
+  "description_ja": "与えられたウェブサイトの内部動作を詳しく理解する：潜在的な攻撃ベクトルを明らかにし、サーバーアーキテクチャを分析し、セキュリティ設定を表示し、サイトが使用している技術を学びます。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,8 @@
   "notes": [
     {
       "text": "This script uses a fork located here: `https://github.com/CrazyWolf13/web-check/` as the original Repository does not provide tagged Github Releases, an issues is open for this: `https://github.com/Lissy93/web-check/issues/248`",
+      "text_zh": "此指令碼使用位於此處的分支：`https://github.com/CrazyWolf13/web-check/`，因為原始儲存庫沒有提供帶標籤的 Github 發佈版本，此問題是開放的：`https://github.com/Lissy93/web-check/issues/248`",
+      "text_ja": "このスクリプトはここにあるフォークを使用します：`https://github.com/CrazyWolf13/web-check/`元のリポジトリはタグ付きのGithubリリースを提供していないため、この問題は未解決です：`https://github.com/Lissy93/web-check/issues/248`",
       "type": "info"
     }
   ]

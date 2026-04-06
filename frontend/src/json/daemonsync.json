@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/daemon-sync.webp",
   "config_path": "",
   "description": "Sync files from app to server, share photos & videos, back up your data and stay secure inside local network.",
+  "description_zh": "從應用程式同步文件到伺服器、共享照片和視頻、備份您的數據並在本地網路中保持安全。",
+  "description_ja": "アプリからサーバーにファイルを同期し、写真や動画を共有し、データをバックアップし、ローカル ネットワーク内で安全を保ちます。",
   "install_methods": [
     {
       "type": "default",

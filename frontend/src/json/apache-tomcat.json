@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/apache-tomcat.webp",
   "config_path": "",
   "description": "Apache Tomcat is an open-source application server that runs Java Servlets and JavaServer Pages (JSP). It allows developers to deploy and manage Java web applications by handling HTTP requests and serving dynamic content. Tomcat is widely used for lightweight web applications and supports various Java EE features like WebSockets and JNDI.",
+  "description_zh": "Apache Tomcat 是一個開源應用服務器，運行 Java Servlets 和 JavaServer Pages (JSP)。它允許開發人員通過處理 HTTP 請求和服務動態內容來部署和管理 Java 網絡應用程序。Tomcat 廣泛用於輕量級網絡應用程序，並支持各種 Java EE 功能，如 WebSockets 和 JNDI。",
+  "description_ja": "Apache Tomcat は、Java Servlets と JavaServer Pages (JSP) を実行するオープンソース アプリケーション サーバーです。HTTP リクエストを処理し、動的コンテンツを提供することで、開発者が Java Web アプリケーションをデプロイおよび管理できます。Tomcat は軽量の Web アプリケーションで広く使用されており、WebSockets と JNDI などのさまざまな Java EE 機能をサポートしています。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,18 @@
   "notes": [
     {
       "text": "User can select which Adoptium JDK should be used for the selected Tomcat version (9, 10.1 or 11). ",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "用戶可以選擇應該為所選 Tomcat 版本（9、10.1 或 11）使用哪個 Adoptium JDK。",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "ユーザーは、選択した Tomcat バージョン（9、10.1、または 11）に使用する Adoptium JDK を選択できます。",
       "type": "info"
     }
   ]

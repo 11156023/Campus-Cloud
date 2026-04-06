@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/smokeping.webp",
   "config_path": "/etc/smokeping/config.d/Targets",
   "description": "SmokePing is a deluxe latency measurement tool. It can measure, store and display latency, latency distribution and packet loss.",
+  "description_zh": "SmokePing 是一個豪華的延遲測量工具。它可以測量、儲存和顯示延遲、延遲分佈和封包損失。",
+  "description_ja": "SmokePingは、上質なレイテンシ測定ツールです。レイテンシ、レイテンシ分布、パケット損失を測定、保存、表示できます。",
   "install_methods": [
     {
       "type": "default",

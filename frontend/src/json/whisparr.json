@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/whisparr.webp",
   "config_path": "",
   "description": "Whisparr is an adult movie collection manager for Usenet and BitTorrent users.",
+  "description_zh": "Whisparr 是 Usenet 和 BitTorrent 使用者的成人電影集合管理員。",
+  "description_ja": "Whisparrは、UseNetおよびBitTorrentユーザー向けの大人向け映画コレクションマネージャーです。",
   "install_methods": [
     {
       "type": "default",

@@ -12,6 +12,8 @@
   "website": "https://coolify.io/",
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/coolify.webp",
   "description": "Coolify is an open-source & self-hostable alternative to Heroku, Netlify, and Vercel. It helps you manage your servers, applications, and databases on your own hardware with Docker. Deploy any application from Git repositories, Docker images, or use pre-built templates.",
+  "description_zh": "Coolify 是 Heroku、Netlify 和 Vercel 的開源且可自託管替代品。它幫助您使用 Docker 在自己的硬體上管理伺服器、應用程式和數據庫。從 Git 存儲庫、Docker 映像部署任何應用程式，或使用預構建範本。",
+  "description_ja": "Coolify は Heroku、Netlify、Vercel のオープンソースで自己ホスト可能な代替手段です。Docker を使用して、自分のハードウェア上でサーバー、アプリケーション、データベースを管理するのに役立ちます。Git リポジトリ、Docker イメージから任意のアプリケーションをデプロイするか、事前に構築されたテンプレートを使用します。",
   "install_methods": [
     {
       "type": "default",
@@ -44,6 +46,42 @@
     },
     {
       "text": "This container uses Docker-in-Docker (nesting) for application deployments.",
+      "type": "warning"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "初始設置將通過首次訪問時的網頁界面完成。",
+      "type": "info"
+    },
+    {
+      "text": "Coolify 具有內置自動更新。您可以在設置中配置更新頻率。",
+      "type": "info"
+    },
+    {
+      "text": "Coolify 需要 SSH 存取權限來管理部署。SSH 會自動啟用。",
+      "type": "info"
+    },
+    {
+      "text": "此容器使用 Docker-in-Docker（嵌套）進行應用程式部署。",
+      "type": "warning"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "初期セットアップは最初のアクセス時に Web インターフェース経由で行われます。",
+      "type": "info"
+    },
+    {
+      "text": "Coolify には自動更新が組み込まれています。設定で更新頻度を構成できます。",
+      "type": "info"
+    },
+    {
+      "text": "Coolify はデプロイメントを管理するために SSH アクセスが必要です。SSH は自動的に有効になります。",
+      "type": "info"
+    },
+    {
+      "text": "このコンテナーはアプリケーション デプロイメント用に Docker-in-Docker（ネスティング）を使用します。",
       "type": "warning"
     }
   ]

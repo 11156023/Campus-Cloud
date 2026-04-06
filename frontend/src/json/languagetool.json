@@ -12,6 +12,8 @@
   "website": "https://languagetool.org/",
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/languagetool.webp",
   "description": "LanguageTool is an Open Source proofreading software for English, Spanish, French, German, Portuguese, Polish, Dutch, and more than 20 other languages. It finds many errors that a simple spell checker cannot detect.",
+  "description_zh": "LanguageTool 是英文、西班牙文、法文、德文、葡萄牙文、波蘭文、荷蘭文和 20 多種其他語言的開源校對軟體。它發現簡單拼寫檢查器無法偵測到的許多錯誤。",
+  "description_ja": "LanguageTool は、英語、スペイン語、フランス語、ドイツ語、ポルトガル語、ポーランド語、オランダ語、および 20 以上の他の言語用のオープンソース校正ソフトウェアです。簡単なスペルチェッカーでは検出できないエラーを検出します。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,8 @@
   "notes": [
     {
       "text": "API is available at `http://<LXC_IP>:8081/v2`.",
+      "text_zh": "API 可在 `http://<LXC_IP>:8081/v2` 取得。",
+      "text_ja": "API は `http://<LXC_IP>:8081/v2` で利用可能です。",
       "type": "info"
     }
   ]

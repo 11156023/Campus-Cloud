@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/teddycloud.webp",
   "config_path": "",
   "description": "TeddyCloud is an open source server replacement for the Boxine Cloud.",
+  "description_zh": "TeddyCloud 是 Boxine Cloud 的開源伺服器替代方案。",
+  "description_ja": "TeddyCloudはBoxine Cloudのオープンソースサーバー置き換えです。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,18 @@
   "notes": [
     {
       "text": "First start of the service can take some time due to certificate generation.",
+      "type": "warn"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "由於憑證生成，服務的首次啟動可能需要一些時間。",
+      "type": "warn"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "証明書の生成のため、サービスの初回起動に時間がかかることがあります。",
       "type": "warn"
     }
   ]

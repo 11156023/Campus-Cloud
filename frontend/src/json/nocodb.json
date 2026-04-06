@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/nocodb.webp",
   "config_path": "",
   "description": "NocoDB is a document-oriented database management system. It uses the NoSQL (Not Only SQL) data model, which allows for more flexible and scalable data storage than traditional relational databases. NoCoDB stores data in JSON format, making it easier to manage and query complex data structures, and supports a range of data types, including strings, numbers, arrays, and objects. The software provides a web-based interface for managing and querying data, and includes features such as real-time data synchronization, auto-indexing, and full-text search. NoCoDB is designed to be scalable, and can be used for a range of applications, from small projects to large enterprise systems. The software is free and open-source, and is designed to be easy to use and integrate with other applications.",
+  "description_zh": "NocoDB 是一個文件導向的資料庫管理系統。它使用 NoSQL（不僅是 SQL）資料模型，與傳統關聯式資料庫相比，提供更靈活且可擴充的資料儲存。NoCoDB 以 JSON 格式儲存資料，讓管理和查詢複雜資料結構變得更容易，並支援字串、數字、陣列和物件等多種資料類型。該軟體提供基於網頁的介面來管理和查詢資料，並包括即時資料同步、自動索引和全文搜尋等功能。NocoDB 設計為可擴充的，可用於各種應用程式，從小型專案到大型企業系統。該軟體是免費開源的，設計為易於使用且與其他應用程式整合。",
+  "description_ja": "NocoDB はドキュメント指向のデータベース管理システムです。従来のリレーショナル データベースよりも柔軟でスケーラブルなデータ ストレージを実現する NoSQL（Not Only SQL）データ モデルを使用します。NocoDB はデータを JSON 形式で保存するため、複雑なデータ構造の管理とクエリが簡単になり、文字列、数値、配列、オブジェクトなど様々なデータ型をサポートします。このソフトウェアは、データを管理およびクエリするためのウェブベース インターフェイスを提供し、リアルタイム データ同期、自動インデックス、フルテキスト検索などの機能を含めています。NocoDB はスケーラブルに設計されており、小規模なプロジェクトから大規模なエンタープライズ システムまで、様々なアプリケーションに使用できます。このソフトウェアはフリーでオープンソースで、使いやすく、他のアプリケーションと統合できるように設計されています。",
   "install_methods": [
     {
       "type": "default",
@@ -29,5 +31,7 @@
     "username": null,
     "password": null
   },
-  "notes": []
+  "notes": [],
+  "notes_zh": [],
+  "notes_ja": []
 }

@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/wastebin.webp",
   "config_path": "/opt/wastebin-data/.env",
   "description": "Wastebin is a minimal pastebin with a design shamelessly copied from bin.",
+  "description_zh": "Wastebin 是一個極簡 pastebin，其設計不好意思地從 bin 複製而來。",
+  "description_ja": "Wastebinは、binからの設計を恥ずかしげなく模倣した最小限のpastebinです。",
   "install_methods": [
     {
       "type": "default",

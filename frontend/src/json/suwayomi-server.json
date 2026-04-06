@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/suwayomi.webp",
   "config_path": "",
   "description": "A free and open source manga reader server that runs extensions built for Mihon (Tachiyomi).",
+  "description_zh": "一個免費且開源的漫畫閱讀器伺服器，執行為 Mihon (Tachiyomi) 構建的擴展。",
+  "description_ja": "Mihon（Tachiyomi）用に構築された拡張機能を実行する無料のオープンソース漫画リーダーサーバーです。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,18 @@
   "notes": [
     {
       "text": "This application can be conflicting with Kaspersky products. You maybe need to disable Kaspersky in order to use this application.",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "此應用程式可能與卡巴斯基產品衝突。你可能需要停用卡巴斯基才能使用此應用程式。",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "このアプリケーションはKasperskyProducts と競合する可能性があります。このアプリケーションを使用するには、Kasperskyを無効にする必要があるかもしれません。",
       "type": "info"
     }
   ]

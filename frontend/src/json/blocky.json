@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/blocky.webp",
   "config_path": "/opt/blocky/config.yml",
   "description": "Blocky is a software tool designed for blocking unwanted ads and trackers on local networks. It functions as a DNS proxy and runs on the Go programming language. Blocky intercepts requests to advertisements and other unwanted content and blocks them before they reach the end user. This results in a cleaner, faster, and more secure online experience for users connected to the local network. Blocky is open-source, easy to configure and can be run on a variety of devices, making it a versatile solution for small to medium-sized local networks.",
+  "description_zh": "Blocky 是一個設計用於在本地網路上阻止不需要的廣告和追蹤器的軟體工具。它作為 DNS 代理運行，使用 Go 編程語言。Blocky 攔截對廣告和其他不需要內容的請求，並在其到達最終用戶之前阻止它們。這為連接到本地網路的用戶帶來更乾淨、更快速和更安全的線上體驗。Blocky 是開源的，易於配置，可在各種設備上運行，使其成為中小型本地網路的多功能解決方案。",
+  "description_ja": "Blocky は、ローカル ネットワーク上の不要な広告とトラッカーをブロックするように設計されたソフトウェア ツールです。DNS プロキシとして機能し、Go プログラミング言語で実行されます。Blocky は広告やその他の不要なコンテンツへのリクエストをインターセプトし、エンドユーザーに到達する前にブロックします。これにより、ローカル ネットワークに接続されたユーザーのために、よりクリーンで高速で安全なオンライン体験が実現されます。Blocky はオープンソースで、構成が簡単で、さまざまなデバイスで実行できるため、小から中規模のローカル ネットワークの多目的ソリューションとなります。",
   "install_methods": [
     {
       "type": "default",

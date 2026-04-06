@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/excalidraw.webp",
   "config_path": "",
   "description": "An open source virtual hand-drawn style whiteboard. Collaborative and end-to-end encrypted.",
+  "description_zh": "一個開源虛擬手繪風格白板。協作且端到端加密。",
+  "description_ja": "オープンソースの仮想手書きスタイルのホワイトボード。コラボレーティブでエンドツーエンド暗号化。",
   "install_methods": [
     {
       "type": "default",

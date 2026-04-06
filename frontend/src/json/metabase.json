@@ -12,6 +12,8 @@
   "website": "https://www.metabase.com/",
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/metabase.webp",
   "description": "Metabase is an open-source business intelligence platform. You can use Metabase to ask questions about your data, or embed Metabase in your app to let your customers explore their data on their own.",
+  "description_zh": "Metabase 是一個開源商業智能平台。您可以使用 Metabase 來提出關於資料的問題，或在您的應用程式中嵌入 Metabase，讓客戶自行探索其資料。",
+  "description_ja": "Metabase はオープンソースのビジネスインテリジェンスプラットフォームです。Metabase を使用してデータに関する質問をすることができます。または、Metabase をアプリに埋め込んで、顧客が自分のデータを自由に探索できるようにすることができます。",
   "install_methods": [
     {
       "type": "default",
@@ -29,5 +31,7 @@
     "username": null,
     "password": null
   },
-  "notes": []
+  "notes": [],
+  "notes_zh": [],
+  "notes_ja": []
 }

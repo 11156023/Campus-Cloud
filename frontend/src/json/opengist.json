@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/opengist.webp",
   "config_path": "/opt/opengist/config.yml",
   "description": "Self-hosted pastebin powered by Git, open-source alternative to Github Gist.",
+  "description_zh": "由 Git 驅動的自託管貼紙，Github Gist 的開源替代方案。",
+  "description_ja": "Git で駆動されるセルフホスト型パスビン、Github Gist のオープンソース代替です。",
   "install_methods": [
     {
       "type": "default",

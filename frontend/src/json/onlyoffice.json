@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/onlyoffice.webp",
   "config_path": "/etc/onlyoffice/documentserver/local.json",
   "description": "ONLYOFFICE Docs is an open-source online office suite that provides collaborative editors for text documents, spreadsheets, and presentations, fully compatible with Microsoft Office formats (DOCX, XLSX, PPTX).",
+  "description_zh": "ONLYOFFICE Docs 是一個開源線上辦公套件，提供適用於文字文件、試算表和簡報的協作編輯器，完全相容 Microsoft Office 格式（DOCX、XLSX、PPTX）。",
+  "description_ja": "ONLYOFFICE Docs は、テキスト文書、スプレッドシート、プレゼンテーション用のコラボレーティブエディターを提供するオープンソースのオンラインオフィススイートで、Microsoft Office 形式（DOCX、XLSX、PPTX）と完全互換です。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,18 @@
   "notes": [
     {
       "text": "Database / RabbitMQ Credentials: `cat ~/onlyoffice.creds`",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "資料庫 / RabbitMQ 認證：`cat ~/onlyoffice.creds`",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "データベース / RabbitMQ 認証: `cat ~/onlyoffice.creds`",
       "type": "info"
     }
   ]

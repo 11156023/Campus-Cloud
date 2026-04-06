@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/zoraxy.webp",
   "config_path": "",
   "description": "Zoraxy is an all in one homelab network routing solution.",
+  "description_zh": "Zoraxy 是一個一體化家庭實驗室網路路由解決方案。",
+  "description_ja": "Zoraxyはオールインワンホームラボネットワークルーティングソリューションです。",
   "install_methods": [
     {
       "type": "default",

@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/jotty.webp",
   "config_path": "/opt/jotty/.env",
   "description": "A simple, self-hosted app for your checklists and notes. Tired of bloated, cloud-based to-do apps? jotty is a lightweight alternative for managing your personal checklists and notes. It's built with Next.js 14, is easy to deploy, and keeps all your data on your own server.",
+  "description_zh": "一個簡單的、自架設的應用程式，用於您的檢查清單和筆記。厭倦了臃腫的雲端待辦事項應用程式？jotty 是管理您的個人檢查清單和筆記的輕量級替代方案。它使用 Next.js 14 構建，易於部署，並將所有資料保存在您自己的伺服器上。",
+  "description_ja": "チェックリストとメモのシンプルな自己ホスト型アプリ。ぶら下がった、クラウドベースのToDoアプリに疲れましたか？jotty は、個人的なチェックリストと注記を管理するための軽量な代替手段です。Next.js 14 で構築され、デプロイが簡単で、すべてのデータを独自のサーバーに保持します。",
   "install_methods": [
     {
       "type": "default",

@@ -12,6 +12,8 @@
   "website": "https://wealthfolio.app/",
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/wealthfolio.webp",
   "description": "Wealthfolio is a beautiful, privacy-focused investment tracker with local data storage. Track your portfolio across multiple accounts and asset types with detailed performance analytics, goal planning, and multi-currency support.",
+  "description_zh": "Wealthfolio 是一個美觀、注重隱私的投資追蹤工具，具有本地資料儲存。使用詳細的效能分析、目標規劃和多幣種支援，在多個帳戶和資產類型中追蹤您的投資組合。",
+  "description_ja": "Wealthfolioは、ローカルデータストレージを備えた美しくプライバシーに焦点を当てた投資トラッカーです。詳細なパフォーマンス分析、目標計画、多通貨サポートにより、複数のアカウントとアセットタイプ全体でポートフォリオを追跡できます。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,8 @@
   "notes": [
     {
       "text": "Login password is stored in ~/wealthfolio.creds",
+      "text_zh": "登入密碼儲存在 ~/wealthfolio.creds",
+      "text_ja": "ログインパスワードは ~/wealthfolio.creds に保存されています",
       "type": "info"
     }
   ]

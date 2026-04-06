@@ -232,6 +232,7 @@ def update_password(
             "New password cannot be the same as the current one"
         )
     current_user.hashed_password = get_password_hash(new_password)
+    current_user.token_version += 1  # Invalidate all existing tokens
     session.add(current_user)
     session.commit()
 

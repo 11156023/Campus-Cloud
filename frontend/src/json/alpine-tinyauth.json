@@ -12,6 +12,8 @@
   "website": "https://tinyauth.app",
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/tinyauth.webp",
   "description": "Tinyauth is a simple authentication middleware that adds simple username/password login or OAuth with Google, Github and any generic provider to all of your docker apps.",
+  "description_zh": "Tinyauth 是一個簡單的身份驗證中間件，可為您的所有 Docker 應用程序添加簡單的用戶名/密碼登錄或 Google、Github 和任何通用提供商的 OAuth。",
+  "description_ja": "Tinyauth は、Google、Github、その他のプロバイダーを使用した簡単なユーザー名/パスワード ログインまたは OAuth を Docker アプリケーションに追加するシンプルな認証ミドルウェアです。",
   "install_methods": [
     {
       "type": "default",
@@ -43,6 +45,18 @@
   "notes": [
     {
       "text": "The default credentials are located in `/opt/tinyauth/credentials.txt`.",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "預設認證信息位於 `/opt/tinyauth/credentials.txt`。",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "デフォルトの認証情報は `/opt/tinyauth/credentials.txt` に保存されています。",
       "type": "info"
     }
   ]

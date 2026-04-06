@@ -61,6 +61,29 @@ def update_resource(
     return db_resource
 
 
+def update_ip_address(*, session: Session, vmid: int, ip_address: str) -> None:
+    """更新 VM 的快取 IP 位址（不存在則忽略）"""
+    from datetime import datetime, timezone
+
+    resource = get_resource_by_vmid(session=session, vmid=vmid)
+    if resource and resource.ip_address != ip_address:
+        resource.ip_address = ip_address
+        resource.ip_address_cached_at = datetime.now(timezone.utc)
+        session.add(resource)
+        session.commit()
+
+
+def is_ip_address_fresh(*, session: Session, vmid: int, ttl_seconds: int = 3600) -> bool:
+    """檢查快取的 IP 位址是否仍在有效期內"""
+    from datetime import datetime, timezone
+
+    resource = get_resource_by_vmid(session=session, vmid=vmid)
+    if not resource or not resource.ip_address or not resource.ip_address_cached_at:
+        return False
+    age = (datetime.now(timezone.utc) - resource.ip_address_cached_at).total_seconds()
+    return age <= ttl_seconds
+
+
 def delete_resource(*, session: Session, vmid: int, commit: bool = True) -> None:
     resource = get_resource_by_vmid(session=session, vmid=vmid)
     if resource:

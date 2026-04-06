@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/mariadb.webp",
   "config_path": "",
   "description": "MariaDB is a fork of the popular MySQL database management system that is developed and maintained by the open-source community. It is also commercially supported, offering enterprise-level features and support for organizations that require them. MariaDB aims to maintain high compatibility with MySQL, ensuring a drop-in replacement capability.",
+  "description_zh": "MariaDB 是流行的 MySQL 資料庫管理系統的分支，由開源社群開發和維護。它也得到商業支援，為需要的組織提供企業級功能和支援。MariaDB 旨在與 MySQL 保持高度相容性，確保即插即用的替換能力。",
+  "description_ja": "MariaDB は一般的な MySQL データベース管理システムのフォークで、オープンソースコミュニティによって開発・保守されています。商業的なサポートも提供されており、必要な組織向けにエンタープライズレベルの機能とサポートを提供しています。MariaDB は MySQL との高い互換性を維持し、ドロップイン置換機能を確保することを目指しています。",
   "install_methods": [
     {
       "type": "default",
@@ -47,6 +49,26 @@
     },
     {
       "text": "Access Adminer Web UI at `http://<CONTAINER_IP>/adminer.php`",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "此指令檔在安裝後需要一些額外步驟，請查看「文檔」",
+      "type": "info"
+    },
+    {
+      "text": "在 `http://<CONTAINER_IP>/adminer.php` 存取 Adminer 網頁介面",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "このスクリプトはインストール後に追加の手順が必要です。「ドキュメント」を確認してください",
+      "type": "info"
+    },
+    {
+      "text": "`http://<CONTAINER_IP>/adminer.php` で Adminer ウェブ UI にアクセスしてください",
       "type": "info"
     }
   ]

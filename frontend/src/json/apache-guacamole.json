@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/apache-guacamole.webp",
   "config_path": "/etc/guacamole/guacd.conf",
   "description": "Apache Guacamole is a clientless remote desktop gateway. It supports standard protocols like VNC, RDP, and SSH.",
+  "description_zh": "Apache Guacamole 是一個無客戶端遠程桌面網關。它支持 VNC、RDP 和 SSH 等標準協議。",
+  "description_ja": "Apache Guacamole はクライアントレスリモート デスクトップ ゲートウェイです。VNC、RDP、SSH などの標準プロトコルをサポートしています。",
   "install_methods": [
     {
       "type": "default",

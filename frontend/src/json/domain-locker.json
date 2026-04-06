@@ -12,6 +12,8 @@
   "website": "https://github.com/Lissy93/domain-locker",
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/domain-locker.webp",
   "description": "The all-in-one tool, for keeping track of your domain name portfolio. Got domain names? Get Domain Locker! ",
+  "description_zh": "追蹤您的域名組合的一體化工具。有域名？取得 Domain Locker！",
+  "description_ja": "ドメイン ネーム ポートフォリオを追跡するためのオールインワン ツール。ドメイン名を持っていますか？Domain Locker を取得しましょう！",
   "install_methods": [
     {
       "type": "default",
@@ -36,6 +38,26 @@
     },
     {
       "text": "Domain-locker takes quite some time to build and a lot of ressources, RAM and Cores can be lowered after install.",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "顯示數據庫認證：`cat ~/Domain-Locker.creds`",
+      "type": "info"
+    },
+    {
+      "text": "Domain-locker 需要相當長的時間來構建並耗費大量資源，安裝後可以降低 RAM 和 Cores。",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "DB 認証情報を表示: `cat ~/Domain-Locker.creds`",
+      "type": "info"
+    },
+    {
+      "text": "Domain-locker は構築にかなりの時間がかかり、多くのリソースが必要です。インストール後、RAM とコア数を下げることができます。",
       "type": "info"
     }
   ]

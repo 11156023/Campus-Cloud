@@ -12,6 +12,8 @@
   "website": "https://linkstack.org/",
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/linkstack.webp",
   "description": "LinkStack is an open-source, self-hosted alternative to Linktree, allowing users to create a customizable profile page to share multiple links, hosted on their own server.",
+  "description_zh": "LinkStack 是 Linktree 的開源自架設替代品，允許使用者建立可自訂的設定檔頁面以共享多個連結，並在其自己的伺服器上託管。",
+  "description_ja": "LinkStack は Linktree のオープンソース自己ホスト型代替品で、ユーザーが複数のリンクを共有するためにカスタマイズ可能なプロファイル ページを作成し、独自のサーバーでホストできます。",
   "install_methods": [
     {
       "type": "default",
@@ -32,10 +34,14 @@
   "notes": [
     {
       "text": "LinkStack can be updated via the user interface.",
+      "text_zh": "LinkStack 可以通過使用者介面更新。",
+      "text_ja": "LinkStack はユーザー インターフェイスから更新できます。",
       "type": "info"
     },
     {
       "text": "Complete setup via the web interface at http://<container-ip>/. Check installation logs: `cat ~/linkstack-install.log`",
+      "text_zh": "通過 http://<container-ip>/ 的網路介面完成設定。檢查安裝日誌：`cat ~/linkstack-install.log`",
+      "text_ja": "http://<container-ip>/ の Web インターフェイスでセットアップを完了します。インストール ログを確認：`cat ~/linkstack-install.log`",
       "type": "info"
     }
   ]

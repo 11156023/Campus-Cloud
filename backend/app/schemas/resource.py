@@ -70,6 +70,7 @@ class VNCInfoSchema(BaseModel):
     vmid: int
     ws_url: str
     ticket: str | None = None
+    port: str | None = None
     message: str
 
 

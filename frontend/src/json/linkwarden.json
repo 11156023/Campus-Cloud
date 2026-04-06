@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/linkwarden.webp",
   "config_path": "/opt/linkwarden/.env",
   "description": "Linkwarden is a fully self-hostable, open-source collaborative bookmark manager to collect, organize and archive webpages.",
+  "description_zh": "Linkwarden 是一個完全自架設的開源協作書籤管理工具，用於收集、組織和存檔網頁。",
+  "description_ja": "Linkwarden は、Web ページを収集、整理、アーカイブするための完全に自己ホスト可能なオープンソース協調ブックマーク マネージャーです。",
   "install_methods": [
     {
       "type": "default",

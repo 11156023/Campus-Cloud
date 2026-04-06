@@ -12,6 +12,8 @@
   "website": "https://www.passbolt.com/",
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/passbolt.webp",
   "description": "Passbolt is a hybrid credential platform. It is built-first for modern IT teams, yet simple enough for everyone. A sovereign, battle-tested solution that delivers for a team of 5, or an organisation of 5000.",
+  "description_zh": "Passbolt 是一個混合認證平台。它首先為現代 IT 團隊構建，但對每個人來說足夠簡單。一個主權的、經過驗證的解決方案，適用於 5 人團隊或 5000 人組織。",
+  "description_ja": "Passbolt はハイブリッド認証プラットフォームです。最初は最新の IT チーム向けに構築されていますが、誰にとっても十分に簡単です。5 人のチームまたは 5000 人の組織に対応できる、主権を持つ、実績のあるソリューション。",
   "install_methods": [
     {
       "type": "default",
@@ -36,6 +38,26 @@
     },
     {
       "text": "The application uses self-signed certificates. You can also use Let's Encrypt to get a valid certificate for your domain. Please read the documentation for more information.",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "輸入 `cat ~/passbolt.creds` 以查看 MariaDB 資料庫認證。您需要這些認證來設定 Passbolt。",
+      "type": "info"
+    },
+    {
+      "text": "應用程式使用自我簽署的憑證。您也可以使用 Let's Encrypt 為您的網域取得有效憑證。請閱讀文件以取得更多資訊。",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "`cat ~/passbolt.creds` と入力して MariaDB データベース認証を確認します。Passbolt をセットアップするにはこれらが必要です。",
+      "type": "info"
+    },
+    {
+      "text": "アプリケーションは自己署名証明書を使用します。Let's Encrypt を使用してドメインの有効な証明書を取得することもできます。詳細については、ドキュメントをお読みください。",
       "type": "info"
     }
   ]

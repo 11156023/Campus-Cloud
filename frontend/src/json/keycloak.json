@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/keycloak.webp",
   "config_path": "/opt/keycloak/conf/keycloak.conf",
   "description": "Keycloak is an open-source identity and access management solution that provides centralized authentication and authorization for modern applications and services. It enables organizations to secure their applications and services with a single sign-on (SSO) solution, reducing the need for users to remember multiple login credentials. Keycloak supports various authentication protocols, including SAML, OAuth, and OpenID Connect, and integrates with a wide range of applications and services. With Keycloak, administrators can manage user identities, define security policies, and monitor access to their applications and services. The software is designed to be scalable, flexible, and easy to use, making it a valuable tool for enhancing the security and usability of modern applications and services.",
+  "description_zh": "Keycloak 是一個開源身分和存取管理解決方案，為現代應用程式和服務提供集中式驗証和授權。它使組織能夠使用單一登入 (SSO) 解決方案保護其應用程式和服務，降低使用者記住多個登入認證的需要。Keycloak 支援各種驗証協定，包括 SAML、OAuth 和 OpenID Connect，並與廣泛的應用程式和服務集成。使用 Keycloak，系統管理員可以管理使用者身分、定義安全性原則，並監視對其應用程式和服務的存取。該軟體設計為可擴充、靈活且易於使用，使其成為增強現代應用程式和服務的安全性和可用性的寶貴工具。",
+  "description_ja": "Keycloak は、最新のアプリケーションとサービスに対して集中認証と認可を提供するオープンソース ID およびアクセス管理ソリューションです。組織が単一サインオン (SSO) ソリューションを使用してアプリケーションとサービスを保護できるようにし、ユーザーが複数のログイン認証情報を記憶する必要性を軽減します。Keycloak は SAML、OAuth、OpenID Connect などのさまざまな認証プロトコルをサポートし、幅広いアプリケーションとサービスと統合されます。Keycloak を使用すると、管理者はユーザー ID を管理し、セキュリティ ポリシーを定義し、アプリケーションとサービスへのアクセスを監視できます。このソフトウェアは、スケーラブル、柔軟、使いやすいように設計されており、最新のアプリケーションとサービスのセキュリティと使いやすさを向上させるための貴重なツールとなっています。",
   "install_methods": [
     {
       "type": "default",
@@ -32,10 +34,14 @@
   "notes": [
     {
       "text": "First start can take a few minutes",
+      "text_zh": "首次啟動可能需要幾分鐘",
+      "text_ja": "最初の起動には数分かかる場合があります",
       "type": "warning"
     },
     {
       "text": "When updating, if you had modified cache-ispn.xml: Re-apply your changes to the new file, otherwise leave it unchanged.",
+      "text_zh": "更新時，如果您已修改 cache-ispn.xml：將變更重新套用到新文件，否則保持不變。",
+      "text_ja": "更新時、cache-ispn.xml を修正した場合は、変更を新しいファイルに再度適用してください。それ以外の場合は、変更なしのままにしてください。",
       "type": "info"
     }
   ]

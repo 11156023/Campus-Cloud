@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/real-debrid.webp",
   "config_path": "/opt/rdtc/appsettings.json",
   "description": "RDTClient is a web interface to manage your torrents on Real-Debrid, AllDebrid or Premiumize.",
+  "description_zh": "RDTClient 是一個用於管理 Real-Debrid、AllDebrid 或 Premiumize 上的種子的網路介面。",
+  "description_ja": "RDTClientは、Real-Debrid、AllDebridまたはPremiumizeでトレントを管理するためのWebインターフェースです。",
   "install_methods": [
     {
       "type": "default",

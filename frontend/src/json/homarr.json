@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/homarr.webp",
   "config_path": "/opt/homarr.env",
   "description": "Homarr is a sleek, modern dashboard that puts all of your apps and services at your fingertips.",
+  "description_zh": "Homarr 是一個光滑、現代的儀表板，將所有應用程式和服務置於您的指尖。",
+  "description_ja": "Homarr は、すべてのアプリとサービスを指の先に置く、洗練された現代的ダッシュボードです。",
   "install_methods": [
     {
       "type": "default",

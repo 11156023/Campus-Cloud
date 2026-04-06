@@ -11,7 +11,9 @@
   "website": "https://www.openproject.org",
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/openproject.webp",
   "config_path": "/etc/openproject/conf.d/env",
-  "description": "OpenProject is a web-based project management software. Use OpenProject to manage your projects, tasks and goals. Collaborate via work packages and link them to your pull requests on Github. Read more about the OpenProject GitHub integration.",
+  "description": "OpenProject is a web-based project management software. Use OpenProject to manage your projects, tasks and goals. Collaborate via work packages and link them to your pull requests on GitHub. Read more about the OpenProject GitHub integration.",
+  "description_zh": "OpenProject 是一個基於網頁的專案管理軟體。使用 OpenProject 來管理您的專案、任務和目標。透過工作套件協作，並將其連結到 GitHub 上的提取請求。閱讀有關 OpenProject GitHub 整合的更多資訊。",
+  "description_ja": "OpenProject は Web ベースのプロジェクト管理ソフトウェアです。OpenProject を使用してプロジェクト、タスク、目標を管理します。作業パッケージを介して共同作業し、それを GitHub のプルリクエストにリンクします。OpenProject GitHub 統合の詳細について、さらに読むことができます。",
   "install_methods": [
     {
       "type": "default",

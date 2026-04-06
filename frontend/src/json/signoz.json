@@ -12,6 +12,8 @@
   "website": "https://signoz.io/",
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/signoz.webp",
   "description": "SigNoz is an open-source Datadog or New Relic alternative. Get APM, logs, traces, metrics, exceptions, & alerts in a single tool.",
+  "description_zh": "SigNoz 是 Datadog 或 New Relic 的開源替代方案。在單一工具中取得 APM、日誌、追蹤、指標、異常和警示。",
+  "description_ja": "SigNozはDatadogまたはNew Relicのオープンソース代替案です。APM、ログ、トレース、メトリクス、例外、アラートをすべて1つのツールで取得します。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,18 @@
   "notes": [
     {
       "text": "The first user you register will be the admin user.",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "你註冊的第一個使用者將是管理員使用者。",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "登録する最初のユーザーがAdmin ユーザーになります。",
       "type": "info"
     }
   ]

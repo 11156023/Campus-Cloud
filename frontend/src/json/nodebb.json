@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/nodebb.webp",
   "config_path": "",
   "description": "NodeBB Forum Software is powered by Node.js and supports either Redis, MongoDB, or a PostgreSQL database. It utilizes web sockets for instant interactions and real-time notifications. NodeBB takes the best of the modern web: real-time streaming discussions, mobile responsiveness, and rich RESTful read/write APIs, while staying true to the original bulletin board/forum format → categorical hierarchies, local user accounts, and asynchronous messaging.",
+  "description_zh": "NodeBB 論壇軟體由 Node.js 提供動力，支援 Redis、MongoDB 或 PostgreSQL 資料庫。它利用 Web 通訊端進行即時互動和實時通知。NodeBB 採用現代網路的精華：即時串流討論、行動回應式設計以及豐富的 RESTful 讀/寫 API，同時保持原始佈告欄/論壇格式 → 分類層級、本機使用者帳戶和非同步訊息。",
+  "description_ja": "NodeBB フォーラム ソフトウェアは Node.js を搭載しており、Redis、MongoDB、または PostgreSQL データベースをサポートしています。インスタント インタラクションとリアルタイム通知のために Web ソケットを利用します。NodeBB は最新の Web の最良の側面を採用しています。リアルタイム ストリーミング ディスカッション、モバイル レスポンシブ性、リッチな RESTful 読み取り/書き込み API は、元の掲示板/フォーム形式 → カテゴリー階層、ローカル ユーザー アカウント、非同期メッセージングを維持しながら。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,18 @@
   "notes": [
     {
       "text": "Only use Ubuntu 24.04!",
+      "type": "warning"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "只使用 Ubuntu 24.04！",
+      "type": "warning"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "Ubuntu 24.04 のみを使用してください。",
       "type": "warning"
     }
   ]

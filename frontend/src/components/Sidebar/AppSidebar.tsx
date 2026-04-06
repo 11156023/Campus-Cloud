@@ -4,6 +4,7 @@ import {
   FileText,
   Home,
   Monitor,
+  Network,
   ServerCog,
   Settings2,
   Shield,
@@ -48,6 +49,7 @@ export function AppSidebar() {
     { icon: UsersRound, title: "群組管理", path: "/groups" },
     { icon: Users, title: t("sidebar.admin"), path: "/admin" },
     { icon: Settings2, title: "系統設定", path: "/admin/configuration" },
+    { icon: Network, title: "Gateway VM", path: "/admin/gateway" },
   ]
 
   const items =

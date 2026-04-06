@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/ubiquiti-unifi.webp",
   "config_path": "",
   "description": "UniFi Network Server is a software that helps manage and monitor UniFi networks (Wi-Fi, Ethernet, etc.) by providing an intuitive user interface and advanced features. It allows network administrators to configure, monitor, and upgrade network devices, as well as view network statistics, client devices, and historical events. The aim of the application is to make the management of UniFi networks easier and more efficient.",
+  "description_zh": "UniFi Network Server 是一款軟體，可透過直覺化的使用者介面和進階功能幫助管理和監控 UniFi 網路（Wi-Fi、乙太網路等）。它允許網路管理員設定、監控和升級網路裝置，以及查看網路統計資料、用戶端裝置和歷史事件。此應用程式的目標是讓 UniFi 網路的管理更輕鬆高效。",
+  "description_ja": "UniFi Network Serverは、直感的なユーザーインターフェースと高度な機能を提供することで、UniFiネットワーク（Wi-Fi、イーサネットなど）の管理と監視を支援するソフトウェアです。ネットワーク管理者はネットワークデバイスの設定、監視、アップグレードを行ったり、ネットワーク統計、クライアントデバイス、履歴イベントを表示したりできます。このアプリケーションの目的は、UniFiネットワーク管理をより簡単で効率的にすることです。",
   "disable": true,
   "disable_description": "This script is disabled because UniFi no longer delivers APT packages for Debian systems. The installation relies on APT repositories that are no longer maintained or available. For more details, see: https://github.com/community-scripts/ProxmoxVE/issues/11876",
   "install_methods": [
@@ -34,6 +36,8 @@
   "notes": [
     {
       "text": "For non-AVX CPUs, MongoDB 4.4 is installed. Please note this is a legacy solution that may present security risks and could become unsupported in future updates.",
+      "text_zh": "對於不支援 AVX 的 CPU，將安裝 MongoDB 4.4。請注意，這是一個舊版解決方案，可能存在安全風險，並可能在未來的更新中變為不支援。",
+      "text_ja": "非AVXのCPUの場合、MongoDB 4.4がインストールされます。これは古いソリューションであり、セキュリティリスクが存在する可能性があり、将来のアップデートでサポートされなくなる可能性があることに注意してください。",
       "type": "warning"
     }
   ]

@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/flowise.webp",
   "config_path": "/opt/flowiseai/.env",
   "description": "FlowiseAI is an open source low-code tool for developers to build customized LLM orchestration flow & AI agents",
+  "description_zh": "FlowiseAI 是一個開源低代碼工具，供開發人員構建自訂 LLM 編排流程和 AI 代理",
+  "description_ja": "FlowiseAI は、開発者がカスタマイズされた LLM オーケストレーション フロー & AI エージェントを構築するためのオープンソース ローコード ツールです",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,18 @@
   "notes": [
     {
       "text": "Application takes long time to install. Please be patient!",
+      "type": "warning"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "應用程式需要很長時間才能安裝。請耐心等待！",
+      "type": "warning"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "アプリケーションのインストールに長時間がかかります。お待ちください！",
       "type": "warning"
     }
   ]

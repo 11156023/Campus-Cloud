@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/firefly-iii.webp",
   "config_path": "/opt/firefly/.env",
   "description": "Firefly III is a free, self-hosted tool for managing your finances. Track expenses, plan budgets, and get detailed reports.",
+  "description_zh": "Firefly III 是一個免費、自託管的財務管理工具。追蹤支出、規劃預算並取得詳細報告。",
+  "description_ja": "Firefly III は、財務を管理するための無料の自己ホスト型ツールです。支出を追跡し、予算を計画し、詳細なレポートを取得します。",
   "install_methods": [
     {
       "type": "default",
@@ -36,6 +38,26 @@
     },
     {
       "text": "Database credentials: `cat ~/firefly.creds`",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "數據導入程式位於 `http://<LXC_IP>/dataimporter/`",
+      "type": "info"
+    },
+    {
+      "text": "數據庫認證：`cat ~/firefly.creds`",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "データ インポーターは `http://<LXC_IP>/dataimporter/` にあります",
+      "type": "info"
+    },
+    {
+      "text": "データベース認証情報: `cat ~/firefly.creds`",
       "type": "info"
     }
   ]

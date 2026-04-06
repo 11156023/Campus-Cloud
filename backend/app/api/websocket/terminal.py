@@ -107,9 +107,13 @@ async def terminal_proxy(websocket: WebSocket, vmid: int, token: str):
 
         logger.info(f"WebSocket proxy established for LXC {vmid}")
 
+        disconnect = asyncio.Event()
+
         async def forward_from_proxmox():
             try:
                 async for message in pve_websocket:
+                    if disconnect.is_set():
+                        break
                     try:
                         if isinstance(message, bytes):
                             await websocket.send_bytes(message)
@@ -121,12 +125,16 @@ async def terminal_proxy(websocket: WebSocket, vmid: int, token: str):
                 pass
             except Exception as e:
                 logger.error(f"Error forwarding from Proxmox: {e}")
+            finally:
+                disconnect.set()
 
         async def forward_to_proxmox():
             try:
-                while True:
+                while not disconnect.is_set():
                     data = await websocket.receive()
                     if data.get("type") == "websocket.disconnect":
+                        break
+                    if disconnect.is_set():
                         break
                     if "bytes" in data:
                         await pve_websocket.send(data["bytes"])
@@ -136,13 +144,21 @@ async def terminal_proxy(websocket: WebSocket, vmid: int, token: str):
                 pass
             except Exception as e:
                 logger.error(f"Error forwarding to Proxmox: {e}")
+            finally:
+                disconnect.set()
 
-        # Run both directions concurrently; first to finish cancels the other
-        await asyncio.gather(
-            forward_from_proxmox(),
-            forward_to_proxmox(),
-            return_exceptions=True,
-        )
+        # Run both directions; cancel the other when one finishes
+        tasks = [
+            asyncio.create_task(forward_from_proxmox()),
+            asyncio.create_task(forward_to_proxmox()),
+        ]
+        _done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+        for task in pending:
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
 
     except Exception as e:
         logger.error(f"Failed to establish WebSocket proxy: {e}", exc_info=True)

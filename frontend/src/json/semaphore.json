@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/semaphore-ui.webp",
   "config_path": "/opt/semaphore/config.json",
   "description": "Semaphore UI is a modern web interface for managing popular DevOps tools",
+  "description_zh": "Semaphore UI 是用於管理流行 DevOps 工具的現代網路介面",
+  "description_ja": "Semaphore UIは、一般的なDevOpsツールを管理するための最新のWebインターフェースです",
   "install_methods": [
     {
       "type": "default",
@@ -36,6 +38,26 @@
     },
     {
       "text": "Admin password: `cat ~/semaphore.creds`",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "此實例使用 BoltDB",
+      "type": "info"
+    },
+    {
+      "text": "管理員密碼：`cat ~/semaphore.creds`",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "このインスタンスはBoltDBを使用しています",
+      "type": "info"
+    },
+    {
+      "text": "管理者パスワード：`cat ~/semaphore.creds`",
       "type": "info"
     }
   ]

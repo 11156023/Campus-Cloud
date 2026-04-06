@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/docker.webp",
   "config_path": "",
   "description": "Docker is an open-source project for automating the deployment of applications as portable, self-sufficient containers.",
+  "description_zh": "Docker 是一個開源項目，用於自動部署應用程式為便攜式、自給自足的容器。",
+  "description_ja": "Docker は、アプリケーションをポータブルで自給自足のコンテナーとしてデプロイメントを自動化するためのオープンソース プロジェクトです。",
   "install_methods": [
     {
       "type": "default",
@@ -51,6 +53,34 @@
     },
     {
       "text": "Options to Install Portainer and/or Docker Compose V2",
+      "type": "warning"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "如果 LXC 以特權方式創建，腳本將自動設置 USB 傳遞。",
+      "type": "warning"
+    },
+    {
+      "text": "通過用空格替換連字符（-）來執行 Compose V2，使用 `docker compose` 而不是 `docker-compose`。",
+      "type": "warning"
+    },
+    {
+      "text": "安裝 Portainer 和/或 Docker Compose V2 的選項",
+      "type": "warning"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "LXC が特権で作成された場合、スクリプトは USB パススルーを自動的にセットアップします。",
+      "type": "warning"
+    },
+    {
+      "text": "ハイフン (-) をスペースで置き換えることで Compose V2 を実行し、`docker-compose` の代わりに `docker compose` を使用します。",
+      "type": "warning"
+    },
+    {
+      "text": "Portainer および/または Docker Compose V2 をインストールするオプション",
       "type": "warning"
     }
   ]

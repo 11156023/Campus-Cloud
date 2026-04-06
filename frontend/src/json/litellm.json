@@ -12,6 +12,8 @@
   "website": "https://www.litellm.ai/",
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/litellm-light.webp",
   "description": "LLM proxy to call 100+ LLMs in a unified interface & track spend, set budgets per virtual key/user",
+  "description_zh": "LLM 代理以在統一介面中呼叫 100+ LLM，並按虛擬金鑰/使用者追蹤支出、設定預算",
+  "description_ja": "統一インターフェイスで 100 以上の LLM を呼び出し、仮想キー/ユーザーごとに支出を追跡し、予算を設定する LLM プロキシ",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,8 @@
   "notes": [
     {
       "text": "Update master key in the config file",
+      "text_zh": "更新設定文件中的主金鑰",
+      "text_ja": "構成ファイルのマスター キーを更新する",
       "type": "info"
     }
   ]

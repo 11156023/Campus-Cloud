@@ -12,6 +12,8 @@
   "website": "https://infisical.com/",
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/infisical.webp",
   "description": "Secrets, certificates, and access management on autopilot. All-in-one platform to securely manage application secrets, certificates, SSH keys, and configurations across your team and infrastructure.",
+  "description_zh": "自動化的機密、憑證和存取管理。一站式平台，可在您的團隊和基礎設施上安全地管理應用程式機密、憑證、SSH 金鑰和組態。",
+  "description_ja": "オートパイロット上のシークレット、証明書、アクセス管理。アプリケーション シークレット、証明書、SSH キー、およびチームとインフラストラクチャ全体の構成を安全に管理するオールインワン プラットフォーム。",
   "install_methods": [
     {
       "type": "default",

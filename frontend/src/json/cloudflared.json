@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/cloudflare.webp",
   "config_path": "/usr/local/etc/cloudflared/config.yml",
   "description": "Cloudflared is a command-line tool that allows you to securely access resources on the Cloudflare network, such as websites and APIs, from your local computer. It works by creating a secure tunnel between your computer and the Cloudflare network, allowing you to access resources as if they were on your local network.",
+  "description_zh": "Cloudflared 是一個命令列工具，允許您從本地電腦安全地存取 Cloudflare 網路上的資源，例如網站和 API。它通過在您的電腦和 Cloudflare 網路之間建立安全隧道來工作，允許您存取資源，就像它們在本地網路上一樣。",
+  "description_ja": "Cloudflared は、ローカル コンピューターから Cloudflare ネットワーク上のリソース（Web サイト、API など）に安全にアクセスできるコマンドライン ツールです。コンピューターと Cloudflare ネットワーク間にセキュアなトンネルを作成することで、ローカル ネットワーク上にあるかのようにリソースにアクセスできるようになります。",
   "install_methods": [
     {
       "type": "default",
@@ -36,6 +38,26 @@
     },
     {
       "text": "Or create tunnel via Cloudflare Zero Trust Dashboard",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "安裝後，執行：cloudflared tunnel login && cloudflared tunnel create <NAME>",
+      "type": "info"
+    },
+    {
+      "text": "或透過 Cloudflare Zero Trust 儀表板建立隧道",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "インストール後、実行してください: cloudflared tunnel login && cloudflared tunnel create <NAME>",
+      "type": "info"
+    },
+    {
+      "text": "または Cloudflare Zero Trust ダッシュボード経由でトンネルを作成する",
       "type": "info"
     }
   ]

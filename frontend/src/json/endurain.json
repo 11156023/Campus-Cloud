@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/endurain.webp",
   "config_path": "/opt/endurain/.env",
   "description": "Endurain is a self-hosted fitness tracking service designed to give users full control over their data and hosting environment. It's similar to Strava but focused on privacy and customization",
+  "description_zh": "Endurain 是一個自託管健身追蹤服務，旨在給用戶完全控制其數據和託管環境。它類似於 Strava，但專注於隱私和自訂",
+  "description_ja": "Endurain は、ユーザーにデータとホスティング環境の完全な制御を提供するために設計された自己ホスト型フィットネス追跡サービスです。Strava に似ていますが、プライバシーとカスタマイズに重点を置いています",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,18 @@
   "notes": [
     {
       "text": "When using a reverse proxy, edit `/opt/endurain/frontend/app/dist/env.js`.",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "使用反向代理時，編輯 `/opt/endurain/frontend/app/dist/env.js`。",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "リバース プロキシを使用する場合は、`/opt/endurain/frontend/app/dist/env.js` を編集します。",
       "type": "info"
     }
   ]

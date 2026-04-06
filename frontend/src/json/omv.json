@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/openmediavault.webp",
   "config_path": "",
   "description": "OpenMediaVault is a next-generation network-attached storage (NAS) solution based on Debian Linux. It provides a web-based interface for managing and storing digital data, making it easy to use and set up. OpenMediaVault supports various storage protocols, including SMB/CIFS, NFS, and FTP, and provides a wide range of features for data management, such as user and group management, disk quotas, and data backup and recovery. The software is designed to be flexible and scalable, making it a valuable solution for both personal and enterprise use. OpenMediaVault provides a stable and reliable platform for managing and storing digital data, making it a popular choice for those who want to host their own data and ensure its security and privacy. With OpenMediaVault, users can access their data from anywhere and easily share it with others, making it a valuable tool for collaboration and data management.",
+  "description_zh": "OpenMediaVault 是基於 Debian Linux 的下一代網路連接儲存 (NAS) 解決方案。它提供了用於管理和儲存數位資料的網頁介面，使其易於使用和設定。OpenMediaVault 支援各種儲存協議，包括 SMB/CIFS、NFS 和 FTP，並提供了廣泛的資料管理功能，例如使用者和群組管理、磁碟配額以及資料備份和復原。該軟體設計具有靈活性和可擴充性，使其成為個人和企業使用的寶貴解決方案。OpenMediaVault 為管理和儲存數位資料提供了穩定可靠的平台，使其成為想要託管自己資料並確保其安全性和隱私性的人的熱門選擇。使用 OpenMediaVault，使用者可以從任何地方存取其資料，並輕鬆與他人共享，使其成為協作和資料管理的寶貴工具。",
+  "description_ja": "OpenMediaVault は Debian Linux ベースの次世代ネットワークアタッチドストレージ（NAS）ソリューションです。デジタルデータを管理および保存するための Web ベースのインターフェイスを提供し、使いやすく設定が簡単です。OpenMediaVault は SMB/CIFS、NFS、FTP などの様々なストレージ プロトコルをサポートし、ユーザーおよびグループ管理、ディスク クォータ、データバックアップおよび復旧などのデータ管理機能の幅広い範囲を提供します。このソフトウェアは柔軟でスケーラブルであるように設計されており、個人使用と企業使用の両方に対して価値のあるソリューションとなります。OpenMediaVault は、デジタルデータを管理および保存するための安定した信頼性の高いプラットフォームを提供し、自分のデータをホストしてセキュリティとプライバシーを確保したい人にとって一般的な選択肢となります。OpenMediaVault を使用すると、ユーザーはどこからでもデータにアクセスでき、他のユーザーと簡単に共有でき、コラボレーションとデータ管理のための価値のあるツールになります。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,18 @@
   "notes": [
     {
       "text": "Running OVM in a LXC container may require a complicated disk setup, consider using a VM instead. More info: `https://github.com/community-scripts/ProxmoxVE/discussions/175`",
+      "type": "warning"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "在 LXC 容器中執行 OVM 可能需要複雜的磁碟設定，建議改用 VM。更多資訊：`https://github.com/community-scripts/ProxmoxVE/discussions/175`",
+      "type": "warning"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "LXC コンテナで OVM を実行すると、複雑なディスク設定が必要になる場合があります。代わりに VM の使用を検討してください。詳細情報: `https://github.com/community-scripts/ProxmoxVE/discussions/175`",
       "type": "warning"
     }
   ]

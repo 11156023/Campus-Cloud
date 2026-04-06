@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/fluidcalendar.webp",
   "config_path": "/opt/fluid-calendar/.env",
   "description": "The open-source intelligent calendar that adapts to your workflow. Experience seamless task scheduling powered by AI, designed to make your time management effortless.",
+  "description_zh": "開源智能日曆，適應您的工作流程。體驗由 AI 驅動的無縫任務排程，旨在使您的時間管理毫不費力。",
+  "description_ja": "ワークフローに適応するオープンソースのインテリジェント カレンダー。AI による シームレスなタスク スケジューリング体験。時間管理を簡単にするように設計されています。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,18 @@
   "notes": [
     {
       "text": "Creds: cat ~/fluid-calendar.creds",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "認證：cat ~/fluid-calendar.creds",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "認証情報: cat ~/fluid-calendar.creds",
       "type": "info"
     }
   ]

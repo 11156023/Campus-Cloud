@@ -12,6 +12,8 @@
   "website": "https://www.dedicatedcode.com/projects/reitti/",
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/reitti.webp",
   "description": "Reitti is a self-hosted location tracking and analysis platform that detects significant places, trip patterns, and integrates with OwnTracks, GPSLogger, and Immich. It uses PostgreSQL + PostGIS, RabbitMQ, Redis, and an optional Photon geocoder.",
+  "description_zh": "Reitti 是一個自主託管的位置追蹤和分析平台，可偵測重要地點、旅程模式，並與 OwnTracks、GPSLogger 和 Immich 整合。它使用 PostgreSQL + PostGIS、RabbitMQ、Redis 和可選的 Photon 地理編碼器。",
+  "description_ja": "Reittiは、重要な場所、旅パターンを検出し、OwnTracks、GPSLogger、Immichと統合する自己ホスト型ロケーション追跡・分析プラットフォームです。PostgreSQL + PostGIS、RabbitMQ、Redis、およびオプションのPhotonジオコーダーを使用しています。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,18 @@
   "notes": [
     {
       "text": "Photon Geocoder running at http://127.0.0.1:2322. Photon is fully setup, but without sample data. (filesize is big) -> checkout our guide: `https://github.com/community-scripts/ProxmoxVE/discussions/8737`.",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "Photon 地理編碼器在 http://127.0.0.1:2322 執行。Photon 已完全設定，但沒有範例資料。(檔案大小很大) -> 查看我們的指南：`https://github.com/community-scripts/ProxmoxVE/discussions/8737`。",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "Photonジオコーダーはhttp://127.0.0.1:2322で実行中です。Photonは完全に設定されていますが、サンプルデータはありません。(ファイルサイズが大) -> ガイドを参照してください：`https://github.com/community-scripts/ProxmoxVE/discussions/8737`。",
       "type": "info"
     }
   ]

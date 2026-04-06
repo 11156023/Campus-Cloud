@@ -12,6 +12,8 @@
   "website": "https://github.com/RayLabsHQ/gitea-mirror/",
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/gitea-mirror.webp",
   "description": "Gitea Mirror auto-syncs GitHub repos to your self-hosted Gitea, with a sleek Web UI and easy Docker deployment. ",
+  "description_zh": "Gitea Mirror 自動將 GitHub 倉庫同步到您的自託管 Gitea，具有光滑的網頁 UI 和簡單的 Docker 部署。",
+  "description_ja": "Gitea Mirror は GitHub リポジトリを自己ホスト型 Gitea に自動同期し、洗練された Web UI と簡単な Docker デプロイメントを備えています。",
   "install_methods": [
     {
       "type": "default",

@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/jenkins.webp",
   "config_path": "",
   "description": "Jenkins provides hundreds of plugins to support building, deploying and automating any project. ",
+  "description_zh": "Jenkins 提供數百個外掛程式以支持建置、部署和自動化任何專案。",
+  "description_ja": "Jenkins は、任意のプロジェクトを構築、展開、自動化するための数百のプラグインを提供します。",
   "install_methods": [
     {
       "type": "default",

@@ -87,6 +87,7 @@ from .firewall import (
     FirewallRulePublic,
     FirewallRuleUpdate,
     LayoutUpdate,
+    NATRulePublic,
     PortSpec,
     TopologyEdge,
     TopologyNode,
@@ -184,6 +185,7 @@ __all__ = [
     "TopologyNode",
     "TopologyEdge",
     "TopologyResponse",
+    "NATRulePublic",
     # Proxmox Config
     "ProxmoxConfigPublic",
     "ProxmoxConfigUpdate",

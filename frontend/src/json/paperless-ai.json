@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/paperless-ai.webp",
   "config_path": "/opt/paperless-ai/data/.env",
   "description": "An automated document analyzer for Paperless-ngx using OpenAI API, Ollama and all OpenAI API compatible Services to automatically analyze and tag your documents.It features: Automode, Manual Mode, Ollama and OpenAI, a Chat function to query your documents with AI, a modern and intuitive Webinterface.",
+  "description_zh": "Paperless-ngx 的自動文件分析器，使用 OpenAI API、Ollama 和所有 OpenAI API 相容服務自動分析和標記您的文件。它具有：自動模式、手動模式、Ollama 和 OpenAI、查詢 AI 文件的聊天功能、現代和直觀的網頁介面。",
+  "description_ja": "Paperless-ngx 用の自動化ドキュメント分析ツール。OpenAI API、Ollama、およびすべての OpenAI API 互換サービスを使用して、ドキュメントを自動的に分析およびタグ付けします。機能：自動モード、手動モード、Ollama と OpenAI、AI でドキュメントをクエリするチャット機能、モダンで直感的な Web インターフェース。",
   "install_methods": [
     {
       "type": "default",

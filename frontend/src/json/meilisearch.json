@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/meilisearch.webp",
   "config_path": "/etc/meilisearch.toml",
   "description": "Meilisearch is a fast, open-source search engine designed for instant, full-text search with typo tolerance. It provides an API that allows developers to integrate powerful search features into applications. Meilisearch-UI is an optional web-based interface that provides a simple way to interact with Meilisearch, visualize indexed data, and test queries without needing to use the API directly.",
+  "description_zh": "Meilisearch 是一個快速的開源搜尋引擎，專為即時全文搜尋和容錯而設計。它提供了一個 API，讓開發人員可以將強大的搜尋功能整合到應用程式中。Meilisearch-UI 是一個可選的網頁介面，提供了與 Meilisearch 互動、視覺化索引資料和測試查詢的簡單方式，無需直接使用 API。",
+  "description_ja": "Meilisearch は、即座の全文検索とタイプミス許容性を備えた高速オープンソース検索エンジンです。開発者がアプリケーションに強力な検索機能を統合できるようにする API を提供します。Meilisearch-UI は、Meilisearch と対話したり、インデックス付きデータを視覚化したり、API を直接使用する必要なく、クエリをテストしたりする簡単な方法を提供するオプションのウェブベースのインターフェイスです。",
   "install_methods": [
     {
       "type": "default",
@@ -36,6 +38,26 @@
     },
     {
       "text": "Meilisearch-UI has early development status and can cause performance issues",
+      "type": "warn"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "可以選擇安裝 Meilisearch-UI 以獲得基於網頁的搜尋介面",
+      "type": "info"
+    },
+    {
+      "text": "Meilisearch-UI 處於早期開發狀態，可能會導致效能問題",
+      "type": "warn"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "Meilisearch-UI はオプションでインストールして、Webベースの検索インターフェイスを使用できます",
+      "type": "info"
+    },
+    {
+      "text": "Meilisearch-UI は初期開発段階にあり、パフォーマンスの問題を引き起こす可能性があります",
       "type": "warn"
     }
   ]

@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/homepage.webp",
   "config_path": "/opt/homepage/config/",
   "description": "Homepage is a self-hosted dashboard solution for centralizing and organizing data and information.",
+  "description_zh": "Homepage 是一個自託管的儀表板解決方案，用於集中化和組織資料和資訊。",
+  "description_ja": "Homepage は、データと情報を一元化して整理するためのセルフホスト型ダッシュボードソリューションです。",
   "install_methods": [
     {
       "type": "default",
@@ -36,6 +38,26 @@
     },
     {
       "text": "Add additional allowed hosts to `/opt/homepage/.env`",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "設定檔（bookmarks.yaml、services.yaml、widgets.yaml）路徑：`/opt/homepage/config/`",
+      "type": "info"
+    },
+    {
+      "text": "在 `/opt/homepage/.env` 中新增其他允許的主機",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "設定ファイル（bookmarks.yaml、services.yaml、widgets.yaml）のパス: `/opt/homepage/config/`",
+      "type": "info"
+    },
+    {
+      "text": "`/opt/homepage/.env` に追加の許可されたホストを追加します",
       "type": "info"
     }
   ]

@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/traccar.webp",
   "config_path": "/opt/traccar/conf/traccar.xml",
   "description": "Traccar is an open source GPS tracking system. It supports more than 200 GPS protocols and more than 2000 models of GPS tracking devices.",
+  "description_zh": "Traccar 是一個開源 GPS 追蹤系統。它支援超過 200 個 GPS 協議和超過 2000 個 GPS 追蹤設備型號。",
+  "description_ja": "Traccarはオープンソースの GPS追跡システムです。200以上のGPSプロトコルと2000以上のGPS追跡デバイスモデルをサポートしています。",
   "install_methods": [
     {
       "type": "default",

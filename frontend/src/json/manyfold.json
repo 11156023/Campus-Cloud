@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/manyfold.webp",
   "config_path": "/opt/manyfold/.env",
   "description": "Manyfold is an open source, self-hosted web application for managing a collection of 3d models, particularly focused on 3d printing.",
+  "description_zh": "Manyfold 是一個開源、自託管的網路應用程式，用於管理 3D 模型集合，特別針對 3D 列印。",
+  "description_ja": "Manyfold はオープンソースの自己ホスト型Webアプリケーションで、3Dモデルのコレクション管理に特に焦点を当てています。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,18 @@
   "notes": [
     {
       "text": "Setup library on first connection in /opt/manyfold/data",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "首次連接時在 /opt/manyfold/data 中設定程式庫",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "初回接続時に /opt/manyfold/data でライブラリを設定してください",
       "type": "info"
     }
   ]

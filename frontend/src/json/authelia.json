@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/authelia.webp",
   "config_path": "/etc/authelia/configuration.yml",
   "description": "Authelia is an open-source authentication and authorization server and portal fulfilling the identity and access management (IAM) role of information security in providing multi-factor authentication and single sign-on (SSO) for your applications via a web portal. It acts as a companion for common reverse proxies.",
+  "description_zh": "Authelia 是一個開源身份驗證和授權服務器和門戶，通過網絡門戶為應用程序提供多因素身份驗證和單點登錄（SSO），履行信息安全中身份和訪問管理（IAM）的角色。它充當通用反向代理的伴侶。",
+  "description_ja": "Authelia は、Web ポータル経由でアプリケーションにMulti-Factor Authentication と Single Sign-On（SSO）を提供することによって、情報セキュリティの Identity and Access Management（IAM）の役割を果たすオープンソース認証・認可サーバーおよびポータルです。一般的なリバース プロキシのコンパニオンとして機能します。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,18 @@
   "notes": [
     {
       "text": "During installation, you will have to input your domain (ex. domain.com). Authelia will use auth.domain.com",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "在安裝過程中，您必須輸入您的域名（例如 domain.com）。Authelia 將使用 auth.domain.com",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "インストール中に、ドメイン（例：domain.com）を入力する必要があります。Authelia は auth.domain.com を使用します",
       "type": "info"
     }
   ]

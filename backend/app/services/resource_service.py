@@ -28,14 +28,29 @@ def _from_punycode_hostname(hostname: str) -> str:
     return ".".join(result_labels)
 
 
-def _get_ip_address(node: str, vmid: int, vm_type: str) -> str | None:
-    return proxmox_service.get_ip_address(node, vmid, vm_type)
-
-
 def _build_resource_public(
-    resource: dict, db_resource, node: str, vm_type: str
+    resource: dict, db_resource, node: str, vm_type: str,
+    session: Session | None = None,
 ) -> ResourcePublic:
-    ip_address = _get_ip_address(node, resource.get("vmid"), vm_type)
+    vmid = resource.get("vmid")
+    ip_address = proxmox_service.get_ip_address(node, vmid, vm_type)
+    if ip_address:
+        if session is not None:
+            try:
+                resource_repo.update_ip_address(
+                    session=session, vmid=vmid, ip_address=ip_address
+                )
+            except Exception:
+                logger.warning(
+                    "Failed to update cached IP address for vmid=%s ip_address=%s",
+                    vmid,
+                    ip_address,
+                    exc_info=True,
+                )
+    else:
+        # VM 離線時用 DB 快取
+        if db_resource and db_resource.ip_address:
+            ip_address = db_resource.ip_address
     return ResourcePublic(
         vmid=resource.get("vmid"),
         name=_from_punycode_hostname(resource.get("name", "")),
@@ -70,7 +85,7 @@ def list_all(
                 session=session, vmid=vmid
             )
             result.append(
-                _build_resource_public(r, db_resource, vm_node, vm_type)
+                _build_resource_public(r, db_resource, vm_node, vm_type, session)
             )
         return result
     except Exception as e:
@@ -101,7 +116,7 @@ def list_by_user(
             vm_node = r.get("node")
             result.append(
                 _build_resource_public(
-                    r, owned_vmids[vmid], vm_node, vm_type
+                    r, owned_vmids[vmid], vm_node, vm_type, session
                 )
             )
         return result

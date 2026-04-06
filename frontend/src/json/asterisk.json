@@ -12,6 +12,8 @@
   "website": "https://asterisk.org/",
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/asterisk.webp",
   "description": "Asterisk is an open-source framework for building communications applications, most commonly used as a phone system (PBX). Developed by Digium (now part of Sangoma), it turns a standard computer into a powerful telephony server.",
+  "description_zh": "Asterisk 是一個開源框架，用於構建通信應用程序，最常用作電話系統（PBX）。由 Digium（現在是 Sangoma 的一部分）開發，它將標準計算機轉變為強大的電話系統服務器。",
+  "description_ja": "Asterisk はコミュニケーション アプリケーションを構築するためのオープンソース フレームワークで、最も一般的には電話システム（PBX）として使用されます。Digium（現在は Sangoma の一部）によって開発され、標準的なコンピュータを強力なテレフォニー サーバーに変換します。",
   "install_methods": [
     {
       "type": "default",

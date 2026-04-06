@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/paperless-ngx-light.webp",
   "config_path": "/opt/paperless-gpt-data/.env",
   "description": "Paperless-GPT seamlessly pairs with paperless-ngx to generate AI-powered document titles and tags, saving you hours of manual sorting. While other tools may offer AI chat features, paperless-gpt stands out by supercharging OCR with LLMs-ensuring high accuracy, even with tricky scans. If you’re craving next-level text extraction and effortless document organization, this is your solution.",
+  "description_zh": "Paperless-GPT 完全與 paperless-ngx 相容，生成由 AI 驅動的文件標題和標籤，為您節省數小時的手動分類。雖然其他工具可能提供 AI 聊天功能，但 paperless-gpt 通過使用 LLM 增強 OCR 而脫穎而出，確保高準確度，即使是複雜的掃描。如果您渴望下一級別的文字提取和輕鬆的文件組織，這就是您的解決方案。",
+  "description_ja": "Paperless-GPT は paperless-ngx とシームレスに統合して、AI を使用したドキュメントタイトルとタグを生成し、手動ソートに数時間を費やす必要がなくなります。他のツールが AI チャット機能を提供する場合がありますが、paperless-gpt は LLM で OCR を強化することで、複雑なスキャンでも高精度を確保できます。次レベルのテキスト抽出と楽なドキュメント編成を求めている場合、これがあなたの解決策です。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,18 @@
   "notes": [
     {
       "text": "Configuration File: `/opt/paperless-gpt-data/.env`",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "配置檔案：`/opt/paperless-gpt-data/.env`",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "構成ファイル: `/opt/paperless-gpt-data/.env`",
       "type": "info"
     }
   ]

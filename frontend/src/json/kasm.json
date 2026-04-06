@@ -12,6 +12,8 @@
   "website": "https://www.kasmweb.com/",
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/kasm-workspaces.webp",
   "description": "Kasm Workspaces is a container streaming platform that delivers browser-based access to desktops, applications, and web services with enhanced security and scalability.",
+  "description_zh": "Kasm Workspaces 是一個容器流媒體平台，提供對桌面、應用程式和網路服務的瀏覽器存取，具有增強的安全性和可擴充性。",
+  "description_ja": "Kasm Workspaces は、強化されたセキュリティとスケーラビリティを備えたデスクトップ、アプリケーション、および Web サービスへのブラウザベースのアクセスを提供するコンテナー ストリーミング プラットフォームです。",
   "install_methods": [
     {
       "type": "default",
@@ -32,14 +34,20 @@
   "notes": [
     {
       "text": "WARNING: Installation sources scripts outside of Community Scripts repo. Please check the source before installing.",
+      "text_zh": "警告：安裝源指令碼源自 Community Scripts 存放庫外。請在安裝前檢查來源。",
+      "text_ja": "警告：インストール ソース スクリプトは Community Scripts リポジトリの外からのものです。インストール前にソースを確認してください。",
       "type": "warning"
     },
     {
       "text": "Kasm needs swap (on Proxmox host) and activated FUSE to be installed successfully!",
+      "text_zh": "Kasm 需要交換（在 Proxmox 主機上）和啟用的 FUSE 才能成功安裝！",
+      "text_ja": "Kasm は、正常にインストールするためにスワップ (Proxmox ホスト上) とアクティブ化された FUSE が必要です。",
       "type": "warning"
     },
     {
       "text": "Show credentials: `cat ~/kasm.creds`",
+      "text_zh": "顯示憑證：`cat ~/kasm.creds`",
+      "text_ja": "認証情報を表示：`cat ~/kasm.creds`",
       "type": "info"
     }
   ]

@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/unbound.webp",
   "config_path": "/etc/unbound/unbound.conf.d/unbound.conf",
   "description": "Unbound is a validating, recursive, caching DNS resolver. It is designed to be fast and lean and incorporates modern features based on open standards.",
+  "description_zh": "Unbound 是一個驗證、遞迴、快取 DNS 解析器。它被設計為快速且精簡，並整合了基於開放標準的現代功能。",
+  "description_ja": "Unboundは検証、再帰、キャッシングDNSリゾルバーです。高速でリーンになるように設計されており、オープン標準に基づいた最新機能を組み込んでいます。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,18 @@
   "notes": [
     {
       "text": "Unbound Configuration Path: `/etc/unbound/unbound.conf.d/unbound.conf`",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "Unbound 組態路徑：`/etc/unbound/unbound.conf.d/unbound.conf`",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "Unbound設定パス：`/etc/unbound/unbound.conf.d/unbound.conf`",
       "type": "info"
     }
   ]

@@ -1,10 +1,12 @@
 import base64
-import hashlib
 from datetime import datetime, timedelta, timezone
+from functools import lru_cache
 from typing import Any
 
 import jwt
 from cryptography.fernet import Fernet
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from pwdlib import PasswordHash
 from pwdlib.hashers.argon2 import Argon2Hasher
 from pwdlib.hashers.bcrypt import BcryptHasher
@@ -19,10 +21,17 @@ password_hash = PasswordHash(
 )
 
 
+@lru_cache(maxsize=1)
 def _get_fernet() -> Fernet:
-    """Derive a Fernet key from SECRET_KEY."""
-    key = hashlib.sha256(settings.SECRET_KEY.encode()).digest()
-    return Fernet(base64.urlsafe_b64encode(key))
+    """Derive a Fernet key from SECRET_KEY using PBKDF2."""
+    kdf = PBKDF2HMAC(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=b"campus-cloud-fernet-v1",
+        iterations=480_000,
+    )
+    key = base64.urlsafe_b64encode(kdf.derive(settings.SECRET_KEY.encode()))
+    return Fernet(key)
 
 
 def encrypt_value(plain_text: str) -> str:
@@ -38,11 +47,34 @@ def decrypt_value(encrypted_text: str) -> str:
 ALGORITHM = "HS256"
 
 
-def create_access_token(subject: str | Any, expires_delta: timedelta) -> str:
+def create_access_token(
+    subject: str | Any,
+    expires_delta: timedelta,
+    token_version: int = 0,
+) -> str:
     expire = datetime.now(timezone.utc) + expires_delta
-    to_encode = {"exp": expire, "sub": str(subject)}
-    encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
+    to_encode = {
+        "exp": expire,
+        "sub": str(subject),
+        "type": "access",
+        "ver": token_version,
+    }
+    return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=ALGORITHM)
+
+
+def create_refresh_token(
+    subject: str | Any,
+    expires_delta: timedelta,
+    token_version: int = 0,
+) -> str:
+    expire = datetime.now(timezone.utc) + expires_delta
+    to_encode = {
+        "exp": expire,
+        "sub": str(subject),
+        "type": "refresh",
+        "ver": token_version,
+    }
+    return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=ALGORITHM)
 
 
 def verify_password(

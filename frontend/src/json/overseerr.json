@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/overseerr.webp",
   "config_path": "/opt/overseerr/config/settings.json",
   "description": "Overseerr is a request management and media discovery tool built to work with your existing Plex ecosystem.",
+  "description_zh": "Overseerr 是一個請求管理和媒體探索工具，設計用於與您現有的 Plex 生態系統搭配使用。",
+  "description_ja": "Overseerr は、既存の Plex エコシステムで動作するように構築されたリクエスト管理およびメディア発見ツールです。",
   "install_methods": [
     {
       "type": "default",

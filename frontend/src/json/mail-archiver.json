@@ -12,6 +12,8 @@
   "website": "https://github.com/s1t5/mail-archiver",
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/mail-archiver.webp",
   "description": "Mail-Archiver is a web application for archiving, searching, and exporting emails from multiple accounts. Featuring folder sync, attachment support, mailbox migration and a dashboard.",
+  "description_zh": "Mail-Archiver 是一個用於歸檔、搜尋和匯出多個帳戶電子郵件的網路應用程式。具有資料夾同步、附件支援、郵箱遷移和儀表板等功能。",
+  "description_ja": "Mail-Archiver は複数のアカウントからメールをアーカイブ、検索、エクスポートするためのWebアプリケーションです。フォルダー同期、添付ファイル対応、メールボックス移行、ダッシュボードなどの機能があります。",
   "install_methods": [
     {
       "type": "default",
@@ -29,5 +31,7 @@
     "username": "admin",
     "password": "secure123!"
   },
-  "notes": []
+  "notes": [],
+  "notes_zh": [],
+  "notes_ja": []
 }

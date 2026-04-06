@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/redis.webp",
   "config_path": "Debian /etc/redis/redis.conf | Alpine: /etc/redis.conf",
   "description": "Redis is an open-source, in-memory data store used by millions of developers as a cache, vector database, document database, streaming engine, and message broker.",
+  "description_zh": "Redis 是一個開源的記憶體資料存放區，被數百萬開發者作為快取、向量資料庫、文件資料庫、串流引擎和訊息代理使用。",
+  "description_ja": "Redisはオープンソースのインメモリデータストアであり、数百万の開発者がキャッシュ、ベクトルデータベース、ドキュメントデータベース、ストリーミングエンジン、メッセージブローカーとして使用しています。",
   "install_methods": [
     {
       "type": "default",
@@ -43,6 +45,18 @@
   "notes": [
     {
       "text": "Redis Configuration: `nano /etc/redis/redis.conf` or in Alpine: `nano /etc/redis.conf`",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "Redis 組態：`nano /etc/redis/redis.conf` 或在 Alpine：`nano /etc/redis.conf`",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "Redis設定：`nano /etc/redis/redis.conf` またはAlpine：`nano /etc/redis.conf`",
       "type": "info"
     }
   ]

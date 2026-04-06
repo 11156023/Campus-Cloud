@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/radicale.webp",
   "config_path": "/etc/radicale/config",
   "description": "Radicale is a small but powerful CalDAV (calendars, to-do lists) and CardDAV (contacts)",
+  "description_zh": "Radicale 是一個小巧而強大的 CalDAV（日曆、待辦事項清單）和 CardDAV（聯絡人）伺服器",
+  "description_ja": "Radicaleは、小さいながら強力なCalDAV（カレンダー、ToDoリスト）およびCardDAV（連絡先）サーバーです",
   "install_methods": [
     {
       "type": "default",
@@ -36,6 +38,26 @@
     },
     {
       "text": "This application requires additional configuration. Please refer to https://github.com/community-scripts/ProxmoxVE/discussions/2073.",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "檢視使用者憑證：`cat radicale.creds`",
+      "type": "info"
+    },
+    {
+      "text": "此應用程式需要其他配置。請參考 https://github.com/community-scripts/ProxmoxVE/discussions/2073。",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "ユーザー認証情報を表示するには：`cat radicale.creds`",
+      "type": "info"
+    },
+    {
+      "text": "このアプリケーションは追加構成が必要です。https://github.com/community-scripts/ProxmoxVE/discussions/2073を参照してください。",
       "type": "info"
     }
   ]

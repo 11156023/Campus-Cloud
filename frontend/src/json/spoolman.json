@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/spoolman.webp",
   "config_path": "/opt/spoolman/.env",
   "description": "Spoolman is a self-hosted web service designed to help you efficiently manage your 3D printer filament spools and monitor their usage.",
+  "description_zh": "Spoolman 是一個自主託管的網路服務，旨在幫助你有效管理 3D 印表機絲材捲盤並監控其使用。",
+  "description_ja": "Spoolmanは、3Dプリンターのフィラメントスプールを効率的に管理し、その使用状況を監視するために設計された自己ホスト型Webサービスです。",
   "install_methods": [
     {
       "type": "default",

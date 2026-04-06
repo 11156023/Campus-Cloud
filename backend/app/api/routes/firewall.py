@@ -12,6 +12,8 @@ from app.api.deps import (
 from app.exceptions import BadRequestError, NotFoundError, ProxmoxError
 from app.repositories import firewall_layout as layout_repo
 from app.schemas import Message
+from app.repositories import nat_rule as nat_repo
+from app.repositories import reverse_proxy as rp_repo
 from app.schemas.firewall import (
     ConnectionCreate,
     ConnectionDelete,
@@ -20,9 +22,11 @@ from app.schemas.firewall import (
     FirewallRulePublic,
     FirewallRuleUpdate,
     LayoutUpdate,
+    NATRulePublic,
+    ReverseProxyRulePublic,
     TopologyResponse,
 )
-from app.services import firewall_service, proxmox_service
+from app.services import firewall_service, nat_service, proxmox_service, reverse_proxy_service
 from app.services.firewall_service import _BLOCK_LOCAL_COMMENT
 
 logger = logging.getLogger(__name__)
@@ -38,6 +42,11 @@ def get_topology(session: SessionDep, current_user: CurrentUser):
     """取得當前使用者有權限的 VM 防火牆拓撲（節點 + 連線）"""
     try:
         return firewall_service.get_topology(user=current_user, session=session)
+    except (NotFoundError, BadRequestError) as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+    except ProxmoxError as e:
+        logger.error(f"Proxmox error in get_topology: {e}")
+        raise HTTPException(status_code=502, detail="Proxmox 服務不可用")
     except Exception:
         logger.exception("取得拓撲失敗")
         raise HTTPException(status_code=500, detail="取得拓撲失敗")
@@ -118,6 +127,7 @@ def create_connection(
             target_vmid=conn.target_vmid,
             ports=conn.ports,
             direction=conn.direction,
+            session=session,
         )
         return Message(message="連線已建立")
     except (BadRequestError, NotFoundError) as e:
@@ -162,6 +172,7 @@ def delete_connection(
             source_vmid=conn.source_vmid,
             target_vmid=conn.target_vmid,
             ports=conn.ports,
+            session=session,
         )
         return Message(message="連線已刪除")
     except (BadRequestError, NotFoundError) as e:
@@ -294,6 +305,185 @@ def delete_rule(
         raise HTTPException(status_code=404, detail=f"VM {vmid} 不存在")
     except ProxmoxError as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ─── NAT 端口轉發管理 ──────────────────────────────────────────────────────────
+
+
+@router.get("/nat-rules", response_model=list[NATRulePublic])
+def list_nat_rules(
+    session: SessionDep,
+    current_user: CurrentUser,
+):
+    """列出所有 NAT 端口轉發規則（僅 superuser 可查看所有；一般使用者只看自己的 VM）"""
+    from app.repositories import resource as resource_repo  # noqa: PLC0415
+
+    rules = nat_repo.list_rules(session)
+    if current_user.is_superuser:
+        visible_rules = rules
+    else:
+        own_resources = resource_repo.get_resources_by_user(
+            session=session, user_id=current_user.id
+        )
+        own_vmids = {r.vmid for r in own_resources}
+        visible_rules = [r for r in rules if r.vmid in own_vmids]
+
+    return [
+        NATRulePublic(
+            id=r.id,
+            ssh_host=r.ssh_host,
+            vmid=r.vmid,
+            vm_ip=r.vm_ip,
+            external_port=r.external_port,
+            internal_port=r.internal_port,
+            protocol=r.protocol,
+            created_at=r.created_at,
+        )
+        for r in visible_rules
+    ]
+
+
+@router.delete("/nat-rules/{rule_id}", response_model=Message)
+def delete_nat_rule(
+    rule_id: str,
+    session: SessionDep,
+    current_user: CurrentUser,
+):
+    """刪除 NAT 端口轉發規則"""
+    import uuid  # noqa: PLC0415
+
+    try:
+        rule_uuid = uuid.UUID(rule_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="無效的規則 ID")
+
+    rule = nat_repo.get_rule(session, rule_uuid)
+    if rule is None:
+        raise HTTPException(status_code=404, detail="NAT 規則不存在")
+
+    # 權限檢查：非 superuser 只能刪除自己 VM 的規則
+    if not current_user.is_superuser:
+        check_firewall_access(
+            vmid=rule.vmid, current_user=current_user, session=session
+        )
+
+    try:
+        nat_service.remove_nat_rule_by_id(session=session, rule_id=rule_id)
+        return Message(message="NAT 規則已刪除")
+    except ProxmoxError as e:
+        logger.error(f"Proxmox error removing NAT rule {rule_id}: {e}")
+        raise HTTPException(status_code=502, detail="Proxmox 操作失敗")
+    except Exception as e:
+        logger.exception(f"Failed to remove NAT rule {rule_id}")
+        raise HTTPException(status_code=500, detail="刪除 NAT 規則失敗")
+
+
+@router.post("/nat-rules/sync", response_model=Message)
+def sync_nat_rules(
+    session: SessionDep,
+    current_user: CurrentUser,
+):
+    """手動將 DB 中的 NAT 規則同步到 Gateway VM haproxy"""
+    if not current_user.is_superuser:
+        raise HTTPException(status_code=403, detail="僅限管理員操作")
+    try:
+        nat_service.sync_to_gateway(session=session)
+        return Message(message="NAT 規則已同步到 Gateway VM")
+    except ProxmoxError as e:
+        logger.error(f"Proxmox error syncing NAT rules: {e}")
+        raise HTTPException(status_code=502, detail="Proxmox 操作失敗")
+    except Exception as e:
+        logger.exception("Failed to sync NAT rules")
+        raise HTTPException(status_code=500, detail="同步 NAT 規則失敗")
+
+
+# ─── 反向代理規則管理 ─────────────────────────────────────────────────────────
+
+
+@router.get("/reverse-proxy-rules", response_model=list[ReverseProxyRulePublic])
+def list_reverse_proxy_rules(
+    session: SessionDep,
+    current_user: CurrentUser,
+):
+    """列出反向代理規則"""
+    from app.repositories import resource as resource_repo  # noqa: PLC0415
+
+    rules = rp_repo.list_rules(session)
+    if current_user.is_superuser:
+        visible_rules = rules
+    else:
+        own_resources = resource_repo.get_resources_by_user(
+            session=session, user_id=current_user.id
+        )
+        own_vmids = {r.vmid for r in own_resources}
+        visible_rules = [r for r in rules if r.vmid in own_vmids]
+
+    return [
+        ReverseProxyRulePublic(
+            id=r.id,
+            vmid=r.vmid,
+            vm_ip=r.vm_ip,
+            domain=r.domain,
+            internal_port=r.internal_port,
+            enable_https=r.enable_https,
+            dns_provider=r.dns_provider,
+            created_at=r.created_at,
+        )
+        for r in visible_rules
+    ]
+
+
+@router.delete("/reverse-proxy-rules/{rule_id}", response_model=Message)
+def delete_reverse_proxy_rule(
+    rule_id: str,
+    session: SessionDep,
+    current_user: CurrentUser,
+):
+    """刪除反向代理規則"""
+    import uuid  # noqa: PLC0415
+
+    try:
+        rule_uuid = uuid.UUID(rule_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="無效的規則 ID")
+
+    rule = rp_repo.get_rule(session, rule_uuid)
+    if rule is None:
+        raise HTTPException(status_code=404, detail="反向代理規則不存在")
+
+    if not current_user.is_superuser:
+        check_firewall_access(
+            vmid=rule.vmid, current_user=current_user, session=session
+        )
+
+    try:
+        reverse_proxy_service.remove_reverse_proxy_rule_by_id(session=session, rule_id=rule_id)
+        return Message(message="反向代理規則已刪除")
+    except ProxmoxError as e:
+        logger.error(f"Proxmox error removing reverse proxy rule {rule_id}: {e}")
+        raise HTTPException(status_code=502, detail="Proxmox 操作失敗")
+    except Exception as e:
+        logger.exception(f"Failed to remove reverse proxy rule {rule_id}")
+        raise HTTPException(status_code=500, detail="刪除反向代理規則失敗")
+
+
+@router.post("/reverse-proxy-rules/sync", response_model=Message)
+def sync_reverse_proxy_rules(
+    session: SessionDep,
+    current_user: CurrentUser,
+):
+    """手動將反向代理規則同步到 Gateway VM Traefik"""
+    if not current_user.is_superuser:
+        raise HTTPException(status_code=403, detail="僅限管理員操作")
+    try:
+        reverse_proxy_service.sync_to_gateway(session=session)
+        return Message(message="反向代理規則已同步到 Gateway VM")
+    except ProxmoxError as e:
+        logger.error(f"Proxmox error syncing reverse proxy rules: {e}")
+        raise HTTPException(status_code=502, detail="Proxmox 操作失敗")
+    except Exception as e:
+        logger.exception("Failed to sync reverse proxy rules")
+        raise HTTPException(status_code=500, detail="同步反向代理規則失敗")
 
 
 @router.get("/{vmid}/options", response_model=FirewallOptionsPublic)

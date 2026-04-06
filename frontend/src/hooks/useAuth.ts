@@ -43,6 +43,9 @@ const useAuth = () => {
       formData: data,
     })
     localStorage.setItem("access_token", response.access_token)
+    if (response.refresh_token) {
+      localStorage.setItem("refresh_token", response.refresh_token)
+    }
   }
 
   const loginMutation = useMutation({
@@ -66,6 +69,9 @@ const useAuth = () => {
     }
     const data = await response.json()
     localStorage.setItem("access_token", data.access_token)
+    if (data.refresh_token) {
+      localStorage.setItem("refresh_token", data.refresh_token)
+    }
   }
 
   const googleLoginMutation = useMutation({
@@ -78,6 +84,7 @@ const useAuth = () => {
 
   const logout = () => {
     localStorage.removeItem("access_token")
+    localStorage.removeItem("refresh_token")
     navigate({ to: "/login" })
   }
 

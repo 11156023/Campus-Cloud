@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/memos.webp",
   "config_path": "",
   "description": "Memos is an open-source, self-hosted platform designed for fast, privacy-focused note-taking. Users can create, organize, and format notes with Markdown, which are securely stored in a local database. It\u2019s lightweight and customizable, built for quick access and adaptability to individual or team needs.",
+  "description_zh": "Memos 是一個開源、自託管的平台，專為快速、隱私導向的筆記而設計。使用者可以使用 Markdown 建立、組織和格式化筆記，這些筆記安全地儲存在本地資料庫中。它輕量且可自訂，為快速存取和適應個人或團隊需求而建立。",
+  "description_ja": "Memos はオープンソースの自己ホスト型プラットフォームで、高速でプライバシーに焦点を当てたメモ作成用に設計されています。ユーザーは Markdown を使用してメモを作成、整理、フォーマットでき、ローカル データベースに安全に保存されます。軽量でカスタマイズ可能で、迅速なアクセスと個人またはチームのニーズへの適応性のために構築されています。",
   "install_methods": [
     {
       "type": "default",
@@ -29,5 +31,7 @@
     "username": null,
     "password": null
   },
-  "notes": []
+  "notes": [],
+  "notes_zh": [],
+  "notes_ja": []
 }

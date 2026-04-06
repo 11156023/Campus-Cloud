@@ -1,3 +1,4 @@
+import logging
 from typing import Annotated
 
 import jwt
@@ -15,6 +16,8 @@ from app.exceptions import PermissionDeniedError
 from app.models import User
 from app.schemas import TokenPayload
 
+logger = logging.getLogger(__name__)
+
 reusable_oauth2 = OAuth2PasswordBearer(
     tokenUrl=f"{settings.API_V1_STR}/login/access-token"
 )
@@ -30,11 +33,15 @@ def get_current_user(session: SessionDep, token: TokenDep) -> User:
         token_data = TokenPayload(**payload)
     except (InvalidTokenError, ValidationError):
         raise PermissionDeniedError("Could not validate credentials")
+    if token_data.type == "refresh":
+        raise PermissionDeniedError("Refresh tokens cannot be used for API access")
     user = session.get(User, token_data.sub)
     if not user:
         raise PermissionDeniedError("User not found")
     if not user.is_active:
         raise PermissionDeniedError("Inactive user")
+    if user.token_version != token_data.ver:
+        raise PermissionDeniedError("Token has been revoked")
     return user
 
 
@@ -63,18 +70,31 @@ async def get_ws_current_user(
 ) -> tuple[User, Session]:
     """Authenticate WebSocket connections via query-string token.
     Returns (user, session) so the caller can also check ownership."""
+    # Reject empty or oversized tokens
+    if not token or not token.strip():
+        logger.warning("WebSocket connection attempted with empty token")
+        raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION)
+    if len(token) > 4096:
+        logger.warning("WebSocket connection attempted with oversized token")
+        raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION)
+
     try:
         payload = jwt.decode(
             token, settings.SECRET_KEY, algorithms=[security.ALGORITHM]
         )
         token_data = TokenPayload(**payload)
     except (InvalidTokenError, ValidationError):
+        logger.warning("WebSocket connection with invalid token")
         raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION)
 
     session = Session(engine)
     try:
         user = session.get(User, token_data.sub)
         if not user or not user.is_active:
+            logger.warning(f"WebSocket auth failed: user not found or inactive (sub={token_data.sub})")
+            raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION)
+        if user.token_version != token_data.ver:
+            logger.warning(f"WebSocket auth failed: token version mismatch for user {user.email}")
             raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION)
         return user, session
     except Exception:

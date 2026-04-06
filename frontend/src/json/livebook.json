@@ -12,6 +12,8 @@
   "website": "https://livebook.dev",
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/livebook.webp",
   "description": "Elixir Livebook is an interactive, web-based notebook platform for Elixir that combines code, documentation, and visualizations in a single document. Similar to Jupyter notebooks, it allows developers to write and execute Elixir code in real-time, making it ideal for data exploration, prototyping, learning, and collaborative development. Livebook features rich markdown support, built-in charting capabilities, and seamless integration with the Elixir ecosystem.",
+  "description_zh": "Elixir Livebook 是一個互動式的基於網路的 Elixir 筆記本平台，將程式碼、文件和視覺化合併在單一文件中。與 Jupyter 筆記本類似，它允許開發人員實時編寫和執行 Elixir 程式碼，使其非常適合資料探索、原型設計、學習和協作開發。Livebook 具有豐富的 Markdown 支援、內置的圖表功能和與 Elixir 生態系統的無縫集成。",
+  "description_ja": "Elixir Livebook は、コード、ドキュメント、視覚化を単一のドキュメントに組み合わせた Elixir 用のインタラクティブな Web ベースのノートブック プラットフォームです。Jupyter ノートブックと同様に、開発者がリアルタイムで Elixir コードを作成および実行できるようにします。これにより、データ探索、プロトタイピング、学習、協調開発に最適です。Livebook は豊富な Markdown サポート、組み込みのグラフ作成機能、および Elixir エコシステムとのシームレスな統合を備えています。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,8 @@
   "notes": [
     {
       "text": "Show initial Livebook password: `cat /opt/livebook/livebook.creds`",
+      "text_zh": "顯示初始 Livebook 密碼：`cat /opt/livebook/livebook.creds`",
+      "text_ja": "初期 Livebook パスワードを表示：`cat /opt/livebook/livebook.creds`",
       "type": "info"
     }
   ]

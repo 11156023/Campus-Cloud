@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/docmost.webp",
   "config_path": "/opt/docmost/.env",
   "description": "Open-source collaborative wiki and documentation software. Create, collaborate, and share knowledge seamlessly with Docmost. Ideal for managing your wiki, knowledge-base, documentation and a lot more.",
+  "description_zh": "開源協作維基和文檔軟體。使用 Docmost 無縫創建、協作和共享知識。適合管理您的維基、知識庫、文檔等。",
+  "description_ja": "オープンソースのコラボレーティブ ウィキとドキュメンテーション ソフトウェア。Docmost でシームレスに知識を作成、共有、共有します。ウィキ、ナレッジベース、ドキュメントなどの管理に最適です。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,18 @@
   "notes": [
     {
       "text": "Use `cat ~/docmost.creds` to see database credentials.",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "使用 `cat ~/docmost.creds` 查看數據庫認證。",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "`cat ~/docmost.creds` を使用してデータベース認証情報を確認します。",
       "type": "info"
     }
   ]

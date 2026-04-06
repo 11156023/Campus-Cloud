@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/bunkerweb.webp",
   "config_path": "/etc/bunkerweb/variables.env",
   "description": "BunkerWeb is a security-focused web server that enhances web application protection. It guards against common web vulnerabilities like SQL injection, XSS, and CSRF. It features simple setup and configuration using a YAML file, customizable security rules, and provides detailed logs for traffic monitoring and threat detection.",
+  "description_zh": "BunkerWeb 是一個安全聚焦的網頁伺服器，可增強網頁應用程式保護。它可防止常見的網頁漏洞，例如 SQL 注入、XSS 和 CSRF。它具有使用 YAML 文件的簡單設置和配置、可自訂的安全規則，並提供詳細的日誌用於流量監控和威脅檢測。",
+  "description_ja": "BunkerWeb はセキュリティに重点を置いた Web サーバーで、Web アプリケーション保護を強化します。SQL インジェクション、XSS、CSRF などの一般的な Web 脆弱性から保護します。YAML ファイルを使用した簡単なセットアップと構成、カスタマイズ可能なセキュリティ ルール、およびトラフィック監視と脅威検出用の詳細ログを提供します。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,18 @@
   "notes": [
     {
       "text": "WARNING: Installation sources scripts outside of Community Scripts repo. Please check the source before installing.",
+      "type": "warning"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "警告：安裝源腳本來自社區腳本存儲庫之外。安裝前請檢查來源。",
+      "type": "warning"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "警告: インストール ソースは Community Scripts リポジトリの外部のスクリプトを取得しています。インストール前にソースを確認してください。",
       "type": "warning"
     }
   ]

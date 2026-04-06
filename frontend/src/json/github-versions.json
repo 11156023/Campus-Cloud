@@ -1,5 +1,7 @@
 {
   "generated": "2026-02-15T06:19:05Z",
+  "generated_zh": "2026-02-15T06:19:05Z",
+  "description_zh": "GitHub versions configuration",
   "versions": [
     {
       "slug": "2fauth",

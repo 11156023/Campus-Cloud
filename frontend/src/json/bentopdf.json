@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/bentopdf.webp",
   "config_path": "",
   "description": "A privacy-first, 100% client-side PDF Toolkit. No signups/accounts, works in the browser, online or offline.",
+  "description_zh": "隱私優先的 100% 客户端 PDF 工具包。無需註冊/帳戶，在瀏覽器中工作，線上或離線。",
+  "description_ja": "プライバシー優先の 100% クライアント側 PDF ツールキット。サインアップ/アカウント不要で、ブラウザで動作します（オンラインまたはオフライン）。",
   "install_methods": [
     {
       "type": "default",

@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/thingsboard.webp",
   "config_path": "/etc/thingsboard/conf/thingsboard.conf",
   "description": "ThingsBoard is an open-source IoT platform for data collection, processing, visualization, and device management. It enables device connectivity via industry standard IoT protocols - MQTT, CoAP and HTTP and supports both cloud and on-premises deployments.",
+  "description_zh": "ThingsBoard 是一個開源 IoT 平台，用於資料收集、處理、可視化和設備管理。它透過業界標準 IoT 協議 - MQTT、CoAP 和 HTTP 啟用設備連線，並支援雲端和內部部署。",
+  "description_ja": "ThingsBoardはデータ収集、処理、可視化、デバイス管理用のオープンソースIoTプラットフォームです。業界標準のIoTプロトコル-MQTT、CoAP、HTTPを介してデバイス接続を有効にし、クラウドとオンプレミスの両方のデプロイメントをサポートしています。",
   "install_methods": [
     {
       "type": "default",
@@ -40,6 +42,34 @@
     },
     {
       "text": "Change passwords for all accounts in the account profile page after first login",
+      "type": "warning"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "請最多等待 90 秒讓 Web UI 啟動",
+      "type": "info"
+    },
+    {
+      "text": "其他示範帳戶：tenant@thingsboard.org / tenant 和 customer@thingsboard.org / customer",
+      "type": "info"
+    },
+    {
+      "text": "首次登入後，在帳戶個人資料頁面上變更所有帳戶的密碼",
+      "type": "warning"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "Web UIの起動まで最大90秒お待ちください",
+      "type": "info"
+    },
+    {
+      "text": "その他のデモアカウント：tenant@thingsboard.org / tenant および customer@thingsboard.org / customer",
+      "type": "info"
+    },
+    {
+      "text": "最初のログイン後、アカウントプロファイルページですべてのアカウントのパスワードを変更してください",
       "type": "warning"
     }
   ]

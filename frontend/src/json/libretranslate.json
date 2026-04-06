@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/libretranslate.webp",
   "config_path": "/opt/libretranslate/.env",
   "description": "Free and Open Source Machine Translation API, entirely self-hosted. Unlike other APIs, it doesn't rely on proprietary providers such as Google or Azure to perform translations. Instead, its translation engine is powered by the open source Argos Translate library.",
+  "description_zh": "免費且開源的機器翻譯 API，完全自架設。與其他 API 不同，它不依賴 Google 或 Azure 等專有提供商進行翻譯。相反，其翻譯引擎由開源 Argos Translate 庫提供支援。",
+  "description_ja": "無料でオープンソースの機械翻訳 API で、完全に自己ホストされています。他の API とは異なり、Google や Azure などの独自プロバイダーに依存して翻訳を実行しません。代わりに、その翻訳エンジンはオープンソース Argos Translate ライブラリによって支援されています。",
   "install_methods": [
     {
       "type": "default",
@@ -32,10 +34,14 @@
   "notes": [
     {
       "text": "During the installation, application will download language models used for translation. Depending on how fast your internet/host is, this can take 5-10 minutes.",
+      "text_zh": "安裝期間，應用程式將下載用於翻譯的語言模型。根據您的網際網路/主機速度，這可能需要 5-10 分鐘。",
+      "text_ja": "インストール中に、アプリケーションは翻訳に使用される言語モデルをダウンロードします。インターネット/ホストの速度に応じて、5〜10 分かかる場合があります。",
       "type": "info"
     },
     {
       "text": "At every boot of LXC, application will look for updates for language models installed. This can prolong the startup of the LXC.",
+      "text_zh": "在 LXC 的每次啟動時，應用程式都會查找安裝的語言模型的更新。這可能會延長 LXC 的啟動時間。",
+      "text_ja": "LXC の起動時に、アプリケーションはインストールされている言語モデルの更新を確認します。これにより LXC の起動が長くなる可能性があります。",
       "type": "info"
     }
   ]

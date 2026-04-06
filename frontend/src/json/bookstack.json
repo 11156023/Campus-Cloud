@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/bookstack.webp",
   "config_path": "/opt/bookstack/.env",
   "description": "BookStack is a user-friendly documentation platform that offers a simple and intuitive experience. New users should be able to create content with basic word-processing skills. While the platform provides advanced features, they do not interfere with the core simplicity of the user experience.",
+  "description_zh": "BookStack 是一個使用者友善的文檔平台，提供簡單直觀的體驗。新用戶應該能夠使用基本的文字處理技能創建內容。雖然該平台提供高級功能，但這些功能不會干擾核心簡單的使用者體驗。",
+  "description_ja": "BookStack はユーザーフレンドリーなドキュメンテーション プラットフォームで、シンプルで直感的なエクスペリエンスを提供します。新規ユーザーは基本的なワード プロセッシング スキルでコンテンツを作成できるはずです。プラットフォームは高度な機能を提供していますが、ユーザー エクスペリエンスの中核となるシンプルさを妨げません。",
   "install_methods": [
     {
       "type": "default",
@@ -36,6 +38,26 @@
     },
     {
       "text": "To see database credentials, type `cat ~/bookstack.creds` in LXC console",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "Bookstack 僅適用於靜態 IP。如果您更改 LXC 的 IP，您需要編輯 .env 文件",
+      "type": "warning"
+    },
+    {
+      "text": "若要查看數據庫認證，在 LXC 控制台中輸入 `cat ~/bookstack.creds`",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "Bookstack は静的 IP でのみ動作します。LXC の IP を変更する場合は、.env ファイルを編集する必要があります",
+      "type": "warning"
+    },
+    {
+      "text": "データベース認証情報を確認するには、LXC コンソールで `cat ~/bookstack.creds` を入力します",
       "type": "info"
     }
   ]

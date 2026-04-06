@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/unmanic.webp",
   "config_path": "",
   "description": "Unmanic is a simple tool for optimising your file library. You can use it to convert your files into a single, uniform format, manage file movements based on timestamps, or execute custom commands against a file based on its file size.",
+  "description_zh": "Unmanic 是一個簡單的工具，用於優化您的檔案庫。您可以使用它將檔案轉換為單一、統一的格式，根據時間戳記管理檔案移動，或根據檔案大小對檔案執行自訂命令。",
+  "description_ja": "Unmanicはファイルライブラリを最適化するシンプルなツールです。ファイルを単一の均一な形式に変換したり、タイムスタンプに基づいてファイルの移動を管理したり、ファイルサイズに基づいてファイルに対してカスタムコマンドを実行したりできます。",
   "install_methods": [
     {
       "type": "default",

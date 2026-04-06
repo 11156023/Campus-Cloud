@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/shelfmark.webp",
   "config_path": "/etc/shelfmark",
   "description": "Shelfmark is a unified web interface for searching and aggregating books and audiobook downloads from multiple sources - all in one place.",
+  "description_zh": "Shelfmark 是一個統一的網路介面，用於從多個來源搜尋和彙總書籍和有聲書下載 - 全部在一個地方。",
+  "description_ja": "Shelfmarkは、複数のソースから本とオーディオブックのダウンロードを検索および集約するための統一されたWebインターフェースです-すべて1か所で。",
   "install_methods": [
     {
       "type": "default",
@@ -36,6 +38,26 @@
     },
     {
       "text": "This version of the application does not support routing through Tor (the `USING_TOR` env var).",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "位於 `/etc/shelfmark/.env` 的組態用於引導初始安裝。透過 Shelfmark UI 自訂組態。",
+      "type": "info"
+    },
+    {
+      "text": "此版本的應用程式不支援透過 Tor 進行路由（`USING_TOR` env var）。",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "`/etc/shelfmark/.env`の設定は初期インストールのブートストラップ用です。Shelfmark UIから設定をカスタマイズしてください。",
+      "type": "info"
+    },
+    {
+      "text": "このバージョンのアプリケーションはTor経由のルーティング（`USING_TOR` env var）をサポートしていません。",
       "type": "info"
     }
   ]

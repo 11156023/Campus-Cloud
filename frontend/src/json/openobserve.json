@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/openobserve.webp",
   "config_path": "/opt/openobserve/data/.env",
   "description": "OpenObserve is a simple yet sophisticated log search, infrastructure monitoring, and APM solution.",
+  "description_zh": "OpenObserve 是一個簡單但複雜的日誌搜尋、基礎設施監控和 APM 解決方案。",
+  "description_ja": "OpenObserve は、シンプルながら洗練されたログ検索、インフラストラクチャ監視、および APM ソリューションです。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,18 @@
   "notes": [
     {
       "text": "Show Login Credentials: `cat /opt/openobserve/data/.env`",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "顯示登入認證：`cat /opt/openobserve/data/.env`",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "ログイン認証を表示：`cat /opt/openobserve/data/.env`",
       "type": "info"
     }
   ]

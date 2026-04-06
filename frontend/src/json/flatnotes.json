@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/flatnotes.webp",
   "config_path": "/opt/flatnotes/.env",
   "description": "A self-hosted, database-less note-taking web app that utilises a flat folder of markdown files for storage.",
+  "description_zh": "一個自託管、無數據庫的筆記網頁應用程式，利用平面 markdown 文件夾進行存儲。",
+  "description_ja": "Markdown ファイルのフラット フォルダーをストレージに利用する自己ホスト型、データベースレスのメモアプリケーション。",
   "install_methods": [
     {
       "type": "default",

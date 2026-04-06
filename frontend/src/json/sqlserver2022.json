@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/microsoft-sql-server.webp",
   "config_path": "",
   "description": "Script to automatically set up a SQL Server 2022 installation.",
+  "description_zh": "用於自動設定 SQL Server 2022 安裝的腳本。",
+  "description_ja": "SQL Server 2022インストールを自動的にセットアップするスクリプト。",
   "install_methods": [
     {
       "type": "default",
@@ -40,6 +42,34 @@
     },
     {
       "text": "Make sure you disable the SA account if you intend to use this in production!",
+      "type": "warning"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "如果你選擇不執行安裝設定，請在 LXC shell 中執行：`/opt/mssql/bin/mssql-conf setup`。",
+      "type": "info"
+    },
+    {
+      "text": "你可以在安裝期間設定管理員帳戶 'SA'",
+      "type": "info"
+    },
+    {
+      "text": "如果你打算在生產環境中使用，請務必停用 SA 帳戶！",
+      "type": "warning"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "インストール設定を実行しないことを選択した場合、LXCシェルで`/opt/mssql/bin/mssql-conf setup`を実行します。",
+      "type": "info"
+    },
+    {
+      "text": "インストール中に管理者アカウント 'SA' を設定できます",
+      "type": "info"
+    },
+    {
+      "text": "本番環境でこれを使用する場合は、必ずSAアカウントを無効にしてください！",
       "type": "warning"
     }
   ]

@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/paperless-ngx.webp",
   "config_path": "/opt/paperless/paperless.conf",
   "description": "Paperless-ngx is a software tool designed for digitizing and organizing paper documents. It provides a web-based interface for scanning, uploading, and organizing paper documents, making it easier to manage, search, and access important information. Paperless-ngx uses the OCR (Optical Character Recognition) technology to extract text from scanned images and makes it searchable, thus increasing the efficiency of document management.",
+  "description_zh": "Paperless-ngx 是一個用於數位化和組織紙質文件的軟體工具。它提供了網頁介面，用於掃描、上傳和組織紙質文件，使其更容易管理、搜尋和存取重要資訊。Paperless-ngx 使用 OCR（光學字元識別）技術從掃描影像中提取文字並使其可搜尋，從而提高文件管理效率。",
+  "description_ja": "Paperless-ngx は、紙文書のデジタル化と整理のために設計されたソフトウェア ツールです。紙文書をスキャン、アップロード、整理するための Web ベースのインターフェースを提供し、重要な情報をより簡単に管理、検索、アクセスできるようにします。Paperless-ngx は OCR（光学文字認識）技術を使用してスキャン画像からテキストを抽出し、検索可能にしてドキュメント管理の効率を向上させます。",
   "install_methods": [
     {
       "type": "default",
@@ -40,6 +42,34 @@
     },
     {
       "text": "Paperless-NGX use uv, so all calls need to start with `uv run` f.e. `uv run python3 manage.py document_exporter $path` instead `python3 manage.py`",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "顯示登入認證，在 LXC 控制台中輸入 `cat ~/paperless-ngx.creds`",
+      "type": "info"
+    },
+    {
+      "text": "指令檔以英文作為預設 OCR 語言。要安裝其他語言，請使用 `apt-get install tesseract-ocr-[lang]`，其中 [lang] 是語言代碼（例如 `apt-get install tesseract-ocr-deu`）。",
+      "type": "info"
+    },
+    {
+      "text": "Paperless-NGX 使用 uv，因此所有呼叫都需要以 `uv run` 開頭，例如 `uv run python3 manage.py document_exporter $path` 而不是 `python3 manage.py`",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "ログイン認証を表示するには、LXC コンソールで `cat ~/paperless-ngx.creds` と入力します",
+      "type": "info"
+    },
+    {
+      "text": "スクリプトは英語をデフォルト OCR 言語としてインストールします。追加の言語をインストールするには、`apt-get install tesseract-ocr-[lang]` を使用します。[lang] は言語コード（例：`apt-get install tesseract-ocr-deu`）です。",
+      "type": "info"
+    },
+    {
+      "text": "Paperless-NGX は uv を使用するため、すべての呼び出しは `uv run` で開始する必要があります。例：`uv run python3 manage.py document_exporter $path` の代わりに `python3 manage.py` ではなく",
       "type": "info"
     }
   ]

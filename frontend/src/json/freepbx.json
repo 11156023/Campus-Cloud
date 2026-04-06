@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/freepbx.webp",
   "config_path": "",
   "description": "FreePBX is a web-based open-source graphical user interface that manages Asterisk, a voice over IP and telephony server.",
+  "description_zh": "FreePBX 是一個基於網頁的開源圖形用戶界面，用於管理 Asterisk、IP 語音和電話傳輸伺服器。",
+  "description_ja": "FreePBX は、VoIP および電話サーバーである Asterisk を管理する Web ベースのオープンソース グラフィカル ユーザー インターフェースです。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,18 @@
   "notes": [
     {
       "text": "This script uses the official FreePBX install script. Check it here: https://github.com/FreePBX/sng_freepbx_debian_install",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "此腳本使用官方 FreePBX 安裝腳本。在此查看：https://github.com/FreePBX/sng_freepbx_debian_install",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "このスクリプトは公式の FreePBX インストール スクリプトを使用しています。ここで確認してください: https://github.com/FreePBX/sng_freepbx_debian_install",
       "type": "info"
     }
   ]

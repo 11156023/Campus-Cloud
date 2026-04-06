@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/graylog.webp",
   "config_path": "/etc/graylog/server/server.conf",
   "description": "Graylog is an open-source log management and analysis platform that centralizes and processes log data from various sources, enabling real-time search, analysis, and alerting for IT infrastructure monitoring and troubleshooting.",
+  "description_zh": "Graylog 是一個開源日誌管理和分析平台，集中處理來自各種源的日誌數據，啟用實時搜索、分析和警報，用於 IT 基礎設施監控和故障排除。",
+  "description_ja": "Graylog はオープンソースのログ管理および分析プラットフォームで、様々なソースからのログデータを一元化・処理し、IT インフラストラクチャの監視とトラブルシューティングのためのリアルタイム検索、分析、アラート設定を実現します。",
   "install_methods": [
     {
       "type": "default",
@@ -36,6 +38,26 @@
     },
     {
       "text": "Type `cat ~/graylog.creds` to get admin password that you use to log in AFTER the Initial Setup",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "初始設置認證：伺服器首次啟動後執行 `tail /var/log/graylog-server/server.log`。",
+      "type": "info"
+    },
+    {
+      "text": "輸入 `cat ~/graylog.creds` 以獲取初始設置後用於登入的管理員密碼",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "初期セットアップ認証情報：サーバーが最初に起動した後に `tail /var/log/graylog-server/server.log` を実行。",
+      "type": "info"
+    },
+    {
+      "text": "`cat ~/graylog.creds` を入力して、初期セットアップ後のログイン用管理者パスワードを取得します",
       "type": "info"
     }
   ]

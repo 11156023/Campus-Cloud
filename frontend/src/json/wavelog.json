@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/wavelog.webp",
   "config_path": "/opt/wavelog/application/config/config.php",
   "description": "Wavelog is a self-hosted PHP application that allows you to log your amateur radio contacts anywhere. All you need is a web browser and active internet connection.",
+  "description_zh": "Wavelog 是一個自主託管的 PHP 應用程式，允許您在任何地方記錄業餘無線電聯絡。您只需要網頁瀏覽器和有效的網際網路連線。",
+  "description_ja": "Wavelogは、アマチュア無線の接続をどこからでもログできるセルフホストされたPHPアプリケーションです。必要なのはWebブラウザとアクティブなインターネット接続だけです。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,8 @@
   "notes": [
     {
       "text": "Database credentials: `cat ~/wavelog.creds`",
+      "text_zh": "資料庫認證：`cat ~/wavelog.creds`",
+      "text_ja": "データベース認証情報：`cat ~/wavelog.creds`",
       "type": "info"
     }
   ]

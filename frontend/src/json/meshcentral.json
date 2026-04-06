@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/meshcentral.webp",
   "config_path": "/opt/meshcentral/meshcentral-data/config.json",
   "description": "MeshCentral is a web-based computer management platform that provides remote control and management capabilities for computers. It allows administrators to manage and control computers over a local network or the internet through a single, centralized web-based interface. With MeshCentral, users can monitor the status of computers, perform remote administration tasks, and control the power state of machines. The software supports various operating systems and provides real-time updates and alerts to keep administrators informed of the status of their systems. MeshCentral is designed to provide an easy-to-use, scalable, and secure solution for remote computer management, making it a valuable tool for IT administrators, helpdesk support, and remote workers.",
+  "description_zh": "MeshCentral 是一個基於網頁的電腦管理平台，為電腦提供遠端控制和管理功能。它允許管理員透過單一集中式的網頁介面透過本地網路或網際網路來管理和控制電腦。使用 MeshCentral，使用者可以監視電腦的狀態、執行遠端管理工作以及控制機器的電源狀態。該軟體支援各種作業系統，並提供即時更新和警示，讓管理員了解其系統的狀態。MeshCentral 旨在為遠端電腦管理提供易於使用、可擴充且安全的解決方案，使其成為 IT 管理員、幫助台支援和遠端工作者的寶貴工具。",
+  "description_ja": "MeshCentral はコンピュータ管理のためのWebベースのプラットフォームで、リモートコントロールと管理機能を提供します。管理者は、単一の集中管理型のWebベースのインターフェイスを通じて、ローカルネットワークまたはインターネット経由でコンピュータを管理・制御できます。MeshCentral を使用すると、ユーザーはコンピュータの状態を監視し、リモート管理タスクを実行し、マシンの電源状態を制御できます。このソフトウェアは様々なオペレーティングシステムをサポートし、リアルタイムの更新とアラートを提供して、管理者にシステムの状態を通知します。MeshCentral は、リモートコンピュータ管理のための使いやすく、スケーラブルで安全なソリューションを提供するように設計されており、IT 管理者、ヘルプデスク サポート、およびリモートワーカーにとって貴重なツールになります。",
   "install_methods": [
     {
       "type": "default",
@@ -29,5 +31,7 @@
     "username": null,
     "password": null
   },
-  "notes": []
+  "notes": [],
+  "notes_zh": [],
+  "notes_ja": []
 }

@@ -12,6 +12,8 @@
   "website": "https://joplinapp.org/",
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/joplin.webp",
   "description": "Joplin - the privacy-focused note taking app with sync capabilities for Windows, macOS, Linux, Android and iOS.",
+  "description_zh": "Joplin - 專注隱私的記事應用程式，具有 Windows、macOS、Linux、Android 和 iOS 的同步功能。",
+  "description_ja": "Joplin - Windows、macOS、Linux、Android、iOS 用の同期機能を備えたプライバシーに焦点を当てたメモ取りアプリ。",
   "install_methods": [
     {
       "type": "default",
@@ -32,10 +34,14 @@
   "notes": [
     {
       "text": "Application can take some time to build, depending on your host speed. Please be patient.",
+      "text_zh": "根據您的主機速度，應用程式可能需要一些時間才能建置。請耐心等待。",
+      "text_ja": "ホスト速度によっては、アプリケーションの構築に時間がかかる場合があります。お待ちください。",
       "type": "info"
     },
     {
       "text": "Default RAM size for LXC is set to 6GB because of Node.js building process. You can lower it after application installs",
+      "text_zh": "由於 Node.js 建置流程，LXC 的預設 RAM 大小設定為 6GB。應用程式安裝後，您可以將其降低。",
+      "text_ja": "Node.js ビルド プロセスのため、LXC のデフォルト RAM サイズは 6GB に設定されています。アプリケーションをインストールした後で低くすることができます。",
       "type": "info"
     }
   ]

@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/seelf.webp",
   "config_path": "",
   "description": "seelf is a self-hosted software which makes it easy to deploy your own applications on your own hardware using an easy to use interface.",
+  "description_zh": "seelf 是一款自主託管軟體，使用簡單易用的介面輕鬆在自己的硬體上部署自己的應用程式。",
+  "description_ja": "seelfは、使いやすいインターフェースを使用して、独自のハードウェア上に独自のアプリケーションを簡単にデプロイできる自己ホスト型ソフトウェアです。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,18 @@
   "notes": [
     {
       "text": "Initial admin email and password: `cat ~/seelf.creds`",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "初始管理員電子郵件和密碼：`cat ~/seelf.creds`",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "初期管理者メールアドレスとパスワード：`cat ~/seelf.creds`",
       "type": "info"
     }
   ]

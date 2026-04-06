@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/peanut.webp",
   "config_path": "/etc/peanut/settings.yml",
   "description": "PeaNUT is a small dashboard for Network UPS Tools (NUT). It provides a web interface to monitor and manage UPS devices. PeaNUT allows users to view device status, retrieve information, and manage UPS parameters through its API. It's customizable for different UPS devices and supports integration with the Homepage dashboard.",
+  "description_zh": "PeaNUT 是網路 UPS 工具 (NUT) 的小型儀表板。它提供網頁介面來監控和管理 UPS 裝置。PeaNUT 允許使用者透過其 API 查看裝置狀態、檢索資訊和管理 UPS 參數。它可針對不同的 UPS 裝置進行自訂，並支援與 Homepage 儀表板整合。",
+  "description_ja": "PeaNUTはNetwork UPS Tools（NUT）の小さなダッシュボードです。UPSデバイスを監視および管理するためのWebインターフェースを提供します。PeaNUTを使用すると、ユーザーはそのAPIを通じてデバイスのステータスを表示し、情報を取得し、UPSパラメータを管理できます。さまざまなUPSデバイスに合わせてカスタマイズでき、Homepageダッシュボードとの統合をサポートしています。",
   "install_methods": [
     {
       "type": "default",

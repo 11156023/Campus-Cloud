@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/patchmon.webp",
   "config_path": "/opt/patchmon/backend/.env, /opt/patchmon/frontend/.env",
   "description": "Monitor Linux patches across all your hosts with real-time visibility, security update tracking, and comprehensive package management.",
+  "description_zh": "在所有主機上監控 Linux 修補程式，具有實時可見性、安全更新追蹤和全面的套件管理。",
+  "description_ja": "すべてのホスト上で Linux パッチをリアルタイムで可視化し、セキュリティ更新を追跡し、包括的なパッケージ管理を行います。",
   "install_methods": [
     {
       "type": "default",

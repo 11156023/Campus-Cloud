@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/ghost.webp",
   "config_path": "",
   "description": "Ghost is a powerful app for professional publishers to create, share, and grow a business around their content. It comes with modern tools to build a website, publish content, send newsletters & offer paid subscriptions to members.",
+  "description_zh": "Ghost 是專業發布商用於創建、共享和圍繞其內容建立業務的強大應用程式。它配備了現代工具，可以構建網站、發布內容、發送新聞通訊並向成員提供付費訂閱。",
+  "description_ja": "Ghost は、プロフェッショナルなパブリッシャーがコンテンツの周りにビジネスを作成、共有、成長させるための強力なアプリです。Web サイトの構築、コンテンツの公開、ニュースレターの送信、メンバーへの有料サブスクリプション提供に必要な最新ツールが付属しています。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,18 @@
   "notes": [
     {
       "text": "To run Ghost-CLI commands, first set a password for the ghost-user by running `sudo passwd ghost-user`. Then, switch to the ghost-user with `sudo -su ghost-user`.",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "若要執行 Ghost-CLI 命令，首先通過運行 `sudo passwd ghost-user` 為 ghost-user 設置密碼。然後，使用 `sudo -su ghost-user` 切換到 ghost-user。",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "Ghost-CLI コマンドを実行するには、まず `sudo passwd ghost-user` を実行して ghost-user のパスワードを設定します。その後、`sudo -su ghost-user` で ghost-user に切り替えます。",
       "type": "info"
     }
   ]

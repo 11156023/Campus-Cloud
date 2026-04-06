@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/lazylibrarian.webp",
   "config_path": "/opt/LazyLibrarian/config.ini",
   "description": "LazyLibrarian is a SickBeard, CouchPotato, Headphones-like application for ebooks, audiobooks and magazines.",
+  "description_zh": "LazyLibrarian 是一個類似 SickBeard、CouchPotato、Headphones 的應用程式，適用於電子書、有聲書和雜誌。",
+  "description_ja": "LazyLibrarian は、電子書籍、オーディオブック、雑誌向けの SickBeard、CouchPotato、Headphones のようなアプリケーションです。",
   "install_methods": [
     {
       "type": "default",

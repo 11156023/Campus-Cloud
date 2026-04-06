@@ -12,6 +12,8 @@
   "config_path": "/opt/actualbudget-data/config.json",
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/actual-budget.webp",
   "description": "Actual Budget is a super fast and privacy-focused app for managing your finances. At its heart is the well proven and much loved Envelope Budgeting methodology.",
+  "description_zh": "Actual Budget 是一個超快速且以隱私為中心的財務管理應用程式。它的核心採用了經過充分驗證且廣受歡迎的信封預算方法論。",
+  "description_ja": "Actual Budgetは、超高速でプライバシーに焦点を当てた財務管理アプリです。その中心には、実証済みで広く愛されているエンベロープ予算編成の方法論があります。",
   "install_methods": [
     {
       "type": "default",

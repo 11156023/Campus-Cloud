@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/audiobookshelf.webp",
   "config_path": "/usr/share/audiobookshelf/config",
   "description": "Audiobookshelf is a Self-hosted audiobook and podcast server.",
+  "description_zh": "Audiobookshelf 是一個自託管的有聲書和播客服務器。",
+  "description_ja": "Audiobookshelf はセルフホスト型のオーディオブックとポッドキャスト サーバーです。",
   "install_methods": [
     {
       "type": "default",

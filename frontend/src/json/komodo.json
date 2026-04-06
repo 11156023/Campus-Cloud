@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/komodo.webp",
   "config_path": "/opt/komodo/compose.env",
   "description": "Komodo is a build and deployment system that automates the creation of versioned Docker images from Git repositories and facilitates the deployment of Docker containers and Docker Compose setups. It provides features such as build automation triggered by Git pushes, deployment management, and monitoring of uptime and logs across multiple servers. The core API and associated agent are developed in Rust.",
+  "description_zh": "Komodo 是一個構建和部署系統，可自動化從 Git 存放庫建立版本 Docker 映像，並便於部署 Docker 容器和 Docker Compose 設定。它提供功能，例如由 Git 推送觸發的構建自動化、部署管理以及跨多個伺服器的正常運行時間和日誌監視。核心 API 和關聯的代理是用 Rust 開發的。",
+  "description_ja": "Komodo は、Git リポジトリからのバージョン付き Docker イメージの作成を自動化し、Docker コンテナーと Docker Compose セットアップのデプロイメントを促進するビルド および デプロイメント システムです。Git プッシュによってトリガーされるビルド自動化、デプロイメント管理、複数のサーバー間のアップタイムとログの監視などの機能を提供します。コア API と関連するエージェントは Rust で開発されています。",
   "install_methods": [
     {
       "type": "default",
@@ -43,6 +45,8 @@
   "notes": [
     {
       "text": "For admin username and password type `cat ~/komodo.creds` inside LXC.",
+      "text_zh": "對於管理員使用者名稱和密碼，請在 LXC 內輸入 `cat ~/komodo.creds`。",
+      "text_ja": "管理者のユーザー名とパスワードについては、LXC 内で `cat ~/komodo.creds` と入力してください。",
       "type": "info"
     }
   ]

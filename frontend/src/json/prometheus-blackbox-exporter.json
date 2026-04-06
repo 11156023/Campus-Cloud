@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/prometheus.webp",
   "config_path": "/opt/blackbox-exporter/blackbox.yml",
   "description": "An exporter allows blackbox probing of endpoints over HTTP, HTTPS, DNS, TCP, ICMP and gRPC for use by the Prometheus monitoring system.",
+  "description_zh": "一個匯出器允許透過 HTTP、HTTPS、DNS、TCP、ICMP 和 gRPC 對端點進行黑盒探測，供 Prometheus 監控系統使用。",
+  "description_ja": "エクスポーターは、Prometheus監視システムで使用するために、HTTP、HTTPS、DNS、TCP、ICMPおよびgRPCを介したエンドポイントのブラックボックスプローブを許可します。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,18 @@
   "notes": [
     {
       "text": "Please adjust the Proxmox credentials in the configuration file!",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "請調整組態檔案中的 Proxmox 憑證！",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "設定ファイルのProxmox認証情報を調整してください！",
       "type": "info"
     }
   ]

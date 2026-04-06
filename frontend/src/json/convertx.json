@@ -12,6 +12,8 @@
   "website": "https://github.com/C4illin/ConvertX",
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/convertx.webp",
   "description": "ConvertX is a self-hosted online file converter supporting over 1000 formats, including images, audio, video, documents, and more, powered by FFmpeg, GraphicsMagick, and other libraries.",
+  "description_zh": "ConvertX 是一個自託管線上文件轉換器，支持超過 1000 種格式，包括圖像、音頻、視頻、文檔等，由 FFmpeg、GraphicsMagick 和其他庫驅動。",
+  "description_ja": "ConvertX は自己ホスト型のオンライン ファイル コンバーターで、FFmpeg、GraphicsMagick、およびその他のライブラリによって駆動され、画像、オーディオ、ビデオ、ドキュメントなど 1000 以上の形式をサポートしています。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,18 @@
   "notes": [
     {
       "text": "Complete setup via the web interface at http://<container-ip>:3000. Create and secure the admin account immediately.",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "通過 http://<container-ip>:3000 的網頁界面完成設置。立即建立並保護管理員帳戶。",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "http://<container-ip>:3000 の Web インターフェース経由でセットアップを完了します。管理者アカウントを即座に作成して保護します。",
       "type": "info"
     }
   ]

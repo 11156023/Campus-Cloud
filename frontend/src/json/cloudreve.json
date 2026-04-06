@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/cloudreve.webp",
   "config_path": "/opt/cloudreve/data/conf.ini",
   "description": "Cloudreve is an open-source, community-driven cloud storage system that provides file sharing, synchronization, and management features. It supports a wide range of storage backends and integrates with various notification and logging platforms.",
+  "description_zh": "Cloudreve 是一個開源、社區驅動的雲端存儲系統，提供文件共享、同步和管理功能。它支持多種存儲後端，並與各種通知和日誌記錄平台集成。",
+  "description_ja": "Cloudreve はオープンソースのコミュニティ駆動型クラウド ストレージ システムで、ファイル共有、同期、管理機能を提供します。幅広いストレージ バックエンドをサポートし、さまざまな通知とロギング プラットフォームと統合されています。",
   "install_methods": [
     {
       "type": "default",
@@ -32,7 +34,19 @@
   "notes": [
     {
       "text": "After Installation: Register your user -> Login -> Dashboard -> Accept Primary URL.",
-      "type": "warn"
+      "type": "warning"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "安裝後：註冊用戶 -> 登入 -> 儀表板 -> 接受主要 URL。",
+      "type": "warning"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "インストール後: ユーザーを登録 -> ログイン -> ダッシュボード -> プライマリ URL を受け入れる。",
+      "type": "warning"
     }
   ]
 }

@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/pocketbase.webp",
   "config_path": "",
   "description": "PocketBase is an open source backend consisting of embedded database (SQLite) with realtime subscriptions, built-in auth management, convenient dashboard UI and simple REST-ish API.",
+  "description_zh": "PocketBase 是一個開源後端，包含嵌入式資料庫 (SQLite)、即時訂閱、內建驗證管理、便利的儀表板 UI 和簡單的 REST-ish API。",
+  "description_ja": "PocketBaseは、埋め込みデータベース（SQLite）とリアルタイム購読、組み込みの認証管理、便利なダッシュボードUIおよび単純なREST-ish APIを備えたオープンソースバックエンドです。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,18 @@
   "notes": [
     {
       "text": "Type `/opt/pocketbase/pocketbase superuser create YOUREMAIL PASSWORD` to create your superuser account.",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "輸入 `/opt/pocketbase/pocketbase superuser create YOUREMAIL PASSWORD` 以建立您的超級使用者帳戶。",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "`/opt/pocketbase/pocketbase superuser create YOUREMAIL PASSWORD`と入力して、スーパーユーザーアカウントを作成してください。",
       "type": "info"
     }
   ]

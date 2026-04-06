@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/checkmate.webp",
   "config_path": "/opt/checkmate/server/.env",
   "description": "Checkmate is an open source uptime and infrastructure monitoring application that helps you track the availability and performance of your services.",
+  "description_zh": "Checkmate 是一個開源正常運行時間和基礎設施監控應用程式，可幫助您追蹤服務的可用性和效能。",
+  "description_ja": "Checkmate はオープンソースのアップタイムおよびインフラストラクチャ監視アプリケーションで、サービスの可用性とパフォーマンスを追跡するのに役立ちます。",
   "install_methods": [
     {
       "type": "default",
@@ -40,6 +42,34 @@
     },
     {
       "text": "For PageSpeed monitoring, add a Google PageSpeed API key to the server .env file.",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "通過網頁界面首次登錄時建立您的管理員帳戶。",
+      "type": "info"
+    },
+    {
+      "text": "伺服器 API 在連接埠 52345 上運行，客户端 UI 在連接埠 5173 上。",
+      "type": "info"
+    },
+    {
+      "text": "如需 PageSpeed 監控，請將 Google PageSpeed API 密鑰添加到伺服器 .env 文件。",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "Web インターフェース経由での初回ログイン時に管理者アカウントを作成します。",
+      "type": "info"
+    },
+    {
+      "text": "サーバー API はポート 52345 で実行され、クライアント UI はポート 5173 で実行されます。",
+      "type": "info"
+    },
+    {
+      "text": "PageSpeed 監視の場合は、Google PageSpeed API キーをサーバー .env ファイルに追加します。",
       "type": "info"
     }
   ]

@@ -12,6 +12,8 @@
   "website": "https://codeberg.org/gelbphoenix/autocaliweb",
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/autocaliweb.webp",
   "description": "A modern web management system for eBooks, eComics and PDFs",
+  "description_zh": "一個現代的 eBooks、eComics 和 PDF 的網絡管理系統。",
+  "description_ja": "電子書籍、電子コミック、PDF 用の最新のウェブ管理システム。",
   "install_methods": [
     {
       "type": "default",

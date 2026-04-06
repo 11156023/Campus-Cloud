@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/itsm-ng.webp",
   "config_path": "/etc/itsm-ng",
   "description": "ITSM-NG is a powerful, open-source IT Service Management (ITSM) solution designed for managing IT assets, software, licenses, and support processes in accordance with ITIL best practices. It offers integrated features for asset inventory, incident tracking, problem management, change requests, and service desk workflows.",
+  "description_zh": "ITSM-NG 是一個強大的開源 IT 服務管理 (ITSM) 解決方案，旨在根據 ITIL 最佳實踐管理 IT 資產、軟體、授權和支援流程。它提供資產庫存、事件追蹤、問題管理、變更要求和服務台工作流程的整合功能。",
+  "description_ja": "ITSM-NG は、ITIL ベスト プラクティスに準拠した IT 資産、ソフトウェア、ライセンス、およびサポート プロセスを管理するために設計された、強力なオープンソース IT サービス管理 (ITSM) ソリューションです。資産インベントリ、インシデント追跡、問題管理、変更要求、およびサービス デスク ワークフローの統合機能を提供します。",
   "install_methods": [
     {
       "type": "default",

@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/rustdesk.webp",
   "config_path": "",
   "description": "RustDesk is a full-featured open source remote control alternative for self-hosting and security with minimal configuration.",
+  "description_zh": "RustDesk 是一個功能完整的開源遠端控制替代方案，用於自主託管和安全，只需最少配置。",
+  "description_ja": "RustDeskは、最小限の設定で自己ホストとセキュリティのための機能豊富なオープンソースリモートコントロール代替案です。",
   "install_methods": [
     {
       "type": "default",
@@ -51,6 +53,34 @@
     },
     {
       "text": "To see admin password on Alpine, type `cat ~/rustdesk.creds` inside LXC.",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "查看我們的組態指南以獲得幫助：`https://github.com/community-scripts/ProxmoxVE/discussions/2388`",
+      "type": "info"
+    },
+    {
+      "text": "若要在 Debian 上設定管理員密碼，在 LXC 內輸入 `cd /var/lib/rustdesk-api && rustdesk-api reset-admin-pwd <yournewpasswordhere>`。",
+      "type": "info"
+    },
+    {
+      "text": "若要在 Alpine 上查看管理員密碼，在 LXC 內輸入 `cat ~/rustdesk.creds`。",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "設定ガイドを参照してください：`https://github.com/community-scripts/ProxmoxVE/discussions/2388`",
+      "type": "info"
+    },
+    {
+      "text": "DebianでAdminパスワードを設定するには、LXC内で`cd /var/lib/rustdesk-api && rustdesk-api reset-admin-pwd <yournewpasswordhere>`と入力します。",
+      "type": "info"
+    },
+    {
+      "text": "AlpineでAdminパスワードを確認するには、LXC内で`cat ~/rustdesk.creds`と入力します。",
       "type": "info"
     }
   ]

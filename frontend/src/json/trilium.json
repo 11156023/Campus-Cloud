@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/trilium-notes.webp",
   "config_path": "/root/trilium-data/config.ini",
   "description": "Trilium Notes is the latest and officially maintained version of the powerful, self-hosted note-taking and personal knowledge management application. It enables users to organize information in a hierarchical tree structure and supports rich text editing, internal linking, images, attachments, and powerful scripting capabilities. This version reflects the most current development efforts under the TriliumNext organization and replaces all prior forks or legacy variants. Trilium is ideal for building personal wikis, structured documentation, and long-term knowledge archives, giving users full local control and privacy.",
+  "description_zh": "Trilium Notes 是強大、自主託管筆記和個人知識管理應用程式的最新且官方維護的版本。它使使用者能夠以分層樹結構組織資訊，並支援豐富的文字編輯、內部連結、影像、附件和強大的指令碼功能。此版本反映了 TriliumNext 組織下的最新開發工作，並取代了所有先前的分支或舊版本。Trilium 非常適合構建個人 wiki、結構化文件和長期知識檔案，讓使用者擁有完整的本地控制和隱私。",
+  "description_ja": "Trilium Notesは、強力な自己ホスト型メモ取得および個人的知識管理アプリケーションの最新かつ公式にメンテナンスされたバージョンです。ユーザーが階層的なツリー構造で情報を整理でき、リッチテキスト編集、内部リンク、画像、添付ファイル、強力なスクリプト機能をサポートしています。このバージョンはTriliumNext組織での最新の開発作業を反映し、以前のすべてのフォークまたはレガシーバリアントに置き換わります。Triliumは個人wiki、構造化ドキュメント、長期知識アーカイブの構築に最適で、ユーザーに完全なローカルコントロールとプライバシーを提供します。",
   "install_methods": [
     {
       "type": "default",

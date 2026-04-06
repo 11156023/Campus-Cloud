@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/stylus.webp",
   "config_path": "/opt/stylus/config.yaml",
   "description": "Stylus (style + status) is a lightweight status page for infrastructure and networks. Configure a set of bash scripts that test the various parts of your infrastructure, set up visualizations with minimal configuration, and Stylus will generate you a dashboard for your system.",
+  "description_zh": "Stylus（樣式 + 狀態）是基礎設施和網路的輕量級狀態頁面。配置一組 bash 指令碼來測試基礎設施的各個部分，使用最小組態設定可視化，Stylus 將為你的系統生成儀表板。",
+  "description_ja": "Stylus（スタイル+ステータス）はインフラストラクチャとネットワーク向けの軽量なステータスページです。インフラストラクチャのさまざまな部分をテストするbashスクリプトのセットを構成し、最小限の設定で可視化を設定し、Stylusがシステム用のダッシュボードを生成します。",
   "install_methods": [
     {
       "type": "default",

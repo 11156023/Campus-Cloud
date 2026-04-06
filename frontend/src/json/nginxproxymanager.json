@@ -14,6 +14,8 @@
   "disable": false,
   "disable_description": "This script is temporarily disabled due to an external issue with the OpenResty APT repository. The repository's GPG key uses SHA-1 signatures, which are no longer accepted by Debian as of February 1, 2026. This causes installation to fail with APT errors. The issue is tracked in openresty/openresty#1097. A workaround exists but requires manual configuration. The script will be re-enabled once OpenResty updates their repository signing key. For more details, see: https://github.com/community-scripts/ProxmoxVE/issues/11406",
   "description": "Nginx Proxy Manager is a tool that provides a web-based interface to manage Nginx reverse proxies. It enables users to easily and securely expose their services to the internet by providing features such as HTTPS encryption, domain mapping, and access control. It eliminates the need for manual configuration of Nginx reverse proxies, making it easy for users to quickly and securely expose their services to the public.",
+  "description_zh": "Nginx Proxy Manager 是一個工具，提供基於網頁的介面來管理 Nginx 反向代理。它讓使用者可以透過提供 HTTPS 加密、網域對應和存取控制等功能來輕鬆且安全地向網際網路公開其服務。它消除了手動設定 Nginx 反向代理的需求，讓使用者可以輕鬆且安全地快速向公眾公開其服務。",
+  "description_ja": "Nginx Proxy Manager は、Nginx リバース プロキシを管理するためのウェブベース インターフェイスを提供するツールです。HTTPS 暗号化、ドメイン マッピング、アクセス制御などの機能を提供することで、ユーザーがインターネットにサービスを簡単かつ安全に公開できます。Nginx リバース プロキシの手動設定の必要性をなくし、ユーザーがサービスを簡単かつ安全に公開できるようにします。",
   "install_methods": [
     {
       "type": "default",
@@ -38,6 +40,26 @@
     },
     {
       "text": "You can install the specific one certbot you prefer, or you can Running /app/scripts/install-certbot-plugins within the Nginx Proxy Manager (NPM) LXC shell will install many common plugins. Important: This script does not install all Certbot plugins, as some require additional, external system dependencies (like specific packages for certain DNS providers). These external dependencies must be manually installed within the LXC container before you can successfully install and use the corresponding Certbot plugin. Consult the plugin's documentation for required packages.",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "首次啟動時，設定精靈將引導您完成建立管理帳戶。沒有預設認證。",
+      "type": "info"
+    },
+    {
+      "text": "您可以安裝您偏好的特定 certbot，或者您可以在 Nginx Proxy Manager（NPM）LXC shell 中執行 /app/scripts/install-certbot-plugins 以安裝許多常見的外掛程式。重要提示：此指令碼不會安裝所有 Certbot 外掛程式，因為某些外掛程式需要額外的外部系統相依性（例如某些 DNS 提供者的特定套件）。在成功安裝和使用相應 Certbot 外掛程式之前，必須在 LXC 容器中手動安裝這些外部相依性。請查閱外掛程式的文檔，瞭解所需的套件。",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "初回起動時に、セットアップ ウィザードが管理者アカウントの作成をガイドします。デフォルト認証情報はありません。",
+      "type": "info"
+    },
+    {
+      "text": "好みの特定の certbot をインストールするか、Nginx Proxy Manager（NPM）LXC シェル内で /app/scripts/install-certbot-plugins を実行して、多くの一般的なプラグインをインストールできます。重要: このスクリプトはすべての Certbot プラグインをインストールするわけではありません。一部のプラグインには追加の外部システム依存関係（特定の DNS プロバイダー向けの特定のパッケージなど）が必要です。対応する Certbot プラグインを正常にインストールして使用する前に、LXC コンテナ内にこれらの外部依存関係を手動でインストールする必要があります。必要なパッケージについては、プラグインのドキュメントを参照してください。",
       "type": "info"
     }
   ]

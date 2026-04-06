@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/pocket-id.webp",
   "config_path": "/opt/pocket-id/.env",
   "description": "Pocket ID is a simple OIDC provider that allows users to authenticate with their passkeys to your services.",
+  "description_zh": "Pocket ID 是一個簡單的 OIDC 提供者，允許使用者使用其通行金鑰向您的服務進行驗證。",
+  "description_ja": "Pocket IDは、ユーザーがパスキーを使用してサービスに認証できる単純なOIDCプロバイダーです。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,18 @@
   "notes": [
     {
       "text": "Pocket ID requires https to work.",
+      "type": "warning"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "Pocket ID 需要 HTTPS 才能運作。",
+      "type": "warning"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "Pocket IDはhttpsで動作する必要があります。",
       "type": "warning"
     }
   ]

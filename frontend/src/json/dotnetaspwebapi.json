@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/asp-net-core.webp",
   "config_path": "",
   "description": "Automatically setup a ASP.NET server up, as well as a FTP server so you can publish to this container from Visual Studio.",
+  "description_zh": "自動設置 ASP.NET 伺服器和 FTP 伺服器，以便您可以從 Visual Studio 發佈到此容器。",
+  "description_ja": "ASP.NET サーバーと FTP サーバーを自動的にセットアップし、Visual Studio からこのコンテナーに発行できるようにします。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,18 @@
   "notes": [
     {
       "text": "FTP server credentials: `cat ~/ftp.creds`",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "FTP 伺服器認證：`cat ~/ftp.creds`",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "FTP サーバー認証情報: `cat ~/ftp.creds`",
       "type": "info"
     }
   ]

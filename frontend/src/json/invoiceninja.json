@@ -12,6 +12,8 @@
   "website": "https://invoiceninja.com/",
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/invoice-ninja.webp",
   "description": "Invoice Ninja is a free, open-source invoicing, quotes, expenses and time-tracking application for freelancers and businesses. Features include recurring invoices, online payments, client portal, and multi-company support.",
+  "description_zh": "Invoice Ninja 是一個免費的開源發票、報價、支出和時間追蹤應用程式，供自由工作者和企業使用。功能包括循環發票、線上付款、客戶入口和多公司支援。",
+  "description_ja": "Invoice Ninja は、フリーランスとビジネス向けの無料でオープンソースの請求書、見積もり、費用、および時間追跡アプリケーションです。機能には、繰り返し請求書、オンライン支払い、クライアント ポータル、マルチカンパニー サポートが含まれます。",
   "install_methods": [
     {
       "type": "default",
@@ -32,14 +34,20 @@
   "notes": [
     {
       "text": "First visit http://IP:8080/setup to complete the initial configuration",
+      "text_zh": "首先訪問 http://IP:8080/setup 以完成初始組態",
+      "text_ja": "最初に http://IP:8080/setup にアクセスして、初期設定を完了してください",
       "type": "info"
     },
     {
       "text": "Database credentials are stored in `~/invoiceninja.creds`. Use them in the above initial configuration step.",
+      "text_zh": "資料庫憑證儲存在 `~/invoiceninja.creds` 中。在上述初始組態步驟中使用它們。",
+      "text_ja": "データベース認証情報は `~/invoiceninja.creds` に保存されています。上記の初期設定ステップで使用してください。",
       "type": "info"
     },
     {
       "text": "Configure SMTP settings in /opt/invoiceninja/.env for email functionality",
+      "text_zh": "在 /opt/invoiceninja/.env 中設定 SMTP 設定以啟用電子郵件功能",
+      "text_ja": "電子メール機能の /opt/invoiceninja/.env で SMTP 設定を設定してください",
       "type": "warning"
     }
   ]

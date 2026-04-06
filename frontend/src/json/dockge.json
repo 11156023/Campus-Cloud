@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/dockge.webp",
   "config_path": "",
   "description": "Dockge is a fancy, easy-to-use and reactive self-hosted docker compose.yaml stack-oriented manager.",
+  "description_zh": "Dockge 是一個精美、易於使用且反應靈敏的自託管 docker compose.yaml 堆棧導向的管理器。",
+  "description_ja": "Dockge は、ファンシーで使いやすく、リアクティブな自己ホスト型 docker compose.yaml スタック指向のマネージャーです。",
   "install_methods": [
     {
       "type": "default",
@@ -36,6 +38,26 @@
     },
     {
       "text": "If the LXC is created Privileged, the script will automatically set up USB passthrough.",
+      "type": "warning"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "添加 Immich 和/或 Home Assistant 的選項",
+      "type": "info"
+    },
+    {
+      "text": "如果 LXC 以特權方式創建，腳本將自動設置 USB 傳遞。",
+      "type": "warning"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "Immich および/または Home Assistant を追加するオプション",
+      "type": "info"
+    },
+    {
+      "text": "LXC が特権で作成された場合、スクリプトは USB パススルーを自動的にセットアップします。",
       "type": "warning"
     }
   ]

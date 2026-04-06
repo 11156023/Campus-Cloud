@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/garage.webp",
   "config_path": "/etc/garage.toml",
   "description": "Garage is a lightweight, self-hosted, S3-compatible object storage service built for distributed environments. It is designed to be simple, efficient, and easy to deploy across multiple nodes.",
+  "description_zh": "Garage 是一個輕量級、自託管、S3 兼容的對象存儲服務，為分佈式環境而構建。它旨在簡單、高效、易於跨多個節點部署。",
+  "description_ja": "Garage は、分散環境向けに構築された軽量でセルフホスト型の S3 互換オブジェクト ストレージ サービスです。シンプルで効率的で、複數のノード間で簡単にデプロイできるように設計されています。",
   "install_methods": [
     {
       "type": "default",
@@ -51,6 +53,34 @@
     },
     {
       "text": "To view your generated tokens and RPC secret, check `~/garage.creds` after installation.",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "Garage 配置文件位於 `/etc/garage.toml`。您可以在那裡編輯 RPC 和 API 綁定、令牌和數據目錄。",
+      "type": "info"
+    },
+    {
+      "text": "管理員 API 預設在連接埠 `3903` 上運行，S3 API 在連接埠 `3900` 上，網頁 UI 在 `3902` 上。相應地調整防火牆規則。",
+      "type": "warning"
+    },
+    {
+      "text": "若要查看生成的令牌和 RPC 密鑰，請在安裝後檢查 `~/garage.creds`。",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "Garage 構成ファイルは `/etc/garage.toml` にあります。そこで RPC および API バインディング、トークン、データ ディレクトリを編集できます。",
+      "type": "info"
+    },
+    {
+      "text": "管理者 API はデフォルトでポート `3903` で実行され、S3 API はポート `3900` で、Web UI はポート `3902` で実行されます。それに応じてファイアウォール ルールを調整します。",
+      "type": "warning"
+    },
+    {
+      "text": "生成されたトークンと RPC シークレットを表示するには、インストール後に `~/garage.creds` を確認します。",
       "type": "info"
     }
   ]

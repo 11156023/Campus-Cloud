@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/it-tools.webp",
   "config_path": "",
   "description": "IT-Tools is a web-based suite of utilities designed to streamline and simplify various IT tasks, providing tools for developers and system administrators to manage their workflows efficiently.",
+  "description_zh": "IT-Tools 是一套基於網絡的實用工具套件，旨在簡化和優化各種 IT 任務，為開發人員和系統管理員提供管理工作流的工具。",
+  "description_ja": "IT-Tools は、様々な IT タスクを効率化・簡素化するために設計された Web ベースのユーティリティ スイートで、開発者とシステム管理者がワークフローを効率的に管理するためのツールを提供します。",
   "install_methods": [
     {
       "type": "default",

@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/duplicati.webp",
   "config_path": "",
   "description": "Duplicati is a free, open-source backup solution that offers zero-trust, fully encrypted backups for your data.",
+  "description_zh": "Duplicati 是一個免費、開源的備份解決方案，為您的數據提供零信任、完全加密的備份。",
+  "description_ja": "Duplicati は、データに対してゼロトラスト、完全に暗号化されたバックアップを提供する無料のオープンソース バックアップ ソリューションです。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,18 @@
   "notes": [
     {
       "text": "Admin password and database encryption key: `cat ~/duplicati.creds`",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "管理員密碼和數據庫加密密鑰：`cat ~/duplicati.creds`",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "管理者パスワードとデータベース暗号化キー: `cat ~/duplicati.creds`",
       "type": "info"
     }
   ]

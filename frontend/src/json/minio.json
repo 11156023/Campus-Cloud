@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/minio.webp",
   "config_path": "/etc/default/minio",
   "description": "MinIO is a High Performance Object Storage released under GNU Affero General Public License v3.0. It is API compatible with Amazon S3 cloud storage service. Use MinIO to build high performance infrastructure for machine learning, analytics and application data workloads.",
+  "description_zh": "MinIO 是在 GNU Affero General Public License v3.0 下發佈的高效能物件儲存。它與 Amazon S3 雲端儲存服務具有 API 相容性。使用 MinIO 為機器學習、分析和應用程式資料工作負載構建高效能基礎設施。",
+  "description_ja": "MinIO は GNU Affero General Public License v3.0 の下でリリースされた高性能オブジェクトストレージです。Amazon S3 クラウド ストレージ サービスと API 互換です。MinIO を使用して、機械学習、分析、アプリケーション データ ワークロード向けの高性能インフラストラクチャを構築してください。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,18 @@
   "notes": [
     {
       "text": "Application credentials: `cat ~/minio.creds`",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "應用程式憑證：`cat ~/minio.creds`",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "アプリケーション認証情報: `cat ~/minio.creds`",
       "type": "info"
     }
   ]

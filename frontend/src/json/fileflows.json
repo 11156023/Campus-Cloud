@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/fileflows.webp",
   "config_path": "/opt/fileflows/Data/server.config",
   "description": "FileFlows is a powerful, open-source tool for automating media file processing workflows, including encoding, decoding, and media management. It offers an intuitive GUI and extensive plugin support, making it ideal for tasks like video transcoding, organizing, and managing large media libraries.",
+  "description_zh": "FileFlows 是一個強大的開源工具，用於自動化媒體文件處理工作流程，包括編碼、解碼和媒體管理。它提供直觀的 GUI 和廣泛的插件支持，使其非常適合視頻轉碼、組織和管理大型媒體庫等任務。",
+  "description_ja": "FileFlows は、エンコーディング、デコーディング、メディア管理を含むメディア ファイル処理ワークフローを自動化するための強力なオープンソース ツールです。直感的な GUI と広範なプラグイン サポートを提供し、ビデオ トランスコード、整理、大規模メディア ライブラリ管理などのタスクに最適です。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,18 @@
   "notes": [
     {
       "text": "With Privileged/Unprivileged Hardware Acceleration Support",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "支持特權/無特權硬體加速",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "特權/非特権ハードウェア アクセラレーション サポート付き",
       "type": "info"
     }
   ]

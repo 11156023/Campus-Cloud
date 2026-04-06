@@ -12,6 +12,8 @@
   "website": "https://openarchiver.com/",
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/open-archiver.webp",
   "description": "Open Archiver is a secure, self-hosted email archiving solution, and it's completely open source. Get an email archiver that enables full-text search across email and attachments. Create a permanent, searchable, and compliant mail archive from Google Workspace, Microsoft 35, and any IMAP server.",
+  "description_zh": "Open Archiver 是一個安全的自託管電子郵件存檔解決方案，完全開源。取得電子郵件存檔器，可在電子郵件和附件中進行全文搜尋。從 Google Workspace、Microsoft 365 和任何 IMAP 伺服器建立永久、可搜尋且符合規範的郵件存檔。",
+  "description_ja": "Open Archiver はセキュアなセルフホスト型電子メール アーカイブソリューション で、完全にオープンソースです。メールと添付ファイル全体にわたるフルテキスト検索を可能にする電子メール アーカイバーを取得します。Google Workspace、Microsoft 365、および任意の IMAP サーバーから、永続的で検索可能でコンプライアンス対応のメール アーカイブを作成します。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,18 @@
   "notes": [
     {
       "text": "Data directory is: `/opt/openarchiver-data`. If you have a lot of email, you might consider mounting external storage to this directory.",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "資料目錄為：`/opt/openarchiver-data`。如果您有大量電子郵件，您可能需要考慮將外部存儲掛載到此目錄。",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "データディレクトリ: `/opt/openarchiver-data`。メールが大量にある場合は、このディレクトリに外部ストレージをマウントすることを検討してください。",
       "type": "info"
     }
   ]

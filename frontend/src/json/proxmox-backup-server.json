@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/proxmox.webp",
   "config_path": "",
   "description": "Proxmox Backup Server is an enterprise backup solution, for backing up and restoring VMs, containers, and physical hosts. By supporting incremental, fully deduplicated backups, Proxmox Backup Server significantly reduces network load and saves valuable storage space.",
+  "description_zh": "Proxmox Backup Server 是一個企業級備份解決方案，用於備份和復原 VM、容器和實體主機。透過支援增量式、完全重複資料刪除備份，Proxmox Backup Server 顯著減少網路負載並節省寶貴的儲存空間。",
+  "description_ja": "Proxmox Backup Serverは、VM、コンテナ、および物理ホストのバックアップと復元のためのエンタープライズバックアップソリューションです。増分、完全に重複排除されたバックアップをサポートすることにより、Proxmox Backup Serverはネットワーク負荷を大幅に削減し、貴重なストレージスペースを節約します。",
   "install_methods": [
     {
       "type": "default",
@@ -36,6 +38,26 @@
     },
     {
       "text": "Advanced Install is only possible with IPv6 disabled! Otherwise, the installation may get stuck.",
+      "type": "warning"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "如果使用自動登入，請設定 root 密碼。這將是 PBS 密碼。`passwd root`",
+      "type": "warning"
+    },
+    {
+      "text": "進階安裝只有在停用 IPv6 時才可能！否則安裝可能會卡住。",
+      "type": "warning"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "自動ログインを使用する場合はrootパスワードを設定します。これはPBSのパスワードになります。`passwd root`",
+      "type": "warning"
+    },
+    {
+      "text": "高度なインストールはIPv6を無効にした場合のみ可能です！そうでない場合、インストールがスタックする可能性があります。",
       "type": "warning"
     }
   ]

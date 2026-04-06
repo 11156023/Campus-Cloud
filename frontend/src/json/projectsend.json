@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/projectsend.webp",
   "config_path": "/opt/projectsend/includes/sys.config.php",
   "description": "ProjectSend is a free, open source software that lets you share files with your clients, focused on ease of use and privacy. It supports clients groups, system users roles, statistics, multiple languages, detailed logs... and much more!",
+  "description_zh": "ProjectSend 是一個免費的開源軟體，允許您與客戶端分享檔案，專注於易用性和隱私。它支援客戶端群組、系統使用者角色、統計資訊、多種語言、詳細日誌...以及更多功能！",
+  "description_ja": "ProjectSendは、クライアントとファイルを共有できるようにする無料のオープンソースソフトウェアで、使いやすさとプライバシーに焦点を当てています。クライアントグループ、システムユーザーロール、統計、複数言語、詳細なログ...およびもっと多くをサポートしています！",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,18 @@
   "notes": [
     {
       "text": "After running the update script, logging in as a system user in ProjectSend is necessary to upgrade the database.",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "執行更新指令碼後，有必要在 ProjectSend 中以系統使用者身份登入以升級資料庫。",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "更新スクリプトを実行した後、ProjectSendでシステムユーザーとしてログインして、データベースをアップグレードする必要があります。",
       "type": "info"
     }
   ]

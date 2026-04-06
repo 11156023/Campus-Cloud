@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/metube.webp",
   "config_path": "/opt/metube/.env",
   "description": "MeTube allows you to download videos from YouTube and dozens of other sites.",
+  "description_zh": "MeTube 讓您可以從 YouTube 和數十個其他網站下載影片。",
+  "description_ja": "MeTube では、YouTube および数十のその他のサイトからビデオをダウンロードできます。",
   "install_methods": [
     {
       "type": "default",
@@ -29,5 +31,7 @@
     "username": null,
     "password": null
   },
-  "notes": []
+  "notes": [],
+  "notes_zh": [],
+  "notes_ja": []
 }

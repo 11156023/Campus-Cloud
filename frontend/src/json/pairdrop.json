@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/pairdrop.webp",
   "config_path": "",
   "description": "PairDrop: Local file sharing in your browser.",
+  "description_zh": "PairDrop：在您的瀏覽器中進行本地檔案共用。",
+  "description_ja": "PairDrop：ブラウザでのローカルファイル共有。",
   "install_methods": [
     {
       "type": "default",

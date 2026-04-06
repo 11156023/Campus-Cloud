@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/watchyourlan.webp",
   "config_path": "/data/config.yaml",
   "description": "WatchYourLAN is a lightweight network IP scanner with web GUI.",
+  "description_zh": "WatchYourLAN 是一個輕量級網路 IP 掃描器，具有網頁 GUI。",
+  "description_ja": "WatchYourLANは、Web GUIを備えた軽量ネットワークIPスキャナーです。",
   "install_methods": [
     {
       "type": "default",

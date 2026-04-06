@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/dolibarr.webp",
   "config_path": "/usr/share/dolibarr/htdocs/conf/conf.php.example",
   "description": "Dolibarr ERP CRM is a modern software package to manage your company or foundation's activity (contacts, suppliers, invoices, orders, stocks, agenda, accounting, ...). it's an open source Web application (written in PHP) designed for businesses of any sizes, foundations and freelancers.",
+  "description_zh": "Dolibarr ERP CRM 是一個現代軟體包，用於管理您的公司或基金會的活動（聯繫人、供應商、發票、訂單、庫存、日程、會計等）。它是一個開源網頁應用程式（用 PHP 編寫），為各種規模的企業、基金會和自由職業者設計。",
+  "description_ja": "Dolibarr ERP CRM は、会社または団体の活動（連絡先、サプライヤー、請求書、注文、在庫、議題、会計など）を管理するための最新のソフトウェア パッケージです。PHP で記述されたオープンソース Web アプリケーションで、あらゆるサイズのビジネス、基金、フリーランサー向けに設計されています。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,18 @@
   "notes": [
     {
       "text": "Database credentials: `cat ~/dolibarr.creds`",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "數據庫認證：`cat ~/dolibarr.creds`",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "データベース認証情報: `cat ~/dolibarr.creds`",
       "type": "info"
     }
   ]

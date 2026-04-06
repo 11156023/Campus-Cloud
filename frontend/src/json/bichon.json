@@ -12,6 +12,8 @@
   "website": "https://github.com/rustmailer/bichon",
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/bichon.webp",
   "description": "Bichon is an open-source email archiving system that synchronizes emails from IMAP servers, indexes them for full-text search, and provides a REST API for programmatic access. Unlike email clients, Bichon is designed for archiving and searching rather than sending/receiving emails. It runs as a standalone server application that continuously synchronizes configured email accounts and maintains a searchable local archive.",
+  "description_zh": "Bichon 是一個開源電子郵件存檔系統，它從 IMAP 伺服器同步電子郵件、為全文搜索編制索引，並提供 REST API 以供程序訪問。與電子郵件客户端不同，Bichon 旨在用於存檔和搜索而非發送/接收電子郵件。它作為獨立伺服器應用程式運行，持續同步配置的電子郵件帳戶並維護可搜索的本地存檔。",
+  "description_ja": "Bichon はオープンソースのメール アーカイブ システムで、IMAP サーバーからメールを同期し、全文検索のためにインデックスを作成し、プログラムによるアクセスのための REST API を提供します。メール クライアントとは異なり、Bichon はメール送受信ではなくアーカイブと検索用に設計されています。スタンドアロン サーバー アプリケーションとして実行され、構成されたメール アカウントを継続的に同期し、検索可能なローカル アーカイブを保持します。",
   "install_methods": [
     {
       "type": "default",
@@ -36,6 +38,26 @@
     },
     {
       "text": "Please copy your `BICHON_ENCRYPT_PASSWORD` from `/opt/bichon/bichon.env` to a safe place.",
+      "type": "warning"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "腳本最初分配的磁碟空間只是佔位符，因為我們無法知道您需要多少空間。您應該增加它以匹配您的工作負載。",
+      "type": "info"
+    },
+    {
+      "text": "請將您的 `BICHON_ENCRYPT_PASSWORD` 從 `/opt/bichon/bichon.env` 複製到安全的地方。",
+      "type": "warning"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "スクリプトによって最初に割り当てられたディスク容量はプレースホルダーのみです。必要な容量の大きさを知ることができないため、ワークロードに合わせて増やす必要があります。",
+      "type": "info"
+    },
+    {
+      "text": "`BICHON_ENCRYPT_PASSWORD` を `/opt/bichon/bichon.env` から安全な場所にコピーしてください。",
       "type": "warning"
     }
   ]

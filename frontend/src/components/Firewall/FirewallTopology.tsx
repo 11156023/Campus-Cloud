@@ -19,6 +19,7 @@ import type React from "react"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
+import type { ApiError } from "@/client"
 import { FirewallService } from "@/services/firewall"
 import { ConnectionDialog } from "./ConnectionDialog"
 import type { ConnectionEdgeData } from "./ConnectionEdge"
@@ -183,12 +184,36 @@ function FirewallTopologyInner() {
           target_vmid: targetVmid,
         },
       }),
+    onMutate: async ({ sourceVmid, targetVmid }) => {
+      // 取消進行中的 refetch，避免覆蓋樂觀更新
+      await queryClient.cancelQueries({ queryKey: ["firewall-topology"] })
+      // 儲存舊資料以備 rollback
+      const previous = queryClient.getQueryData(["firewall-topology"])
+      // 立即從 cache 移除對應的 edge
+      queryClient.setQueryData(["firewall-topology"], (old: any) => {
+        if (!old) return old
+        return {
+          ...old,
+          edges: old.edges.filter(
+            (e: any) =>
+              !(e.source_vmid === sourceVmid && e.target_vmid === targetVmid) &&
+              !(e.source_vmid === targetVmid && e.target_vmid === sourceVmid),
+          ),
+        }
+      })
+      return { previous }
+    },
     onSuccess: () => {
       toast.success("連線已刪除")
       queryClient.invalidateQueries({ queryKey: ["firewall-topology"] })
     },
-    onError: (e: Error) => {
-      toast.error(`刪除連線失敗: ${e.message}`)
+    onError: (e: Error, _vars, context: any) => {
+      // 失敗時 rollback
+      if (context?.previous) {
+        queryClient.setQueryData(["firewall-topology"], context.previous)
+      }
+      const detail = ((e as ApiError)?.body as { detail?: string })?.detail ?? e.message
+      toast.error(`刪除連線失敗: ${detail}`)
     },
   })
 
@@ -402,7 +427,8 @@ function FirewallTopologyInner() {
       queryClient.invalidateQueries({ queryKey: ["firewall-topology"] })
     },
     onError: (e: Error) => {
-      toast.error(`建立連線失敗: ${e.message}`)
+      const detail = ((e as ApiError)?.body as { detail?: string })?.detail ?? e.message
+      toast.error(`建立連線失敗: ${detail}`)
     },
   })
 

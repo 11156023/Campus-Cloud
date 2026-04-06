@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/flaresolverr.webp",
   "config_path": "",
   "description": "FlareSolverr is a proxy server to bypass Cloudflare and DDoS-GUARD protection.",
+  "description_zh": "FlareSolverr 是一個代理伺服器，用於繞過 Cloudflare 和 DDoS-GUARD 保護。",
+  "description_ja": "FlareSolverr は Cloudflare と DDoS-GUARD 保護をバイパスするプロキシ サーバーです。",
   "install_methods": [
     {
       "type": "default",

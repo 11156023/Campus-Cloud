@@ -26,6 +26,7 @@ def get_vm_console(vmid: int, vm_info: VmInfoDep):
             "vmid": vmid,
             "ws_url": f"/ws/vnc/{vmid}/",
             "ticket": console_data["ticket"],
+            "port": str(console_data["port"]),
             "message": "Connect to this WebSocket URL to access the VM console",
         }
     except (BadRequestError, ProxmoxError):

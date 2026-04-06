@@ -13,7 +13,32 @@ import { request as __request } from "@/client/core/request"
 
 export type PortSpec = {
   port: number
-  protocol: "tcp" | "udp"
+  protocol: string
+  external_port?: number | null
+  domain?: string | null
+  enable_https?: boolean
+}
+
+export type ReverseProxyRulePublic = {
+  id: string
+  vmid: number
+  vm_ip: string
+  domain: string
+  internal_port: number
+  enable_https: boolean
+  dns_provider: string
+  created_at: string
+}
+
+export type NATRulePublic = {
+  id: string
+  ssh_host: string
+  vmid: number
+  vm_ip: string
+  external_port: number
+  internal_port: number
+  protocol: string
+  created_at: string
 }
 
 export type TopologyNode = {
@@ -100,12 +125,70 @@ export class FirewallService {
     })
   }
 
+  /** 列出 NAT 端口轉發規則 */
+  public static listNATRules(): CancelablePromise<NATRulePublic[]> {
+    return __request(OpenAPI, {
+      method: "GET",
+      url: "/api/v1/firewall/nat-rules",
+      errors: { 422: "Validation Error" },
+    })
+  }
+
+  /** 刪除 NAT 端口轉發規則 */
+  public static deleteNATRule(data: {
+    ruleId: string
+  }): CancelablePromise<{ message: string }> {
+    return __request(OpenAPI, {
+      method: "DELETE",
+      url: "/api/v1/firewall/nat-rules/{rule_id}",
+      path: { rule_id: data.ruleId },
+      errors: { 404: "Not Found", 422: "Validation Error" },
+    })
+  }
+
+  /** 同步 NAT 規則到 Gateway VM */
+  public static syncNATRules(): CancelablePromise<{ message: string }> {
+    return __request(OpenAPI, {
+      method: "POST",
+      url: "/api/v1/firewall/nat-rules/sync",
+      errors: { 403: "Forbidden", 422: "Validation Error" },
+    })
+  }
+
+  /** 列出反向代理規則 */
+  public static listReverseProxyRules(): CancelablePromise<ReverseProxyRulePublic[]> {
+    return __request(OpenAPI, {
+      method: "GET",
+      url: "/api/v1/firewall/reverse-proxy-rules",
+    })
+  }
+
+  /** 刪除反向代理規則 */
+  public static deleteReverseProxyRule(data: {
+    ruleId: string
+  }): CancelablePromise<{ message: string }> {
+    return __request(OpenAPI, {
+      method: "DELETE",
+      url: "/api/v1/firewall/reverse-proxy-rules/{rule_id}",
+      path: { rule_id: data.ruleId },
+    })
+  }
+
+  /** 同步反向代理規則到 Gateway VM */
+  public static syncReverseProxyRules(): CancelablePromise<{ message: string }> {
+    return __request(OpenAPI, {
+      method: "POST",
+      url: "/api/v1/firewall/reverse-proxy-rules/sync",
+      errors: { 403: "Forbidden" },
+    })
+  }
+
   /** 建立連線 */
   public static createFirewallConnection(data: {
     requestBody: {
-      source_vmid: number
+      source_vmid: number | null
       target_vmid: number | null
-      ports: Array<{ port: number; protocol: string }>
+      ports: PortSpec[]
       direction: string
     }
   }): CancelablePromise<{ message: string }> {

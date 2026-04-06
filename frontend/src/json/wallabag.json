@@ -12,6 +12,8 @@
   "website": "https://wallabag.org/",
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/wallabag.webp",
   "description": "Wallabag is a self-hosted read-it-later application. Save web articles to read them later, offline, in a clean and distraction-free interface. Features tagging, full-text search, and browser/mobile app integrations.",
+  "description_zh": "Wallabag 是一個自主託管的稍後閱讀應用程式。儲存網頁文章，以便稍後離線閱讀，在乾淨且不受干擾的介面中。功能包括標籤、全文搜尋和瀏覽器/行動應用程式整合。",
+  "description_ja": "Wallabagはセルフホストされた後で読むアプリケーションです。Webの記事を保存して、後でオフラインで読むことができます。クリーンで邪魔のないインターフェースで。タグ、フルテキスト検索、ブラウザ/モバイルアプリの統合機能があります。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,8 @@
   "notes": [
     {
       "text": "Database credentials are stored in ~/wallabag.creds",
+      "text_zh": "資料庫認證儲存在 ~/wallabag.creds",
+      "text_ja": "データベース認証情報は ~/wallabag.creds に保存されています",
       "type": "info"
     }
   ]

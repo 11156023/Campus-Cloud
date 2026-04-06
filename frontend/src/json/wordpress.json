@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/wordpress.webp",
   "config_path": "/var/www/html/wordpress/wp-config.php",
   "description": "WordPress is the simplest, most popular way to create your own website or blog. In fact, WordPress powers over 43.6% of all the websites on the Internet. Yes – more than one in four websites that you visit are likely powered by WordPress.\n\nOn a slightly more technical level, WordPress is an open-source content management system licensed under GPLv2, which means that anyone can use or modify the WordPress software for free.",
+  "description_zh": "WordPress 是建立自己的網站或部落格的最簡單、最流行的方式。事實上，WordPress 為網際網路上超過 43.6% 的網站提供支援。是的 – 您訪問的四分之一以上的網站可能由 WordPress 提供支援。\n\n在稍微更技術性的層面上，WordPress 是根據 GPLv2 授權的開源內容管理系統，這意味著任何人都可以免費使用或修改 WordPress 軟體。",
+  "description_ja": "WordPressはあなた自身のウェブサイトやブログを作成するための最も簡単で最も人気のある方法です。実は、WordPressはインターネット上のすべてのウェブサイトの43.6％以上に力を供給しています。はい – あなたが訪問するウェブサイトの4分の1以上はおそらくWordPressによって駆動されています。\n\nやや技術的なレベルでは、WordPressはGPLv2の下でライセンスされているオープンソースのコンテンツ管理システムです。つまり、誰でもWordPressソフトウェアを無料で使用または変更できます。",
   "install_methods": [
     {
       "type": "default",

@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/listmonk.webp",
   "config_path": "/opt/listmonk/config.toml",
   "description": "High performance, self-hosted, newsletter and mailing list manager with a modern dashboard.",
+  "description_zh": "高效能、自架設的電子報和郵件列表經理，具有現代儀表板。",
+  "description_ja": "モダン ダッシュボード付きの高性能な自己ホスト型ニュースレターおよびメーリング リスト マネージャー。",
   "install_methods": [
     {
       "type": "default",

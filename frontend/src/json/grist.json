@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/grist.webp",
   "config_path": "/opt/grist/.env",
   "description": "Grist is like a spreadsheet + database hybrid. It lets you store structured data, use relational links between tables, apply formulas (even with Python), build custom layouts (cards, forms, dashboards), set fine-grained access rules, and visualize data with charts or pivot-tables.",
+  "description_zh": "Grist 是電子表格和數據庫的混合體。它允許您存儲結構化數據、使用表之間的關係鏈接、應用公式（甚至 Python）、構建自訂佈局（卡片、表單、儀表板）、設置細粒度訪問規則並使用圖表或數據透視表可視化數據。",
+  "description_ja": "Grist はスプレッドシートとデータベースのハイブリッドです。構造化データの保存、テーブル間の関係リンク、フォーミュラの適用（Python も含む）、カスタムレイアウト（カード、フォーム、ダッシュボード）の構築、きめ細かいアクセスルールの設定、チャートやピボットテーブルでのデータ可視化ができます。",
   "install_methods": [
     {
       "type": "default",

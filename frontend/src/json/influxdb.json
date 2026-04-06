@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/influxdb.webp",
   "config_path": "",
   "description": "InfluxDB is designed to handle high write and query loads, and is optimized for storing and analyzing time-stamped data, such as metrics, events, and logs. InfluxDB supports SQL-like query language and has a built-in HTTP API for data ingestion and retrieval. It's commonly used for IoT and industrial applications where time-series data is involved.\r\n\r\nTelegraf is a server agent that collects, processes, and aggregates metrics and events data from different sources, such as systems, databases, and APIs, and outputs the data to various outputs, such as InfluxDB, Prometheus, Elasticsearch, and many others.",
+  "description_zh": "InfluxDB 設計用於處理高寫入和查詢負載，並針對存儲和分析時間戳記的資料進行了最佳化，例如指標、事件和日誌。InfluxDB 支持類似 SQL 的查詢語言，並具有用於資料擷取和檢索的內置 HTTP API。它通常用於涉及時間序列資料的 IoT 和工業應用程式。\r\n\r\nTelegraf 是一個伺服器代理，可從不同來源（例如系統、資料庫和 API）蒐集、處理和彙總指標和事件資料，並將資料輸出到各種輸出，例如 InfluxDB、Prometheus、Elasticsearch 等。",
+  "description_ja": "InfluxDB は高い書き込みとクエリ負荷を処理し、メトリクス、イベント、ログなどのタイムスタンプ付きデータの保存と分析に最適化されています。InfluxDB は SQL に似たクエリ言語をサポートし、データ取得と取得用の組み込み HTTP API があります。これは通常、時系列データが関係する IoT および産業向けアプリケーションで使用されます。\r\n\r\nTelegraf は、システム、データベース、API などのさまざまなソースからメトリクスとイベント データを収集、処理、集約し、InfluxDB、Prometheus、Elasticsearch などのさまざまな出力にデータを出力するサーバー エージェントです。",
   "install_methods": [
     {
       "type": "default",
@@ -32,10 +34,14 @@
   "notes": [
     {
       "text": "Port for V1: 8888",
+      "text_zh": "V1 的連接埠：8888",
+      "text_ja": "V1 のポート：8888",
       "type": "info"
     },
     {
       "text": "Port for V2: 8086",
+      "text_zh": "V2 的連接埠：8086",
+      "text_ja": "V2 のポート：8086",
       "type": "info"
     }
   ]

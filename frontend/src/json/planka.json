@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/planka.webp",
   "config_path": "/opt/planka/.env",
   "description": "Planka is a powerful, project management platform that transforms how teams collaborate. Create projects with multiple boards, organize tasks with intuitive drag-and-drop cards, attach files, write rich markdown descriptions, set due dates, assign team members, and keep conversations flowing with comments and labels—all with seamless real-time updates and smart notifications.",
+  "description_zh": "Planka 是一個強大的專案管理平台，改變了團隊的協作方式。建立具有多個看板的專案、使用直觀的拖放卡片組織任務、附加檔案、編寫豐富的 Markdown 描述、設定到期日期、指派團隊成員，並透過留言和標籤保持對話流暢—所有這一切都具有無縫實時更新和智慧通知。",
+  "description_ja": "Plankaは、チームのコラボレーション方法を変える強力なプロジェクト管理プラットフォームです。複数のボードを持つプロジェクトを作成し、直感的なドラッグアンドドロップカードでタスクを整理し、ファイルを添付し、リッチなマークダウン説明を書き、期限を設定し、チームメンバーを割り当て、コメントとラベルでコンテンツを流す—すべてがシームレスなリアルタイム更新とスマート通知を備えています。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,18 @@
   "notes": [
     {
       "text": "Type `cat ~/planka.creds` inside LXC to see admin user and database credentials.",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "在 LXC 內輸入 `cat ~/planka.creds` 以查看管理員使用者和資料庫憑證。",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "LXC内で`cat ~/planka.creds`と入力して、管理者ユーザーとデータベース認証情報を表示します。",
       "type": "info"
     }
   ]

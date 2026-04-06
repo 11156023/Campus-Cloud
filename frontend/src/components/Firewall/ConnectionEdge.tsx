@@ -8,7 +8,12 @@ import { X } from "lucide-react"
 import { useState } from "react"
 
 export type ConnectionEdgeData = {
-  ports: Array<{ port: number; protocol: string }>
+  ports: Array<{
+    port: number
+    protocol: string
+    external_port?: number | null
+    domain?: string | null
+  }>
   direction: string
   onDelete?: (sourceVmid: number | null, targetVmid: number | null) => void
   sourceVmid: number | null
@@ -58,7 +63,15 @@ export function ConnectionEdge({
 
   const portLabel =
     data?.ports && data.ports.length > 0
-      ? data.ports.map((p) => `${p.port}/${p.protocol}`).join(", ")
+      ? data.ports
+          .map((p) =>
+            p.domain
+              ? `${p.domain}→:${p.port}`
+              : p.external_port != null
+                ? `外:${p.external_port}→${p.port}/${p.protocol}`
+                : `${p.port}/${p.protocol}`,
+          )
+          .join(", ")
       : "All"
 
   const isGateway = data?.isGateway
@@ -164,7 +177,7 @@ export function ConnectionEdge({
             }`}
           >
             <span
-              className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+              className={`w-1.5 h-1.5 rounded-full shrink-0 ${
                 isInbound
                   ? "bg-blue-400"
                   : isVMtoVM

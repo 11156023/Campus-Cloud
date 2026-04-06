@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/baikal.webp",
   "config_path": "/opt/baikal/config/baikal.yaml",
   "description": "Baïkal is a lightweight CalDAV+CardDAV server. It offers an extensive web interface with easy management of users, address books and calendars.",
+  "description_zh": "Baïkal 是一個輕量級 CalDAV+CardDAV 伺服器。它提供廣泛的網頁界面，便於管理用戶、通訊錄和日曆。",
+  "description_ja": "Baïkal は軽量の CalDAV+CardDAV サーバーです。ユーザー、アドレス帳、カレンダーの管理が簡単な広範な Web インターフェースを提供します。",
   "install_methods": [
     {
       "type": "default",

@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/nginx-ui.webp",
   "config_path": "/usr/local/etc/nginx-ui/app.ini",
   "description": "Nginx UI is a comprehensive web-based interface designed to simplify the management and configuration of Nginx servers. It provides features like online statistics, ChatGPT-powered config assistant, automatic Let's Encrypt certificates, and config file editing with syntax highlighting.",
+  "description_zh": "Nginx UI 是一個全面的網頁介面，旨在簡化 Nginx 伺服器的管理和設定。它提供線上統計資料、ChatGPT 驅動的設定助手、自動 Let's Encrypt 憑證以及具有語法醒目提示的設定檔編輯等功能。",
+  "description_ja": "Nginx UI は、Nginx サーバーの管理と構成を簡素化するために設計された包括的なウェブベース インターフェイスです。オンライン統計、ChatGPT 驅動の構成アシスタント、自動 Let's Encrypt 証明書、および構文強調表示機能を備えた構成ファイル編集などの機能を提供します。",
   "install_methods": [
     {
       "type": "default",
@@ -40,6 +42,34 @@
     },
     {
       "text": "SSL certificates can be managed automatically with Let's Encrypt integration.",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "首次造訪時，設定精靈將引導您建立管理帳戶並設定 ACME 電子郵件。",
+      "type": "warning"
+    },
+    {
+      "text": "Nginx 在連接埠 80/443 上執行，Nginx UI 管理介面在連接埠 9000 上執行。",
+      "type": "info"
+    },
+    {
+      "text": "SSL 憑證可透過 Let's Encrypt 整合自動管理。",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "初回訪問時、セットアップ ウィザードが管理者アカウントの作成と ACME メールの構成をガイドします。",
+      "type": "warning"
+    },
+    {
+      "text": "Nginx はポート 80/443 で実行され、Nginx UI 管理インターフェイスはポート 9000 で実行されます。",
+      "type": "info"
+    },
+    {
+      "text": "SSL 証明書は Let's Encrypt 統合で自動的に管理できます。",
       "type": "info"
     }
   ]

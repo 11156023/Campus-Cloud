@@ -12,6 +12,8 @@
   "website": "https://tududi.com/",
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/tududi.webp",
   "description": "Self-hosted task management with functional programming architecture, hierarchical organization, and multi-language support.",
+  "description_zh": "具有函數式編程架構、階層式組織和多語言支援的自主託管工作管理。",
+  "description_ja": "機能型プログラミングアーキテクチャ、階層型組織、マルチ言語対応の自己ホスト型タスク管理。",
   "install_methods": [
     {
       "type": "default",
@@ -36,6 +38,26 @@
     },
     {
       "text": "Database location: `/opt/tududi-db`. Uploads: `/opt/tududi-uploads`",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "像這樣建立使用者：`cd /opt/tududi` => `npm run user:create <email> <password>`",
+      "type": "info"
+    },
+    {
+      "text": "資料庫位置：`/opt/tududi-db`。上傳：`/opt/tududi-uploads`",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "ユーザーを作成するには：`cd /opt/tududi` => `npm run user:create <email> <password>`",
+      "type": "info"
+    },
+    {
+      "text": "データベースの場所：`/opt/tududi-db`。アップロード：`/opt/tududi-uploads`",
       "type": "info"
     }
   ]

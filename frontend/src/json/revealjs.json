@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/reveal-js.webp",
   "config_path": "/opt/revealjs/gulpfile.js",
   "description": "reveal.js is an open source HTML presentation framework. It's a tool that enables anyone with a web browser to create fully-featured and beautiful presentations for free.",
+  "description_zh": "reveal.js 是一個開源的 HTML 展示框架。這是一個工具，使任何擁有網路瀏覽器的人都能免費建立功能完整且美觀的簡報。",
+  "description_ja": "reveal.jsはオープンソースのHTMLプレゼンテーションフレームワークです。Webブラウザを持つ誰でも無料で機能豊富で美しいプレゼンテーションを作成できるツールです。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,18 @@
   "notes": [
     {
       "text": "LiveReload is on port: 35729",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "LiveReload 在連接埠：35729",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "LiveReloadはポート：35729です",
       "type": "info"
     }
   ]

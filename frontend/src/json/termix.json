@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/termix.webp",
   "config_path": "",
   "description": "Termix is an open-source, self-hosted server management platform with SSH terminal access, SSH tunneling, remote file management, Docker management, and multi-platform support.",
+  "description_zh": "Termix 是一個開源的自主託管伺服器管理平台，具有 SSH 終端存取、SSH 隧道、遠端檔案管理、Docker 管理和多平台支援。",
+  "description_ja": "Termixはオープンソースの自己ホスト型サーバー管理プラットフォームで、SSHターミナルアクセス、SSHトンネリング、リモートファイル管理、Docker管理、マルチプラットフォームサポートを備えています。",
   "install_methods": [
     {
       "type": "default",

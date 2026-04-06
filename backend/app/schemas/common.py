@@ -13,6 +13,7 @@ class Token(BaseModel):
     """JWT 存取權杖回應"""
 
     access_token: str
+    refresh_token: str | None = None
     token_type: str = "bearer"
 
 
@@ -20,6 +21,8 @@ class TokenPayload(BaseModel):
     """JWT Token payload"""
 
     sub: str | None = None
+    type: str | None = None
+    ver: int = 0
 
 
 class NewPassword(BaseModel):

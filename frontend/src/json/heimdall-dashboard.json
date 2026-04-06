@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/heimdall.webp",
   "config_path": "/opt/Heimdall/.env",
   "description": "Heimdall Dashboard is a self-hosted, web-based dashboard for managing and monitoring the health of applications and servers. It allows you to keep track of the status of your systems from a single, centralized location, and receive notifications when things go wrong. With Heimdall Dashboard, you have full control over your data and can customize it to meet your specific needs. Self-hosting the dashboard gives you the flexibility to run it on your own infrastructure, making it a suitable solution for organizations that prioritize data security and privacy.",
+  "description_zh": "Heimdall Dashboard 是一個自託管的基於網頁的儀表板，用於管理和監控應用程式和伺服器的健康狀況。它允許您從單一的集中位置追蹤系統的狀態，並在出現問題時接收通知。通過 Heimdall Dashboard，您完全控制您的數據並可以自訂它以滿足您的特定需求。自託管儀表板為您提供了在自己的基礎設施上運行的靈活性，使其成為優先考慮數據安全和隱私的組織的合適解決方案。",
+  "description_ja": "Heimdall Dashboard は、アプリケーションとサーバーのヘルスを管理・監視するための自己ホスト型の Web ベースダッシュボードです。単一の集中化されたロケーションからシステムのステータスを追跡し、問題が発生したときに通知を受け取ることができます。Heimdall Dashboard では、データを完全に制御でき、特定のニーズに合わせてカスタマイズできます。ダッシュボードを自己ホストすることで、独自のインフラストラクチャで実行する柔軟性が得られ、データセキュリティとプライバシーを優先する組織に適したソリューションになります。",
   "install_methods": [
     {
       "type": "default",

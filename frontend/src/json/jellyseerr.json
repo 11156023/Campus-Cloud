@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/jellyseerr.webp",
   "config_path": "/etc/jellyseerr/jellyseerr.conf",
   "description": "Jellyseerr is a free and open source software application for managing requests for your media library. It is a a fork of Overseerr built to bring support for Jellyfin & Emby media servers.",
+  "description_zh": "Jellyseerr 是一個免費的開源軟體應用程式，用於管理媒體庫的請求。它是 Overseerr 的分支，用於為 Jellyfin 和 Emby 媒體伺服器帶來支援。",
+  "description_ja": "Jellyseerr は、メディア ライブラリのリクエストを管理するための無料のオープンソース ソフトウェア アプリケーションです。これは Jellyfin と Emby メディア サーバーのサポートをもたらすために構築された Overseerr のフォークです。",
   "install_methods": [
     {
       "type": "default",

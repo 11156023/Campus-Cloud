@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/proxmox.webp",
   "config_path": "",
   "description": "Proxmox Mail Gateway is the leading open-source email security solution helping you to protect your mail server against all email threats from the moment they emerge.",
+  "description_zh": "Proxmox Mail Gateway 是領先的開源電子郵件安全解決方案，幫助您保護郵件伺服器免受所有電子郵件威脅。",
+  "description_ja": "Proxmox Mail Gatewayは、メールサーバーを出現した時点からすべてのメール脅威から保護するのに役立つ、主要なオープンソースメールセキュリティソリューションです。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,18 @@
   "notes": [
     {
       "text": "Set a root password if using autologin. This will be the PMG password. `passwd root`",
+      "type": "warning"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "如果使用自動登入，請設定 root 密碼。這將是 PMG 密碼。`passwd root`",
+      "type": "warning"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "自動ログインを使用する場合はrootパスワードを設定します。これはPMGのパスワードになります。`passwd root`",
       "type": "warning"
     }
   ]

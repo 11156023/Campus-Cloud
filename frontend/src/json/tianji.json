@@ -11,7 +11,9 @@
   "website": "https://tianji.msgbyte.com/",
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/tianji.webp",
   "config_path": "/opt/tianji/src/server/.env",
-  "description": "Tianji is an open-source tool for website analytics, uptime monitoring, and server status tracking, all in one. It\u2019s lightweight, privacy-focused, and helps teams monitor web traffic, server health, and gather user interaction data",
+  "description": "Tianji is an open-source tool for website analytics, uptime monitoring, and server status tracking, all in one. It's lightweight, privacy-focused, and helps teams monitor web traffic, server health, and gather user interaction data",
+  "description_zh": "Tianji 是一個開源工具，用於網站分析、正常運作時間監控和伺服器狀態追蹤，全部合併在一起。它輕量級、注重隱私，並幫助團隊監控網路流量、伺服器健康狀況和收集使用者互動資料",
+  "description_ja": "Tianjiはウェブサイト分析、稼働時間監視、サーバーステータス追跡を1つで行うオープンソースツールです。軽量でプライバシーに焦点を当てており、チームがWebトラフィック、サーバーの健全性を監視し、ユーザーインタラクションデータを収集するのに役立ちます",
   "install_methods": [
     {
       "type": "default",

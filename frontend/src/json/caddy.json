@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/caddy.webp",
   "config_path": "/etc/caddy/Caddyfile",
   "description": "Caddy is a powerful, extensible platform to serve your sites, services, and apps, written in Go.",
+  "description_zh": "Caddy 是一個強大的、可擴展的平台，用於提供您的網站、服務和應用程式，用 Go 編寫。",
+  "description_ja": "Caddy は、Go で記述されたサイト、サービス、アプリを提供するための強力で拡張可能なプラットフォームです。",
   "install_methods": [
     {
       "type": "default",
@@ -51,6 +53,34 @@
     },
     {
       "text": "if you need an external module run: `xcaddy build --with github.com/caddy-dns/cloudflare`",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "caddy 更新後，xcaddy 需要手動更新！",
+      "type": "warning"
+    },
+    {
+      "text": "如果您需要內部模組，請執行：`caddy add-package PACKAGENAME`",
+      "type": "info"
+    },
+    {
+      "text": "如果您需要外部模組，請執行：`xcaddy build --with github.com/caddy-dns/cloudflare`",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "caddy 更新後、xcaddy を手動で更新する必要があります！",
+      "type": "warning"
+    },
+    {
+      "text": "内部モジュールが必要な場合は、`caddy add-package PACKAGENAME` を実行してください",
+      "type": "info"
+    },
+    {
+      "text": "外部モジュールが必要な場合は、`xcaddy build --with github.com/caddy-dns/cloudflare` を実行してください",
       "type": "info"
     }
   ]

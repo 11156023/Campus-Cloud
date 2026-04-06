@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/investbrain.webp",
   "config_path": "/opt/investbrain/.env",
   "description": "Investbrain is a smart open-source investment tracker that helps you manage, track, and make informed decisions about your investments.",
+  "description_zh": "Investbrain 是一個聰明的開源投資追蹤器，可幫助您管理、追蹤和做出有關投資的明智決策。",
+  "description_ja": "Investbrain は、投資を管理、追跡し、投資について情報に基づいた決定を下すのに役立つスマートなオープンソース投資トラッカーです。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,8 @@
   "notes": [
     {
       "text": "Database credentials: `cat ~/investbrain.creds`",
+      "text_zh": "資料庫憑證：`cat ~/investbrain.creds`",
+      "text_ja": "データベース認証情報：`cat ~/investbrain.creds`",
       "type": "info"
     }
   ]

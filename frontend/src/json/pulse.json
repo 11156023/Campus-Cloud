@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/pulse.webp",
   "config_path": "/etc/pulse",
   "description": "A lightweight monitoring application for Proxmox VE that displays real-time status for VMs and containers via a simple web interface.",
+  "description_zh": "一個適用於 Proxmox VE 的輕量級監控應用程式，透過簡單的網頁介面顯示 VM 和容器的即時狀態。",
+  "description_ja": "Proxmox VE用の軽量監視アプリケーションで、シンプルなWebインターフェースを通じてVMとコンテナのリアルタイムステータスを表示します。",
   "install_methods": [
     {
       "type": "default",
@@ -40,6 +42,34 @@
     },
     {
       "text": "Configure authentication in the Web UI => Settings => Security",
+      "type": "Info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "首先建立 Proxmox-API-Token：`https://github.com/rcourtman/Pulse?tab=readme-ov-file#creating-api-token`",
+      "type": "Info"
+    },
+    {
+      "text": "安裝後，透過內建設定精靈存取網頁介面以設定您的 Proxmox 連線詳細資訊",
+      "type": "Info"
+    },
+    {
+      "text": "在 Web UI => 設定 => 安全性中設定驗證",
+      "type": "Info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "最初にProxmox-API-Tokenを作成します：`https://github.com/rcourtman/Pulse?tab=readme-ov-file#creating-api-token`",
+      "type": "Info"
+    },
+    {
+      "text": "インストール後、組み込みセットアップウィザードを使用してWebインターフェースにアクセスし、Proxmox接続の詳細を構成します",
+      "type": "Info"
+    },
+    {
+      "text": "Web UI => 設定 => セキュリティで認証を構成します",
       "type": "Info"
     }
   ]

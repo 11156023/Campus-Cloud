@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/zot-registry.webp",
   "config_path": "/etc/zot/config.json",
   "description": "Zot is a cloud-native OCI image registry focused on extensibility, maintainability, and performance. It supports advanced features such as Web UI, security scanning, authentication via htpasswd and OIDC, and more.",
+  "description_zh": "Zot 是一個以可擴展性、可維護性和效能為重點的雲端原生 OCI 影像登錄檔。它支援進階功能，例如 Web UI、安全掃描、透過 htpasswd 和 OIDC 進行驗證等。",
+  "description_ja": "Zotは、拡張性、保守性、パフォーマンスに焦点を当てたクラウドネイティブOCIイメージレジストリです。Web UI、セキュリティスキャン、htpasswdおよびOIDC認証など、高度な機能をサポートしています。",
   "install_methods": [
     {
       "type": "default",

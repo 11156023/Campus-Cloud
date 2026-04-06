@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/librenms.webp",
   "config_path": "/opt/librenms/config.php and /opt/librenms/.env",
   "description": "LibreNMS is an open-source, community-driven network monitoring system that provides automatic discovery, alerting, and performance tracking for network devices. It supports a wide range of hardware and integrates with various notification and logging platforms.",
+  "description_zh": "LibreNMS 是一個開源、社區驅動的網路監控系統，提供自動發現、警報和網路設備的效能追蹤。它支持多種硬體並與各種通知和記錄平台集成。",
+  "description_ja": "LibreNMS は、ネットワーク デバイスの自動発見、アラート、パフォーマンス追跡を提供するオープンソースのコミュニティ主導型ネットワーク監視システムです。広範なハードウェアをサポートし、さまざまな通知とログ プラットフォームと統合されます。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,8 @@
   "notes": [
     {
       "text": "After installation, the admin user credentials are saved in the file ~/librenms.creds inside the container.",
+      "text_zh": "安裝後，管理員使用者認證儲存在容器內的 ~/librenms.creds 文件中。",
+      "text_ja": "インストール後、管理者ユーザー認証情報がコンテナ内の ~/librenms.creds ファイルに保存されます。",
       "type": "info"
     }
   ]

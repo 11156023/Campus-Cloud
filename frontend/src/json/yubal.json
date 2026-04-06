@@ -12,6 +12,8 @@
   "config_path": "/opt/yubal.env",
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/yubal.webp",
   "description": "YouTube Music album downloader with Spotify metadata auto-tagging.",
+  "description_zh": "YouTube Music 專輯下載器，具有 Spotify 中繼資料自動標記。",
+  "description_ja": "Spotifyメタデータ自動タグ付けを備えたYouTube Musicアルバムダウンローダー。",
   "install_methods": [
     {
       "type": "default",

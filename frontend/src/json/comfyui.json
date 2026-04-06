@@ -12,6 +12,8 @@
   "website": "https://www.comfy.org/",
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/comfyui.webp",
   "description": "ComfyUI is a node-based interface and inference engine for generative AI. Users can combine various AI models and operations through nodes to achieve highly customizable and controllable content generation.",
+  "description_zh": "ComfyUI 是一個基於節點的介面和生成式 AI 推論引擎。用戶可以通過節點組合各種 AI 模型和操作，實現高度可自訂和可控的內容生成。",
+  "description_ja": "ComfyUI は、生成 AI のノード ベースのインターフェースと推論エンジンです。ユーザーはノードを通じてさまざまな AI モデルと操作を組み合わせて、高度にカスタマイズ可能で制御可能なコンテンツ生成を実現できます。",
   "install_methods": [
     {
       "type": "default",
@@ -36,6 +38,26 @@
     },
     {
       "text": "Please check that you have installed the drivers for your GPU.",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "應用程式需要很長時間才能安裝。請耐心等待！",
+      "type": "warning"
+    },
+    {
+      "text": "請確認您已安裝 GPU 的驅動程式。",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "アプリケーションのインストールに長時間がかかります。お待ちください！",
+      "type": "warning"
+    },
+    {
+      "text": "GPU のドライバーがインストールされていることを確認してください。",
       "type": "info"
     }
   ]

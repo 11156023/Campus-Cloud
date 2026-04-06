@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/paymenter.webp",
   "config_path": "/opt/paymenter/.env",
   "description": "Paymenter is an open source webshop solution for hosting companies. It's developed to provide an more easy way to manage your hosting company.",
+  "description_zh": "Paymenter 是針對託管公司的開源網店解決方案。它的開發目的是提供一個更簡單的方式來管理您的託管公司。",
+  "description_ja": "Paymenterは、ホスティング企業向けのオープンソースウェブショップソリューションです。ホスティング会社を管理するためのより簡単な方法を提供するために開発されました。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,8 @@
   "notes": [
     {
       "text": "After installation, navigate to the directory with `cd /opt/paymenter` and run `php artisan app:init`. An interactive setup will prompt you to enter your company name and application URL.",
+      "text_zh": "安裝後，使用 `cd /opt/paymenter` 導覽到目錄，然後執行 `php artisan app:init`。互動設定會提示您輸入公司名稱和應用程式 URL。",
+      "text_ja": "インストール後、`cd /opt/paymenter` でディレクトリに移動し、`php artisan app:init` を実行してください。インタラクティブセットアップで、会社名とアプリケーションURLを入力するように促されます。",
       "type": "info"
     }
   ]

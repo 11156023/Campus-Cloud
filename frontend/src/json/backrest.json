@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/backrest.webp",
   "config_path": "/opt/backrest/config/config.json | /opt/backrest/.env",
   "description": "Backrest is a web-accessible backup solution built on top of restic and providing a WebUI which wraps the restic CLI and makes it easy to create repos, browse snapshots, and restore files. Additionally, Backrest can run in the background and take an opinionated approach to scheduling snapshots and orchestrating repo health operations.",
+  "description_zh": "Backrest 是一個建立在 restic 之上的網頁可訪問備份解決方案，提供 WebUI 以包裝 restic CLI，使創建存儲庫、瀏覽快照和恢復文件變得容易。此外，Backrest 可在後台運行，並採用明確的方法來安排快照和協調存儲庫健康操作。",
+  "description_ja": "Backrest は restic の上に構築されたウェブアクセス可能なバックアップソリューションで、restic CLI をラップし、リポジトリの作成、スナップショットの閲覧、ファイルの復元を簡単にする WebUI を提供します。さらに、Backrest はバックグラウンドで実行でき、スナップショットのスケジューリングとリポジトリの健全性操作の調整に対して明確なアプローチを採用できます。",
   "install_methods": [
     {
       "type": "default",
@@ -33,6 +35,18 @@
     {
       "type": "info",
       "text": "`cat ~/.ssh/id_ed25519.pub` to view ssh public key. This key is used to authenticate with sftp targets. You can add this key on the sftp server."
+    }
+  ],
+  "notes_zh": [
+    {
+      "type": "info",
+      "text": "使用 `cat ~/.ssh/id_ed25519.pub` 查看 SSH 公開金鑰。此金鑰用於與 sftp 目標進行身份驗證。您可以在 sftp 伺服器上新增此金鑰。"
+    }
+  ],
+  "notes_ja": [
+    {
+      "type": "info",
+      "text": "`cat ~/.ssh/id_ed25519.pub` を使用して SSH 公開キーを表示します。このキーは sftp ターゲットで認証するために使用されます。このキーを sftp サーバーに追加できます。"
     }
   ]
 }

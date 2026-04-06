@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/ntfy.webp",
   "config_path": "/etc/ntfy/server.yml",
   "description": "ntfy (pronounced notify) is a simple HTTP-based pub-sub notification service. It allows you to send notifications to your phone or desktop via scripts from any computer, and/or using a REST API. It's infinitely flexible, and 100% free software.",
+  "description_zh": "ntfy（發音為 notify）是一個簡單的基於 HTTP 的發布-訂閱通知服務。它允許您透過來自任何電腦的指令碼以及/或使用 REST API 向您的手機或桌面發送通知。它具有無限的靈活性，並且 100% 是免費軟體。",
+  "description_ja": "ntfy（notify と発音）は、シンプルな HTTP ベースのパブサブ通知サービスです。任意のコンピュータからのスクリプトまたは REST API を使用して、携帯電話またはデスクトップに通知を送信できます。完全に柔軟で、100% 無料ソフトウェアです。",
   "install_methods": [
     {
       "type": "default",
@@ -29,5 +31,7 @@
     "username": null,
     "password": null
   },
-  "notes": []
+  "notes": [],
+  "notes_zh": [],
+  "notes_ja": []
 }

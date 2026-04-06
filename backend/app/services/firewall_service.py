@@ -176,15 +176,43 @@ def setup_default_rules(node: str, vmid: int, resource_type: ResourceType) -> No
 # ─── 連線管理（高階 API）─────────────────────────────────────────────────────
 
 
-def _get_vm_ip(vmid: int) -> str | None:
-    """取得 VM 的 IP 位址"""
+def _get_vm_ip(vmid: int, session: object = None) -> str | None:
+    """取得 VM 的 IP 位址。
+    優先從 Proxmox 即時查詢；若 VM 離線則回退到 DB 快取。
+    查詢成功時自動更新 DB 快取。
+    """
+    from app.repositories import resource as resource_repo  # noqa: PLC0415
+
+    ip: str | None = None
     try:
         resource = proxmox_service.find_resource(vmid)
         node = resource["node"]
         resource_type = resource["type"]
-        return proxmox_service.get_ip_address(node, vmid, resource_type)
+        ip = proxmox_service.get_ip_address(node, vmid, resource_type)
     except Exception:
-        return None
+        pass
+
+    if ip and session is not None:
+        # 更新 DB 快取（fire-and-forget，忽略失敗）
+        try:
+            resource_repo.update_ip_address(session=session, vmid=vmid, ip_address=ip)  # type: ignore[arg-type]
+        except Exception as e:
+            logger.debug(f"VM {vmid} IP 快取寫入失敗: {e}")
+        return ip
+
+    if ip:
+        return ip
+
+    # Proxmox 取不到 IP → 嘗試 DB 快取
+    if session is not None:
+        try:
+            cached = resource_repo.get_resource_by_vmid(session=session, vmid=vmid)  # type: ignore[arg-type]
+            if cached and cached.ip_address:
+                logger.debug(f"VM {vmid} 使用 DB 快取 IP: {cached.ip_address}")
+                return cached.ip_address
+        except Exception as e:
+            logger.debug(f"VM {vmid} DB 快取讀取失敗: {e}")
+    return None
 
 
 def _parse_connection_comment(comment: str) -> dict | None:
@@ -294,10 +322,12 @@ def create_connection(
     target_vmid: int | None,
     ports: list[PortSpec],
     direction: str = "one_way",
+    session: object = None,
 ) -> None:
     """建立 VM 間連線（或 VM 到網關，或 Internet 入站）。
 
     Internet 入站（source_vmid=None）：在 target VM 上建立入站允許規則。
+      - 若 port_spec.external_port 有值，額外建立 DNAT 規則（需傳入 session）。
     往網關（target_vmid=None）：在 source VM 上建立出站允許規則。
     VM 間連線：在 target VM 上建立入站允許規則，source 為 source VM 的 IP。
     雙向連線：同時在兩個 VM 上建立規則。
@@ -315,20 +345,99 @@ def create_connection(
             raise BadRequestError(f"目標 VM {target_vmid} 不存在")
         tgt_node = tgt_resource["node"]
         tgt_type = tgt_resource["type"]
-        for port_spec in ports:
-            comment = (
-                f"{_CC_PREFIX}gateway->{target_vmid}:{port_spec.protocol}"
-                if port_spec.port == 0
-                else f"{_CC_PREFIX}gateway->{target_vmid}:{port_spec.port}/{port_spec.protocol}"
-            )
-            rule = {
-                "type": "in",
-                "action": "ACCEPT",
-                **_make_rule_fields(port_spec.port, port_spec.protocol),
-                "enable": 1,
-                "comment": comment,
-            }
-            create_rule(tgt_node, target_vmid, tgt_type, rule)
+
+        # 判斷是否需要 Gateway VM（有 external_port 或 domain 的情況）
+        needs_gateway = any(
+            (p.external_port is not None and p.port != 0)
+            or (getattr(p, "domain", None) is not None and p.port != 0)
+            for p in ports
+        )
+        if needs_gateway:
+            if session is None:
+                raise BadRequestError("建立 Port Forwarding / 反向代理需要 DB session")
+            from app.repositories import gateway_config as gw_repo  # noqa: PLC0415
+            gw_cfg = gw_repo.get_gateway_config(session)  # type: ignore[arg-type]
+            if gw_cfg is None or not gw_cfg.host or not gw_cfg.encrypted_private_key:
+                raise BadRequestError(
+                    "請先至「Gateway VM 管理」設定 SSH 連線並生成金鑰，才能建立外部存取"
+                )
+
+        # 取得 VM IP（NAT / 反向代理規則需要）——在建立任何規則前先驗證
+        if needs_gateway:
+            tgt_ip = _get_vm_ip(target_vmid, session)
+            if tgt_ip is None:
+                raise BadRequestError(
+                    f"目標 VM {target_vmid} 沒有 IP 位址，無法建立外部存取規則"
+                )
+        else:
+            tgt_ip = None
+
+        # 記錄已建立的防火牆規則 comment，供失敗時 rollback
+        created_comments: list[str] = []
+        try:
+            for port_spec in ports:
+                comment = (
+                    f"{_CC_PREFIX}gateway->{target_vmid}:{port_spec.protocol}"
+                    if port_spec.port == 0
+                    else f"{_CC_PREFIX}gateway->{target_vmid}:{port_spec.port}/{port_spec.protocol}"
+                )
+                rule = {
+                    "type": "in",
+                    "action": "ACCEPT",
+                    **_make_rule_fields(port_spec.port, port_spec.protocol),
+                    "enable": 1,
+                    "comment": comment,
+                }
+                create_rule(tgt_node, target_vmid, tgt_type, rule)
+                created_comments.append(comment)
+
+                if port_spec.port == 0 or session is None:
+                    continue
+
+                domain = getattr(port_spec, "domain", None)
+                enable_https = getattr(port_spec, "enable_https", True)
+
+                if domain:
+                    # 🌐 反向代理（Traefik）
+                    from app.services import reverse_proxy_service  # noqa: PLC0415
+                    reverse_proxy_service.apply_reverse_proxy_rule(
+                        session=session,
+                        vmid=target_vmid,
+                        vm_ip=tgt_ip,
+                        domain=domain,
+                        internal_port=port_spec.port,
+                        enable_https=enable_https,
+                    )
+                elif port_spec.external_port is not None:
+                    # 🔌 Port 轉發（haproxy）
+                    from app.services import nat_service  # noqa: PLC0415
+                    nat_service.apply_nat_rule(
+                        session=session,
+                        vmid=target_vmid,
+                        vm_ip=tgt_ip,
+                        external_port=port_spec.external_port,
+                        internal_port=port_spec.port,
+                        protocol=port_spec.protocol,
+                    )
+                # else: 🔓 僅開放防火牆，不需額外操作
+        except Exception:
+            # 回退：刪除已建立的 Proxmox 防火牆規則
+            if created_comments:
+                try:
+                    existing = get_vm_firewall_rules(tgt_node, target_vmid, tgt_type)
+                    comment_set = set(created_comments)
+                    to_delete = sorted(
+                        [r["pos"] for r in existing if r.get("comment") in comment_set],
+                        reverse=True,
+                    )
+                    for pos in to_delete:
+                        try:
+                            delete_rule_by_pos(tgt_node, target_vmid, tgt_type, pos)
+                        except Exception as rb_err:
+                            logger.warning(f"rollback 刪除規則 pos={pos} 失敗: {rb_err}")
+                except Exception as rb_err:
+                    logger.warning(f"rollback 取得規則列表失敗: {rb_err}")
+            raise
         return
 
     try:
@@ -370,7 +479,7 @@ def create_connection(
         return
 
     # ── VM → VM ─────────────────────────────────────────────────────────────
-    src_ip = _get_vm_ip(source_vmid)
+    src_ip = _get_vm_ip(source_vmid, session)
     if not src_ip:
         raise BadRequestError(
             f"來源 VM {source_vmid} 沒有 IP 位址，請確認 VM 已啟動"
@@ -384,7 +493,7 @@ def create_connection(
     tgt_node = tgt_resource["node"]
     tgt_type = tgt_resource["type"]
 
-    tgt_ip = _get_vm_ip(target_vmid)
+    tgt_ip = _get_vm_ip(target_vmid, session)
     if not tgt_ip:
         raise BadRequestError(
             f"目標 VM {target_vmid} 沒有 IP 位址，請確認 VM 已啟動"
@@ -444,9 +553,11 @@ def delete_connection(
     source_vmid: int | None,
     target_vmid: int | None,
     ports: list[PortSpec] | None = None,
+    session: object = None,
 ) -> None:
     """刪除 VM 間連線（透過 comment 前綴識別 campus-cloud 管理的規則）。
     從最高 pos 開始刪除，避免 pos 位移問題。
+    Internet→VM 時同步清理 NAT DB 記錄並更新 Gateway VM haproxy。
     """
     # ── Internet → VM 入站規則刪除 ─────────────────────────────────────────
     if source_vmid is None:
@@ -464,6 +575,20 @@ def delete_connection(
             target_vmid=target_vmid,
             ports=ports,
         )
+        # 同步清理 Gateway VM 規則（haproxy + Traefik）
+        if session is not None:
+            from app.services import nat_service, reverse_proxy_service  # noqa: PLC0415
+            if ports is None:
+                nat_service.remove_nat_rules_for_vmid(session, target_vmid)
+                reverse_proxy_service.remove_reverse_proxy_rules_for_vmid(session, target_vmid)
+            else:
+                for port_spec in ports:
+                    nat_service.remove_nat_rules_by_internal_port(
+                        session, target_vmid, port_spec.port, port_spec.protocol
+                    )
+                    reverse_proxy_service.remove_reverse_proxy_rules_by_internal_port(
+                        session, target_vmid, port_spec.port
+                    )
         return
 
     # 決定要在哪個 VM 上刪除規則
@@ -677,6 +802,57 @@ def get_connections_from_rules(vmids: list[int]) -> list[TopologyEdge]:
     return list(edges.values())
 
 
+def _enrich_edges_from_db(
+    edges: list[TopologyEdge], session: Session
+) -> None:
+    """將 Internet→VM edge 中的 port specs 充實 DB 資訊。
+    - NatRule → 填入 external_port
+    - ReverseProxyRule → 填入 domain + enable_https
+    """
+    from app.repositories import nat_rule as nat_repo  # noqa: PLC0415
+    from app.repositories import reverse_proxy as rp_repo  # noqa: PLC0415
+
+    # 只處理 Internet→VM edges（source_vmid=None）
+    inbound_edges = [e for e in edges if e.source_vmid is None and e.target_vmid is not None]
+    if not inbound_edges:
+        return
+
+    # 一次載入所有相關 VM 的 NAT / Reverse Proxy 規則
+    vmids = {e.target_vmid for e in inbound_edges}
+    nat_rules = nat_repo.list_rules(session)
+    rp_rules = rp_repo.list_rules(session)
+
+    # 建立快查 dict：(vmid, internal_port, protocol) → NatRule
+    nat_lookup: dict[tuple[int, int, str], object] = {}
+    for r in nat_rules:
+        if r.vmid in vmids:
+            nat_lookup[(r.vmid, r.internal_port, r.protocol)] = r
+
+    # 建立快查 dict：(vmid, internal_port) → ReverseProxyRule
+    rp_lookup: dict[tuple[int, int], object] = {}
+    for r in rp_rules:
+        if r.vmid in vmids:
+            rp_lookup[(r.vmid, r.internal_port)] = r
+
+    # 充實 port specs
+    for edge in inbound_edges:
+        tgt = edge.target_vmid
+        for port_spec in edge.ports:
+            # 先查 reverse proxy
+            rp_key = (tgt, port_spec.port)
+            rp_rule = rp_lookup.get(rp_key)
+            if rp_rule:
+                port_spec.domain = rp_rule.domain
+                port_spec.enable_https = rp_rule.enable_https
+                continue
+
+            # 再查 NAT
+            nat_key = (tgt, port_spec.port, port_spec.protocol)
+            nat_rule = nat_lookup.get(nat_key)
+            if nat_rule:
+                port_spec.external_port = nat_rule.external_port
+
+
 def get_topology(user: User, session: Session) -> TopologyResponse:
     """取得使用者的防火牆拓撲（節點 + 連線）
 
@@ -724,6 +900,15 @@ def get_topology(user: User, session: Session) -> TopologyResponse:
             ip_address = proxmox_service.get_ip_address(
                 resource["node"], vmid, resource["type"]
             )
+            if ip_address:
+                resource_repo.update_ip_address(
+                    session=session, vmid=vmid, ip_address=ip_address
+                )
+            else:
+                # VM 離線時回退 DB 快取
+                cached = resource_repo.get_resource_by_vmid(session=session, vmid=vmid)
+                if cached and cached.ip_address:
+                    ip_address = cached.ip_address
         except Exception:
             pass
 
@@ -770,7 +955,8 @@ def get_topology(user: User, session: Session) -> TopologyResponse:
         )
     )
 
-    # 解析連線
+    # 解析連線並充實 DB 資訊（external_port / domain）
     edges = get_connections_from_rules(valid_vmids)
+    _enrich_edges_from_db(edges, session)
 
     return TopologyResponse(nodes=nodes, edges=edges)

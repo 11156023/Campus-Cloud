@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/jupyter.webp",
   "config_path": "",
   "description": "The Jupyter Notebook is an open-source web application that allows you to create and share documents that contain live code, equations, visualizations and narrative text. Uses include: data cleaning and transformation, numerical simulation, statistical modeling, data visualization, machine learning, and much more.",
+  "description_zh": "Jupyter Notebook 是一個開源的網路應用程式，允許您建立和共享包含即時程式碼、方程式、視覺化和敘述文字的文件。用途包括：資料清理和轉換、數值模擬、統計建模、資料視覺化、機器學習等等。",
+  "description_ja": "Jupyter Notebook は、ライブ コード、方程式、視覚化、ナラティブ テキストを含むドキュメントを作成して共有できるオープンソースの Web アプリケーションです。用途には、データのクリーニングと変換、数値シミュレーション、統計モデリング、データ視覚化、機械学習などが含まれます。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,8 @@
   "notes": [
     {
       "text": "To get the token to access the Jupyter Notebook, run the following command: jupyter notebook list.",
+      "text_zh": "若要取得存取 Jupyter Notebook 的權杖，執行下列命令：jupyter notebook list。",
+      "text_ja": "Jupyter Notebook にアクセスするためのトークンを取得するには、次のコマンドを実行します：jupyter notebook list。",
       "type": "info"
     }
   ]

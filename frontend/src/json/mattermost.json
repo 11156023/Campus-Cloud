@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/mattermost.webp",
   "config_path": "/opt/mattermost/config/config.json",
   "description": "Mattermost is an open source platform for secure collaboration across the entire software development lifecycle. It's written in Go and React and runs as a single Linux binary with MySQL or PostgreSQL. It has a slimilar interface and features to Slack or Discord.",
+  "description_zh": "Mattermost 是一個開源平台，用於整個軟體開發生命週期中的安全協作。它使用 Go 和 React 編寫，作為具有 MySQL 或 PostgreSQL 的單一 Linux 二進位檔運行。它具有與 Slack 或 Discord 相似的介面和功能。",
+  "description_ja": "Mattermost はソフトウェア開発ライフサイクル全体における安全なコラボレーションのためのオープンソースプラットフォームです。Go と React で記述され、MySQL または PostgreSQL を備えた単一の Linux バイナリとして実行されます。Slack や Discord と同様のインターフェイスと機能を備えています。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,18 @@
   "notes": [
     {
       "text": "WARNING: Installation sources scripts outside of Community Scripts repo. Please check the source before installing.",
+      "type": "warning"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "警告：安裝源指令碼在社群指令碼存放庫外。安裝前請檢查來源。",
+      "type": "warning"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "警告: インストール ソース スクリプトはコミュニティ スクリプト リポジトリの外にあります。インストール前に必ずソースを確認してください。",
       "type": "warning"
     }
   ]

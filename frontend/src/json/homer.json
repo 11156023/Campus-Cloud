@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/homer.webp",
   "config_path": "/opt/homer/assets/config.yml",
   "description": "Homer is a simple and lightweight static homepage generator that allows you to create and manage a home page for your server. It uses a YAML configuration file to define the layout and content of your homepage, making it easy to set up and customize. The generated homepage is static, meaning it does not require any server-side processing, making it fast and efficient to serve. Homer is designed to be a flexible and low-maintenance solution for organizing and accessing your services and information from a single, centralized location.",
+  "description_zh": "Homer 是一個簡單輕量的靜態主頁生成器，允許您為伺服器創建和管理主頁。它使用 YAML 配置文件定義主頁的佈局和內容，使其易於設置和自訂。生成的主頁是靜態的，這意味著它不需要任何服務器端處理，使其快速高效地提供。Homer 設計用於靈活、低維護的解決方案，用於從單一的集中位置組織和訪問您的服務和信息。",
+  "description_ja": "Homer は、シンプルで軽量の静的ホームページ ジェネレーター、サーバー用のホームページを作成・管理できます。YAML 設定ファイルを使用してホームページのレイアウトと内容を定義するため、セットアップとカスタマイズが簡単です。生成されたホームページは静的であり、サーバー側の処理が不要なため、高速で効率的に提供できます。Homer は、単一の集中化されたロケーションからサービスと情報を整理・アクセスするための、柔軟で低保守ソリューションに設計されています。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,18 @@
   "notes": [
     {
       "text": "Configuration Path: `/opt/homer/assets/config.yml`",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "配置路徑：`/opt/homer/assets/config.yml`",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "設定パス：`/opt/homer/assets/config.yml`",
       "type": "info"
     }
   ]

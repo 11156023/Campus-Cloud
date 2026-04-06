@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/adguard-home.webp",
   "config_path": "/opt/AdGuardHome/AdGuardHome.yaml",
   "description": "AdGuard Home is an open-source, self-hosted network-wide ad blocker. It blocks advertisements, trackers, phishing and malware websites, and provides protection against online threats. AdGuard Home is a DNS-based solution, which means it blocks ads and malicious content at the network level, before it even reaches your device. It runs on your home network and can be easily configured and managed through a web-based interface. It provides detailed statistics and logs, allowing you to see which websites are being blocked, and why. AdGuard Home is designed to be fast, lightweight, and easy to use, making it an ideal solution for home users who want to block ads, protect their privacy, and improve the speed and security of their online experience.",
+  "description_zh": "AdGuard Home 是一個開源的、自主部署的網路級廣告攔截器。它可以攔截廣告、追蹤器、釣魚和惡意軟體網站，並提供防護對抗線上威脅。AdGuard Home 是一個基於 DNS 的解決方案，這意味著它在廣告和惡意內容到達您的設備之前，就在網路級別攔截它們。它在您的家庭網路上運行，可以通過基於網絡的介面輕鬆配置和管理。它提供詳細的統計資訊和日誌，讓您能夠查看哪些網站被攔截以及原因。AdGuard Home 設計得快速、輕量級且易於使用，是家庭用戶希望攔截廣告、保護隱私並改善線上體驗的速度和安全性的理想解決方案。",
+  "description_ja": "AdGuard Homeはオープンソースの自己ホスト型ネットワーク規模の広告ブロッカーです。広告、追跡者、フィッシング、マルウェアサイトをブロックし、オンライン上の脅威から保護します。AdGuard HomeはDNSベースのソリューションであり、デバイスに到達する前にネットワークレベルで広告と悪意のあるコンテンツをブロックします。ホームネットワーク上で実行でき、Webベースのインターフェイスを通じて簡単に構成および管理できます。詳細な統計情報とログを提供し、どのサイトがブロックされているのか、そしてなぜかを確認できます。AdGuard Homeは、高速で軽量で使いやすいように設計されており、広告をブロックしてプライバシーを保護し、オンライン体験の速度とセキュリティを向上させたいホームユーザーに最適なソリューションです。",
   "install_methods": [
     {
       "type": "default",
@@ -43,6 +45,18 @@
   "notes": [
     {
       "text": "AdGuard Home can only be updated via the user interface.",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "AdGuard Home 只能通過使用者介面進行更新。",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "AdGuard Homeはユーザーインターフェイスを通じてのみ更新できます。",
       "type": "info"
     }
   ]

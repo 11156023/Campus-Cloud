@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/omada.webp",
   "config_path": "",
   "description": "Omada Controller is a software application used to manage TP-Link's Omada EAP (Enterprise Access Point) devices. It allows administrators to centrally manage a large number of EAPs, monitor network performance, and control user access to the network. The software provides an intuitive interface for network configuration, firmware upgrades, and network monitoring. By using the Omada Controller, administrators can streamline the management process, reduce manual intervention, and improve the overall security and reliability of the network.",
+  "description_zh": "Omada Controller 是一個軟體應用程式，用於管理 TP-Link 的 Omada EAP（企業存取點）設備。它允許管理員集中管理大量 EAP、監視網路效能以及控制使用者對網路的存取。該軟體提供直觀的介面進行網路設定、韌體升級和網路監視。透過使用 Omada Controller，管理員可以簡化管理流程、減少手動干預，並改善網路的整體安全性和可靠性。",
+  "description_ja": "Omada Controller は、TP-Link の Omada EAP（エンタープライズ アクセス ポイント）デバイスを管理するために使用されるソフトウェア アプリケーションです。管理者は多数の EAP を一元管理し、ネットワーク パフォーマンスを監視し、ネットワークへのユーザー アクセスを制御できます。このソフトウェアは、ネットワーク構成、ファームウェア アップグレード、ネットワーク監視のための直感的なインターフェイスを提供します。Omada Controller を使用することで、管理者は管理プロセスを効率化し、手動操作を減らし、ネットワークの全体的なセキュリティと信頼性を向上させることができます。",
   "install_methods": [
     {
       "type": "default",
@@ -29,5 +31,7 @@
     "username": null,
     "password": null
   },
-  "notes": []
+  "notes": [],
+  "notes_zh": [],
+  "notes_ja": []
 }

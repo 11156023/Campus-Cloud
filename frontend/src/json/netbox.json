@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/netbox.webp",
   "config_path": "/opt/netbox/netbox/netbox/configuration.py",
   "description": "NetBox is the source of truth for everything on your network, from physical components like power systems and cabling to virtual assets like IP addresses and VLANs. Network automation and observability tools depend on NetBox’s authoritative data to roll out configurations, monitor changes, and accelerate operations across the enterprise",
+  "description_zh": "NetBox 是您網路上一切事物的真實來源，從電源系統和佈線等實體元件到 IP 位址和 VLAN 等虛擬資產。網路自動化和可觀測性工具依靠 NetBox 的權威資料來推出設定、監視變更以及加快企業範圍內的營運。",
+  "description_ja": "NetBox は、電源システムとケーブルなどの物理コンポーネントから IP アドレスと VLAN などの仮想資産まで、ネットワーク上のすべてのシングル ソース オブ トゥルースです。ネットワーク自動化と可観測性ツールは、NetBox の権威あるデータに依存して、構成をロール アウトし、変更を監視し、企業全体の操作を加速化しています。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,18 @@
   "notes": [
     {
       "text": "Show login and database credentials: `cat netbox.creds`",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "顯示登入和資料庫認證：`cat netbox.creds`",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "ログインとデータベース認証情報を表示: `cat netbox.creds`",
       "type": "info"
     }
   ]

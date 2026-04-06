@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/proxmox.webp",
   "config_path": "",
   "description": "The Proxmox Datacenter Manager project has been developed with the objective of providing a centralized overview of all your individual nodes and clusters. It also enables basic management like migrations of virtual guests without any cluster network requirements. ",
+  "description_zh": "Proxmox 資料中心管理員專案的開發目的是提供所有個別節點和叢集的集中概覽。它也支援基本管理，例如在沒有任何叢集網路需求的情況下遷移虛擬來賓。",
+  "description_ja": "Proxmoxデータセンターマネージャープロジェクトは、すべての個別ノードとクラスターの集中化された概要を提供することを目的として開発されました。また、クラスターネットワーク要件なしで仮想ゲストの移行などの基本的な管理を可能にします。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,18 @@
   "notes": [
     {
       "text": "Set a root password if using autologin. This will be the Proxmox-Datacenter-Manager password. `sudo passwd root`",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "如果使用自動登入，請設定 root 密碼。這將是 Proxmox-Datacenter-Manager 密碼。`sudo passwd root`",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "自動ログインを使用する場合はrootパスワードを設定します。これはProxmox-Datacenter-Managerのパスワードになります。`sudo passwd root`",
       "type": "info"
     }
   ]

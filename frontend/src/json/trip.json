@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/trip.webp",
   "config_path": "/opt/trip.env",
   "description": "Minimalist POI Map Tracker and Trip Planner. Self-hosted.",
+  "description_zh": "最小化 POI 地圖追蹤器和行程規劃工具。自主託管。",
+  "description_ja": "ミニマリストPOIマップトラッカーとトリッププランナー。自己ホスト型。",
   "install_methods": [
     {
       "type": "default",

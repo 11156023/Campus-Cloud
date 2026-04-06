@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/snipe-it.webp",
   "config_path": "/opt/snipe-it/.env",
   "description": "This is a FOSS project for asset management in IT Operations. Knowing who has which laptop, when it was purchased in order to depreciate it correctly, handling software licenses, etc.",
+  "description_zh": "這是一個用於 IT 營運中資產管理的 FOSS 專案。知道誰有哪台筆記型電腦、何時購買以正確折舊、處理軟體授權等。",
+  "description_ja": "これはIT運用におけるアセット管理のためのFOSSプロジェクトです。誰がどのラップトップを持っているか、正しく減価償却するために購入した時期、ソフトウェアライセンスの処理などを知っています。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,18 @@
   "notes": [
     {
       "text": "Post Install: `https://github.com/community-scripts/ProxmoxVE/discussions/671`",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "安裝後：`https://github.com/community-scripts/ProxmoxVE/discussions/671`",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "インストール後：`https://github.com/community-scripts/ProxmoxVE/discussions/671`",
       "type": "info"
     }
   ]

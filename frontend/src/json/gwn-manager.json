@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/gwn-manager.webp",
   "config_path": "/gwn/conf/gwn.conf",
   "description": "GWN Manager is a free on-premise enterprise-grade, management platform for Grandstream GWN series devices. Typically deployed on a customer’s private network, this flexible, scalable solution offers simplified configuration and management.",
+  "description_zh": "GWN Manager 是一個免費的內部部署企業級管理平台，用於 Grandstream GWN 系列設備。通常部署在客戶的私有網絡上，這個靈活、可擴展的解決方案提供了簡化的配置和管理。",
+  "description_ja": "GWN Manager は Grandstream GWN シリーズデバイス用の無料のオンプレミス エンタープライズグレードの管理プラットフォームです。通常はカスタマーのプライベートネットワークに展開され、この柔軟でスケーラブルなソリューションは簡略化された構成と管理を提供します。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,18 @@
   "notes": [
     {
       "text": "Installation package is pulled from GrandStream website. Installation may take a while.",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "安裝包從 GrandStream 網站拉取。安裝可能需要一段時間。",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "インストール パッケージは GrandStream ウェブサイトから取得されます。インストールに時間がかかる場合があります。",
       "type": "info"
     }
   ]

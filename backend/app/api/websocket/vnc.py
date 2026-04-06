@@ -14,8 +14,20 @@ from app.services import proxmox_service
 logger = logging.getLogger(__name__)
 
 
-async def vnc_proxy(websocket: WebSocket, vmid: int, token: str):
-    """WebSocket proxy for VM VNC console access."""
+async def vnc_proxy(
+    websocket: WebSocket,
+    vmid: int,
+    token: str,
+    vnc_ticket: str = "",
+    vnc_port: str = "",
+):
+    """WebSocket proxy for VM VNC console access.
+
+    When *vnc_ticket* and *vnc_port* are supplied (from the REST
+    ``/console`` endpoint) the proxy re-uses them so that the noVNC
+    client can authenticate with the **same** ticket it already has.
+    Otherwise the proxy creates a fresh ticket (fallback).
+    """
     # Authenticate user and check ownership before accepting
     user, session = await get_ws_current_user(websocket, token=token)
     try:
@@ -39,8 +51,6 @@ async def vnc_proxy(websocket: WebSocket, vmid: int, token: str):
             await websocket.close(code=1008, reason="Authentication failed")
             return
 
-        logger.info("Retrieved session ticket for VNC WebSocket authentication")
-
         # Find VM in cluster resources
         try:
             vm_info = proxmox_service.find_resource(vmid)
@@ -50,14 +60,13 @@ async def vnc_proxy(websocket: WebSocket, vmid: int, token: str):
             return
 
         node = vm_info["node"]
-        logger.info(
-            f"VM {vmid} found on node {node}, status: {vm_info.get('status', 'unknown')}"
-        )
 
-        # Get VNC proxy ticket
-        console_data = proxmox_service.get_vnc_ticket(node, vmid)
-        vnc_port = console_data["port"]
-        vnc_ticket = console_data["ticket"]
+        # Re-use the ticket/port from the REST endpoint when available,
+        # so the noVNC client authenticates with the same ticket.
+        if not (vnc_ticket and vnc_port):
+            console_data = proxmox_service.get_vnc_ticket(node, vmid)
+            vnc_port = console_data["port"]
+            vnc_ticket = console_data["ticket"]
 
         encoded_vnc_ticket = quote(vnc_ticket, safe="")
 
@@ -72,10 +81,9 @@ async def vnc_proxy(websocket: WebSocket, vmid: int, token: str):
 
         ssl_context = build_ws_ssl_context(_cfg)
 
-        logger.debug(f"Connecting to Proxmox VNC WebSocket: {pve_ws_url}")
         try:
             # Cookie header must NOT be URL-encoded; Proxmox rejects percent-encoded cookies.
-            # Proxmox vncwebsocket requires Sec-WebSocket-Protocol: binary (same as noVNC client).
+            # Proxmox vncwebsocket requires Sec-WebSocket-Protocol: binary.
             # proxy=None: disable system proxy — Proxmox is on a private network and
             # going through a proxy (websockets 16 default: proxy=True) breaks the connection.
             pve_websocket = await websockets.connect(
@@ -86,10 +94,9 @@ async def vnc_proxy(websocket: WebSocket, vmid: int, token: str):
                 max_size=2**20,
                 proxy=None,
             )
-            logger.info("Successfully connected to Proxmox VNC WebSocket")
         except websockets.exceptions.InvalidStatus as e:
             logger.error(
-                f"Proxmox WebSocket rejected: HTTP {e.response.status_code} — {e.response.headers}"
+                f"Proxmox WebSocket rejected: HTTP {e.response.status_code}"
             )
             await websocket.close(code=1008, reason="Proxmox connection failed")
             return
@@ -100,9 +107,13 @@ async def vnc_proxy(websocket: WebSocket, vmid: int, token: str):
 
         logger.info(f"WebSocket proxy established for VM {vmid}")
 
+        disconnect = asyncio.Event()
+
         async def forward_from_proxmox():
             try:
                 async for message in pve_websocket:
+                    if disconnect.is_set():
+                        break
                     try:
                         if isinstance(message, bytes):
                             await websocket.send_bytes(message)
@@ -114,12 +125,16 @@ async def vnc_proxy(websocket: WebSocket, vmid: int, token: str):
                 pass
             except Exception as e:
                 logger.error(f"Error forwarding from Proxmox: {e}")
+            finally:
+                disconnect.set()
 
         async def forward_to_proxmox():
             try:
-                while True:
+                while not disconnect.is_set():
                     data = await websocket.receive()
                     if data.get("type") == "websocket.disconnect":
+                        break
+                    if disconnect.is_set():
                         break
                     if "bytes" in data:
                         await pve_websocket.send(data["bytes"])
@@ -129,13 +144,21 @@ async def vnc_proxy(websocket: WebSocket, vmid: int, token: str):
                 pass
             except Exception as e:
                 logger.error(f"Error forwarding to Proxmox: {e}")
+            finally:
+                disconnect.set()
 
-        # Run both directions concurrently; first to finish cancels the other
-        await asyncio.gather(
-            forward_from_proxmox(),
-            forward_to_proxmox(),
-            return_exceptions=True,
-        )
+        # Run both directions; cancel the other when one finishes
+        tasks = [
+            asyncio.create_task(forward_from_proxmox()),
+            asyncio.create_task(forward_to_proxmox()),
+        ]
+        _done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+        for task in pending:
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
 
     except Exception as e:
         logger.error(f"Failed to establish WebSocket proxy: {e}", exc_info=True)

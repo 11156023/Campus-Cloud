@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/postgresql.webp",
   "config_path": "",
   "description": "PostgreSQL (often referred to as Postgres) is an open-source relational database management system that is known for its extensibility and strict adherence to SQL standards. It is a free and powerful database solution, suitable for a wide range of applications, from small projects to large enterprise systems. PostgreSQL is widely used for its reliability, feature-richness, and robustness.",
+  "description_zh": "PostgreSQL（通常稱為 Postgres）是一個開源關聯式資料庫管理系統，以其可擴展性和對 SQL 標準的嚴格遵守而聞名。它是一個免費且強大的資料庫解決方案，適合廣泛的應用程式，從小型專案到大型企業系統。PostgreSQL 因其可靠性、功能豐富性和健壯性而被廣泛使用。",
+  "description_ja": "PostgreSQL（通常Postgresと呼ばれる）は、拡張性とSQL標準への厳格な準拠で知られるオープンソースのリレーショナルデータベース管理システムです。小規模なプロジェクトから大規模なエンタープライズシステムまで、幅広いアプリケーションに適した無料で強力なデータベースソリューションです。PostgreSQLは、その信頼性、機能の豊かさ、堅牢性で広く使用されています。",
   "install_methods": [
     {
       "type": "default",
@@ -47,6 +49,26 @@
     },
     {
       "text": "Debian script offers versions `15, 16, 17, 18`, while Alpine script offers versions `15, 16, 17`.",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "安裝後透過執行 `echo \"ALTER USER postgres with encrypted password 'your_password';\" | sudo -u postgres psql` 為 postgres 使用者設定密碼",
+      "type": "info"
+    },
+    {
+      "text": "Debian 指令碼提供版本 `15、16、17、18`，而 Alpine 指令碼提供版本 `15、16、17`。",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "インストール後、`echo \"ALTER USER postgres with encrypted password 'your_password';\" | sudo -u postgres psql`を実行してPostgresユーザーのパスワードを設定してください",
+      "type": "info"
+    },
+    {
+      "text": "Debianスクリプトはバージョン`15、16、17、18`を提供し、Alpineスクリプトはバージョン`15、16、17`を提供します。",
       "type": "info"
     }
   ]

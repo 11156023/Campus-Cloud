@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/wger.webp",
   "config_path": "/opt/wikijs/config.yml",
   "description": "wger (ˈvɛɡɐ) Workout Manager is a free, open source web application that helps you manage your personal workouts, weight and diet plans and can also be used as a simple gym management utility. It offers a REST API as well, for easy integration with other projects and tools.",
+  "description_zh": "wger (ˈvɛɡɐ) 工作管理員是一個免費、開源的網頁應用程式，可幫助您管理個人工作、體重和飲食計畫，也可用作簡單的健身房管理工具。它還提供 REST API，便於與其他專案和工具整合。",
+  "description_ja": "wger (ˈvɛɡɐ) Workout Managerは、個人的なワークアウト、体重、ダイエットプランの管理を支援する無料のオープンソースWebアプリケーションで、シンプルなジム管理ユーティリティとしても使用できます。他のプロジェクトやツールとの簡単な統合のためのREST APIも提供しています。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,8 @@
   "notes": [
     {
       "text": "This LXC also runs Celery and Redis to synchronize workouts and ingredients",
+      "text_zh": "此 LXC 也執行 Celery 和 Redis 以同步工作和配料。",
+      "text_ja": "このLXCはCeleryとRedisも実行して、ワークアウトと成分を同期します。",
       "type": "info"
     }
   ]

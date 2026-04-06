@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/py-medusa.webp",
   "config_path": "",
   "description": "Medusa is an automatic Video Library Manager for TV Shows. It watches for new episodes of your favorite shows, and when they are posted it does its magic: automatic torrent/nzb searching, downloading, and processing at the qualities you want.",
+  "description_zh": "Medusa 是電視節目的自動視頻庫管理器。它監視您最喜歡節目的新集數，當發佈時，它會施展魔法：自動種子/nzb 搜尋、下載和按您想要的品質進行處理。",
+  "description_ja": "Medusa はテレビ番組の自動ビデオライブラリマネージャーです。お気に入りの番組の新しいエピソードを監視し、投稿されると魔法を施します。自動トレント/nzb 検索、ダウンロード、希望の品質での処理。",
   "install_methods": [
     {
       "type": "default",
@@ -29,5 +31,7 @@
     "username": null,
     "password": null
   },
-  "notes": []
+  "notes": [],
+  "notes_zh": [],
+  "notes_ja": []
 }

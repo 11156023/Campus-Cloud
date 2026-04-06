@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/runtipi.webp",
   "config_path": "opt/runtipi/state/settings.json",
   "description": "Runtipi lets you install all your favorite self-hosted apps without the hassle of configuring and managing each service. One-click installs and updates for more than 180 popular apps.",
+  "description_zh": "Runtipi 讓你安裝所有最愛的自主託管應用程式，無需配置和管理每個服務的麻煩。超過 180 個熱門應用程式的一鍵安裝和更新。",
+  "description_ja": "Runtimepyを使用すると、各サービスを構成・管理する手間をかけずに、お気に入りのすべての自己ホスト型アプリをインストールできます。180以上の人気アプリのワンクリックインストールと更新が可能です。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,18 @@
   "notes": [
     {
       "text": "WARNING: Installation sources scripts outside of Community Scripts repo. Please check the source before installing.",
+      "type": "warning"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "警告：安裝源於 Community Scripts 倉庫外的指令碼。安裝前請檢查來源。",
+      "type": "warning"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "警告：インストールスクリプトはCommunity Scriptsリポジトリの外から取得されます。インストール前にソースを確認してください。",
       "type": "warning"
     }
   ]

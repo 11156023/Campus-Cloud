@@ -299,16 +299,30 @@ def delete_resource(
 # IP address
 # ---------------------------------------------------------------------------
 
+def _is_usable_ipv4(ip: str) -> bool:
+    """過濾 loopback、link-local 等不可用的 IPv4 位址"""
+    return (
+        bool(ip)
+        and not ip.startswith("127.")
+        and not ip.startswith("169.254.")
+        and ip != "0.0.0.0"
+    )
+
+
 def get_ip_address(node: str, vmid: int, resource_type: ResourceType) -> str | None:
+    """取得 VM 的 IP 位址，掃描全部網卡（跳過 loopback / link-local）。"""
     proxmox = get_proxmox_api()
     try:
         if resource_type == "lxc":
             interfaces = proxmox.nodes(node).lxc(vmid).interfaces.get()
-            for iface in interfaces:
-                if iface.get("name") in ["eth0", "net0"]:
-                    inet = iface.get("inet")
-                    if inet:
-                        return inet.split("/")[0]
+            for iface in interfaces or []:
+                if iface.get("name") == "lo":
+                    continue
+                inet = iface.get("inet")
+                if inet:
+                    ip = inet.split("/")[0]
+                    if _is_usable_ipv4(ip):
+                        return ip
         else:
             try:
                 network_info = (
@@ -318,13 +332,13 @@ def get_ip_address(node: str, vmid: int, resource_type: ResourceType) -> str | N
                 )
                 if network_info and "result" in network_info:
                     for iface in network_info["result"]:
-                        if iface.get("name") in ["eth0", "ens18"]:
-                            for ip in iface.get("ip-addresses", []):
-                                if (
-                                    ip.get("ip-address-type") == "ipv4"
-                                    and not ip.get("ip-address", "").startswith("127.")
-                                ):
-                                    return ip.get("ip-address")
+                        if iface.get("name") == "lo":
+                            continue
+                        for ip_entry in iface.get("ip-addresses", []):
+                            if ip_entry.get("ip-address-type") == "ipv4":
+                                ip = ip_entry.get("ip-address", "")
+                                if _is_usable_ipv4(ip):
+                                    return ip
             except Exception:
                 pass
     except Exception as e:

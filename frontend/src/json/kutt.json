@@ -12,6 +12,8 @@
   "website": "https://kutt.it",
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/kutt.webp",
   "description": "Kutt is a modern URL shortener with support for custom domains. Create and edit links, view statistics, manage users, and more.",
+  "description_zh": "Kutt 是一個現代 URL 縮短工具，支援自訂網域。建立和編輯連結、檢視統計資料、管理使用者等。",
+  "description_ja": "Kutt は、カスタム ドメインをサポートする最新の URL 短縮工具です。リンクの作成と編集、統計の表示、ユーザーの管理など。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,8 @@
   "notes": [
     {
       "text": "Kutt needs so be served with an SSL certificate for its login to work. During install, you will be prompted to choose if you want to have Caddy installed for SSL termination or if you want to use your own reverse proxy (in that case point your reverse proxy to port 3000).",
+      "text_zh": "Kutt 需要使用 SSL 憑證提供其登入以進行工作。在安裝期間，系統將提示您選擇是否要安裝 Caddy 以進行 SSL 終止，或是否要使用自己的反向代理（在這種情況下，將反向代理指向連接埠 3000）。",
+      "text_ja": "Kutt は、ログインを機能させるために SSL 証明書で提供する必要があります。インストール中に、SSL 終了のために Caddy をインストールするか、独自のリバース プロキシを使用するか（その場合、リバース プロキシをポート 3000 にポイントします）を選択するように求められます。",
       "type": "info"
     }
   ]

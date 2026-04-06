@@ -12,6 +12,8 @@
   "website": "https://minarca.org/en_CA",
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/minarca.webp",
   "description": "Minarca is a self-hosted open source data backup software that allows you to manage your computer and server backups for free from a direct online accessible centralized view of your data with easy retrieval.",
+  "description_zh": "Minarca 是一個自託管的開源資料備份軟體，讓您可以免費從直接線上存取的集中式資料檢視中管理電腦和伺服器備份，並能輕鬆擷取。",
+  "description_ja": "Minarca は自己ホスト型のオープンソースデータバックアップソフトウェアで、直接オンラインでアクセス可能な一元化されたデータビューから、コンピュータとサーバーのバックアップを無料で管理でき、簡単に取得できます。",
   "install_methods": [
     {
       "type": "default",
@@ -29,5 +31,7 @@
     "username": "admin",
     "password": "admin123"
   },
-  "notes": []
+  "notes": [],
+  "notes_zh": [],
+  "notes_ja": []
 }

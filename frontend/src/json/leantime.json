@@ -12,6 +12,8 @@
   "website": "https://leantime.io",
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/leantime.webp",
   "description": "Leantime is a goals focused project management system for non-project managers. Building with ADHD, Autism, and dyslexia in mind. ",
+  "description_zh": "Leantime 是一個目標導向的專案管理系統，適用於非專案經理。以 ADHD、自閉症和閱讀障礙為考慮而構建。",
+  "description_ja": "Leantime は、非プロジェクト マネージャー向けの目標志向のプロジェクト管理システムです。ADHD、自閉症、失読症を念頭に置いて構築されています。",
   "install_methods": [
     {
       "type": "default",

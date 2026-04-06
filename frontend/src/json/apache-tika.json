@@ -12,6 +12,8 @@
   "logo": "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp/apache-tika.webp",
   "config_path": "/opt/apache-tika/tika-config.xml",
   "description": "The Apache Tika™ toolkit detects and extracts metadata and text from over a thousand different file types (such as PPT, XLS, and PDF). All of these file types can be parsed through a single interface, making Tika useful for search engine indexing, content analysis, translation, and much more.",
+  "description_zh": "Apache Tika™ 工具包從超過一千種不同的文件類型（如 PPT、XLS 和 PDF）檢測和提取元數據和文本。所有這些文件類型都可以通過單一介面進行解析，使 Tika 對搜索引擎索引、內容分析、翻譯等非常有用。",
+  "description_ja": "Apache Tika™ ツールキットは、PPT、XLS、PDF などの 1000 種類以上のファイル形式からメタデータとテキストを検出・抽出します。これらすべてのファイル タイプを単一のインターフェイスで解析できるため、Tika は検索エンジン インデックス作成、コンテンツ分析、翻訳などに役立ちます。",
   "install_methods": [
     {
       "type": "default",
@@ -32,6 +34,18 @@
   "notes": [
     {
       "text": "Configuration file is not created at install time. Example is at: `https://cwiki.apache.org/confluence/display/TIKA/TikaServer+in+Tika+2.x`",
+      "type": "info"
+    }
+  ],
+  "notes_zh": [
+    {
+      "text": "配置文件在安裝時不會創建。示例位於：`https://cwiki.apache.org/confluence/display/TIKA/TikaServer+in+Tika+2.x`",
+      "type": "info"
+    }
+  ],
+  "notes_ja": [
+    {
+      "text": "設定ファイルはインストール時に作成されません。例は次の場所にあります：`https://cwiki.apache.org/confluence/display/TIKA/TikaServer+in+Tika+2.x`",
       "type": "info"
     }
   ]
