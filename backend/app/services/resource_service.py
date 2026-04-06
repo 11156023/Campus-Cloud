@@ -41,7 +41,12 @@ def _build_resource_public(
                     session=session, vmid=vmid, ip_address=ip_address
                 )
             except Exception:
-                pass
+                logger.warning(
+                    "Failed to update cached IP address for vmid=%s ip_address=%s",
+                    vmid,
+                    ip_address,
+                    exc_info=True,
+                )
     else:
         # VM 離線時用 DB 快取
         if db_resource and db_resource.ip_address:
