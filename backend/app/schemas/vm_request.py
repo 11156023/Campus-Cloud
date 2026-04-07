@@ -41,8 +41,9 @@ class VMRequestCreate(BaseModel):
     environment_type: str = "Custom"
     os_info: str | None = None
     expiry_date: date | None = None
-    start_at: datetime
-    end_at: datetime
+    mode: Literal["immediate", "scheduled"] = "scheduled"
+    start_at: datetime | None = None
+    end_at: datetime | None = None
 
     ostemplate: str | None = None
     rootfs_size: int | None = None
@@ -92,6 +93,8 @@ class VMRequestPublic(BaseModel):
     placement_strategy_used: str | None = None
     migration_status: VMMigrationStatus = VMMigrationStatus.idle
     migration_error: str | None = None
+    migration_pinned: bool = False
+    resource_warning: str | None = None
     rebalance_epoch: int = 0
     last_rebalanced_at: datetime | None = None
     last_migrated_at: datetime | None = None
@@ -135,6 +138,21 @@ class VMRequestReviewOverlapItem(BaseModel):
     is_provisioned: bool = False
 
 
+class VMRequestReviewNodeScore(BaseModel):
+    node: str
+    balance_score: float = 0.0
+    cpu_share: float = 0.0
+    memory_share: float = 0.0
+    disk_share: float = 0.0
+    peak_penalty: float = 0.0
+    loadavg_penalty: float = 0.0
+    storage_penalty: float = 0.0
+    migration_cost: float = 0.0
+    priority: int = 5
+    is_selected: bool = False
+    reason: str | None = None
+
+
 class VMRequestReviewProjectedNode(BaseModel):
     node: str
     request_count: int = Field(default=0, ge=0)
@@ -153,6 +171,7 @@ class VMRequestReviewContext(BaseModel):
     summary: str
     reasons: list[str] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
+    resource_warnings: list[str] = Field(default_factory=list)
     cluster_nodes: list[str] = Field(default_factory=list)
     current_running_resources: list[VMRequestReviewRuntimeResource] = Field(
         default_factory=list
@@ -161,6 +180,7 @@ class VMRequestReviewContext(BaseModel):
         default_factory=list
     )
     projected_nodes: list[VMRequestReviewProjectedNode] = Field(default_factory=list)
+    node_scores: list[VMRequestReviewNodeScore] = Field(default_factory=list)
 
 
 class VMRequestAvailabilityRequest(BaseModel):

@@ -22,10 +22,10 @@ from app.repositories import vm_request as vm_request_repo
 
 GIB = 1024**3
 _STORAGE_SPEED_RANK = {"nvme": 0, "ssd": 1, "hdd": 2, "unknown": 3}
-_CPU_PEAK_WARN_SHARE = 0.7
-_CPU_PEAK_HIGH_SHARE = 1.2
-_RAM_PEAK_WARN_SHARE = 0.8
-_RAM_PEAK_HIGH_SHARE = 0.85
+_DEFAULT_CPU_PEAK_WARN_SHARE = 0.7
+_DEFAULT_CPU_PEAK_HIGH_SHARE = 1.2
+_DEFAULT_RAM_PEAK_WARN_SHARE = 0.8
+_DEFAULT_RAM_PEAK_HIGH_SHARE = 0.85
 
 
 @dataclass
@@ -73,6 +73,16 @@ class _PlacementTuning:
     disk_penalty_weight: float
     search_max_relocations: int
     search_depth: int
+    cpu_peak_warn_share: float = _DEFAULT_CPU_PEAK_WARN_SHARE
+    cpu_peak_high_share: float = _DEFAULT_CPU_PEAK_HIGH_SHARE
+    memory_peak_warn_share: float = _DEFAULT_RAM_PEAK_WARN_SHARE
+    memory_peak_high_share: float = _DEFAULT_RAM_PEAK_HIGH_SHARE
+    resource_weight_cpu: float = 1.0
+    resource_weight_memory: float = 1.0
+    resource_weight_disk: float = 1.0
+    lxc_live_migration_enabled: bool = False
+    cpu_contention_weight: float = 2.0
+    memory_overflow_weight: float = 5.0
 
 
 @dataclass(frozen=True)
@@ -150,6 +160,14 @@ def _get_placement_tuning(*, session: Session) -> _PlacementTuning:
         disk_penalty_weight=max(float(config.rebalance_disk_penalty_weight or 0.75), 0.0),
         search_max_relocations=max(int(config.rebalance_search_max_relocations or 2), 0),
         search_depth=max(int(config.rebalance_search_depth or 3), 0),
+        cpu_peak_warn_share=max(float(config.rebalance_cpu_peak_warn_share or _DEFAULT_CPU_PEAK_WARN_SHARE), 0.0),
+        cpu_peak_high_share=max(float(config.rebalance_cpu_peak_high_share or _DEFAULT_CPU_PEAK_HIGH_SHARE), 0.01),
+        memory_peak_warn_share=max(float(config.rebalance_memory_peak_warn_share or _DEFAULT_RAM_PEAK_WARN_SHARE), 0.0),
+        memory_peak_high_share=max(float(config.rebalance_memory_peak_high_share or _DEFAULT_RAM_PEAK_HIGH_SHARE), 0.01),
+        resource_weight_cpu=max(float(config.rebalance_resource_weight_cpu or 1.0), 0.0),
+        resource_weight_memory=max(float(config.rebalance_resource_weight_memory or 1.0), 0.0),
+        resource_weight_disk=max(float(config.rebalance_resource_weight_disk or 1.0), 0.0),
+        lxc_live_migration_enabled=bool(config.migration_lxc_live_enabled),
     )
 
 
@@ -1137,6 +1155,38 @@ def _initial_active_assignment_map(
             candidates.append((item, storage_selection))
 
         if not candidates:
+            # Try relief relocation before giving up
+            relief = _try_relief_relocation(
+                session=session,
+                stuck_request=request,
+                ordered_requests_so_far=[r for r in ordered_requests if r.id in assignments],
+                current_assignments=assignments,
+                working_nodes=working_nodes,
+                storage_pools_by_node=storage_pools_by_node,
+                has_managed_storage=has_managed_storage,
+                strategy=strategy,
+                priorities=priorities,
+                tuning=tuning,
+                locked_request_ids=set(locked_nodes.keys()),
+                disk_overcommit_ratio=disk_overcommit_ratio,
+            )
+            if relief is not None:
+                # Adopt the relief assignments and continue
+                assignments = relief
+                # Re-build working state for the relief assignments
+                working_nodes_copy = [item.model_copy(deep=True) for item in baseline_nodes]
+                for r in ordered_requests:
+                    if r.id in assignments:
+                        _reserve_request_on_capacities(
+                            node_capacities=working_nodes_copy,
+                            db_request=r,
+                            node_name=assignments[r.id],
+                        )
+                working_nodes = working_nodes_copy
+                placements = {item.node: 0 for item in working_nodes}
+                for node_name in assignments.values():
+                    placements[node_name] = placements.get(node_name, 0) + 1
+                continue
             raise ValueError(f"No feasible active rebalance exists for request {request.id}")
 
         chosen, chosen_storage = min(
@@ -1185,7 +1235,11 @@ def _run_local_rebalance_search(
         return initial_assignments
 
     current_assignments = dict(initial_assignments)
-    locked_ids = locked_request_ids or set()
+    locked_ids = set(locked_request_ids or ())
+    # Also lock requests that are migration-pinned
+    for req in ordered_requests:
+        if getattr(req, 'migration_pinned', False):
+            locked_ids.add(req.id)
     current_eval = _evaluate_active_assignment_map(
         session=session,
         ordered_requests=ordered_requests,
@@ -1274,6 +1328,93 @@ def _run_local_rebalance_search(
     return current_assignments
 
 
+_RELIEF_MAX_EVALUATIONS = 50
+
+
+def _try_relief_relocation(
+    *,
+    session: Session,
+    stuck_request: VMRequest,
+    ordered_requests_so_far: list[VMRequest],
+    current_assignments: dict[uuid.UUID, str],
+    working_nodes: list[NodeCapacity],
+    storage_pools_by_node: dict[str, list[_WorkingStoragePool]],
+    has_managed_storage: bool,
+    strategy: str,
+    priorities: dict[str, int],
+    tuning: _PlacementTuning,
+    locked_request_ids: set[uuid.UUID],
+    disk_overcommit_ratio: float,
+) -> dict[uuid.UUID, str] | None:
+    """Try 1-move or 2-move relief to make room for a stuck request.
+
+    When direct placement fails, this function tries moving existing requests
+    to other nodes to free capacity for the stuck request.
+    Returns updated assignment map or None if no relief found.
+    """
+    if tuning.search_max_relocations <= 0:
+        return None
+
+    stuck_placement = _to_placement_request(stuck_request)
+    effective_type, _ = advisor_service._decide_resource_type(stuck_placement)
+    required_cpu = advisor_service._effective_cpu_cores(stuck_placement, effective_type)
+    required_memory = advisor_service._effective_memory_bytes(stuck_placement, effective_type)
+    required_disk = stuck_placement.disk_gb * GIB
+
+    node_names = [n.node for n in working_nodes]
+    evaluations = 0
+    best_result: dict[uuid.UUID, str] | None = None
+    best_score: tuple | None = None
+
+    # 1-move relief: move one request away from a node, then check if stuck_request fits
+    for req in ordered_requests_so_far:
+        if req.id in locked_request_ids:
+            continue
+        if evaluations >= _RELIEF_MAX_EVALUATIONS:
+            break
+
+        current_node = current_assignments.get(req.id)
+        if not current_node:
+            continue
+
+        for target_node in node_names:
+            if target_node == current_node:
+                continue
+            if evaluations >= _RELIEF_MAX_EVALUATIONS:
+                break
+            evaluations += 1
+
+            # Trial: move req from current_node to target_node
+            trial = dict(current_assignments)
+            trial[req.id] = target_node
+
+            # Check if stuck_request now fits on current_node (freed capacity)
+            trial[stuck_request.id] = current_node
+
+            # Validate the entire assignment
+            all_requests = ordered_requests_so_far + [stuck_request]
+            try:
+                trial_eval = _evaluate_active_assignment_map(
+                    session=session,
+                    ordered_requests=all_requests,
+                    baseline_nodes=working_nodes,
+                    assignments=trial,
+                    priorities=priorities,
+                    tuning=tuning,
+                )
+            except (ValueError, KeyError):
+                continue
+
+            if not trial_eval.feasible:
+                continue
+
+            if best_score is None or trial_eval.objective < best_score:
+                best_score = trial_eval.objective
+                best_result = trial
+
+    return best_result
+
+
 def _solve_rebalance_assignments(
     *,
     session: Session,
@@ -1300,7 +1441,10 @@ def _solve_rebalance_assignments(
         initial_assignments=initial_assignments,
         priorities=priorities,
         tuning=tuning,
-        locked_request_ids=set((fixed_assignments or {}).keys()),
+        locked_request_ids=(
+            set((fixed_assignments or {}).keys())
+            | {r.id for r in ordered_requests if getattr(r, 'migration_pinned', False)}
+        ),
     )
     final_eval = _evaluate_active_assignment_map(
         session=session,
@@ -1475,6 +1619,187 @@ def rebalance_active_assignments(
     return selections
 
 
+@dataclass
+class NodeScoreBreakdown:
+    node: str
+    balance_score: float = 0.0
+    cpu_share: float = 0.0
+    memory_share: float = 0.0
+    disk_share: float = 0.0
+    peak_penalty: float = 0.0
+    loadavg_penalty: float = 0.0
+    storage_penalty: float = 0.0
+    migration_cost: float = 0.0
+    priority: int = 5
+    is_selected: bool = False
+    reason: str | None = None
+
+
+def compute_node_score_breakdown(
+    *,
+    session: Session,
+    candidate_evals: dict[str, "_AssignmentEvaluation"],
+    selected_node: str | None,
+    priorities: dict[str, int] | None = None,
+) -> list[NodeScoreBreakdown]:
+    if not candidate_evals:
+        return []
+    tuning = _get_placement_tuning(session=session)
+    priorities = priorities or get_node_priorities(session)
+    breakdowns: list[NodeScoreBreakdown] = []
+    for node_name, evaluation in sorted(candidate_evals.items()):
+        node_score = (evaluation.node_scores or {}).get(node_name, 0.0)
+        storage_pen = (evaluation.storage_penalties or {}).get(node_name, 0.0)
+        breakdowns.append(NodeScoreBreakdown(
+            node=node_name,
+            balance_score=round(node_score, 4),
+            cpu_share=round(evaluation.objective[0], 4) if evaluation.feasible else 0.0,
+            memory_share=0.0,
+            disk_share=0.0,
+            peak_penalty=0.0,
+            loadavg_penalty=0.0,
+            storage_penalty=round(storage_pen * tuning.disk_penalty_weight, 4),
+            migration_cost=round(evaluation.movement_count * tuning.migration_cost, 4),
+            priority=priorities.get(node_name, 5),
+            is_selected=node_name == selected_node,
+            reason=(
+                "最佳平衡方案" if node_name == selected_node
+                else ("可行但非最佳" if evaluation.feasible else "不可行")
+            ),
+        ))
+    breakdowns.sort(key=lambda b: (not b.is_selected, b.balance_score, b.priority))
+    return breakdowns
+
+
+def get_preview_node_scores(
+    *,
+    session: Session,
+    db_request: VMRequest,
+    reserved_requests: list[VMRequest] | None = None,
+) -> list[NodeScoreBreakdown]:
+    start_at, end_at = _request_window(db_request)
+    if not start_at or not end_at:
+        return []
+
+    request = _to_placement_request(db_request)
+    effective_resource_type, _ = advisor_service._decide_resource_type(request)
+
+    nodes, resources = advisor_service._load_cluster_state()
+    cpu_overcommit_ratio, disk_overcommit_ratio = get_overcommit_ratios(session)
+    baseline_capacities = advisor_service._build_node_capacities(
+        nodes=nodes,
+        resources=resources,
+        cpu_overcommit_ratio=cpu_overcommit_ratio,
+        disk_overcommit_ratio=disk_overcommit_ratio,
+    )
+
+    if reserved_requests is None:
+        reserved_requests = vm_request_repo.get_approved_vm_requests_overlapping_window(
+            session=session,
+            window_start=start_at,
+            window_end=end_at,
+        )
+
+    checkpoints = [start_at] + [
+        checkpoint
+        for checkpoint in _hour_window_iter(start_at, end_at)
+        if checkpoint != start_at
+    ]
+
+    feasible_nodes = {item.node for item in baseline_capacities}
+    for checkpoint in checkpoints:
+        adjusted = _apply_reserved_requests_to_capacities(
+            baseline_capacities=baseline_capacities,
+            reserved_requests=reserved_requests,
+            at_time=checkpoint,
+        )
+        hour_feasible = {
+            item.node for item in adjusted
+            if advisor_service._can_fit(
+                item,
+                cores=advisor_service._effective_cpu_cores(request, effective_resource_type),
+                memory_bytes=advisor_service._effective_memory_bytes(request, effective_resource_type),
+                disk_bytes=request.disk_gb * GIB,
+                gpu_required=request.gpu_required,
+            )
+        }
+        feasible_nodes &= hour_feasible
+        if not feasible_nodes:
+            break
+
+    if not feasible_nodes:
+        return []
+
+    overlapping_start_requests = [
+        item for item in reserved_requests
+        if (w := _request_window(item))[0] is not None
+        and w[1] is not None
+        and w[0] <= start_at < w[1]
+    ]
+    preview_request = _build_preview_vm_request(
+        request=request, start_at=start_at, end_at=end_at,
+    )
+    preview_cohort = overlapping_start_requests + [preview_request]
+    preview_ordered = sorted(
+        preview_cohort,
+        key=lambda item: (
+            _normalize_datetime(item.start_at) or datetime.min.replace(tzinfo=UTC),
+            _normalize_datetime(item.reviewed_at) or datetime.min.replace(tzinfo=UTC),
+            _normalize_datetime(item.created_at) or datetime.min.replace(tzinfo=UTC),
+            str(item.id),
+        ),
+    )
+    preview_baseline = _build_rebalance_baseline_nodes(
+        session=session, requests=preview_ordered,
+    )
+    preview_baseline = [
+        item.model_copy(deep=True) for item in preview_baseline
+        if item.node in feasible_nodes
+    ]
+
+    priorities = get_node_priorities(session)
+    strategy = get_placement_strategy(session)
+    tuning = _get_placement_tuning(session=session)
+
+    candidate_evals: dict[str, _AssignmentEvaluation] = {}
+    best_node: str | None = None
+    best_obj = None
+    for candidate_node in sorted(feasible_nodes):
+        try:
+            assignments = _solve_rebalance_assignments(
+                session=session,
+                ordered_requests=preview_ordered,
+                baseline_nodes=preview_baseline,
+                strategy=strategy,
+                priorities=priorities,
+                tuning=tuning,
+                fixed_assignments={preview_request.id: candidate_node},
+            )
+            evaluation = _evaluate_active_assignment_map(
+                session=session,
+                ordered_requests=preview_ordered,
+                baseline_nodes=preview_baseline,
+                assignments=assignments,
+                priorities=priorities,
+                tuning=tuning,
+            )
+        except ValueError:
+            continue
+        if not evaluation.feasible:
+            continue
+        candidate_evals[candidate_node] = evaluation
+        if best_obj is None or evaluation.objective < best_obj:
+            best_obj = evaluation.objective
+            best_node = candidate_node
+
+    return compute_node_score_breakdown(
+        session=session,
+        candidate_evals=candidate_evals,
+        selected_node=best_node,
+        priorities=priorities,
+    )
+
+
 def get_placement_strategy(session: Session) -> str:
     config = proxmox_config_repo.get_proxmox_config(session)
     if not config:
@@ -1563,10 +1888,17 @@ def _placement_sort_key(
         used=max(node.total_disk_bytes - node.allocatable_disk_bytes, 0) + disk_bytes,
         total=max(node.total_disk_bytes, 1),
     )
-    dominant_share = max(projected_cpu_share, projected_memory_share, projected_disk_share)
-    average_share = (
-        projected_cpu_share + projected_memory_share + projected_disk_share
-    ) / 3.0
+    w_cpu = tuning.resource_weight_cpu
+    w_mem = tuning.resource_weight_memory
+    w_disk = tuning.resource_weight_disk
+    weighted_shares = [
+        projected_cpu_share * w_cpu,
+        projected_memory_share * w_mem,
+        projected_disk_share * w_disk,
+    ]
+    dominant_share = max(weighted_shares)
+    weight_sum = w_cpu + w_mem + w_disk
+    average_share = sum(weighted_shares) / max(weight_sum, 0.01)
     peak_penalty = _peak_penalty(
         projected_cpu_share=_projected_share(
             used=max(node.total_cpu_cores - node.allocatable_cpu_cores, 0.0)
@@ -1578,10 +1910,19 @@ def _placement_sort_key(
             + int(memory_bytes * tuning.peak_memory_margin),
             total=max(node.total_memory_bytes, 1),
         ),
+        tuning=tuning,
     )
     loadavg_penalty = _loadavg_penalty(
         _reference_loadavg_per_core(node),
         tuning=tuning,
+    )
+    cpu_contention = _cpu_contention_penalty(projected_cpu_share, tuning=tuning)
+    cpu_contention_score = cpu_contention * tuning.cpu_contention_weight
+
+    memory_overflow_penalty = (
+        tuning.memory_overflow_weight
+        if projected_memory_share > 1.0 + 1e-9
+        else 0.0
     )
     migration_penalty = (
         tuning.migration_cost
@@ -1596,6 +1937,8 @@ def _placement_sort_key(
     total_score = (
         dominant_share
         + peak_penalty
+        + cpu_contention_score
+        + memory_overflow_penalty
         + (loadavg_penalty * tuning.loadavg_penalty_weight)
         + migration_penalty
         + disk_penalty
@@ -1673,15 +2016,29 @@ def _node_balance_score(node: NodeCapacity, *, tuning: _PlacementTuning) -> floa
         used=max(node.total_disk_bytes - node.allocatable_disk_bytes, 0),
         total=max(node.total_disk_bytes, 1),
     )
-    dominant_share = max(cpu_share, memory_share, disk_share)
-    average_share = (cpu_share + memory_share + disk_share) / 3.0
+    w_cpu = tuning.resource_weight_cpu
+    w_mem = tuning.resource_weight_memory
+    w_disk = tuning.resource_weight_disk
+    weighted_shares = [
+        cpu_share * w_cpu,
+        memory_share * w_mem,
+        disk_share * w_disk,
+    ]
+    dominant_share = max(weighted_shares)
+    weight_sum = w_cpu + w_mem + w_disk
+    average_share = sum(weighted_shares) / max(weight_sum, 0.01)
+    cpu_contention = _cpu_contention_penalty(cpu_share, tuning=tuning)
+    memory_overflow = tuning.memory_overflow_weight if memory_share > 1.0 + 1e-9 else 0.0
     return (
         dominant_share
         + (average_share * 0.2)
         + _peak_penalty(
             projected_cpu_share=cpu_share,
             projected_memory_share=memory_share,
+            tuning=tuning,
         )
+        + (cpu_contention * tuning.cpu_contention_weight)
+        + memory_overflow
         + (
             _loadavg_penalty(
                 _reference_loadavg_per_core(node),
@@ -1696,18 +2053,40 @@ def _peak_penalty(
     *,
     projected_cpu_share: float,
     projected_memory_share: float,
+    tuning: _PlacementTuning | None = None,
 ) -> float:
+    cpu_warn = tuning.cpu_peak_warn_share if tuning else _DEFAULT_CPU_PEAK_WARN_SHARE
+    cpu_high = tuning.cpu_peak_high_share if tuning else _DEFAULT_CPU_PEAK_HIGH_SHARE
+    mem_warn = tuning.memory_peak_warn_share if tuning else _DEFAULT_RAM_PEAK_WARN_SHARE
+    mem_high = tuning.memory_peak_high_share if tuning else _DEFAULT_RAM_PEAK_HIGH_SHARE
     return max(
         _linear_penalty(
             projected_cpu_share,
-            low=_CPU_PEAK_WARN_SHARE,
-            high=_CPU_PEAK_HIGH_SHARE,
+            low=cpu_warn,
+            high=max(cpu_high, cpu_warn + 0.01),
         ),
         _linear_penalty(
             projected_memory_share,
-            low=_RAM_PEAK_WARN_SHARE,
-            high=_RAM_PEAK_HIGH_SHARE,
+            low=mem_warn,
+            high=max(mem_high, mem_warn + 0.01),
         ),
+    )
+
+
+def _cpu_contention_penalty(
+    projected_cpu_share: float,
+    *,
+    tuning: _PlacementTuning,
+) -> float:
+    """Separate CPU contention penalty based on physical CPU share.
+
+    This penalizes nodes where the projected physical CPU usage approaches
+    or exceeds the safe threshold, independent of peak margin.
+    """
+    return _linear_penalty(
+        projected_cpu_share,
+        low=tuning.cpu_peak_warn_share,
+        high=max(tuning.cpu_peak_high_share, tuning.cpu_peak_warn_share + 0.01),
     )
 
 

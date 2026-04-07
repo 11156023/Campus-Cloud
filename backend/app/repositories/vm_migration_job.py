@@ -1,6 +1,7 @@
 import uuid
 from datetime import datetime, timedelta, timezone
 
+from sqlalchemy import func as sa_func
 from sqlmodel import Session, select
 
 from app.models import VMMigrationJob, VMMigrationJobStatus
@@ -268,12 +269,97 @@ def update_job_status(
     return job
 
 
+def list_all_jobs(
+    *,
+    session: Session,
+    status: VMMigrationJobStatus | None = None,
+    skip: int = 0,
+    limit: int = 100,
+) -> tuple[list[VMMigrationJob], int]:
+    count_stmt = select(sa_func.count()).select_from(VMMigrationJob)
+    query_stmt = select(VMMigrationJob)
+
+    if status is not None:
+        count_stmt = count_stmt.where(VMMigrationJob.status == status)
+        query_stmt = query_stmt.where(VMMigrationJob.status == status)
+
+    total = session.exec(count_stmt).one()
+    jobs = list(
+        session.exec(
+            query_stmt.order_by(
+                VMMigrationJob.requested_at.desc(),
+                VMMigrationJob.updated_at.desc(),
+            )
+            .offset(skip)
+            .limit(limit)
+        ).all()
+    )
+    return jobs, total
+
+
+def get_job_by_id(
+    *,
+    session: Session,
+    job_id: uuid.UUID,
+) -> VMMigrationJob | None:
+    return session.get(VMMigrationJob, job_id)
+
+
+def get_migration_stats(
+    *,
+    session: Session,
+) -> dict:
+    from sqlalchemy import case, extract
+
+    total = session.exec(
+        select(sa_func.count()).select_from(VMMigrationJob)
+    ).one()
+
+    by_status = {}
+    for s in VMMigrationJobStatus:
+        count = session.exec(
+            select(sa_func.count())
+            .select_from(VMMigrationJob)
+            .where(VMMigrationJob.status == s)
+        ).one()
+        by_status[s.value] = count
+
+    avg_duration = session.exec(
+        select(
+            sa_func.avg(
+                extract(
+                    "epoch",
+                    VMMigrationJob.finished_at - VMMigrationJob.started_at,
+                )
+            )
+        )
+        .select_from(VMMigrationJob)
+        .where(
+            VMMigrationJob.status == VMMigrationJobStatus.completed,
+            VMMigrationJob.started_at.is_not(None),
+            VMMigrationJob.finished_at.is_not(None),
+        )
+    ).first()
+
+    return {
+        "total_jobs": total,
+        "by_status": by_status,
+        "avg_duration_seconds": round(float(avg_duration or 0), 2),
+        "success_rate": (
+            round(by_status.get("completed", 0) / max(total, 1) * 100, 1)
+        ),
+    }
+
+
 __all__ = [
     "cancel_pending_jobs_for_request",
     "claim_jobs_for_requests",
     "create_or_update_pending_job",
+    "get_job_by_id",
     "get_latest_job_for_request",
+    "get_migration_stats",
     "get_open_job_for_request",
+    "list_all_jobs",
     "list_pending_jobs_for_requests",
     "update_job_status",
 ]

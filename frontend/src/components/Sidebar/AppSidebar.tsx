@@ -1,4 +1,5 @@
 import {
+  ArrowRightLeft,
   Bot,
   ClipboardCheck,
   FileText,
@@ -66,6 +67,7 @@ export function AppSidebar() {
     { icon: UsersRound, title: "群組管理", path: "/groups" },
     { icon: Users, title: t("sidebar.admin"), path: "/admin" },
     { icon: Settings2, title: "系統設定", path: "/admin/configuration" },
+    { icon: ArrowRightLeft, title: "Migration Jobs", path: "/admin/migration-jobs" },
     { icon: Network, title: "Gateway VM", path: "/admin/gateway" },
   ]
 

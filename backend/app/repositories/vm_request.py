@@ -1,6 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
+import sqlalchemy as sa
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, func, select
 
@@ -113,10 +114,9 @@ def get_approved_vm_requests_overlapping_window(
         .where(
             VMRequest.status == VMRequestStatus.approved,
             VMRequest.start_at.is_not(None),
-            VMRequest.end_at.is_not(None),
             VMRequest.desired_node.is_not(None),
             VMRequest.start_at < window_end,
-            VMRequest.end_at > window_start,
+            sa.or_(VMRequest.end_at.is_(None), VMRequest.end_at > window_start),
         )
         .options(selectinload(VMRequest.user))  # type: ignore[arg-type]
         .order_by(VMRequest.start_at.asc(), VMRequest.reviewed_at.asc())  # type: ignore[union-attr]
@@ -139,9 +139,8 @@ def lock_overlapping_vm_requests_for_window(
         .where(
             VMRequest.status.in_(statuses),
             VMRequest.start_at.is_not(None),
-            VMRequest.end_at.is_not(None),
             VMRequest.start_at < window_end,
-            VMRequest.end_at > window_start,
+            sa.or_(VMRequest.end_at.is_(None), VMRequest.end_at > window_start),
         )
         .options(selectinload(VMRequest.user))  # type: ignore[arg-type]
         .order_by(
@@ -300,9 +299,8 @@ def list_active_approved_vm_requests(
         .where(
             VMRequest.status == VMRequestStatus.approved,
             VMRequest.start_at.is_not(None),
-            VMRequest.end_at.is_not(None),
             VMRequest.start_at <= at_time,
-            VMRequest.end_at > at_time,
+            sa.or_(VMRequest.end_at.is_(None), VMRequest.end_at > at_time),
         )
         .options(selectinload(VMRequest.user))  # type: ignore[arg-type]
         .order_by(
@@ -324,9 +322,8 @@ def list_due_for_rebalance_vm_requests(
         .where(
             VMRequest.status == VMRequestStatus.approved,
             VMRequest.start_at.is_not(None),
-            VMRequest.end_at.is_not(None),
             VMRequest.start_at <= at_time,
-            VMRequest.end_at > at_time,
+            sa.or_(VMRequest.end_at.is_(None), VMRequest.end_at > at_time),
             (
                 VMRequest.last_rebalanced_at.is_(None)
                 | (VMRequest.last_rebalanced_at < VMRequest.start_at)

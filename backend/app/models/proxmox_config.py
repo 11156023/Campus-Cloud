@@ -49,6 +49,14 @@ class ProxmoxConfig(SQLModel, table=True):
     migration_worker_concurrency: int = Field(default=2, ge=1, le=20)
     migration_job_claim_timeout_seconds: int = Field(default=300, ge=30, le=86400)
     migration_retry_backoff_seconds: int = Field(default=120, ge=0, le=86400)
+    migration_lxc_live_enabled: bool = Field(default=False)
+    rebalance_cpu_peak_warn_share: float = Field(default=0.7, ge=0.0, le=2.0)
+    rebalance_cpu_peak_high_share: float = Field(default=1.2, ge=0.1, le=3.0)
+    rebalance_memory_peak_warn_share: float = Field(default=0.8, ge=0.0, le=2.0)
+    rebalance_memory_peak_high_share: float = Field(default=0.85, ge=0.1, le=3.0)
+    rebalance_resource_weight_cpu: float = Field(default=1.0, ge=0.0, le=10.0)
+    rebalance_resource_weight_memory: float = Field(default=1.0, ge=0.0, le=10.0)
+    rebalance_resource_weight_disk: float = Field(default=1.0, ge=0.0, le=10.0)
     updated_at: datetime = Field(
         default_factory=get_datetime_utc,
         sa_type=DateTime(timezone=True),

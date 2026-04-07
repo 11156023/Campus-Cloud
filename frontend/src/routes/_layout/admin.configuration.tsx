@@ -3,6 +3,7 @@ import { createFileRoute, redirect } from "@tanstack/react-router"
 import {
   AlertTriangle,
   CheckCircle,
+  ChevronRight,
   Cpu,
   Database,
   Edit2,
@@ -13,6 +14,7 @@ import {
   RefreshCw,
   Save,
   Server,
+  Settings2,
   ShieldCheck,
   ShieldOff,
   Trash2,
@@ -126,6 +128,14 @@ interface ProxmoxConfigPublic {
   rebalance_loadavg_warn_per_core: number
   rebalance_loadavg_max_per_core: number
   rebalance_loadavg_penalty_weight: number
+  rebalance_cpu_peak_warn_share: number
+  rebalance_cpu_peak_high_share: number
+  rebalance_memory_peak_warn_share: number
+  rebalance_memory_peak_high_share: number
+  rebalance_resource_weight_cpu: number
+  rebalance_resource_weight_memory: number
+  rebalance_resource_weight_disk: number
+  migration_lxc_live_enabled: boolean
   updated_at: string | null
   is_configured: boolean
   has_ca_cert: boolean
@@ -159,6 +169,14 @@ interface ProxmoxConfigUpdate {
   rebalance_loadavg_warn_per_core: number
   rebalance_loadavg_max_per_core: number
   rebalance_loadavg_penalty_weight: number
+  rebalance_cpu_peak_warn_share: number
+  rebalance_cpu_peak_high_share: number
+  rebalance_memory_peak_warn_share: number
+  rebalance_memory_peak_high_share: number
+  rebalance_resource_weight_cpu: number
+  rebalance_resource_weight_memory: number
+  rebalance_resource_weight_disk: number
+  migration_lxc_live_enabled: boolean
 }
 
 interface ProxmoxNodePublic {
@@ -371,6 +389,14 @@ interface ConfigFormData {
   rebalance_loadavg_warn_per_core: number
   rebalance_loadavg_max_per_core: number
   rebalance_loadavg_penalty_weight: number
+  rebalance_cpu_peak_warn_share: number
+  rebalance_cpu_peak_high_share: number
+  rebalance_memory_peak_warn_share: number
+  rebalance_memory_peak_high_share: number
+  rebalance_resource_weight_cpu: number
+  rebalance_resource_weight_memory: number
+  rebalance_resource_weight_disk: number
+  migration_lxc_live_enabled: boolean
 }
 
 interface NodeFormData {
@@ -1187,6 +1213,7 @@ function AdminConfigPage() {
     useState<ClusterPreviewResult | null>(null)
   const [isPreviewing, setIsPreviewing] = useState(false)
   const [editingNode, setEditingNode] = useState<ProxmoxNodePublic | null>(null)
+  const [showAdvanced, setShowAdvanced] = useState(false)
 
   const nodeForm = useForm<NodeFormData>({
     defaultValues: { host: "", port: 8006, priority: 5 },
@@ -1229,6 +1256,14 @@ function AdminConfigPage() {
       rebalance_loadavg_warn_per_core: 0.8,
       rebalance_loadavg_max_per_core: 1.5,
       rebalance_loadavg_penalty_weight: 0.9,
+      rebalance_cpu_peak_warn_share: 0.7,
+      rebalance_cpu_peak_high_share: 1.2,
+      rebalance_memory_peak_warn_share: 0.8,
+      rebalance_memory_peak_high_share: 0.85,
+      rebalance_resource_weight_cpu: 1.0,
+      rebalance_resource_weight_memory: 1.0,
+      rebalance_resource_weight_disk: 1.0,
+      migration_lxc_live_enabled: false,
     },
   })
 
@@ -1265,6 +1300,22 @@ function AdminConfigPage() {
           config.rebalance_loadavg_max_per_core ?? 1.5,
         rebalance_loadavg_penalty_weight:
           config.rebalance_loadavg_penalty_weight ?? 0.9,
+        rebalance_cpu_peak_warn_share:
+          config.rebalance_cpu_peak_warn_share ?? 0.7,
+        rebalance_cpu_peak_high_share:
+          config.rebalance_cpu_peak_high_share ?? 1.2,
+        rebalance_memory_peak_warn_share:
+          config.rebalance_memory_peak_warn_share ?? 0.8,
+        rebalance_memory_peak_high_share:
+          config.rebalance_memory_peak_high_share ?? 0.85,
+        rebalance_resource_weight_cpu:
+          config.rebalance_resource_weight_cpu ?? 1.0,
+        rebalance_resource_weight_memory:
+          config.rebalance_resource_weight_memory ?? 1.0,
+        rebalance_resource_weight_disk:
+          config.rebalance_resource_weight_disk ?? 1.0,
+        migration_lxc_live_enabled:
+          config.migration_lxc_live_enabled ?? false,
       })
     }
   }, [config, form])
@@ -1339,6 +1390,14 @@ function AdminConfigPage() {
       rebalance_loadavg_warn_per_core: data.rebalance_loadavg_warn_per_core,
       rebalance_loadavg_max_per_core: data.rebalance_loadavg_max_per_core,
       rebalance_loadavg_penalty_weight: data.rebalance_loadavg_penalty_weight,
+      rebalance_cpu_peak_warn_share: data.rebalance_cpu_peak_warn_share,
+      rebalance_cpu_peak_high_share: data.rebalance_cpu_peak_high_share,
+      rebalance_memory_peak_warn_share: data.rebalance_memory_peak_warn_share,
+      rebalance_memory_peak_high_share: data.rebalance_memory_peak_high_share,
+      rebalance_resource_weight_cpu: data.rebalance_resource_weight_cpu,
+      rebalance_resource_weight_memory: data.rebalance_resource_weight_memory,
+      rebalance_resource_weight_disk: data.rebalance_resource_weight_disk,
+      migration_lxc_live_enabled: data.migration_lxc_live_enabled,
     }
   }
 
@@ -2270,70 +2329,140 @@ function AdminConfigPage() {
                       />
                     </div>
 
+                    <Separator />
+
+                    <div className="space-y-1">
+                      <h4 className="text-sm font-medium">Peak Share 門檻</h4>
+                      <p className="text-xs text-muted-foreground">
+                        控制尖峰負載懲罰的觸發門檻。超過 Warn 開始加罰，達到 High 時罰到最大值。
+                      </p>
+                    </div>
+                    <div className="grid gap-4 lg:grid-cols-4">
+                      <FormField
+                        control={form.control}
+                        name="rebalance_cpu_peak_warn_share"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>CPU Peak Warn</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                min={0}
+                                max={2}
+                                step={0.05}
+                                {...field}
+                                onChange={(e) =>
+                                  field.onChange(Number(e.target.value))
+                                }
+                              />
+                            </FormControl>
+                            <FormDescription>
+                              CPU 佔比超過此值開始加 peak penalty。
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="rebalance_cpu_peak_high_share"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>CPU Peak High</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                min={0.1}
+                                max={3}
+                                step={0.05}
+                                {...field}
+                                onChange={(e) =>
+                                  field.onChange(Number(e.target.value))
+                                }
+                              />
+                            </FormControl>
+                            <FormDescription>
+                              CPU 佔比達到此值時 penalty 視為滿額。
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="rebalance_memory_peak_warn_share"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Memory Peak Warn</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                min={0}
+                                max={2}
+                                step={0.05}
+                                {...field}
+                                onChange={(e) =>
+                                  field.onChange(Number(e.target.value))
+                                }
+                              />
+                            </FormControl>
+                            <FormDescription>
+                              RAM 佔比超過此值開始加 peak penalty。
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="rebalance_memory_peak_high_share"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Memory Peak High</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                min={0.1}
+                                max={3}
+                                step={0.05}
+                                {...field}
+                                onChange={(e) =>
+                                  field.onChange(Number(e.target.value))
+                                }
+                              />
+                            </FormControl>
+                            <FormDescription>
+                              RAM 佔比達到此值時 penalty 視為滿額。
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <Separator />
+
+                    <div className="space-y-1">
+                      <h4 className="text-sm font-medium">資源權重 (Resource Weights)</h4>
+                      <p className="text-xs text-muted-foreground">
+                        調整 CPU、RAM、Disk 在平衡評分中的相對權重。數值越高該資源影響越大。
+                      </p>
+                    </div>
                     <div className="grid gap-4 lg:grid-cols-3">
                       <FormField
                         control={form.control}
-                        name="migration_retry_limit"
+                        name="rebalance_resource_weight_cpu"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Migration Retry Limit</FormLabel>
+                            <FormLabel>CPU Weight</FormLabel>
                             <FormControl>
                               <Input
                                 type="number"
                                 min={0}
                                 max={10}
-                                {...field}
-                                disabled={!migrationEnabledVal}
-                                onChange={(e) =>
-                                  field.onChange(Number(e.target.value))
-                                }
-                              />
-                            </FormControl>
-                            <FormDescription>
-                              0 代表失敗後持續留在 queue，等待下一輪再試。
-                            </FormDescription>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="rebalance_migration_cost"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Migration Cost</FormLabel>
-                            <FormControl>
-                              <Input
-                                type="number"
-                                min={0}
-                                max={5}
-                                step={0.01}
-                                {...field}
-                                onChange={(e) =>
-                                  field.onChange(Number(e.target.value))
-                                }
-                              />
-                            </FormControl>
-                            <FormDescription>
-                              數值越高，演算法越傾向維持既有 VM 位置，降低重排搬移次數。
-                            </FormDescription>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="rebalance_loadavg_penalty_weight"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Loadavg Penalty Weight</FormLabel>
-                            <FormControl>
-                              <Input
-                                type="number"
-                                min={0}
-                                max={5}
                                 step={0.1}
                                 {...field}
                                 onChange={(e) =>
@@ -2342,35 +2471,7 @@ function AdminConfigPage() {
                               />
                             </FormControl>
                             <FormDescription>
-                              提高後會更積極避開近期負載偏高的節點。
-                            </FormDescription>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-
-                    <div className="grid gap-4 lg:grid-cols-4">
-                      <FormField
-                        control={form.control}
-                        name="rebalance_peak_cpu_margin"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Peak CPU Margin</FormLabel>
-                            <FormControl>
-                              <Input
-                                type="number"
-                                min={1}
-                                max={2}
-                                step={0.01}
-                                {...field}
-                                onChange={(e) =>
-                                  field.onChange(Number(e.target.value))
-                                }
-                              />
-                            </FormControl>
-                            <FormDescription>
-                              估算尖峰 CPU 風險時套用的保守倍率。
+                              預設 1.0。提高後演算法更偏重 CPU 均衡。
                             </FormDescription>
                             <FormMessage />
                           </FormItem>
@@ -2379,42 +2480,16 @@ function AdminConfigPage() {
 
                       <FormField
                         control={form.control}
-                        name="rebalance_peak_memory_margin"
+                        name="rebalance_resource_weight_memory"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Peak Memory Margin</FormLabel>
-                            <FormControl>
-                              <Input
-                                type="number"
-                                min={1}
-                                max={2}
-                                step={0.01}
-                                {...field}
-                                onChange={(e) =>
-                                  field.onChange(Number(e.target.value))
-                                }
-                              />
-                            </FormControl>
-                            <FormDescription>
-                              估算尖峰 RAM 風險時套用的保守倍率。
-                            </FormDescription>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="rebalance_loadavg_warn_per_core"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Loadavg Warn/Core</FormLabel>
+                            <FormLabel>Memory Weight</FormLabel>
                             <FormControl>
                               <Input
                                 type="number"
                                 min={0}
-                                max={4}
-                                step={0.05}
+                                max={10}
+                                step={0.1}
                                 {...field}
                                 onChange={(e) =>
                                   field.onChange(Number(e.target.value))
@@ -2422,7 +2497,7 @@ function AdminConfigPage() {
                               />
                             </FormControl>
                             <FormDescription>
-                              每核心 loadavg 超過此值後開始降權。
+                              預設 1.0。提高後演算法更偏重 RAM 均衡。
                             </FormDescription>
                             <FormMessage />
                           </FormItem>
@@ -2431,16 +2506,16 @@ function AdminConfigPage() {
 
                       <FormField
                         control={form.control}
-                        name="rebalance_loadavg_max_per_core"
+                        name="rebalance_resource_weight_disk"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Loadavg Max/Core</FormLabel>
+                            <FormLabel>Disk Weight</FormLabel>
                             <FormControl>
                               <Input
                                 type="number"
-                                min={0.1}
-                                max={8}
-                                step={0.05}
+                                min={0}
+                                max={10}
+                                step={0.1}
                                 {...field}
                                 onChange={(e) =>
                                   field.onChange(Number(e.target.value))
@@ -2448,13 +2523,247 @@ function AdminConfigPage() {
                               />
                             </FormControl>
                             <FormDescription>
-                              達到此值時 loadavg penalty 視為滿額。
+                              預設 1.0。提高後演算法更偏重磁碟均衡。
                             </FormDescription>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
                     </div>
+
+                    <Separator />
+
+                    {/* ── 進階內部參數（Tier 2）── */}
+                    <button
+                      type="button"
+                      onClick={() => setShowAdvanced(!showAdvanced)}
+                      className="flex w-full items-center gap-2 rounded-lg border border-border/50 bg-muted/30 px-4 py-3 text-sm text-muted-foreground transition-colors hover:bg-muted/50"
+                    >
+                      <ChevronRight className={cn("h-4 w-4 transition-transform", showAdvanced && "rotate-90")} />
+                      <Settings2 className="h-4 w-4" />
+                      <span>進階內部參數</span>
+                      <span className="ml-auto text-xs opacity-60">不建議輕易修改</span>
+                    </button>
+
+                    {showAdvanced && (
+                      <div className="mt-4 space-y-6">
+                        <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-400/90">
+                          <AlertTriangle className="mr-1.5 inline h-3.5 w-3.5" />
+                          這些參數影響排程演算法的內部行為。不正確的設定可能導致分配品質下降。
+                        </div>
+
+                        {/* LXC Live Migration */}
+                        <FormField
+                          control={form.control}
+                          name="migration_lxc_live_enabled"
+                          render={({ field }) => (
+                            <FormItem className="flex items-start justify-between rounded-lg border p-4">
+                              <div className="space-y-1">
+                                <FormLabel>LXC Live Migration</FormLabel>
+                                <FormDescription>
+                                  允許對正在運行的 LXC 容器執行 live migration。關閉時會等待容器停止或以 relocate 方式搬移。
+                                </FormDescription>
+                              </div>
+                              <FormControl>
+                                <Switch
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                  disabled={!migrationEnabledVal}
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+
+                        {/* Migration Tuning */}
+                        <div className="grid gap-4 lg:grid-cols-3">
+                          <FormField
+                            control={form.control}
+                            name="migration_retry_limit"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Migration Retry Limit</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    type="number"
+                                    min={0}
+                                    max={10}
+                                    {...field}
+                                    disabled={!migrationEnabledVal}
+                                    onChange={(e) =>
+                                      field.onChange(Number(e.target.value))
+                                    }
+                                  />
+                                </FormControl>
+                                <FormDescription>
+                                  0 代表失敗後持續留在 queue，等待下一輪再試。
+                                </FormDescription>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name="rebalance_migration_cost"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Migration Cost</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    type="number"
+                                    min={0}
+                                    max={5}
+                                    step={0.01}
+                                    {...field}
+                                    onChange={(e) =>
+                                      field.onChange(Number(e.target.value))
+                                    }
+                                  />
+                                </FormControl>
+                                <FormDescription>
+                                  數值越高，演算法越傾向維持既有 VM 位置，降低重排搬移次數。
+                                </FormDescription>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name="rebalance_loadavg_penalty_weight"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Loadavg Penalty Weight</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    type="number"
+                                    min={0}
+                                    max={5}
+                                    step={0.1}
+                                    {...field}
+                                    onChange={(e) =>
+                                      field.onChange(Number(e.target.value))
+                                    }
+                                  />
+                                </FormControl>
+                                <FormDescription>
+                                  提高後會更積極避開近期負載偏高的節點。
+                                </FormDescription>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+
+                        {/* Peak / Loadavg Margins */}
+                        <div className="grid gap-4 lg:grid-cols-4">
+                          <FormField
+                            control={form.control}
+                            name="rebalance_peak_cpu_margin"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Peak CPU Margin</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    type="number"
+                                    min={1}
+                                    max={2}
+                                    step={0.01}
+                                    {...field}
+                                    onChange={(e) =>
+                                      field.onChange(Number(e.target.value))
+                                    }
+                                  />
+                                </FormControl>
+                                <FormDescription>
+                                  估算尖峰 CPU 風險時套用的保守倍率。
+                                </FormDescription>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name="rebalance_peak_memory_margin"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Peak Memory Margin</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    type="number"
+                                    min={1}
+                                    max={2}
+                                    step={0.01}
+                                    {...field}
+                                    onChange={(e) =>
+                                      field.onChange(Number(e.target.value))
+                                    }
+                                  />
+                                </FormControl>
+                                <FormDescription>
+                                  估算尖峰 RAM 風險時套用的保守倍率。
+                                </FormDescription>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name="rebalance_loadavg_warn_per_core"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Loadavg Warn/Core</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    type="number"
+                                    min={0}
+                                    max={4}
+                                    step={0.05}
+                                    {...field}
+                                    onChange={(e) =>
+                                      field.onChange(Number(e.target.value))
+                                    }
+                                  />
+                                </FormControl>
+                                <FormDescription>
+                                  每核心 loadavg 超過此值後開始降權。
+                                </FormDescription>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name="rebalance_loadavg_max_per_core"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Loadavg Max/Core</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    type="number"
+                                    min={0.1}
+                                    max={8}
+                                    step={0.05}
+                                    {...field}
+                                    onChange={(e) =>
+                                      field.onChange(Number(e.target.value))
+                                    }
+                                  />
+                                </FormControl>
+                                <FormDescription>
+                                  達到此值時 loadavg penalty 視為滿額。
+                                </FormDescription>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
 

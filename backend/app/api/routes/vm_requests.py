@@ -3,8 +3,6 @@ import uuid
 from fastapi import APIRouter, Query
 
 from app.api.deps import AdminUser, CurrentUser, SessionDep
-from app.exceptions import PermissionDeniedError
-from app.models import UserRole
 from app.schemas import (
     VMRequestAvailabilityRequest,
     VMRequestAvailabilityResponse,
@@ -49,9 +47,6 @@ def list_my_vm_requests(
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=100, ge=1, le=100),
 ):
-    if current_user.role != UserRole.student:
-        raise PermissionDeniedError("Only students can view their VM requests")
-
     return vm_request_service.list_by_user(
         session=session, user_id=current_user.id, skip=skip, limit=limit
     )

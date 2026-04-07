@@ -11,6 +11,7 @@ from app.api.routes import (
     groups,
     login,
     lxc,
+    migration_jobs,
     private,
     proxmox_config,
     resource_details,
@@ -33,6 +34,7 @@ api_router.include_router(resource_details.router)
 api_router.include_router(vm.router)
 api_router.include_router(lxc.router)
 api_router.include_router(vm_requests.router)
+api_router.include_router(migration_jobs.router)
 api_router.include_router(ai_api.router)
 api_router.include_router(ai_proxy.router)
 api_router.include_router(ai_pve_advisor_router)

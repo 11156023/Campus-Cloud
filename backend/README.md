@@ -1,172 +1,216 @@
-# FastAPI Project - Backend
+# Campus Cloud — Backend
 
-## Requirements
+Campus Cloud 後端：基於 FastAPI + SQLModel + PostgreSQL 的 Proxmox VE 虛擬化管理 API，提供 VM/LXC 生命週期、申請審核、防火牆/閘道、AI 放置建議與 vLLM 代理等能力。
 
-* [Docker](https://www.docker.com/).
-* [uv](https://docs.astral.sh/uv/) for Python package and environment management.
+## 技術棧
 
-## Docker Compose
+- **Web 框架**：FastAPI（standard ≥ 0.135）+ Pydantic v2
+- **ORM / 遷移**：SQLModel + Alembic
+- **資料庫**：PostgreSQL（psycopg）+ Redis（hiredis，速率限制與快取）
+- **Proxmox 整合**：proxmoxer（含 HA failover、TCP ping）
+- **安全**：PyJWT、pwdlib（Argon2 + Bcrypt）、Cryptography（Fernet 加密）
+- **遠端連線**：websockets（VNC 代理）、Paramiko（Gateway SSH / LXC terminal）
+- **錯誤追蹤**：sentry-sdk[fastapi]
+- **重試 / 工具**：tenacity、httpx、emails、jinja2、pyyaml
+- **開發工具**：UV、pytest、ruff、mypy、prek
 
-Start the local development environment with Docker Compose following the guide in [../development.md](../development.md).
+## 目錄結構
 
-## General Workflow
-
-By default, the dependencies are managed with [uv](https://docs.astral.sh/uv/), go there and install it.
-
-From `./backend/` you can install all the dependencies with:
-
-```console
-$ uv sync
+```
+backend/
+├── app/
+│   ├── main.py                # FastAPI 入口、lifespan、middleware、WebSocket
+│   ├── api/
+│   │   ├── main.py            # 路由聚合
+│   │   ├── routes/            # 19 個 REST 路由模組
+│   │   ├── websocket/         # VNC / Terminal WebSocket 代理
+│   │   └── deps/              # 依賴注入（auth、db、proxmox）
+│   ├── core/                  # config、db、security、proxmox client、redis
+│   ├── models/                # 21 個 SQLModel 模型
+│   ├── schemas/               # 14 個 Pydantic schema 模組
+│   ├── services/              # 21 個業務邏輯服務
+│   ├── repositories/          # 15 個資料存取層
+│   ├── ai/                    # PVE Advisor / Template Recommendation 內嵌邏輯
+│   ├── ai_api/                # 外部 AI API 整合設定
+│   ├── alembic/versions/      # 22+ 個遷移版本
+│   ├── email-templates/       # MJML 來源 + 編譯後 HTML
+│   ├── utils/                 # email、token 工具
+│   ├── backend_pre_start.py   # 啟動前 DB 連線檢查
+│   └── initial_data.py        # 預設超級管理員初始化
+├── tests/                     # pytest 測試
+├── scripts/                   # prestart / test / lint / format
+├── alembic.ini
+├── pyproject.toml
+└── Dockerfile
 ```
 
-Then you can activate the virtual environment with:
+## API 路由概覽
 
-```console
-$ source .venv/bin/activate
+於 `app/api/main.py` 註冊的主要路由：
+
+| 模組 | 功能 |
+| --- | --- |
+| `login.py` | 登入 / token 換發 / 刷新 |
+| `users.py` | 使用者 CRUD、密碼管理、個人資料 |
+| `groups.py` | 群組管理、CSV 匯入成員、寄發初始密碼 |
+| `vm.py` | VM 建立、VNC ticket、模板列舉 |
+| `lxc.py` | LXC 建立與終端機連線 |
+| `vm_requests.py` | VM 申請提交、可用性檢查、審核工作流 |
+| `migration_jobs.py` | VM 遷移工作追蹤 |
+| `resources.py` | 節點 / VM / LXC 列表、使用者資源 |
+| `resource_details.py` | 規格、RRD、快照、直接規格更新 |
+| `proxmox_config.py` | Cluster 連線設定、憑證驗證、cluster 統計 |
+| `firewall.py` | 防火牆拓撲、規則、NAT、Reverse Proxy |
+| `gateway.py` | 閘道 VM SSH 隧道、HAProxy / Traefik / FRP 設定 |
+| `ai_api.py` | AI API 憑證、申請審核、流量限制 |
+| `ai_proxy.py` | OpenAI 相容 `/chat/completions` 代理至 vLLM |
+| `spec_change_requests.py` | VM 規格變更申請與審核 |
+| `audit_logs.py` | 操作稽核紀錄查詢 |
+| `script_deploy.py` | 從 GitHub 自動化部署服務模板 |
+| `ai_pve_advisor` | 內嵌 AI 放置建議 |
+| `ai_template_recommendation` | 內嵌 AI 模板推薦 |
+
+WebSocket 端點（`app/main.py`）：
+
+- `GET /ws/vnc/{vmid}` — 透過 JWT query token 取得 Proxmox VNC 代理
+- `GET /ws/terminal/{vmid}` — LXC 終端機（Paramiko + xterm.js）
+
+## 核心模組
+
+`app/core/`：
+
+- `config.py`：Pydantic Settings，從 `.env` 載入 Proxmox / SMTP / CORS / DB / SECRET_KEY 等
+- `db.py`：SQLAlchemy engine、連線池、首位 superuser 建立
+- `security.py`：密碼雜湊（Argon2 + Bcrypt）、JWT 簽發/驗證、Fernet 加密
+- `proxmox.py`：ProxmoxAPI client factory，HA failover（TCP ping）、SSL/CA 處理
+- `redis.py`：Redis 連線池初始化與關閉
+
+## 中介層與安全
+
+- **SecurityHeadersMiddleware**：純 ASGI，注入 X-Content-Type-Options、X-Frame-Options、CSP、HSTS
+- **CORSMiddleware**：可從環境變數設定來源，預設加入 `FRONTEND_HOST`
+- **lifespan**：啟動 Redis、啟動 / 停止 VM 申請排程器
+- **Exception handlers**：將 `AppError`/`ProxmoxError`/`ProvisioningError` 等映射到對應 HTTP 狀態
+
+## 環境變數
+
+主要設定（完整見 `app/core/config.py` 與根目錄 `.env.example`）：
+
+```env
+# Project
+PROJECT_NAME=Campus Cloud
+SECRET_KEY=...
+ENVIRONMENT=local            # local | staging | production
+BACKEND_CORS_ORIGINS=http://localhost:5173
+
+# PostgreSQL
+POSTGRES_SERVER=db
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=...
+POSTGRES_DB=app
+
+# Initial superuser
+FIRST_SUPERUSER=admin@example.com
+FIRST_SUPERUSER_PASSWORD=...
+
+# Proxmox
+PROXMOX_HOST=192.168.x.x
+PROXMOX_USER=ccapiuser@pve
+PROXMOX_PASSWORD=...
+PROXMOX_VERIFY_SSL=false
+
+# SMTP（可選）
+SMTP_HOST=...
+SMTP_USER=...
+SMTP_PASSWORD=...
+EMAILS_FROM_EMAIL=...
+
+# Sentry（可選）
+SENTRY_DSN=...
 ```
 
-Make sure your editor is using the correct Python virtual environment, with the interpreter at `backend/.venv/bin/python`.
+## 開發環境
 
-Modify or add SQLModel models for data and SQL tables in `./backend/app/models.py`, API endpoints in `./backend/app/api/`, CRUD (Create, Read, Update, Delete) utils in `./backend/app/crud.py`.
-
-## VS Code
-
-There are already configurations in place to run the backend through the VS Code debugger, so that you can use breakpoints, pause and explore variables, etc.
-
-The setup is also already configured so you can run the tests through the VS Code Python tests tab.
-
-## Docker Compose Override
-
-During development, you can change Docker Compose settings that will only affect the local development environment in the file `compose.override.yml`.
-
-The changes to that file only affect the local development environment, not the production environment. So, you can add "temporary" changes that help the development workflow.
-
-For example, the directory with the backend code is synchronized in the Docker container, copying the code you change live to the directory inside the container. That allows you to test your changes right away, without having to build the Docker image again. It should only be done during development, for production, you should build the Docker image with a recent version of the backend code. But during development, it allows you to iterate very fast.
-
-There is also a command override that runs `fastapi run --reload` instead of the default `fastapi run`. It starts a single server process (instead of multiple, as would be for production) and reloads the process whenever the code changes. Have in mind that if you have a syntax error and save the Python file, it will break and exit, and the container will stop. After that, you can restart the container by fixing the error and running again:
-
-```console
-$ docker compose watch
-```
-
-There is also a commented out `command` override, you can uncomment it and comment the default one. It makes the backend container run a process that does "nothing", but keeps the container alive. That allows you to get inside your running container and execute commands inside, for example a Python interpreter to test installed dependencies, or start the development server that reloads when it detects changes.
-
-To get inside the container with a `bash` session you can start the stack with:
-
-```console
-$ docker compose watch
-```
-
-and then in another terminal, `exec` inside the running container:
-
-```console
-$ docker compose exec backend bash
-```
-
-You should see an output like:
-
-```console
-root@7f2607af31c3:/app#
-```
-
-that means that you are in a `bash` session inside your container, as a `root` user, under the `/app` directory, this directory has another directory called "app" inside, that's where your code lives inside the container: `/app/app`.
-
-There you can use the `fastapi run --reload` command to run the debug live reloading server.
-
-```console
-$ fastapi run --reload app/main.py
-```
-
-...it will look like:
-
-```console
-root@7f2607af31c3:/app# fastapi run --reload app/main.py
-```
-
-and then hit enter. That runs the live reloading server that auto reloads when it detects code changes.
-
-Nevertheless, if it doesn't detect a change but a syntax error, it will just stop with an error. But as the container is still alive and you are in a Bash session, you can quickly restart it after fixing the error, running the same command ("up arrow" and "Enter").
-
-...this previous detail is what makes it useful to have the container alive doing nothing and then, in a Bash session, make it run the live reload server.
-
-## Backend tests
-
-To test the backend run:
-
-```console
-$ bash ./scripts/test.sh
-```
-
-The tests run with Pytest, modify and add tests to `./backend/tests/`.
-
-If you use GitHub Actions the tests will run automatically.
-
-### Test running stack
-
-If your stack is already up and you just want to run the tests, you can use:
+### 使用 UV 本機開發
 
 ```bash
-docker compose exec backend bash scripts/tests-start.sh
+cd backend
+uv sync
+source .venv/bin/activate           # Windows: .venv\Scripts\activate
+fastapi dev app/main.py
 ```
 
-That `/app/scripts/tests-start.sh` script just calls `pytest` after making sure that the rest of the stack is running. If you need to pass extra arguments to `pytest`, you can pass them to that command and they will be forwarded.
+`fastapi dev` 會啟動單一 worker、autoreload 模式。Swagger 位於 http://localhost:8000/docs。
 
-For example, to stop on first error:
+### Docker Compose
 
 ```bash
+docker compose watch                # 全 stack 熱重載
+docker compose exec backend bash    # 進入容器
+docker compose logs backend         # 查看日誌
+```
+
+容器啟動時 `scripts/prestart.sh` 會：
+
+1. 執行 `app/backend_pre_start.py` 等待 DB 就緒
+2. 執行 `alembic upgrade head`
+3. 執行 `app/initial_data.py` 建立預設 superuser
+
+## 資料庫遷移
+
+```bash
+docker compose exec backend bash
+alembic revision --autogenerate -m "Add column foo to bar"
+alembic upgrade head
+```
+
+> 修改 `app/models/` 下任何 SQLModel 後務必建立遷移檔；`app/alembic/versions/` 內已有 22+ 個歷史版本。
+
+## 測試
+
+```bash
+# 完整測試
+bash ./scripts/test.sh
+
+# 在執行中的 stack 內跑（支援 pytest 參數）
 docker compose exec backend bash scripts/tests-start.sh -x
 ```
 
-### Test Coverage
+測試報告：`backend/htmlcov/index.html`
 
-When the tests are run, a file `htmlcov/index.html` is generated, you can open it in your browser to see the coverage of the tests.
+主要測試檔（`tests/api/routes/`）：
 
-## Migrations
+- `test_login.py` / `test_users.py`：認證與使用者
+- `test_ai_api.py`：AI API 工作流
+- `test_ai_pve_advisor.py`：放置建議
+- `test_vm_request_availability.py`：VM 申請可用性
 
-As during local development your app directory is mounted as a volume inside the container, you can also run the migrations with `alembic` commands inside the container and the migration code will be in your app directory (instead of being only inside the container). So you can add it to your git repository.
+## 程式碼品質
 
-Make sure you create a "revision" of your models and that you "upgrade" your database with that revision every time you change them. As this is what will update the tables in your database. Otherwise, your application will have errors.
-
-* Start an interactive session in the backend container:
-
-```console
-$ docker compose exec backend bash
+```bash
+uv run ruff check .          # Lint
+uv run ruff check --fix .    # 自動修復
+uv run mypy .                # 型別檢查
+uv run prek install -f       # 安裝 pre-commit
+uv run prek run --all-files  # 手動執行
 ```
 
-* Alembic is already configured to import your SQLModel models from `./backend/app/models.py`.
+## 主要特性
 
-* After changing a model (for example, adding a column), inside the container, create a revision, e.g.:
+- **VM 申請工作流**：可用性檢查 → AI 放置建議 → 審核 → 排程供應 → 自動遷移（背景排程器每 60 秒掃描）
+- **HA failover**：cluster 設定支援多個 Proxmox host，TCP ping 偵測接管
+- **Gateway 控制**：透過 SSH 直接讀寫 HAProxy / Traefik / FRP 設定並重啟服務
+- **腳本部署**：從 community-scripts/ProxmoxVE 拉取腳本並於 PVE 節點背景部署
+- **AI 代理**：以 OpenAI Chat Completion 介面連接內部 vLLM，含 Redis sliding-window 流量限制
+- **加密憑證儲存**：AI API 憑證以 Fernet 加密落地
 
-```console
-$ alembic revision --autogenerate -m "Add column last_name to User model"
-```
+## Email 模板
 
-* Commit to the git repository the files generated in the alembic directory.
+`app/email-templates/` 內含 `src/`（MJML）與 `build/`（HTML）兩個資料夾。建議在 VS Code 安裝 MJML 套件，編輯後 `MJML: Export to HTML` 輸出到 `build/`。
 
-* After creating the revision, run the migration in the database (this is what will actually change the database):
+## 參考
 
-```console
-$ alembic upgrade head
-```
-
-If you don't want to use migrations at all, uncomment the lines in the file at `./backend/app/core/db.py` that end in:
-
-```python
-SQLModel.metadata.create_all(engine)
-```
-
-and comment the line in the file `scripts/prestart.sh` that contains:
-
-```console
-$ alembic upgrade head
-```
-
-If you don't want to start with the default models and want to remove them / modify them, from the beginning, without having any previous revision, you can remove the revision files (`.py` Python files) under `./backend/app/alembic/versions/`. And then create a first migration as described above.
-
-## Email Templates
-
-The email templates are in `./backend/app/email-templates/`. Here, there are two directories: `build` and `src`. The `src` directory contains the source files that are used to build the final email templates. The `build` directory contains the final email templates that are used by the application.
-
-Before continuing, ensure you have the [MJML extension](https://github.com/mjmlio/vscode-mjml) installed in your VS Code.
-
-Once you have the MJML extension installed, you can create a new email template in the `src` directory. After creating the new email template and with the `.mjml` file open in your editor, open the command palette with `Ctrl+Shift+P` and search for `MJML: Export to HTML`. This will convert the `.mjml` file to a `.html` file and now you can save it in the build directory.
+- 主專案：[`../README.md`](../README.md)
+- 開發指引：[`../development.md`](../development.md)
+- 部署指引：[`../deployment.md`](../deployment.md)
+- VM 放置邏輯：[`../placement.md`](../placement.md)

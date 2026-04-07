@@ -1,6 +1,6 @@
 import { standardSchemaResolver } from "@hookform/resolvers/standard-schema"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Link, useNavigate } from "@tanstack/react-router"
+import { useNavigate } from "@tanstack/react-router"
 import { ArrowLeft, LayoutTemplate, X } from "lucide-react"
 import {
   type CSSProperties,
@@ -16,6 +16,7 @@ import { z } from "zod"
 
 import { type ApiError, LxcService, VmRequestsService, VmService } from "@/client"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   Form,
   FormControl,
@@ -37,6 +38,8 @@ import { Slider } from "@/components/ui/slider"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import useCustomToast from "@/hooks/useCustomToast"
+import useAuth from "@/hooks/useAuth"
+import { cn } from "@/lib/utils"
 import { handleError } from "@/utils"
 import { AiChatPanel, type AiPlanResult } from "./AiChatPanel"
 import { type FastTemplate, FastTemplatesTab } from "./FastTemplatesTab"
@@ -107,6 +110,8 @@ export function ApplicationRequestPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { showSuccessToast, showErrorToast } = useCustomToast()
+  const { user } = useAuth()
+  const backPath = user?.role === "student" ? "/applications" : "/approvals"
   const showAiAssistant = true
   const [showTemplateSelector, setShowTemplateSelector] = useState(false)
   const [resourceType, setResourceType] = useState<"lxc" | "vm">("lxc")
@@ -120,6 +125,7 @@ export function ApplicationRequestPage() {
     () =>
       z.object({
         resource_type: z.enum(["lxc", "vm"]),
+        mode: z.enum(["scheduled", "immediate"]).default("scheduled"),
         reason: z
           .string()
           .min(1, { message: t("validation:reason.required") })
@@ -148,8 +154,9 @@ export function ApplicationRequestPage() {
           }),
         storage: z.string().default("local-lvm"),
         os_info: z.string().optional(),
-        start_at: z.string().min(1),
-        end_at: z.string().min(1),
+        start_at: z.string().optional(),
+        end_at: z.string().optional(),
+        immediate_no_end: z.boolean().optional(),
       }),
     [t],
   )
@@ -162,6 +169,7 @@ export function ApplicationRequestPage() {
     criteriaMode: "all",
     defaultValues: {
       resource_type: "lxc",
+      mode: "scheduled",
       reason: "",
       hostname: "",
       ostemplate: "",
@@ -176,6 +184,7 @@ export function ApplicationRequestPage() {
       os_info: "",
       start_at: "",
       end_at: "",
+      immediate_no_end: true,
     },
   })
 
@@ -207,6 +216,11 @@ export function ApplicationRequestPage() {
   })
   const watchedStartAt = useWatch({ control: form.control, name: "start_at" })
   const watchedEndAt = useWatch({ control: form.control, name: "end_at" })
+  const watchedMode = useWatch({ control: form.control, name: "mode" })
+  const watchedImmediateNoEnd = useWatch({
+    control: form.control,
+    name: "immediate_no_end",
+  })
 
   function getSelectedTemplateLabel() {
     if (resourceType === "lxc") {
@@ -255,7 +269,11 @@ export function ApplicationRequestPage() {
     const basicReady = Boolean(
       reasonReady && watchedHostname?.trim() && watchedPassword,
     )
-    const slotReady = Boolean(watchedStartAt && watchedEndAt)
+
+    const isImmediate = watchedMode === "immediate"
+    const slotReady = isImmediate
+      ? true
+      : Boolean(watchedStartAt && watchedEndAt)
 
     if (!basicReady || !slotReady) return false
 
@@ -266,6 +284,7 @@ export function ApplicationRequestPage() {
     return Boolean(watchedOsTemplate)
   }, [
     watchedHostname,
+    watchedMode,
     watchedOsTemplate,
     watchedPassword,
     watchedReason,
@@ -305,6 +324,14 @@ export function ApplicationRequestPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mutation = useMutation<any, Error, FormData>({
     mutationFn: (data: FormData) => {
+      const isImmediate = data.mode === "immediate"
+      const effectiveStartAt = isImmediate ? undefined : data.start_at
+      const effectiveEndAt = isImmediate
+        ? data.immediate_no_end
+          ? undefined
+          : data.end_at
+        : data.end_at
+
       if (data.resource_type === "lxc") {
         if (!data.ostemplate || !data.rootfs_size) {
           throw new Error(t("validation:requirement.lxc"))
@@ -323,9 +350,10 @@ export function ApplicationRequestPage() {
             password: data.password,
             storage: data.storage,
             os_info: data.os_info || null,
-            start_at: data.start_at,
-            end_at: data.end_at,
-          },
+            mode: data.mode ?? "scheduled",
+            start_at: effectiveStartAt,
+            end_at: effectiveEndAt,
+          } as any,
         })
       }
       if (!data.template_id || !data.disk_size || !data.username) {
@@ -344,15 +372,16 @@ export function ApplicationRequestPage() {
           memory: data.memory,
           disk_size: data.disk_size,
           os_info: data.os_info || null,
-          start_at: data.start_at,
-          end_at: data.end_at,
-        },
+          mode: data.mode ?? "scheduled",
+          start_at: effectiveStartAt,
+          end_at: effectiveEndAt,
+        } as any,
       })
     },
     onSuccess: () => {
       showSuccessToast(t("messages:success.applicationSubmitted"))
       queryClient.invalidateQueries({ queryKey: ["vm-requests"] })
-      navigate({ to: "/applications" })
+      navigate({ to: backPath })
     },
     onError: (err) => handleError.call(showErrorToast, err as ApiError),
   })
@@ -513,17 +542,13 @@ export function ApplicationRequestPage() {
         <div className="min-w-0 max-w-[760px] space-y-6">
           <div className="flex items-start gap-3">
             <Button
-              asChild
               variant="outline"
               size="icon"
               className="mt-0.5 shrink-0"
+              onClick={() => navigate({ to: backPath })}
+              aria-label={t("common:buttons.back")}
             >
-              <Link
-                to="/applications"
-                aria-label={t("common:buttons.back")}
-              >
-                <ArrowLeft className="h-4 w-4" />
-              </Link>
+              <ArrowLeft className="h-4 w-4" />
             </Button>
             <div className="min-w-0">
               <h1 className="text-2xl font-bold tracking-tight">
@@ -546,6 +571,35 @@ export function ApplicationRequestPage() {
                 onSubmit={form.handleSubmit(onSubmit)}
                 className="space-y-6"
               >
+                {(user?.is_superuser || user?.role === "admin" || user?.role === "teacher") && (
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => form.setValue("mode", "scheduled")}
+                      className={cn(
+                        "rounded-lg border px-4 py-2 text-sm transition-colors",
+                        watchedMode === "scheduled"
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-border text-muted-foreground hover:bg-muted/50"
+                      )}
+                    >
+                      預約模式
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => form.setValue("mode", "immediate")}
+                      className={cn(
+                        "rounded-lg border px-4 py-2 text-sm transition-colors",
+                        watchedMode === "immediate"
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-border text-muted-foreground hover:bg-muted/50"
+                      )}
+                    >
+                      立即模式
+                    </button>
+                  </div>
+                )}
+
                 <Tabs
                   value={resourceType}
                   onValueChange={(value) => {
@@ -1138,29 +1192,72 @@ export function ApplicationRequestPage() {
                     )}
                   />
                 </Tabs>
-                <RequestAvailabilityPanel
-                  mode="draft"
-                  onChange={(value) => {
-                    updateFormValue("start_at", value.start_at ?? "")
-                    updateFormValue("end_at", value.end_at ?? "")
-                  }}
-                  draft={{
-                    resource_type: resourceType,
-                    cores: Number(watchedCores || 0),
-                    memory: Number(watchedMemory || 0),
-                    disk_size:
-                      resourceType === "vm"
-                        ? Number(watchedDiskSize || 0)
-                        : null,
-                    rootfs_size:
-                      resourceType === "lxc"
-                        ? Number(watchedRootfsSize || 0)
-                        : null,
-                    instance_count: 1,
-                    days: 7,
-                    timezone: "Asia/Taipei",
-                  }}
-                />
+                {watchedMode !== "immediate" ? (
+                  <RequestAvailabilityPanel
+                    mode="draft"
+                    onChange={(value) => {
+                      updateFormValue("start_at", value.start_at ?? "")
+                      updateFormValue("end_at", value.end_at ?? "")
+                    }}
+                    draft={{
+                      resource_type: resourceType,
+                      cores: Number(watchedCores || 0),
+                      memory: Number(watchedMemory || 0),
+                      disk_size:
+                        resourceType === "vm"
+                          ? Number(watchedDiskSize || 0)
+                          : null,
+                      rootfs_size:
+                        resourceType === "lxc"
+                          ? Number(watchedRootfsSize || 0)
+                          : null,
+                      instance_count: 1,
+                      days: 7,
+                      timezone: "Asia/Taipei",
+                    }}
+                  />
+                ) : (
+                  <div className="rounded-2xl border bg-muted/20 p-5 space-y-4">
+                    <h3 className="font-medium">立即模式設定</h3>
+                    <p className="text-sm text-muted-foreground">
+                      立即模式會在送出申請後馬上開始部署，不需要選擇開始時間。
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="immediate-no-end"
+                        checked={watchedImmediateNoEnd ?? true}
+                        onCheckedChange={(checked) =>
+                          form.setValue("immediate_no_end", Boolean(checked))
+                        }
+                      />
+                      <label
+                        htmlFor="immediate-no-end"
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                      >
+                        無限期 (No end date)
+                      </label>
+                    </div>
+                    {!watchedImmediateNoEnd && (
+                      <FormField
+                        control={form.control}
+                        name="end_at"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>結束時間</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="datetime-local"
+                                value={field.value ?? ""}
+                                onChange={field.onChange}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    )}
+                  </div>
+                )}
                 <section className="hidden rounded-2xl border bg-card/60 p-5">
                   <div className="flex flex-col gap-3 border-b border-border/70 pb-4 sm:flex-row sm:items-start sm:justify-between">
                     <div>
@@ -1231,7 +1328,7 @@ export function ApplicationRequestPage() {
                       variant="outline"
                       onClick={() =>
                         navigate({
-                          to: "/applications",
+                          to: backPath,
                         })
                       }
                       disabled={mutation.isPending}

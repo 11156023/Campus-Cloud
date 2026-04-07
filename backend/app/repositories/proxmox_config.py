@@ -50,6 +50,14 @@ def upsert_proxmox_config(
     migration_worker_concurrency: int = 2,
     migration_job_claim_timeout_seconds: int = 300,
     migration_retry_backoff_seconds: int = 120,
+    migration_lxc_live_enabled: bool = False,
+    rebalance_cpu_peak_warn_share: float = 0.7,
+    rebalance_cpu_peak_high_share: float = 1.2,
+    rebalance_memory_peak_warn_share: float = 0.8,
+    rebalance_memory_peak_high_share: float = 0.85,
+    rebalance_resource_weight_cpu: float = 1.0,
+    rebalance_resource_weight_memory: float = 1.0,
+    rebalance_resource_weight_disk: float = 1.0,
 ) -> ProxmoxConfig:
     config = session.get(ProxmoxConfig, _SINGLETON_ID)
 
@@ -92,6 +100,14 @@ def upsert_proxmox_config(
             migration_worker_concurrency=migration_worker_concurrency,
             migration_job_claim_timeout_seconds=migration_job_claim_timeout_seconds,
             migration_retry_backoff_seconds=migration_retry_backoff_seconds,
+            migration_lxc_live_enabled=migration_lxc_live_enabled,
+            rebalance_cpu_peak_warn_share=rebalance_cpu_peak_warn_share,
+            rebalance_cpu_peak_high_share=rebalance_cpu_peak_high_share,
+            rebalance_memory_peak_warn_share=rebalance_memory_peak_warn_share,
+            rebalance_memory_peak_high_share=rebalance_memory_peak_high_share,
+            rebalance_resource_weight_cpu=rebalance_resource_weight_cpu,
+            rebalance_resource_weight_memory=rebalance_resource_weight_memory,
+            rebalance_resource_weight_disk=rebalance_resource_weight_disk,
         )
         session.add(config)
     else:
@@ -131,6 +147,14 @@ def upsert_proxmox_config(
         config.migration_worker_concurrency = migration_worker_concurrency
         config.migration_job_claim_timeout_seconds = migration_job_claim_timeout_seconds
         config.migration_retry_backoff_seconds = migration_retry_backoff_seconds
+        config.migration_lxc_live_enabled = migration_lxc_live_enabled
+        config.rebalance_cpu_peak_warn_share = rebalance_cpu_peak_warn_share
+        config.rebalance_cpu_peak_high_share = rebalance_cpu_peak_high_share
+        config.rebalance_memory_peak_warn_share = rebalance_memory_peak_warn_share
+        config.rebalance_memory_peak_high_share = rebalance_memory_peak_high_share
+        config.rebalance_resource_weight_cpu = rebalance_resource_weight_cpu
+        config.rebalance_resource_weight_memory = rebalance_resource_weight_memory
+        config.rebalance_resource_weight_disk = rebalance_resource_weight_disk
         config.updated_at = datetime.now(timezone.utc)
         session.add(config)
 

@@ -41,8 +41,30 @@ export type VmRequestReviewProjectedNode = {
   hostnames: string[]
 }
 
+export type VmRequestReviewNodeScore = {
+  node: string
+  balance_score: number
+  cpu_share: number
+  memory_share: number
+  disk_share: number
+  peak_penalty: number
+  loadavg_penalty: number
+  storage_penalty: number
+  migration_cost: number
+  priority: number
+  is_selected: boolean
+  reason?: string | null
+}
+
 export type VmRequestReviewContext = {
-  request: VMRequestPublic
+  request: VMRequestPublic & {
+    migration_pinned?: boolean
+    resource_warning?: string | null
+    desired_node?: string | null
+    actual_node?: string | null
+    migration_status?: string | null
+    migration_error?: string | null
+  }
   window_start: string
   window_end: string
   window_active_now: boolean
@@ -52,10 +74,12 @@ export type VmRequestReviewContext = {
   summary: string
   reasons: string[]
   warnings: string[]
+  resource_warnings: string[]
   cluster_nodes: string[]
   current_running_resources: VmRequestReviewRuntimeResource[]
   overlapping_approved_requests: VmRequestReviewOverlapItem[]
   projected_nodes: VmRequestReviewProjectedNode[]
+  node_scores: VmRequestReviewNodeScore[]
 }
 
 export const VmRequestReviewService = {

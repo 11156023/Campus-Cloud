@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query"
 import { Link, useNavigate } from "@tanstack/react-router"
-import { ArrowLeft, Check, X } from "lucide-react"
+import { ArrowLeft, AlertTriangle, Check, Pin, X } from "lucide-react"
 import { useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
 
@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea"
 import useCustomToast from "@/hooks/useCustomToast"
 import { cn } from "@/lib/utils"
 import {
+  type VmRequestReviewNodeScore,
   type VmRequestReviewOverlapItem,
   type VmRequestReviewRuntimeResource,
   VmRequestReviewService,
@@ -228,6 +229,72 @@ function PveStackColumn({
   )
 }
 
+function NodeScoreCard({ score }: { score: VmRequestReviewNodeScore }) {
+  const pct = (v: number) => `${(v * 100).toFixed(1)}%`
+  return (
+    <article
+      className={cn(
+        "rounded-xl border border-border/70 bg-background/50 p-3",
+        score.is_selected && "border-primary/60 bg-primary/5",
+      )}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <h3 className="font-medium">{score.node}</h3>
+          {score.is_selected && <Badge variant="secondary">選中</Badge>}
+        </div>
+        <div className="text-right">
+          <span className="text-lg font-bold tabular-nums">{score.balance_score.toFixed(4)}</span>
+          <div className="text-[10px] text-muted-foreground">Balance Score</div>
+        </div>
+      </div>
+      <div className="mt-3 grid grid-cols-3 gap-x-3 gap-y-2 text-xs">
+        <div>
+          <div className="text-muted-foreground">CPU 佔比</div>
+          <div className="font-medium tabular-nums">{pct(score.cpu_share)}</div>
+        </div>
+        <div>
+          <div className="text-muted-foreground">RAM 佔比</div>
+          <div className="font-medium tabular-nums">{pct(score.memory_share)}</div>
+        </div>
+        <div>
+          <div className="text-muted-foreground">Disk 佔比</div>
+          <div className="font-medium tabular-nums">{pct(score.disk_share)}</div>
+        </div>
+        <div>
+          <div className="text-muted-foreground">Peak Penalty</div>
+          <div className={cn("font-medium tabular-nums", score.peak_penalty > 0 && "text-amber-500")}>
+            {score.peak_penalty.toFixed(3)}
+          </div>
+        </div>
+        <div>
+          <div className="text-muted-foreground">Loadavg Penalty</div>
+          <div className={cn("font-medium tabular-nums", score.loadavg_penalty > 0 && "text-amber-500")}>
+            {score.loadavg_penalty.toFixed(3)}
+          </div>
+        </div>
+        <div>
+          <div className="text-muted-foreground">Storage Penalty</div>
+          <div className={cn("font-medium tabular-nums", score.storage_penalty > 0 && "text-amber-500")}>
+            {score.storage_penalty.toFixed(3)}
+          </div>
+        </div>
+        <div>
+          <div className="text-muted-foreground">Migration Cost</div>
+          <div className="font-medium tabular-nums">{score.migration_cost.toFixed(3)}</div>
+        </div>
+        <div>
+          <div className="text-muted-foreground">Priority</div>
+          <div className="font-medium tabular-nums">{score.priority}</div>
+        </div>
+      </div>
+      {score.reason && (
+        <div className="mt-2 text-xs text-muted-foreground">{score.reason}</div>
+      )}
+    </article>
+  )
+}
+
 function OverlapCard({ item }: { item: VmRequestReviewOverlapItem }) {
   const status = statusMeta(item.status)
   const migration = migrationMeta(item.migration_status)
@@ -353,11 +420,24 @@ export function VMRequestReviewPage({ requestId }: { requestId: string }) {
             <Badge variant={context.feasible ? "default" : "destructive"}>
               {context.feasible ? "可分配" : "無法分配"}
             </Badge>
+            {request.migration_pinned && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-400">
+                <Pin className="h-3 w-3" />
+                Pinned
+              </span>
+            )}
             {context.projected_node && <Badge variant="secondary">預測節點 {context.projected_node}</Badge>}
             {context.window_active_now && <Badge variant="outline">時段進行中</Badge>}
           </div>
         </div>
       </header>
+
+      {request.resource_warning && (
+        <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-300">
+          <AlertTriangle className="mr-1.5 inline h-4 w-4" />
+          {request.resource_warning}
+        </div>
+      )}
 
       <section className="grid gap-5 xl:grid-cols-[420px_minmax(0,1fr)]">
         <div className="rounded-2xl border border-border/80 bg-card/40 p-4">
@@ -406,6 +486,17 @@ export function VMRequestReviewPage({ requestId }: { requestId: string }) {
                 <Badge key={warning} variant="outline">
                   {warning}
                 </Badge>
+              ))}
+            </div>
+          )}
+
+          {context.resource_warnings?.length > 0 && (
+            <div className="mt-4 space-y-1.5">
+              {context.resource_warnings.map((w) => (
+                <div key={w} className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-2.5 text-xs text-amber-400">
+                  <AlertTriangle className="mr-1 inline h-3.5 w-3.5" />
+                  {w}
+                </div>
               ))}
             </div>
           )}
@@ -486,6 +577,27 @@ export function VMRequestReviewPage({ requestId }: { requestId: string }) {
           </div>
         </div>
       </section>
+
+      {context.node_scores.length > 0 && (
+        <section className="rounded-2xl border border-border/80 bg-card/40 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 pb-3">
+            <div>
+              <h2 className="text-lg font-semibold">節點評分比較</h2>
+              <p className="text-sm text-muted-foreground">
+                各節點的平衡分數、資源佔比與懲罰項，分數越低代表資源越均衡，演算法會選擇分數最低的節點。
+              </p>
+            </div>
+          </div>
+          <div className="mt-4 grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
+            {context.node_scores
+              .slice()
+              .sort((a, b) => a.balance_score - b.balance_score)
+              .map((score) => (
+                <NodeScoreCard key={score.node} score={score} />
+              ))}
+          </div>
+        </section>
+      )}
 
       <section className="rounded-2xl border border-border/80 bg-card/40 p-4">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 pb-3">

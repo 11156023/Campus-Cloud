@@ -1,249 +1,173 @@
-# vLLM Web UI - 優雅夢幻助手
+# vLLM API — Multi-Model Gateway Web UI
 
-基於 vLLM 的現代化 Web UI，支援**流式輸出**和**圖片辨識**，採用優雅夢幻的動漫風格設計。
+`vllm-API/` 的 Web 前端與 Gateway：FastAPI 統一閘道（將請求轉發到多個 vLLM 模型實例）+ React 18（Vite + Tailwind）。與 [`vllm-inference/webapp`](../../vllm-inference/webapp/README.md) 的差異是：本服務面對的是**多模型叢集**，前端可在送出請求前選擇要使用哪一個模型 alias。
 
-## ✨ 特色
+## 功能
 
-- 🎨 **優雅夢幻風格**: 紫色系漸變、玻璃質感、星空背景
-- 🌊 **流式輸出**: 實時顯示 AI 回應，提升互動體驗  
-- 🖼️ **圖片辨識**: 支援視覺模型，上傳圖片進行分析
-- 💬 **單次對話**: 不保存歷史記錄，專注當前問題
-- ⚡ **高效能**: FastAPI + React，異步處理，響應迅速
+- 多模型路由：依 `model` 參數轉發到對應上游 vLLM 實例
+- SSE 串流輸出
+- 圖片 / 影片 / 文件多模態
+- inflight semaphore 保護（避免 Gateway 被打爆）
+- 模型列表 60 秒快取
+- 上傳檔案大小 / 類型驗證
+- 上游連線池與非同步轉發
 
-## 🏗️ 技術架構
+## 架構
 
 ```
-webapp/
-├── backend/          # FastAPI 後端
-│   └── main.py      # API 服務 (流式代理)
-└── frontend/        # React 前端
-    ├── src/
-    │   ├── App.jsx           # 主應用
-    │   ├── components/
-    │   │   ├── ChatBox.jsx   # 聊天容器
-    │   │   └── MessageBubble.jsx  # 訊息氣泡
-    │   └── index.css         # 夢幻風格樣式
-    └── package.json
+vllm-API/
+├── main.py                       # 叢集 orchestrator：啟動所有模型 + Gateway
+├── models.json                   # 多模型實例設定
+├── models.json.example
+├── config/
+│   ├── settings.py               # 共用設定
+│   └── multi_model.py            # 載入 models.json + Gateway 設定
+├── core/
+│   ├── engine.py                 # 單一 vLLM 實例啟停
+│   └── cluster.py                # MultiModelEngineManager
+├── api/                          # 上游 client
+├── benchmark/, utils/            # 與 vllm-inference 相同
+├── webapp/
+│   ├── backend/main.py           # FastAPI Gateway（路由到對應模型）
+│   └── frontend/                 # React 18 + Vite
+└── start_webapp.sh
 ```
 
-### 後端 API
+## Gateway API
+
+Gateway 預設位於 port 3000，會接收前端請求並依 `model` 參數轉發到對應上游模型 endpoint。
 
 | 端點 | 方法 | 說明 |
-|------|------|------|
-| `/api/model-info` | GET | 獲取模型資訊 |
-| `/api/chat` | POST | 文字聊天（非流式） |
-| `/api/chat/stream` | POST | 文字聊天（流式 SSE） |
-| `/api/chat/vision` | POST | 視覺聊天（非流式） |
-| `/api/chat/vision/stream` | POST | 視覺聊天（流式 SSE） |
+| --- | --- | --- |
+| `/api/models` | GET | 列出所有可用模型與 alias（60 秒 cache） |
+| `/api/chat` | POST | 文字對話；以 `model` 指定 alias，未指定則使用 `GATEWAY_DEFAULT_MODEL` |
+| `/api/chat/stream` | POST | 串流對話 |
+| `/api/chat/vision` | POST | 圖片對話 |
+| `/api/chat/vision/stream` | POST | 圖片對話（串流） |
+| `/api/chat/video` | POST | 影片分析 |
+| `/api/chat/document` | POST | 文件分析 |
 
-## 🚀 快速開始
+> 上游 vLLM 實例本身仍對外提供原生 OpenAI 相容 `/v1/...` API，但**通常只在 Gateway 內部呼叫**。
 
-### 前置需求
+## models.json 範例
 
-1. **vLLM 服務已啟動**:
-   ```bash
-   python main.py
-   ```
-
-2. **Node.js** (v18+):
-   ```bash
-   node --version
-   ```
-
-### 一鍵啟動
-
-```bash
-# 賦予執行權限
-chmod +x start_webapp.sh
-
-# 啟動全部服務
-./start_webapp.sh
+```json
+[
+  {
+    "alias": "qwen-9b",
+    "model_name": "./AImodels/Qwen3.5-9B",
+    "api_port": 8101,
+    "max_model_len": 32768,
+    "gpu_memory_utilization": 0.15,
+    "max_num_seqs": 48,
+    "max_num_batched_tokens": 65536
+  },
+  {
+    "alias": "qwen-235b",
+    "model_name": "nvidia/Qwen3-235B-A22B-NVFP4",
+    "api_port": 8102,
+    "max_model_len": 4096,
+    "gpu_memory_utilization": 0.95,
+    "max_num_seqs": 64
+  }
+]
 ```
 
-腳本會自動：
-1. ✅ 檢查 vLLM 服務狀態
-2. 📦 安裝 Python 依賴 (FastAPI, uvicorn)
-3. 📦 安裝 Node.js 依賴 (React, Vite)
-4. 🚀 啟動前端開發伺服器 (http://localhost:5173)
-5. 🚀 啟動後端 API 服務 (http://localhost:3000)
+每個項目都會獨立啟動一個 vLLM 實例（在自己的 `api_port` 上），並覆寫 `.env` 中的對應預設值。
 
-### 手動啟動
+## 共用 .env
 
-#### 方法 1: 開發模式（推薦）
+```env
+# Gateway
+GATEWAY_HOST=0.0.0.0
+GATEWAY_PORT=3000
+GATEWAY_REQUEST_TIMEOUT=120
+GATEWAY_MAX_INFLIGHT=48
+GATEWAY_DEFAULT_MODEL=qwen-9b
 
-**終端 1 - 啟動後端**:
+# 共用引擎預設值（會被 models.json 覆寫）
+HF_CACHE_DIR=/raid/hf-cache/hub
+TRUST_REMOTE_CODE=true
+DTYPE=auto
+ENABLE_PREFIX_CACHING=true
+GPU_MEMORY_UTILIZATION=0.9
+```
+
+## 啟動
+
+### 完整叢集
+
 ```bash
-cd webapp/backend
-pip install fastapi uvicorn[standard] python-multipart
+source .venv/bin/activate
+pip install -r requirements.txt
+
+cp .env.example .env             # 編輯 GATEWAY_*、HF_CACHE_DIR、…
+cp models.json.example models.json
+# 編輯 models.json：加入你的模型路徑、port、GPU 配額
+
 python main.py
 ```
 
-**終端 2 - 啟動前端**:
+`main.py` 會：
+
+1. 執行 pre-flight system check
+2. 載入 `models.json` 與共用 `.env`
+3. 透過 `MultiModelEngineManager` 依序啟動每個 vLLM 實例（5 秒間隔，任一失敗即中止）
+4. 啟動 Gateway（`uvicorn webapp.backend.main:app`）
+5. 等待所有引擎與 Gateway `/health` OK 後才宣告就緒
+
+### 透過 Gateway 呼叫
+
+```bash
+curl http://localhost:3000/api/chat \
+  -H "Authorization: Bearer Rushia_Secret_Key_Change_Me" \
+  -H "Content-Type: application/json" \
+  -d '{"message": "你好", "model": "qwen-9b"}'
+```
+
+### 前端開發模式
+
 ```bash
 cd webapp/frontend
 npm install
-npm run dev
+npm run dev          # http://localhost:5173
 ```
 
-訪問: http://localhost:5173
+前端 dev server 會將 `/api` proxy 到 `http://localhost:3000`。
 
-#### 方法 2: 生產模式
+### 前端 production
 
 ```bash
-# 建置前端
 cd webapp/frontend
 npm install
 npm run build
 
-# 啟動後端（會自動提供前端靜態檔案）
-cd ../backend
-python main.py
+# Gateway 會直接提供 dist/ 靜態檔
+# 開啟 http://localhost:3000
 ```
 
-訪問: http://localhost:3000
+## 設計重點
 
-## 🎨 設計系統
+- **Sequential startup**：`MultiModelEngineManager._start_sequential()` 一次起一個引擎，避免 GPU 同時搶資源
+- **Gateway semaphore**：`GATEWAY_MAX_INFLIGHT` 限制同時轉發的請求數
+- **模型快取**：`/api/models` 會快取上游 `/v1/models` 60 秒
+- **檔案上傳**：使用 `aiofiles` 異步處理，<50 MB 限制，圖片 / 影片 / 文件型別檢查
+- **串流轉發**：Gateway 直接把上游 SSE chunk 透傳到前端
 
-### 配色方案
+## 與 `vllm-inference` 的差別
 
-採用 **AI/Chatbot Platform** 配色（來自 UI/UX Pro Max）:
+| | `vllm-inference` | `vllm-API` |
+| --- | --- | --- |
+| 範疇 | 單一模型 | 多模型 |
+| 設定 | `.env` | `.env` + `models.json` |
+| 啟動 | 單一 vLLM engine | 多個 engine + Gateway |
+| 路由 | 直接到 vLLM | Gateway 依 `model` 轉發 |
+| Port | API port = 8000 | 多個 model port + Gateway = 3000 |
+| 適用 | 單模型實驗 / MVP | 校園叢集 / 成本最佳化 |
 
-| 角色 | 顏色 | 說明 |
-|------|------|------|
-| Primary | `#7C3AED` | 主要紫色 |
-| Secondary | `#A78BFA` | 淡紫色 |
-| CTA | `#06B6D4` | 青色按鈕 |
-| Background | `#FAF5FF` | 淺紫背景 |
-| Text | `#1E1B4B` | 深紫文字 |
+## 故障排除
 
-### 視覺效果
-
-- **玻璃質感** (Glassmorphism): `backdrop-blur` + 半透明背景
-- **星空背景**: 動態移動的星點
-- **漸變光暈**: 浮動動畫的彩色光球
-- **文字發光**: 紫色發光效果
-- **流暢過渡**: 300ms ease-in-out
-
-### 字型
-
-- **標題**: Noto Serif JP (優雅日系)
-- **內文**: Noto Sans JP (清晰易讀)
-
-## 📸 使用指南
-
-### 文字對話
-
-1. 在輸入框輸入訊息
-2. 按 Enter 或點擊發送按鈕
-3. 實時查看 AI 流式回應
-4. 點擊「開始新對話」重新開始
-
-### 圖片辨識
-
-（需要視覺模型，如 Qwen-VL）
-
-1. 點擊「上傳圖片」按鈕
-2. 選擇圖片檔案（支援 JPG, PNG, WebP 等）
-3. 圖片會顯示預覽
-4. 輸入關於圖片的問題
-5. 發送後實時查看 AI 分析結果
-
-## 🔧 配置選項
-
-### 後端配置
-
-編輯 `webapp/backend/main.py`:
-
-```python
-# 伺服器設定
-host="0.0.0.0"    # 監聽地址
-port=3000          # 埠號
-
-# 模型參數（在請求中設定）
-max_tokens=512     # 最大生成長度
-temperature=0.7    # 溫度參數
-```
-
-### 前端配置
-
-編輯 `webapp/frontend/vite.config.js`:
-
-```javascript
-server: {
-  port: 5173,      // 前端埠
-  proxy: {
-    '/api': {
-      target: 'http://localhost:3000',  // 後端地址
-      changeOrigin: true,
-    }
-  }
-}
-```
-
-## 🐛 故障排除
-
-### 問題 1: 無法連接到 vLLM 服務
-
-```
-❌ vLLM 服務未運行！
-```
-
-**解決方案**:
-```bash
-# 啟動 vLLM 服務
-python main.py
-
-# 檢查服務狀態
-curl http://localhost:8000/health
-```
-
-### 問題 2: 圖片上傳失敗
-
-```
-當前模型不支援視覺輸入
-```
-
-**解決方案**:
-- 確認 `.env` 中的 `MODEL_NAME` 是視覺模型（如 Qwen-VL, LLaVA）
-- 檢查 `utils/model_utils.py` 的 `VISION_KEYWORDS`
-
-### 問題 3: 流式輸出中斷
-
-**可能原因**:
-- 網路超時
-- vLLM 服務過載
-
-**解決方案**:
-- 降低併發請求數
-- 調整 `config/settings.py` 的 `request_timeout`
-
-## 📊 性能建議
-
-### 開發環境
-
-- 使用 `npm run dev` 啟用 HMR（熱更新）
-- 後端使用 `reload=True` 自動重載
-
-### 生產環境
-
-- 建置前端: `npm run build`
-- 使用 Nginx 反向代理
-- 啟用 Gzip 壓縮
-- 使用 CDN 加速靜態資源
-
-## 🎯 未來擴展
-
-- [ ] 多輪對話記憶（可選）
-- [ ] 語音輸入/輸出
-- [ ] 深色/淺色主題切換
-- [ ] 匯出對話為 Markdown
-- [ ] 多模型切換
-- [ ] 自定義主題顏色
-
-## 📄 授權
-
-本專案遵循 MIT 授權。
-
----
-
-**Powered by vLLM** | **Designed with UI/UX Pro Max** | **Built with ❤️**
+- Gateway 無法啟動：確認 `models.json` 中所有 `api_port` 都已被對應的 vLLM 引擎成功啟動
+- `/api/models` 為空：上游引擎尚未 ready，等待 health check 通過
+- 上傳檔案被拒：檢查大小（< 50 MB）與型別
+- 串流中斷：調整 `GATEWAY_REQUEST_TIMEOUT`

@@ -44,6 +44,7 @@ class _MigrationPolicy:
     worker_concurrency: int
     claim_timeout_seconds: int
     retry_backoff_seconds: int
+    lxc_live_enabled: bool = False
 
 
 def _utc_now() -> datetime:
@@ -73,6 +74,7 @@ def _get_migration_policy(*, session: Session) -> _MigrationPolicy:
             worker_concurrency=2,
             claim_timeout_seconds=300,
             retry_backoff_seconds=120,
+            lxc_live_enabled=False,
         )
     return _MigrationPolicy(
         enabled=bool(config.migration_enabled),
@@ -88,6 +90,7 @@ def _get_migration_policy(*, session: Session) -> _MigrationPolicy:
             int(config.migration_retry_backoff_seconds or 120),
             0,
         ),
+        lxc_live_enabled=bool(config.migration_lxc_live_enabled),
     )
 
 
@@ -213,6 +216,22 @@ def _adopt_or_provision_due_request(
             vmid,
             request.id,
         )
+        # Detect if resource should be pinned
+        try:
+            pinned = _detect_migration_pinned(
+                node=actual_node,
+                vmid=vmid,
+                resource_type=resource_type,
+            )
+            if pinned and not request.migration_pinned:
+                request.migration_pinned = True
+                session.add(request)
+                logger.info(
+                    "Auto-pinned request %s VMID %s on %s (passthrough/local mount detected)",
+                    request.id, vmid, actual_node,
+                )
+        except Exception:
+            logger.debug("Failed to detect migration pinning for VMID %s", vmid, exc_info=True)
         return vmid, actual_node, placement_strategy_used, started
 
     vmid, actual_node, placement_strategy_used = (
@@ -263,6 +282,22 @@ def _adopt_or_provision_due_request(
         vmid,
         actual_node,
     )
+    # Detect if resource should be pinned
+    try:
+        pinned = _detect_migration_pinned(
+            node=actual_node,
+            vmid=vmid,
+            resource_type=resource_type,
+        )
+        if pinned and not request.migration_pinned:
+            request.migration_pinned = True
+            session.add(request)
+            logger.info(
+                "Auto-pinned request %s VMID %s on %s (passthrough/local mount detected)",
+                request.id, vmid, actual_node,
+            )
+    except Exception:
+        logger.debug("Failed to detect migration pinning for VMID %s", vmid, exc_info=True)
     return vmid, actual_node, placement_strategy_used, True
 
 
@@ -293,6 +328,12 @@ def _mark_request_runtime_error(
         last_rebalanced_at=request.last_rebalanced_at,
         commit=False,
     )
+    if any(
+        keyword in message.lower()
+        for keyword in ("no feasible", "capacity", "no node", "cannot fit")
+    ):
+        request.resource_warning = message[:500]
+        session.add(request)
     session.commit()
 
 
@@ -357,6 +398,42 @@ def _storage_ids_available_on_node(*, node: str) -> set[str]:
         for item in proxmox_service.list_node_storages(node)
         if str(item.get("storage") or item.get("id") or "").strip()
     }
+
+
+def _detect_migration_pinned(
+    *,
+    node: str,
+    vmid: int,
+    resource_type: str,
+) -> bool:
+    """Detect if a resource should be pinned to its current node.
+
+    Checks for hardware passthrough devices, local disk paths,
+    and bind mounts that would make migration unsafe.
+    """
+    try:
+        config = proxmox_service.get_config(node, vmid, resource_type)
+    except Exception:
+        return False
+
+    if resource_type == "qemu":
+        if any(key.startswith(("hostpci", "usb")) for key in config):
+            return True
+        for key, value in config.items():
+            if not key.startswith(_VM_DISK_PREFIXES):
+                continue
+            text = str(value or "").strip()
+            if text.startswith("/"):
+                return True
+    else:  # lxc
+        for key, value in config.items():
+            if not key.startswith(_LXC_MOUNT_PREFIXES):
+                continue
+            text = str(value or "").strip()
+            if text.startswith("/"):
+                return True
+
+    return False
 
 
 def _migration_block_reason(
@@ -541,6 +618,43 @@ def _migrate_request_to_desired_node(
             commit=False,
         )
         return current_node, False
+    if getattr(request, 'migration_pinned', False):
+        block_reason = (
+            "Migration blocked because this resource is pinned to its current node "
+            "(hardware passthrough or local mount detected)."
+        )
+        if job is not None:
+            vm_migration_job_repo.update_job_status(
+                session=session,
+                job=job,
+                status=VMMigrationJobStatus.blocked,
+                last_error=block_reason,
+                source_node=current_node,
+                target_node=desired_node,
+                vmid=request.vmid,
+                finished_at=now,
+                commit=False,
+            )
+        vm_request_repo.update_vm_request_provisioning(
+            session=session,
+            db_request=request,
+            vmid=request.vmid,
+            assigned_node=desired_node,
+            desired_node=desired_node,
+            actual_node=current_node,
+            placement_strategy_used=request.placement_strategy_used,
+            migration_status=VMMigrationStatus.blocked,
+            migration_error=block_reason,
+            rebalance_epoch=request.rebalance_epoch,
+            last_rebalanced_at=request.last_rebalanced_at,
+            last_migrated_at=request.last_migrated_at,
+            commit=False,
+        )
+        logger.info(
+            "Skipped pinned request %s VMID %s from %s to %s",
+            request.id, request.vmid, current_node, desired_node,
+        )
+        return current_node, False
     if policy.max_per_rebalance <= migrations_used:
         defer_reason = (
             "Migration deferred because this rebalance window reached the migration budget."
@@ -618,6 +732,49 @@ def _migrate_request_to_desired_node(
         resource_type,
     )
     online = str(current_status.get("status") or "").lower() == "running"
+
+    if resource_type == "lxc" and online and not policy.lxc_live_enabled:
+        block_reason = (
+            "Migration blocked because LXC live migration is disabled. "
+            "The container must be stopped before migrating, or enable "
+            "migration_lxc_live_enabled in system settings."
+        )
+        if job is not None:
+            vm_migration_job_repo.update_job_status(
+                session=session,
+                job=job,
+                status=VMMigrationJobStatus.blocked,
+                last_error=block_reason,
+                source_node=current_node,
+                target_node=desired_node,
+                vmid=request.vmid,
+                finished_at=now,
+                commit=False,
+            )
+        vm_request_repo.update_vm_request_provisioning(
+            session=session,
+            db_request=request,
+            vmid=request.vmid,
+            assigned_node=desired_node,
+            desired_node=desired_node,
+            actual_node=current_node,
+            placement_strategy_used=request.placement_strategy_used,
+            migration_status=VMMigrationStatus.blocked,
+            migration_error=block_reason,
+            rebalance_epoch=request.rebalance_epoch,
+            last_rebalanced_at=request.last_rebalanced_at,
+            last_migrated_at=request.last_migrated_at,
+            commit=False,
+        )
+        logger.warning(
+            "Blocked LXC live migration for request %s VMID %s from %s to %s",
+            request.id,
+            request.vmid,
+            current_node,
+            desired_node,
+        )
+        return current_node, False
+
     block_reason = _migration_block_reason(
         source_node=current_node,
         target_node=desired_node,
@@ -1160,6 +1317,34 @@ def _rebalance_active_window(now: datetime) -> int:
         return len(due_requests)
 
 
+def process_single_request_start(request_id: uuid.UUID) -> bool:
+    """Immediately trigger provisioning for a single approved request."""
+    now = _utc_now()
+    with Session(engine) as session:
+        policy = _get_migration_policy(session=session)
+        request = vm_request_repo.get_vm_request_by_id(
+            session=session, request_id=request_id
+        )
+        if not request or request.status != VMRequestStatus.approved:
+            return False
+        try:
+            started, _ = _ensure_request_running(
+                session=session,
+                request=request,
+                now=now,
+                policy=policy,
+                migrations_used=0,
+            )
+            session.commit()
+            return started
+        except Exception:
+            session.rollback()
+            logger.exception(
+                "Failed to immediately provision request %s", request_id
+            )
+            return False
+
+
 def process_due_request_starts() -> int:
     started_count = 0
     now = _utc_now()
@@ -1299,11 +1484,14 @@ def process_due_request_stops() -> int:
                     vmid,
                 )
             except NotFoundError:
-                logger.warning(
-                    "Scheduled shutdown skipped because resource %s was not found for request %s",
+                logger.debug(
+                    "Scheduled shutdown skipped: resource %s not found for request %s, clearing vmid",
                     vmid,
                     request.id,
                 )
+                request.vmid = None
+                session.add(request)
+                session.commit()
             except Exception:
                 logger.exception(
                     "Failed to auto-shutdown approved request %s with VMID %s",

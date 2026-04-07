@@ -89,6 +89,8 @@ class VMRequest(SQLModel, table=True):
         ),
     )
     migration_error: str | None = Field(default=None)
+    migration_pinned: bool = Field(default=False)
+    resource_warning: str | None = Field(default=None)
     rebalance_epoch: int = Field(default=0)
     last_rebalanced_at: datetime | None = Field(
         default=None,
