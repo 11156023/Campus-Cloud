@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 
 from app.api.deps import AdminUser, CurrentUser, ResourceInfoDep, SessionDep
