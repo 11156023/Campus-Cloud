@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from typing import AsyncGenerator
 
 import httpx
+from sqlalchemy import and_, or_
 from sqlmodel import Session, select
 
 from app.ai_api.config import settings as ai_api_settings
@@ -22,7 +23,9 @@ from app.models import (
     get_datetime_utc,
 )
 from app.schemas import (
+    AIAPICredentialAdminPublic,
     AIAPICredentialPublic,
+    AIAPICredentialsAdminPublic,
     AIAPICredentialsPublic,
     AIAPIRequestCreate,
     AIAPIRequestPublic,
@@ -89,6 +92,38 @@ def _to_credential_public(credential: AIAPICredential) -> AIAPICredentialPublic:
         api_key_prefix=credential.api_key_prefix,
         api_key_name=credential.api_key_name,
         rate_limit=credential.rate_limit,
+        expires_at=credential.expires_at,
+        revoked_at=credential.revoked_at,
+        created_at=credential.created_at,
+    )
+
+
+def _resolve_credential_status(
+    *, credential: AIAPICredential, now: datetime
+) -> tuple[str, str | None]:
+    if credential.revoked_at is not None:
+        return "inactive", "revoked"
+    if credential.expires_at is not None and credential.expires_at <= now:
+        return "inactive", "expired"
+    return "active", None
+
+
+def _to_credential_admin_public(
+    *, credential: AIAPICredential, user: User, now: datetime
+) -> AIAPICredentialAdminPublic:
+    status, inactive_reason = _resolve_credential_status(credential=credential, now=now)
+    return AIAPICredentialAdminPublic(
+        id=credential.id,
+        user_id=credential.user_id,
+        user_email=user.email,
+        user_full_name=user.full_name,
+        request_id=credential.request_id,
+        base_url=credential.base_url,
+        api_key_prefix=credential.api_key_prefix,
+        api_key_name=credential.api_key_name,
+        rate_limit=credential.rate_limit,
+        status=status,
+        inactive_reason=inactive_reason,
         expires_at=credential.expires_at,
         revoked_at=credential.revoked_at,
         created_at=credential.created_at,
@@ -257,6 +292,53 @@ def list_credentials_by_user(
     )
     return AIAPICredentialsPublic(
         data=[_to_credential_public(item) for item in session.exec(data_query).all()],
+        count=len(session.exec(count_query).all()),
+    )
+
+
+def list_all_credentials(
+    *,
+    session: Session,
+    status: str | None = None,
+    user_email: str | None = None,
+    skip: int = 0,
+    limit: int = 100,
+) -> AIAPICredentialsAdminPublic:
+    now = get_datetime_utc()
+
+    count_query = select(AIAPICredential.id).join(User, User.id == AIAPICredential.user_id)
+    data_query = select(AIAPICredential, User).join(User, User.id == AIAPICredential.user_id)
+
+    keyword = (user_email or "").strip()
+    if keyword:
+        like_pattern = f"%{keyword}%"
+        count_query = count_query.where(User.email.ilike(like_pattern))
+        data_query = data_query.where(User.email.ilike(like_pattern))
+
+    active_clause = and_(
+        AIAPICredential.revoked_at.is_(None),
+        or_(AIAPICredential.expires_at.is_(None), AIAPICredential.expires_at > now),
+    )
+    inactive_clause = or_(
+        AIAPICredential.revoked_at.is_not(None),
+        and_(AIAPICredential.expires_at.is_not(None), AIAPICredential.expires_at <= now),
+    )
+
+    if status == "active":
+        count_query = count_query.where(active_clause)
+        data_query = data_query.where(active_clause)
+    elif status == "inactive":
+        count_query = count_query.where(inactive_clause)
+        data_query = data_query.where(inactive_clause)
+
+    data_query = data_query.order_by(AIAPICredential.created_at.desc()).offset(skip).limit(limit)
+    rows = session.exec(data_query).all()
+
+    return AIAPICredentialsAdminPublic(
+        data=[
+            _to_credential_admin_public(credential=credential, user=user, now=now)
+            for credential, user in rows
+        ],
         count=len(session.exec(count_query).all()),
     )
 

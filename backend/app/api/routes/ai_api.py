@@ -1,11 +1,12 @@
 import uuid
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, Query
 
 from app.api.deps import AdminUser, CurrentUser, SessionDep
 from app.models import AIAPIRequestStatus
 from app.schemas import (
+    AIAPICredentialsAdminPublic,
     AIAPICredentialsPublic,
     AIAPIRequestCreate,
     AIAPIRequestPublic,
@@ -91,6 +92,24 @@ def list_my_ai_api_credentials(
 ) -> Any:
     return ai_api_service.list_credentials_by_user(
         session=session, user_id=current_user.id, skip=skip, limit=limit
+    )
+
+
+@router.get("/credentials", response_model=AIAPICredentialsAdminPublic)
+def list_all_ai_api_credentials(
+    session: SessionDep,
+    current_user: AdminUser,
+    status: Literal["active", "inactive"] | None = None,
+    user_email: str | None = Query(default=None, max_length=255),
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=100, ge=1, le=100),
+) -> Any:
+    return ai_api_service.list_all_credentials(
+        session=session,
+        status=status,
+        user_email=user_email,
+        skip=skip,
+        limit=limit,
     )
 
 
