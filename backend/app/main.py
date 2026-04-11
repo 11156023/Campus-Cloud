@@ -45,16 +45,28 @@ class SecurityHeadersMiddleware:
     def __init__(self, app: ASGIApp) -> None:
         self.app = app
 
+    # Paths that serve Swagger / ReDoc UI and need relaxed CSP
+    _DOCS_PREFIXES = ("/docs", "/redoc")
+
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         # Only inject headers for HTTP; let WebSocket pass through untouched.
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
 
+        path: str = scope.get("path", "")
+        is_docs = any(path.startswith(p) for p in self._DOCS_PREFIXES)
+
         async def send_with_headers(message):
             if message["type"] == "http.response.start":
                 headers = list(message.get("headers", []))
                 for name, value in _SECURITY_HEADERS:
+                    # Skip CSP and X-Frame-Options for docs pages so Swagger UI loads
+                    if is_docs and name in (
+                        "Content-Security-Policy",
+                        "X-Frame-Options",
+                    ):
+                        continue
                     headers.append((name.lower().encode(), value.encode()))
                 if settings.ENVIRONMENT == "production":
                     headers.append((
