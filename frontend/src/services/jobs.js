@@ -1,4 +1,5 @@
 import { apiGet } from "./api";
+import { wsBaseUrl } from "../hooks/useClassroomSocket";
 
 export const JobsService = {
   /** 列出統一背景任務,支援篩選 */
@@ -24,3 +25,58 @@ export const JobsService = {
     return apiGet(`/api/v1/jobs/${encodeURIComponent(jobId)}`);
   },
 };
+
+/**
+ * 建立 /ws/jobs 即時推送連線，每次收到後端 snapshot 時呼叫 onSnapshot。
+ * 斷線後每 5 秒自動重連。回傳中止函式（供 useEffect cleanup 用）。
+ */
+export function connectJobsWebSocket(token, onSnapshot) {
+  const url = `${wsBaseUrl()}/ws/jobs?token=${encodeURIComponent(token)}`;
+
+  let ws = null;
+  let stopped = false;
+  let reconnectTimer = null;
+
+  const schedule = () => {
+    if (stopped || reconnectTimer !== null) return;
+    reconnectTimer = setTimeout(() => {
+      reconnectTimer = null;
+      open();
+    }, 5000);
+  };
+
+  const open = () => {
+    if (stopped) return;
+    try {
+      ws = new WebSocket(url);
+    } catch {
+      schedule();
+      return;
+    }
+    ws.onmessage = (evt) => {
+      try {
+        onSnapshot(JSON.parse(evt.data));
+      } catch {
+        // 非 JSON 訊息直接忽略
+      }
+    };
+    ws.onclose = () => {
+      ws = null;
+      schedule();
+    };
+  };
+
+  open();
+
+  return () => {
+    stopped = true;
+    if (reconnectTimer !== null) {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+    }
+    if (ws) {
+      try { ws.close(); } catch { /* noop */ }
+      ws = null;
+    }
+  };
+}

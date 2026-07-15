@@ -4,6 +4,7 @@ import MIcon from "../components/MIcon";
 import Sidebar from "../components/Sidebar/Sidebar";
 import AiFloatingChat from "../components/AiFloatingChat/AiFloatingChat";
 import ClassroomStudentLayer from "../components/Classroom/ClassroomStudentLayer";
+import JobsBanner from "../components/Jobs/JobsBanner";
 import ErrorBoundary from "../components/ErrorBoundary/ErrorBoundary";
 import styles from "./DashboardLayout.module.scss";
 
@@ -58,6 +59,7 @@ export default function DashboardLayout() {
               <MIcon name="segment" size={22} />
             </button>
           </div>
+          <JobsBanner />
           <ErrorBoundary>
             <Outlet />
           </ErrorBoundary>

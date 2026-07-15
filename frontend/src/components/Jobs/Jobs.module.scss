@@ -1,0 +1,485 @@
+@use "../../assets/styles/variables" as *;
+@use "../../assets/styles/mixins" as *;
+
+/* ── 共用 ── */
+
+.spin {
+  display: inline-flex;
+  animation: jobs-spin 1.2s linear infinite;
+}
+
+@keyframes jobs-spin {
+  to { transform: rotate(360deg); }
+}
+
+.toneMuted   { color: var(--color-text-muted); }
+.toneInfo    { color: var(--color-info); }
+.toneSuccess { color: var(--color-success); }
+.toneDanger  { color: var(--color-danger); }
+.toneWarning { color: #d97706; }
+
+/* ── Banner ── */
+
+.banner {
+  @include flex-between;
+  gap: $spacing-8;
+  padding: 6px $spacing-16;
+  margin: $spacing-8 $spacing-8 0;
+  border-radius: $radius-12;
+  @include glass-surface($shadow: var(--shadow-sm));
+  /* glass 的 backdrop-filter 會建立 stacking context，
+     需抬高整個 banner 讓 popover 蓋得過後面的頁面內容 */
+  position: relative;
+  z-index: 60;
+
+  @include respond-to(md) {
+    margin: 0 0 $spacing-16;
+  }
+}
+
+.bannerSummary {
+  display: flex;
+  align-items: center;
+  gap: $spacing-8;
+  min-width: 0;
+  color: var(--color-text-muted);
+}
+
+.bannerActive .bannerSummary {
+  color: var(--color-info);
+}
+
+.bannerPulse {
+  @include flex-center;
+  flex-shrink: 0;
+}
+
+.bannerText {
+  font-size: $font-size-12;
+  @include text-truncate;
+}
+
+.bannerActive .bannerText {
+  font-weight: $font-weight-500;
+}
+
+/* ── 鈴鐺按鈕 ── */
+
+.bellWrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.bellBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 $spacing-16 0 10px;
+  border: 1px solid var(--color-border);
+  border-radius: $radius-pill;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: $font-size-12;
+  font-weight: $font-weight-500;
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  transition: background $transition-base;
+
+  &:hover {
+    background: var(--color-hover);
+  }
+}
+
+.bellCount {
+  @include flex-center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: $radius-pill;
+  background: var(--color-primary);
+  color: var(--color-text-on-primary);
+  font-size: 10px;
+  font-weight: $font-weight-700;
+}
+
+/* ── Popover ── */
+
+.popover {
+  position: absolute;
+  top: calc(100% + #{$spacing-8});
+  right: 0;
+  z-index: 200;
+  width: min(360px, calc(100vw - #{$spacing-32}));
+  padding: $spacing-8;
+  border-radius: $radius-12;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-lg);
+}
+
+.popoverHeader {
+  @include flex-between;
+  padding: 6px $spacing-8;
+}
+
+.popoverTitle {
+  font-size: $font-size-14;
+  font-weight: $font-weight-700;
+  color: var(--color-text-primary);
+}
+
+.popoverSub {
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+.notifyToggle {
+  display: flex;
+  align-items: center;
+  gap: $spacing-8;
+  margin: 0 $spacing-4 $spacing-4;
+  padding: 6px $spacing-8;
+  border-radius: $radius-8;
+  background: var(--color-hover);
+  font-size: 11px;
+  color: var(--color-text-muted);
+  cursor: pointer;
+
+  input {
+    accent-color: var(--color-primary);
+    cursor: pointer;
+  }
+}
+
+.popoverList {
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.popoverFooter {
+  margin-top: $spacing-4;
+  padding-top: $spacing-4;
+  border-top: 1px solid var(--color-divider);
+}
+
+.popoverLink {
+  @include flex-between;
+  padding: $spacing-8 10px;
+  border-radius: $radius-8;
+  font-size: $font-size-14;
+  font-weight: $font-weight-500;
+  color: var(--color-primary);
+  transition: background $transition-base;
+
+  &:hover {
+    background: var(--color-hover);
+  }
+}
+
+/* ── JobRow ── */
+
+.jobRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  padding: $spacing-8;
+  border-radius: $radius-8;
+  text-align: left;
+  cursor: pointer;
+  transition: background $transition-base;
+
+  &:hover:not(:disabled) {
+    background: var(--color-hover);
+  }
+
+  &:disabled {
+    cursor: default;
+  }
+}
+
+.jobRowIcon {
+  @include flex-center;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.jobRowBody {
+  @include flex-column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+}
+
+.jobRowHead {
+  display: flex;
+  align-items: center;
+  gap: $spacing-8;
+  min-width: 0;
+}
+
+.jobKindChip {
+  flex-shrink: 0;
+  padding: 1px 6px;
+  border-radius: $radius-8;
+  background: var(--color-hover);
+  font-size: 10px;
+  font-weight: $font-weight-500;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.jobRowTitle {
+  font-size: 13px;
+  font-weight: $font-weight-500;
+  color: var(--color-text-primary);
+  @include text-truncate;
+}
+
+.jobRowMessage {
+  font-size: $font-size-12;
+  color: var(--color-text-muted);
+  @include text-truncate;
+}
+
+.jobRowProgress {
+  display: block;
+  height: 4px;
+  margin-top: 2px;
+  border-radius: $radius-pill;
+  background: var(--color-hover);
+  overflow: hidden;
+}
+
+.jobRowProgressFill {
+  display: block;
+  height: 100%;
+  border-radius: $radius-pill;
+  background: var(--color-primary);
+  transition: width $transition-base;
+}
+
+.jobRowProgressBlocked {
+  background: #d97706;
+}
+
+.jobRowFoot {
+  @include flex-between;
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+.jobEmpty {
+  @include flex-column;
+  align-items: center;
+  gap: $spacing-8;
+  padding: $spacing-32 $spacing-24;
+  text-align: center;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.jobLoading {
+  @include flex-center;
+  gap: $spacing-8;
+  padding: $spacing-24;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+/* ── JobDetailDialog ── */
+
+.dialogOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  @include flex-center;
+  padding: $spacing-16;
+  background: var(--color-overlay);
+}
+
+.dialog {
+  width: min(640px, 100%);
+  max-height: 85vh;
+  overflow-y: auto;
+  padding: $spacing-24;
+  border-radius: $radius-16;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-lg);
+}
+
+.dialogHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: $spacing-8;
+}
+
+.dialogTitleRow {
+  display: flex;
+  align-items: center;
+  gap: $spacing-8;
+  min-width: 0;
+}
+
+.dialogTitle {
+  font-size: $font-size-16;
+  font-weight: $font-weight-700;
+  color: var(--color-text-primary);
+  @include text-truncate;
+}
+
+.dialogClose {
+  @include flex-center;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: $radius-8;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: background $transition-base;
+
+  &:hover {
+    background: var(--color-hover);
+  }
+}
+
+.dialogJobId {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--color-text-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  word-break: break-all;
+}
+
+.dialogBody {
+  @include flex-column;
+  gap: $spacing-16;
+  margin-top: $spacing-16;
+}
+
+.dialogStatusRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: $spacing-8;
+}
+
+.statusBadge {
+  @include badge-base;
+  gap: 4px;
+  padding: 2px 10px;
+  background: var(--color-hover);
+  color: var(--color-text-primary);
+}
+
+.dialogInitiator {
+  font-size: $font-size-12;
+  color: var(--color-text-muted);
+}
+
+.dialogTimes {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: $spacing-8;
+  padding: $spacing-8 $spacing-16;
+  border: 1px solid var(--color-border);
+  border-radius: $radius-8;
+  background: var(--color-hover);
+}
+
+.dialogFieldLabel {
+  margin-bottom: 4px;
+  font-size: $font-size-12;
+  font-weight: $font-weight-500;
+  color: var(--color-text-muted);
+}
+
+.dialogMono {
+  font-size: $font-size-12;
+  color: var(--color-text-primary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  word-break: break-all;
+}
+
+.dialogMessage {
+  padding: $spacing-8;
+  border: 1px solid var(--color-border);
+  border-radius: $radius-8;
+  background: var(--color-hover);
+  font-size: $font-size-14;
+  color: var(--color-text-primary);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.dialogExtraGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px $spacing-16;
+  padding: $spacing-8 $spacing-16;
+  border: 1px solid var(--color-border);
+  border-radius: $radius-8;
+  background: var(--color-hover);
+
+  @include respond-to(sm) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.dialogExtraItem {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: $font-size-12;
+}
+
+.dialogExtraKey {
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+}
+
+.dialogError {
+  display: flex;
+  gap: $spacing-8;
+  margin-top: $spacing-16;
+  padding: $spacing-8 $spacing-16;
+  border: 1px solid color-mix(in srgb, var(--color-danger) 50%, transparent);
+  border-radius: $radius-8;
+  background: color-mix(in srgb, var(--color-danger) 6%, transparent);
+  font-size: $font-size-14;
+  color: var(--color-danger);
+}
+
+.dialogErrorTitle {
+  font-weight: $font-weight-500;
+}
+
+.dialogErrorOutput {
+  max-height: 160px;
+  overflow: auto;
+  padding: $spacing-8;
+  border: 1px solid color-mix(in srgb, var(--color-danger) 50%, transparent);
+  border-radius: $radius-8;
+  background: color-mix(in srgb, var(--color-danger) 6%, transparent);
+  font-size: $font-size-12;
+  color: var(--color-danger);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.dialogOutput {
+  height: 280px;
+  overflow: auto;
+  padding: $spacing-16;
+  border-radius: $radius-8;
+  background: #101420;
+  color: #e6ebf5;
+  font-size: $font-size-12;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
