@@ -4,7 +4,7 @@ import MIcon from "../components/MIcon";
 import Sidebar from "../components/Sidebar/Sidebar";
 import AiFloatingChat from "../components/AiFloatingChat/AiFloatingChat";
 import ClassroomStudentLayer from "../components/Classroom/ClassroomStudentLayer";
-import JobsBanner from "../components/Jobs/JobsBanner";
+import JobsProvider from "../components/Jobs/JobsProvider";
 import SubnetBanner from "../components/SubnetBanner/SubnetBanner";
 import SessionWarningDialog from "../components/SessionWarning/SessionWarningDialog";
 import useSessionWarning from "../hooks/useSessionWarning";
@@ -35,6 +35,8 @@ export default function DashboardLayout() {
 
   return (
     <LayoutContext.Provider value={{ setCompactFooter }}>
+    {/* 任務狀態全站常駐（WS + toast + 詳情 dialog）；顯示按鈕放在首頁 pageHeader */}
+    <JobsProvider>
     <div className={`${styles.layout} ${collapsed ? styles.collapsed : ""}`}>
       {mobileOpen && (
         <div
@@ -63,7 +65,6 @@ export default function DashboardLayout() {
               <MIcon name="segment" size={22} />
             </button>
           </div>
-          <JobsBanner />
           <SubnetBanner />
           <SessionWarningDialog
             status={sessionWarning}
@@ -78,6 +79,7 @@ export default function DashboardLayout() {
         </ClassroomStudentLayer>
       </main>
     </div>
+    </JobsProvider>
     </LayoutContext.Provider>
   );
 }
