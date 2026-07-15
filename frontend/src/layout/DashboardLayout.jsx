@@ -5,6 +5,8 @@ import Sidebar from "../components/Sidebar/Sidebar";
 import AiFloatingChat from "../components/AiFloatingChat/AiFloatingChat";
 import ClassroomStudentLayer from "../components/Classroom/ClassroomStudentLayer";
 import JobsBanner from "../components/Jobs/JobsBanner";
+import SessionWarningDialog from "../components/SessionWarning/SessionWarningDialog";
+import useSessionWarning from "../hooks/useSessionWarning";
 import ErrorBoundary from "../components/ErrorBoundary/ErrorBoundary";
 import styles from "./DashboardLayout.module.scss";
 
@@ -16,6 +18,7 @@ export default function DashboardLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [compactFooter, setCompactFooter] = useState(false);
+  const { active: sessionWarning, dismiss, dismissPermanent } = useSessionWarning();
 
   useEffect(() => {
     function handleResize() {
@@ -60,6 +63,11 @@ export default function DashboardLayout() {
             </button>
           </div>
           <JobsBanner />
+          <SessionWarningDialog
+            status={sessionWarning}
+            onClose={dismiss}
+            onDismissPermanent={dismissPermanent}
+          />
           <ErrorBoundary>
             <Outlet />
           </ErrorBoundary>
