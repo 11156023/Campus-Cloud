@@ -1,0 +1,36 @@
+@use "../../assets/styles/variables" as *;
+@use "../../assets/styles/mixins" as *;
+
+.banner {
+  display: flex;
+  align-items: center;
+  gap: $spacing-8;
+  padding: 8px $spacing-16;
+  margin: $spacing-8 $spacing-8 0;
+  border-radius: $radius-12;
+  border: 1px solid color-mix(in srgb, #d97706 40%, transparent);
+  background: color-mix(in srgb, #f59e0b 12%, transparent);
+  color: #b45309;
+
+  body.dark & {
+    color: #fbbf24;
+  }
+
+  @include respond-to(md) {
+    margin: 0 0 $spacing-16;
+  }
+}
+
+.text {
+  font-size: $font-size-14;
+}
+
+.link {
+  margin-left: $spacing-4;
+  color: inherit;
+  text-decoration: underline;
+
+  &:hover {
+    opacity: 0.8;
+  }
+}

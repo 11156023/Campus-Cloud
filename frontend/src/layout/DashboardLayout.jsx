@@ -5,6 +5,7 @@ import Sidebar from "../components/Sidebar/Sidebar";
 import AiFloatingChat from "../components/AiFloatingChat/AiFloatingChat";
 import ClassroomStudentLayer from "../components/Classroom/ClassroomStudentLayer";
 import JobsBanner from "../components/Jobs/JobsBanner";
+import SubnetBanner from "../components/SubnetBanner/SubnetBanner";
 import SessionWarningDialog from "../components/SessionWarning/SessionWarningDialog";
 import useSessionWarning from "../hooks/useSessionWarning";
 import ErrorBoundary from "../components/ErrorBoundary/ErrorBoundary";
@@ -63,6 +64,7 @@ export default function DashboardLayout() {
             </button>
           </div>
           <JobsBanner />
+          <SubnetBanner />
           <SessionWarningDialog
             status={sessionWarning}
             onClose={dismiss}
