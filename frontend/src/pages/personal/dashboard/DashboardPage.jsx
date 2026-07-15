@@ -116,6 +116,7 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const firstName = user?.full_name?.split(" ")[0] ?? user?.email?.split("@")[0] ?? "同學";
+  const isAdmin = Boolean(user?.is_superuser || user?.role === "admin");
 
   const scrollRef = useRef(null);
 
@@ -168,6 +169,27 @@ export default function DashboardPage() {
           <p className={styles.pageSubtitle}>歡迎回來，很高興再次見到你！</p>
         </div>
       </div>
+
+      {/* ── 快速操作（非管理員）── */}
+      {!isAdmin && (
+        <nav aria-label="快速操作" className={styles.quickActions}>
+          <button
+            type="button"
+            className={styles.quickPrimary}
+            onClick={() => navigate("/my-requests", { state: { create: true } })}
+          >
+            <MIcon name="add" size={18} />
+            申請新資源
+          </button>
+          <button
+            type="button"
+            className={styles.quickSecondary}
+            onClick={() => navigate("/my-requests")}
+          >
+            查看我的申請
+          </button>
+        </nav>
+      )}
 
       {/* ── 課程推薦 ── */}
       <section className={styles.section}>
