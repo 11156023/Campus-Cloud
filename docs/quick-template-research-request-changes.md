@@ -75,16 +75,16 @@ submit_sync(vm_request_schedule_service.process_single_request_start, ...)
 process_due_request_stops()
 ```
 
-### 分配與重平衡邏輯
+### 分配與容量評估邏輯
 
 快速模板採用「只使用現有空間」策略：
 
 - 核准快速模板時，只檢查同時段已核准資源後剩下的容量。
 - 不會為了快速模板重新分配既有研究申請的 `assigned_node`。
-- 不會在 preview placement 中模擬 cohort rebalance 來替快速模板找位置。
-- active rebalance 時，已建立的快速模板會固定在目前節點，不主動遷移。
+- preview placement 只評估租借時段的可用容量，不模擬搬移既有資源。
+- 已建立的快速模板固定在 Proxmox 回報的目前節點。
 
-研究申請維持原本邏輯：審核後可依照 reservation rebuild 與 active rebalance 做整體最佳化，適合較長期且需要管理員控管的資源。
+研究申請會依 reservation rebuild 評估租借時段容量並選擇新資源的建立節點；既有資源不重新指派或搬移。
 
 ## 前端變更
 

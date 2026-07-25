@@ -35,7 +35,7 @@ class StorageSelection:
 
 @dataclass(frozen=True)
 class PlacementTuning:
-    migration_cost: float
+    reassignment_cost: float
     peak_cpu_margin: float
     peak_memory_margin: float
     loadavg_warn_per_core: float
@@ -44,7 +44,7 @@ class PlacementTuning:
     disk_contention_warn_share: float
     disk_contention_high_share: float
     disk_penalty_weight: float
-    search_max_relocations: int
+    search_max_reassignments: int
     search_depth: int
     cpu_peak_warn_share: float = DEFAULT_CPU_PEAK_WARN_SHARE
     cpu_peak_high_share: float = DEFAULT_CPU_PEAK_HIGH_SHARE
@@ -53,7 +53,6 @@ class PlacementTuning:
     resource_weight_cpu: float = 1.0
     resource_weight_memory: float = 1.0
     resource_weight_disk: float = 1.0
-    lxc_live_migration_enabled: bool = False
     cpu_contention_weight: float = 2.0
     memory_overflow_weight: float = 5.0
 
@@ -65,7 +64,7 @@ class AssignmentEvaluation:
     max_node_score: float = float("inf")
     total_score: float = float("inf")
     priority_total: float = float("inf")
-    movement_count: int = 10**9
+    reassignment_count: int = 10**9
     node_scores: dict[str, float] | None = None
     storage_penalties: dict[str, float] | None = None
 
@@ -80,7 +79,7 @@ class NodeScoreBreakdown:
     peak_penalty: float = 0.0
     loadavg_penalty: float = 0.0
     storage_penalty: float = 0.0
-    migration_cost: float = 0.0
+    reassignment_cost: float = 0.0
     priority: int = 5
     is_selected: bool = False
     reason: str | None = None

@@ -5,7 +5,7 @@ from datetime import UTC, datetime, timedelta
 
 from app.models import (
     CourseDeployment,
-    VMMigrationStatus,
+    VMProvisioningStatus,
     VMRequest,
     VMRequestStatus,
 )
@@ -32,9 +32,9 @@ def _vm_request(**overrides) -> VMRequest:
         hostname="course-abc-def",
         password="x",
         status=VMRequestStatus.approved,
-        migration_status=VMMigrationStatus.idle,
+        provisioning_status=VMProvisioningStatus.idle,
         vmid=None,
-        migration_error=None,
+        provisioning_error=None,
         created_at=NOW,
     )
     defaults.update(overrides)
@@ -52,17 +52,17 @@ def test_running_once_vmid_assigned():
     assert _derive_status(_deployment(), req, now=NOW) == "running"
 
 
-def test_failed_when_migration_failed_without_vmid():
+def test_failed_when_provisioning_failed_without_vmid():
     req = _vm_request(
-        migration_status=VMMigrationStatus.failed,
-        migration_error="Failed to plan provisioning",
+        provisioning_status=VMProvisioningStatus.failed,
+        provisioning_error="Failed to plan provisioning",
     )
     assert _derive_status(_deployment(), req, now=NOW) == "failed"
 
 
-def test_running_survives_failed_migration_after_provision():
+def test_running_survives_failed_status_after_provision():
     """provision 成功後的遷移失敗不是部署失敗——機器仍在跑。"""
-    req = _vm_request(vmid=12345, migration_status=VMMigrationStatus.failed)
+    req = _vm_request(vmid=12345, provisioning_status=VMProvisioningStatus.failed)
     assert _derive_status(_deployment(), req, now=NOW) == "running"
 
 

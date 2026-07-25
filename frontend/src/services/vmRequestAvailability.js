@@ -8,7 +8,7 @@ export const VmRequestAvailabilityService = {
   preview(draft, options = {}) {
     return apiPost("/api/v1/vm-requests/availability", {
       ...draft,
-      days:     7,
+      days:     90,
       timezone: "Asia/Taipei",
       detail:   false,
     }, options);

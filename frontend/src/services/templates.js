@@ -12,8 +12,8 @@ export const TEMPLATE_TASK_LABEL = {
 
 export const TemplatesService = {
   /** 列出可見範本（admin 全部；teacher 自有+可見；student 僅 ready 且可見） */
-  list() {
-    return apiGet("/api/v1/templates/");
+  list(options) {
+    return apiGet("/api/v1/templates/", options);
   },
 
   /** 單一範本 */

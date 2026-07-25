@@ -1,0 +1,44 @@
+name: campus-litellm
+
+# This Compose project is intentionally independent from the Campus application
+# Compose project.  It uses host networking to reach local vLLM instances that
+# listen only on 127.0.0.1:8103/8104; do not add it to the Campus `skylab`
+# network or expose the vLLM ports.
+services:
+  litellm:
+    image: litellm/litellm:latest
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+    environment:
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:?set in vllm-service/litellm/.env}
+      VLLM_UPSTREAM_API_KEY: ${VLLM_UPSTREAM_API_KEY:?set in vllm-service/litellm/.env}
+      DATABASE_URL: ${DATABASE_URL:?set in vllm-service/litellm/.env}
+      LITELLM_SALT_KEY: ${LITELLM_SALT_KEY:?set in vllm-service/litellm/.env}
+      DO_NOT_TRACK: "true"
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        test -f /app/config.yaml || {
+          echo "Missing generated config.yaml; run vllm-service/tools/generate_litellm_config.py first." >&2
+          exit 1
+        }
+        exec litellm --config /app/config.yaml --host 0.0.0.0 --port 4000 --telemetry False
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          /app/.venv/bin/python -c "import urllib.request;
+          urllib.request.urlopen('http://127.0.0.1:4000/health/liveliness', timeout=3).read()"
+      interval: 15s
+      timeout: 5s
+      retries: 4
+      start_period: 20s
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "3"
+    security_opt:
+      - no-new-privileges:true

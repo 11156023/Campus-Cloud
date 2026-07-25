@@ -14,7 +14,6 @@ from app.exceptions import (
 from app.models import AuditLog, SpecChangeRequest, User, VMRequest
 from app.repositories import resource as resource_repo
 from app.repositories import user as user_repo
-from app.repositories import vm_migration_job as vm_migration_job_repo
 from app.schemas import (
     UserCreate,
     UserRegister,
@@ -50,11 +49,6 @@ def _prepare_user_delete(*, session: Session, user: User) -> None:
         select(VMRequest).where(VMRequest.user_id == user.id)
     ).all()
     for request in vm_requests:
-        vm_migration_job_repo.delete_jobs_for_request(
-            session=session,
-            request_id=request.id,
-            commit=False,
-        )
         session.delete(request)
 
     spec_change_requests = session.exec(

@@ -6,7 +6,7 @@ import ssl
 from app.exceptions import ProxmoxError
 from app.infrastructure.proxmox.settings import ProxmoxSettings
 
-_TCP_PING_TIMEOUT = 2.0
+_TCP_PING_TIMEOUT = 0.75
 
 
 def _tcp_ping(host: str, port: int = 8006, timeout: float = _TCP_PING_TIMEOUT) -> bool:

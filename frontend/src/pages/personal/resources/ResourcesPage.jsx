@@ -172,10 +172,10 @@ function getCreatingDisplay(req) {
   if (req.status === "pending") {
     return { label: "審核中", color: "info", spin: true };
   }
-  if (req.migration_status === "failed") {
+  if (req.provisioning_status === "failed") {
     return { label: "開通失敗", color: "danger", spin: false };
   }
-  if (req.migration_status === "running") {
+  if (req.provisioning_status === "running") {
     return { label: "開通中", color: "info", spin: true };
   }
   // approved 等待排程開機：start_at 已過但仍未開始建立 → 超時
@@ -200,7 +200,7 @@ function CreatingCard({ request, onCancelled }) {
   const type    = TYPE_MAP[request.resource_type === "lxc" ? "lxc" : "qemu"];
   const display = getCreatingDisplay(request);
   // 開通流程一旦開始跑 Proxmox clone 就無法取消
-  const canCancel = request.migration_status !== "running";
+  const canCancel = request.provisioning_status !== "running";
 
   async function handleCancel() {
     setCancelling(true);
@@ -511,18 +511,18 @@ export default function ResourcesPage() {
   const pendingSigRef = useRef(null);
 
   /** silent = true 時不觸發 skeleton / error state，供背景同步使用 */
-  const fetchResources = useCallback(async (silent = false) => {
+  const fetchResources = useCallback(async (silent = false, signal) => {
     if (!silent) {
       setLoading(true);
       setError(false);
     }
     try {
-      const data = await ResourcesService.list();
+      const data = await ResourcesService.list({ signal });
       setResources(data ?? []);
-    } catch {
-      if (!silent) setError(true);
+    } catch (err) {
+      if (!silent && !err?.cancelled) setError(true);
     } finally {
-      if (!silent) setLoading(false);
+      if (!silent && !signal?.aborted) setLoading(false);
     }
   }, []);
 
@@ -542,7 +542,9 @@ export default function ResourcesPage() {
   }, [fetchResources]);
 
   useEffect(() => {
-    fetchResources();
+    const controller = new AbortController();
+    fetchResources(false, controller.signal);
+    return () => controller.abort();
   }, [fetchResources]);
 
   useEffect(() => {

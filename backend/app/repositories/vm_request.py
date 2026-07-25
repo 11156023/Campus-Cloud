@@ -1,11 +1,11 @@
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 import sqlalchemy as sa
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, func, select
 
-from app.models import VMMigrationStatus, VMRequest, VMRequestStatus
+from app.models import VMProvisioningStatus, VMRequest, VMRequestStatus
 from app.repositories import resource as resource_repo
 from app.schemas import VMRequestCreate
 from app.utils.hostname import to_punycode_hostname
@@ -60,7 +60,7 @@ def create_vm_request(
         requested_mode=getattr(vm_request_in, "requested_mode", "manual"),
         auto_decision_reason=auto_decision_reason,
         status=VMRequestStatus.pending,
-        migration_status=VMMigrationStatus.idle,
+        provisioning_status=VMProvisioningStatus.idle,
         created_at=datetime.now(timezone.utc),
     )
     session.add(db_request)
@@ -136,9 +136,13 @@ def count_quick_template_requests_for_user(
     since: datetime | None = None,
     active_at: datetime | None = None,
 ) -> int:
-    statement = select(func.count()).select_from(VMRequest).where(
-        VMRequest.user_id == user_id,
-        VMRequest.request_kind == "quick_template",
+    statement = (
+        select(func.count())
+        .select_from(VMRequest)
+        .where(
+            VMRequest.user_id == user_id,
+            VMRequest.request_kind == "quick_template",
+        )
     )
     if since is not None:
         statement = statement.where(VMRequest.created_at >= since)
@@ -150,7 +154,7 @@ def count_quick_template_requests_for_user(
                     VMRequestStatus.approved,
                 )
             ),
-            VMRequest.migration_status != VMMigrationStatus.failed,
+            VMRequest.provisioning_status != VMProvisioningStatus.failed,
             VMRequest.start_at.is_not(None),
             VMRequest.start_at <= active_at,
             sa.or_(VMRequest.end_at.is_(None), VMRequest.end_at > active_at),
@@ -158,9 +162,7 @@ def count_quick_template_requests_for_user(
     return int(session.exec(statement).one())
 
 
-_ACTIVE_STATUSES = (
-    VMRequestStatus.approved,
-)
+_ACTIVE_STATUSES = (VMRequestStatus.approved,)
 
 
 def get_approved_vm_requests_overlapping_window(
@@ -173,7 +175,7 @@ def get_approved_vm_requests_overlapping_window(
         select(VMRequest)
         .where(
             VMRequest.status.in_(_ACTIVE_STATUSES),
-            VMRequest.migration_status != VMMigrationStatus.failed,
+            VMRequest.provisioning_status != VMProvisioningStatus.failed,
             VMRequest.start_at.is_not(None),
             VMRequest.desired_node.is_not(None),
             VMRequest.start_at < window_end,
@@ -199,7 +201,7 @@ def lock_overlapping_vm_requests_for_window(
         select(VMRequest)
         .where(
             VMRequest.status.in_(statuses),
-            VMRequest.migration_status != VMMigrationStatus.failed,
+            VMRequest.provisioning_status != VMProvisioningStatus.failed,
             VMRequest.start_at.is_not(None),
             VMRequest.start_at < window_end,
             sa.or_(VMRequest.end_at.is_(None), VMRequest.end_at > window_start),
@@ -227,11 +229,8 @@ def update_vm_request_status(
     desired_node: str | None = None,
     actual_node: str | None = None,
     placement_strategy_used: str | None = None,
-    migration_status: VMMigrationStatus | None = None,
-    migration_error: str | None = None,
-    rebalance_epoch: int | None = None,
-    last_rebalanced_at: datetime | None = None,
-    last_migrated_at: datetime | None = None,
+    provisioning_status: VMProvisioningStatus | None = None,
+    provisioning_error: str | None = None,
     commit: bool = True,
 ) -> VMRequest:
     db_request.status = status
@@ -248,15 +247,9 @@ def update_vm_request_status(
         db_request.actual_node = actual_node
     if placement_strategy_used is not None:
         db_request.placement_strategy_used = placement_strategy_used
-    if migration_status is not None:
-        db_request.migration_status = migration_status
-    db_request.migration_error = migration_error
-    if rebalance_epoch is not None:
-        db_request.rebalance_epoch = rebalance_epoch
-    if last_rebalanced_at is not None:
-        db_request.last_rebalanced_at = last_rebalanced_at
-    if last_migrated_at is not None:
-        db_request.last_migrated_at = last_migrated_at
+    if provisioning_status is not None:
+        db_request.provisioning_status = provisioning_status
+    db_request.provisioning_error = provisioning_error
     session.add(db_request)
     if commit:
         session.commit()
@@ -275,29 +268,22 @@ def update_vm_request_provisioning(
     desired_node: str | None = None,
     actual_node: str | None = None,
     placement_strategy_used: str | None = None,
-    migration_status: VMMigrationStatus | None = None,
-    migration_error: str | None = None,
-    rebalance_epoch: int | None = None,
-    last_rebalanced_at: datetime | None = None,
-    last_migrated_at: datetime | None = None,
+    provisioning_status: VMProvisioningStatus | None = None,
+    provisioning_error: str | None = None,
     commit: bool = True,
 ) -> VMRequest:
     if vmid is not None:
         db_request.vmid = vmid
     db_request.assigned_node = assigned_node
-    db_request.desired_node = desired_node if desired_node is not None else assigned_node
+    db_request.desired_node = (
+        desired_node if desired_node is not None else assigned_node
+    )
     if actual_node is not None:
         db_request.actual_node = actual_node
     db_request.placement_strategy_used = placement_strategy_used
-    if migration_status is not None:
-        db_request.migration_status = migration_status
-    db_request.migration_error = migration_error
-    if rebalance_epoch is not None:
-        db_request.rebalance_epoch = rebalance_epoch
-    if last_rebalanced_at is not None:
-        db_request.last_rebalanced_at = last_rebalanced_at
-    if last_migrated_at is not None:
-        db_request.last_migrated_at = last_migrated_at
+    if provisioning_status is not None:
+        db_request.provisioning_status = provisioning_status
+    db_request.provisioning_error = provisioning_error
     session.add(db_request)
     if commit:
         session.commit()
@@ -319,8 +305,8 @@ def clear_vm_request_provisioning(
     db_request.desired_node = None
     db_request.actual_node = None
     db_request.placement_strategy_used = None
-    db_request.migration_status = VMMigrationStatus.idle
-    db_request.migration_error = None
+    db_request.provisioning_status = VMProvisioningStatus.idle
+    db_request.provisioning_error = None
     session.add(db_request)
     if stale_vmid is not None:
         resource_repo.delete_resource(
@@ -360,7 +346,7 @@ def list_active_approved_vm_requests(
         select(VMRequest)
         .where(
             VMRequest.status.in_(_ACTIVE_STATUSES),
-            VMRequest.migration_status != VMMigrationStatus.failed,
+            VMRequest.provisioning_status != VMProvisioningStatus.failed,
             VMRequest.start_at.is_not(None),
             VMRequest.start_at <= at_time,
             sa.or_(VMRequest.end_at.is_(None), VMRequest.end_at > at_time),
@@ -371,36 +357,5 @@ def list_active_approved_vm_requests(
             VMRequest.reviewed_at.asc(),  # type: ignore[union-attr]
             VMRequest.created_at.asc(),  # type: ignore[union-attr]
         )
-    )
-    return list(session.exec(statement).all())
-
-
-def list_due_for_rebalance_vm_requests(
-    *,
-    session: Session,
-    at_time: datetime,
-    interval_minutes: int = 15,
-) -> list[VMRequest]:
-    rebalance_before = at_time - timedelta(minutes=max(int(interval_minutes or 0), 0))
-    statement = (
-        select(VMRequest)
-        .where(
-            VMRequest.status.in_(_ACTIVE_STATUSES),
-            VMRequest.migration_status != VMMigrationStatus.failed,
-            VMRequest.start_at.is_not(None),
-            VMRequest.start_at <= at_time,
-            sa.or_(VMRequest.end_at.is_(None), VMRequest.end_at > at_time),
-            (
-                VMRequest.last_rebalanced_at.is_(None)
-                | (VMRequest.last_rebalanced_at < VMRequest.start_at)
-                | (VMRequest.last_rebalanced_at <= rebalance_before)
-            ),
-        )
-        .options(selectinload(VMRequest.user))  # type: ignore[arg-type]
-        .order_by(
-            VMRequest.start_at.asc(),  # type: ignore[union-attr]
-            VMRequest.created_at.asc(),  # type: ignore[union-attr]
-        )
-        .with_for_update()
     )
     return list(session.exec(statement).all())

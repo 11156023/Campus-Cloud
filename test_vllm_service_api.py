@@ -18,8 +18,8 @@ import urllib.request
 # =========================
 # CONFIG: 請自行填入
 # =========================
-API_KEY = "ccai_Ql5cpWA46d2-iAhQeuv5tJ_nlcq1Ab12"
-BASE_URL = "http://127.0.0.1:3000/v1"
+API_KEY = "ccai_WnQnsdkdJrncfTXzhzEPFi3mgpZyYjtD"
+BASE_URL = "http://localhost:8000/api/v1/ai-proxy"
 MODEL = "gpt-oss-20B"
 
 PROMPT = "請用繁體中文簡短回答：vLLM 是什麼？"

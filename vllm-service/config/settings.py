@@ -45,6 +45,10 @@ class Settings(BaseSettings):
         default="nvidia/Qwen3-235B-A22B-NVFP4",
         description="HuggingFace 模型名稱或路徑",
     )
+    served_model_name: str = Field(
+        default="",
+        description="vLLM OpenAI API 對外回報的模型名稱（對應 --served-model-name）",
+    )
     hf_cache_dir: str = Field(
         default="/raid/hf-cache/hub",
         description="HuggingFace 快取目錄 (共用)",
@@ -115,15 +119,9 @@ class Settings(BaseSettings):
         default="",
         description='排程策略（fcfs 或 priority；對應 --scheduling-policy）',
     )
-    max_num_partial_prefills: int | None = Field(
-        default=None,
-        description="Chunked prefill 可同時部分 prefill 的最大序列數",
-        ge=1,
-    )
-    max_long_partial_prefills: int | None = Field(
-        default=None,
-        description="Chunked prefill 下長 prompt 可同時部分 prefill 的最大數量",
-        ge=1,
+    enable_chunked_prefill: bool = Field(
+        default=False,
+        description="顯式啟用 chunked prefill（對應 --enable-chunked-prefill）",
     )
     long_prefill_token_threshold: int | None = Field(
         default=None,
@@ -370,6 +368,8 @@ class Settings(BaseSettings):
             "--tensor-parallel-size", str(self.tensor_parallel_size),
             "--api-key", self.api_key,
         ]
+        if self.served_model_name:
+            args.extend(["--served-model-name", self.served_model_name])
 
         if self.trust_remote_code:
             args.append("--trust-remote-code")
@@ -413,10 +413,8 @@ class Settings(BaseSettings):
             args.append("--enable-request-id-headers")
         if self.scheduling_policy:
             args.extend(["--scheduling-policy", self.scheduling_policy])
-        if self.max_num_partial_prefills is not None:
-            args.extend(["--max-num-partial-prefills", str(self.max_num_partial_prefills)])
-        if self.max_long_partial_prefills is not None:
-            args.extend(["--max-long-partial-prefills", str(self.max_long_partial_prefills)])
+        if self.enable_chunked_prefill:
+            args.append("--enable-chunked-prefill")
         if self.long_prefill_token_threshold is not None:
             args.extend(["--long-prefill-token-threshold", str(self.long_prefill_token_threshold)])
         if self.limit_mm_per_prompt:

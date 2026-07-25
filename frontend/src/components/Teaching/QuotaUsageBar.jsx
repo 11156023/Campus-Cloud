@@ -27,13 +27,11 @@ export default function QuotaUsageBar() {
   const [data, setData] = useState(null);
 
   useEffect(() => {
-    let cancelled = false;
-    QuotasService.getMyUsage()
-      .then((res) => !cancelled && setData(res))
+    const controller = new AbortController();
+    QuotasService.getMyUsage({ signal: controller.signal })
+      .then((res) => setData(res))
       .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
+    return () => controller.abort();
   }, []);
 
   if (!data) return null;

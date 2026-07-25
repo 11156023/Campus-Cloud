@@ -46,9 +46,7 @@ from .nat_rule import NatRule
 from .proxmox_config import (
     ProxmoxConfig,
     ProxmoxConnectionConfig,
-    ProxmoxMigrationConfig,
     ProxmoxPlacementConfig,
-    ProxmoxRebalanceConfig,
     ProxmoxSchedulerConfig,
 )
 from .proxmox_node import ProxmoxNode
@@ -80,11 +78,9 @@ from .teacher_judge_script_run import (
 from .teacher_judge_template_command import TeacherJudgeTemplateCommand
 from .tunnel_proxy import TunnelProxy
 from .user import User, UserBase, UserRole
-from .vm_migration_job import VMMigrationJob, VMMigrationJobStatus
 from .vm_request import (
-    VMMigrationStatus,
+    VMProvisioningStatus,
     VMRequest,
-    VMRequestMigrationState,
     VMRequestProvisioningState,
     VMRequestReviewState,
     VMRequestScheduleState,
@@ -117,13 +113,10 @@ __all__ = [
     "ResourceNetwork",
     "ResourceQuota",
     "QuotaScope",
-    "VMMigrationJob",
-    "VMMigrationJobStatus",
     # VM Request
-    "VMMigrationStatus",
+    "VMProvisioningStatus",
     "VMRequest",
     "VMRequestStatus",
-    "VMRequestMigrationState",
     "VMRequestProvisioningState",
     "VMRequestReviewState",
     "VMRequestScheduleState",
@@ -149,9 +142,7 @@ __all__ = [
     # Proxmox Config
     "ProxmoxConfig",
     "ProxmoxConnectionConfig",
-    "ProxmoxMigrationConfig",
     "ProxmoxPlacementConfig",
-    "ProxmoxRebalanceConfig",
     "ProxmoxSchedulerConfig",
     # Proxmox Nodes
     "ProxmoxNode",

@@ -7,7 +7,7 @@ clone 任務佔滿 runner slot、餓死發信/狀態同步等輕量任務。
 
 防重複三層：runner ``task_id=provision-{request_id}`` 去重（本模組）→
 DB ``SELECT FOR UPDATE SKIP LOCKED``（coordinator 既有）→
-``migration_status``/vmid 再檢查（coordinator 既有）。
+``provisioning_status``/vmid 再檢查（coordinator 既有）。
 """
 
 from __future__ import annotations

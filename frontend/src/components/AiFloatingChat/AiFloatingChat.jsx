@@ -1,82 +1,105 @@
-/**
- * AiFloatingChat
- * 浮動 AI 助手 — FAB 按鈕 + 右下角彈出聊天視窗
- * 設計為放在任何有 position:relative 容器內使用
- *
- * 兩種模式：
- *   - 諮詢（chat）    : AI 模板推薦對話（/ai/template-recommendation/chat）
- *   - 導航（navigate）: 自然語言找頁面（/ai/navigation/resolve）
- */
-import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import styles from "./AiFloatingChat.module.scss";
-import MIcon from "../MIcon";
-import { AiTemplateRecommendationApi } from "../../services/aiTemplateRecommendation";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "../../contexts/AuthContext";
 import { AiNavigationService } from "../../services/aiNavigation";
+import { AiTemplateRecommendationApi } from "../../services/aiTemplateRecommendation";
+import MIcon from "../MIcon";
+import styles from "./AiFloatingChat.module.scss";
+
+const PAGE_CONTEXTS = [
+  { match: /^\/dashboard/, title: "首頁", suggestions: ["我該申請 LXC 還是 VM？", "帶我到我的資源", "如何申請 GPU？"] },
+  { match: /^\/my-resources/, title: "我的資源", suggestions: ["說明資源可以進行哪些操作", "帶我到我的申請", "如何公開 Web 服務？"] },
+  { match: /^\/my-requests/, title: "我的申請", suggestions: ["我該申請 LXC 還是 VM？", "如何選擇資源規格？", "帶我到我的資源"] },
+  { match: /^\/resource-mgmt/, title: "資源管理", suggestions: ["帶我到申請審核", "如何選擇 GPU？", "帶我到資源監控"] },
+  { match: /^\/request-review/, title: "申請審核", suggestions: ["帶我到資源管理", "說明 LXC 與 VM 的差異", "帶我到背景任務"] },
+  { match: /^\/ip-management/, title: "IP 管理", suggestions: ["說明 IP 管理的用途", "帶我到閘道 VM", "如何公開 Web 服務？"] },
+  { match: /^\/reverse-proxy/, title: "反向代理", suggestions: ["如何公開 Web 服務？", "帶我到網域管理", "帶我到防火牆"] },
+  { match: /^\/firewall/, title: "防火牆", suggestions: ["說明防火牆規則的用途", "帶我到反向代理", "帶我到 IP 管理"] },
+  { match: /^\/domain/, title: "網域管理", suggestions: ["如何公開 Web 服務？", "帶我到反向代理", "帶我到 IP 管理"] },
+  { match: /^\/gateway/, title: "閘道 VM", suggestions: ["說明閘道 VM 的用途", "帶我到 IP 管理", "帶我到防火牆"] },
+  { match: /^\/ai-api-review/, title: "AI API 申請審核", suggestions: ["帶我到金鑰管理", "帶我到使用監控", "說明 AI API 申請流程"] },
+  { match: /^\/ai-api-keys/, title: "AI API 金鑰管理", suggestions: ["帶我到使用監控", "帶我到申請審核", "說明 API 金鑰安全原則"] },
+  { match: /^\/ai-monitoring/, title: "AI API 使用監控", suggestions: ["帶我到金鑰管理", "帶我到申請審核", "如何管理 AI API 配額？"] },
+  { match: /^\/ai-api/, title: "AI API", suggestions: ["說明 AI API 申請流程", "如何保護 API 金鑰？", "我適合使用哪種 AI 服務？"] },
+  { match: /^\/templates/, title: "模板管理", suggestions: ["說明 LXC 與 VM 模板差異", "帶我到資源管理", "如何選擇 GPU？"] },
+  { match: /^\/gpu-mgmt/, title: "GPU 管理", suggestions: ["如何選擇 GPU？", "帶我到資源管理", "帶我到申請審核"] },
+  { match: /^\/monitoring/, title: "資源監控", suggestions: ["帶我到資源管理", "帶我到背景任務", "說明資源監控用途"] },
+];
+
+const DEFAULT_CONTEXT = {
+  title: "SkyLab",
+  suggestions: ["我該申請 LXC 還是 VM？", "帶我到我的資源", "有哪些功能可以使用？"],
+};
+
+const NAVIGATION_PATTERN = /(帶我|前往|打開|開啟|跳到|導航|在哪|哪裡|頁面)/i;
 
 function stripThinkTags(text) {
   return String(text || "").replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
 }
 
-/** 後端導航目標使用舊版前端路徑，映射到本前端的路由 */
+function pageContextFor(pathname) {
+  return PAGE_CONTEXTS.find((item) => item.match.test(pathname)) ?? DEFAULT_CONTEXT;
+}
+
+// The navigation service still returns a few legacy paths. Keep the mapping
+// here so the assistant always opens a route that exists in the current UI.
 const PATH_MAP = {
   "/": "/dashboard",
   "/resources": "/resource-mgmt",
   "/resources-create": "/my-requests",
   "/approvals": "/request-review",
   "/gpu-management": "/gpu-mgmt",
-  "/ai-api-approvals": "/request-review",
-  "/ai-api-credentials": "/ai-management",
+  "/ai-api-approvals": "/ai-api-review",
+  "/ai-api-credentials": "/ai-api-keys",
   "/admin/audit-logs": "/audit",
-  "/admin/migration-jobs": "/migration",
   "/admin/domains": "/domain",
   "/admin/gateway": "/gateway",
   "/admin/ip-management": "/ip-management",
   "/admin/configuration": "/settings",
   "/admin/batch-provision-review": "/batch-review",
-  "/admin/ai-management": "/ai-management",
+  "/admin/ai-management": "/ai-monitoring",
   "/admin/ai-monitoring": "/ai-monitoring",
 };
 
 function mapPath(path) {
   if (!path) return null;
-  const clean = path.split("?")[0];
-  return PATH_MAP[clean] ?? clean;
+  const [clean, query] = path.split("?");
+  const target = PATH_MAP[clean] ?? clean;
+  return query ? `${target}?${query}` : target;
+}
+
+function displayName(user) {
+  return user?.full_name?.trim() || user?.email?.split("@")[0] || "你好";
 }
 
 function TypingIndicator() {
   return (
-    <div className={styles.bubble}>
-      <span className={styles.dot} />
-      <span className={styles.dot} />
-      <span className={styles.dot} />
+    <div className={styles.typing} aria-label="AI 正在回覆">
+      <span /><span /><span />
     </div>
   );
 }
 
-function Message({ msg, onNavigate }) {
-  const isUser = msg.role === "user";
+function Message({ message, onNavigate }) {
+  const isUser = message.role === "user";
   return (
-    <div className={`${styles.msgRow} ${isUser ? styles.msgRowUser : ""}`}>
+    <div className={`${styles.message} ${isUser ? styles.messageUser : styles.messageAssistant}`}>
       {!isUser && (
-        <div className={styles.avatar}>
-          <MIcon name="smart_toy" size={14} />
-        </div>
+        <span className={styles.messageAvatar}>
+          <MIcon name="smart_toy" size={17} />
+        </span>
       )}
-      <div className={`${styles.msgBubble} ${isUser ? styles.msgBubbleUser : styles.msgBubbleAi}`}>
-        {msg.content}
-        {msg.targets?.length > 0 && (
-          <div className={styles.navTargets}>
-            {msg.targets.map((t) => (
-              <button
-                key={t.path}
-                type="button"
-                className={styles.navTargetBtn}
-                title={t.reason}
-                onClick={() => onNavigate(t.path)}
-              >
-                <MIcon name="arrow_forward" size={13} />
-                {t.title}
+      <div className={styles.messageContent}>
+        <div className={styles.messageText}>{message.content}</div>
+        {message.targets?.length > 0 && (
+          <div className={styles.actionList}>
+            {message.targets.map((target) => (
+              <button key={target.path} type="button" onClick={() => onNavigate(target.path)}>
+                <span>
+                  <strong>{target.title}</strong>
+                  {target.reason && <small>{target.reason}</small>}
+                </span>
+                <MIcon name="arrow_forward" size={17} />
               </button>
             ))}
           </div>
@@ -86,55 +109,34 @@ function Message({ msg, onNavigate }) {
   );
 }
 
-const GREETING_CHAT = "嗨！我是 AI 助手，可以幫你決定要申請什麼規格的資源。\n你有什麼需求嗎？";
-const GREETING_NAV = "想去哪個頁面？直接告訴我，例如「我要看防火牆規則」或「幫我找申請審核」。";
-
-export default function AiFloatingChat({ context }) {
+export default function AiFloatingChat({ open = false, onOpenChange = () => {} }) {
+  const location = useLocation();
   const navigate = useNavigate();
-  const [open, setOpen]         = useState(false);
-  const [mode, setMode]         = useState("chat"); // "chat" | "navigate"
+  const { user } = useAuth();
   const [messages, setMessages] = useState([]);
-  const [history, setHistory]   = useState([]);
-  const [input, setInput]       = useState("");
-  const [loading, setLoading]   = useState(false);
-  const [closing, setClosing]   = useState(false);
-  const scrollRef               = useRef(null);
-  const inputRef                = useRef(null);
+  const [history, setHistory] = useState([]);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const scrollRef = useRef(null);
+  const inputRef = useRef(null);
+  const pageContext = useMemo(() => pageContextFor(location.pathname), [location.pathname]);
 
-  const greeting = mode === "chat" ? GREETING_CHAT : GREETING_NAV;
-
-  /* 開啟時若無訊息，顯示問候語 */
   useEffect(() => {
-    if (open && messages.length === 0) {
-      setMessages([{ role: "assistant", content: greeting }]);
-    }
-    if (open) {
-      setTimeout(() => inputRef.current?.focus(), 120);
-    }
-  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (open) window.setTimeout(() => inputRef.current?.focus(), 120);
+  }, [open]);
 
-  /* 自動捲到最新訊息 */
   useEffect(() => {
-    if (!scrollRef.current) return;
-    scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages, loading]);
 
-  function handleClose() {
-    setClosing(true);
-    setTimeout(() => {
-      setOpen(false);
-      setClosing(false);
-    }, 180);
+  function close() {
+    onOpenChange(false);
   }
 
-  function switchMode(next) {
-    if (next === mode) return;
-    setMode(next);
+  function clearChat() {
+    setMessages([]);
     setHistory([]);
-    setMessages([{
-      role: "assistant",
-      content: next === "chat" ? GREETING_CHAT : GREETING_NAV,
-    }]);
+    setInput("");
     inputRef.current?.focus();
   }
 
@@ -142,176 +144,156 @@ export default function AiFloatingChat({ context }) {
     const target = mapPath(path);
     if (!target) return;
     navigate(target);
-    handleClose();
+    if (window.matchMedia("(max-width: 1439px)").matches) close();
+  }
+
+  async function sendNavigation(text) {
+    const data = await AiNavigationService.resolve(text);
+    const targets = [...(data.primary ? [data.primary] : []), ...(data.suggestions ?? [])]
+      .filter((target, index, all) => all.findIndex((item) => item.path === target.path) === index);
+
+    const content = data.action === "clarify"
+      ? (data.clarification_question || "你想前往哪一類功能？")
+      : targets.length
+        ? "我找到以下可能符合需求的功能："
+        : "目前找不到符合的頁面，請換個方式描述。";
+    const assistantMessage = { role: "assistant", content, targets };
+    setMessages((previous) => [...previous, assistantMessage]);
+    setHistory((previous) => [...previous, { role: "assistant", content }]);
   }
 
   async function sendChat(text, nextHistory) {
+    const contextualHistory = nextHistory.map((message, index) => {
+      if (index !== nextHistory.length - 1 || message.role !== "user") return message;
+      return {
+        ...message,
+        content: `目前所在頁面：${pageContext.title}。使用者問題：${message.content}`,
+      };
+    });
     const data = await AiTemplateRecommendationApi.chat({
-      messages: nextHistory,
+      messages: contextualHistory,
       top_k: 5,
       device_nodes: [],
-      form_context: context ?? null,
+      form_context: null,
     });
-    const aiMsg = {
+    const assistantMessage = {
       role: "assistant",
-      content: stripThinkTags(data.reply) || "我收到你的需求了。",
+      content: stripThinkTags(data.reply) || "目前無法產生回覆，請稍後再試。",
     };
-    setMessages((prev) => [...prev, aiMsg]);
-    setHistory((prev) => [...prev, aiMsg]);
+    setMessages((previous) => [...previous, assistantMessage]);
+    setHistory((previous) => [...previous, assistantMessage]);
   }
 
-  async function sendNavigate(text) {
-    const data = await AiNavigationService.resolve(text);
-    const targets = [
-      ...(data.primary ? [data.primary] : []),
-      ...(data.suggestions ?? []),
-    ].filter((t, i, arr) => arr.findIndex((x) => x.path === t.path) === i);
-
-    let content;
-    if (data.action === "clarify") {
-      content = data.clarification_question || "可以再描述得具體一點嗎？";
-    } else if (targets.length === 0) {
-      content = "找不到符合的頁面，換個說法試試？";
-    } else if (data.action === "navigate" && data.primary) {
-      content = `找到了：${data.primary.title}。${data.primary.reason ?? ""}`;
-    } else {
-      content = "這幾個頁面可能是你要找的：";
-    }
-
-    setMessages((prev) => [...prev, { role: "assistant", content, targets }]);
-  }
-
-  async function send() {
-    const text = input.trim();
+  async function send(value = input) {
+    const text = value.trim();
     if (!text || loading) return;
 
+    const userMessage = { role: "user", content: text };
+    const nextHistory = [...history, userMessage];
     setInput("");
-    const userMsg = { role: "user", content: text };
-    const nextHistory = [...history, userMsg];
-    setMessages((prev) => [...prev, userMsg]);
+    setMessages((previous) => [...previous, userMessage]);
     setHistory(nextHistory);
     setLoading(true);
 
     try {
-      if (mode === "chat") {
-        await sendChat(text, nextHistory);
-      } else {
-        await sendNavigate(text);
-      }
-    } catch (err) {
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: err?.message ?? "發生錯誤，請稍後再試。" },
-      ]);
+      if (NAVIGATION_PATTERN.test(text)) await sendNavigation(text);
+      else await sendChat(text, nextHistory);
+    } catch (error) {
+      setMessages((previous) => [...previous, {
+        role: "assistant",
+        content: error?.message || "AI 目前無法回覆，請稍後再試。",
+      }]);
     } finally {
       setLoading(false);
       inputRef.current?.focus();
     }
   }
 
-  function onKeyDown(e) {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
+  function handleKeyDown(event) {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
       send();
     }
   }
 
-  function clearChat() {
-    setHistory([]);
-    setMessages([{ role: "assistant", content: greeting }]);
-  }
-
   return (
-    <div className={styles.root}>
-      {/* ── Chat panel ── */}
+    <div className={`${styles.root} ${open ? styles.rootOpen : ""}`}>
+      {open && <button type="button" className={styles.backdrop} onClick={close} aria-label="關閉 AI 助手" />}
+
       {open && (
-        <div className={`${styles.panel} ${closing ? styles.panelOut : styles.panelIn}`}>
-          {/* Header */}
-          <div className={styles.header}>
-            <span className={styles.headerIcon}>
-              <MIcon name="smart_toy" size={16} />
-            </span>
-            <span className={styles.headerTitle}>AI 助手</span>
-            <div className={styles.modeTabs}>
-              <button
-                type="button"
-                className={mode === "chat" ? styles.modeTabActive : styles.modeTab}
-                onClick={() => switchMode("chat")}
-              >
-                諮詢
-              </button>
-              <button
-                type="button"
-                className={mode === "navigate" ? styles.modeTabActive : styles.modeTab}
-                onClick={() => switchMode("navigate")}
-              >
-                導航
-              </button>
+        <aside className={styles.panel} aria-label="AI 助手">
+          <header className={styles.header}>
+            <span className={styles.brandIcon}><MIcon name="auto_awesome" size={19} /></span>
+            <div className={styles.headerText}>
+              <strong>AI 助手</strong>
+              <span>SkyLab 智慧協作</span>
             </div>
-            <button type="button" className={styles.headerClear} onClick={clearChat} title="清除對話">
-              <MIcon name="refresh" size={16} />
+            <button type="button" onClick={clearChat} title="建立新對話" aria-label="建立新對話">
+              <MIcon name="refresh" size={19} />
             </button>
-            <button type="button" className={styles.headerClose} onClick={handleClose} title="關閉">
-              <MIcon name="close" size={18} />
+            <button type="button" onClick={close} title="關閉" aria-label="關閉">
+              <MIcon name="close" size={21} />
             </button>
+          </header>
+
+          <div className={styles.contextBar}>
+            <MIcon name="web_asset" size={16} />
+            <span>正在查看「{pageContext.title}」</span>
           </div>
 
-          {/* Messages */}
           <div className={styles.messages} ref={scrollRef}>
-            {messages.map((msg, i) => (
-              <Message key={i} msg={msg} onNavigate={handleNavigate} />
-            ))}
-            {loading && (
-              <div className={styles.msgRow}>
-                <div className={styles.avatar}>
-                  <MIcon name="smart_toy" size={14} />
+            {messages.length === 0 ? (
+              <div className={styles.emptyState}>
+                <span className={styles.emptyIcon}><MIcon name="auto_awesome" size={30} /></span>
+                <h2>{displayName(user)}，你好！</h2>
+                <p>有什麼我可以幫上忙的嗎？</p>
+                <div className={styles.suggestions}>
+                  {pageContext.suggestions.map((suggestion) => (
+                    <button key={suggestion} type="button" onClick={() => send(suggestion)}>
+                      {suggestion}
+                    </button>
+                  ))}
                 </div>
+              </div>
+            ) : (
+              messages.map((message, index) => (
+                <Message key={`${message.role}-${index}`} message={message} onNavigate={handleNavigate} />
+              ))
+            )}
+            {loading && (
+              <div className={`${styles.message} ${styles.messageAssistant}`}>
+                <span className={styles.messageAvatar}><MIcon name="smart_toy" size={17} /></span>
                 <TypingIndicator />
               </div>
             )}
           </div>
 
-          {/* Input */}
-          <div className={styles.inputWrap}>
-            <textarea
-              ref={inputRef}
-              className={styles.input}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={onKeyDown}
-              placeholder={mode === "chat" ? "輸入訊息… (Enter 送出)" : "描述你要找的頁面… (Enter 送出)"}
-              rows={1}
-              disabled={loading}
-            />
-            <button
-              type="button"
-              className={styles.sendBtn}
-              onClick={send}
-              disabled={loading || !input.trim()}
-              title="送出"
-            >
-              <MIcon name="send" size={16} />
-            </button>
-          </div>
-        </div>
+          <footer className={styles.composerWrap}>
+            <div className={styles.composer}>
+              <textarea
+                ref={inputRef}
+                value={input}
+                onChange={(event) => setInput(event.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="詢問 SkyLab 或尋找功能"
+                rows={2}
+                disabled={loading}
+              />
+              <button type="button" onClick={() => send()} disabled={loading || !input.trim()} aria-label="送出訊息">
+                <MIcon name="arrow_upward" size={20} />
+              </button>
+            </div>
+            <small>AI 可能會產生錯誤，重要操作仍需由你確認。</small>
+          </footer>
+        </aside>
       )}
 
-      {/* ── FAB ── */}
-      <button
-        type="button"
-        className={`${styles.fab} ${open ? styles.fabOpen : ""}`}
-        onClick={() => (open ? handleClose() : setOpen(true))}
-        title="AI 助手"
-        aria-label="開啟 AI 助手"
-      >
-        <span className={`${styles.fabIcon} ${styles.fabIconAi}`}>
-          <MIcon name="smart_toy" size={22} />
-        </span>
-        <span className={`${styles.fabIcon} ${styles.fabIconClose}`}>
-          <MIcon name="close" size={22} />
-        </span>
-        {!open && <span className={styles.fabLabel}>AI 助手</span>}
-      </button>
+      {!open && (
+        <button type="button" className={styles.fab} onClick={() => onOpenChange(true)} aria-label="開啟 AI 助手">
+          <MIcon name="auto_awesome" size={21} />
+          <span>AI 助手</span>
+        </button>
+      )}
     </div>
   );
 }

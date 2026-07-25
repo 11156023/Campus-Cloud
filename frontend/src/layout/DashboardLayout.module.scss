@@ -1,3 +1,11 @@
+.routeLoading {
+  display: grid;
+  min-height: 240px;
+  place-items: center;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+
 .layout {
   --layout-py: 30px;
   --layout-px: 60px;
@@ -37,6 +45,24 @@
 
   @include respond-to(md) {
     padding: 0;
+  }
+}
+
+.workspace {
+  display: flex;
+  align-items: flex-start;
+  flex: 1;
+  min-width: 0;
+}
+
+.pageColumn {
+  min-width: 0;
+  min-height: 100dvh;
+  flex: 1;
+  @include flex-column;
+
+  @include respond-to(md) {
+    min-height: calc(100dvh - 60px);
   }
 }
 

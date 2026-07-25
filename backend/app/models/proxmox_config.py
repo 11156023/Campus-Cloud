@@ -33,20 +33,8 @@ class ProxmoxPlacementConfig:
 
 
 @dataclass(frozen=True, slots=True)
-class ProxmoxMigrationConfig:
-    enabled: bool
-    max_per_rebalance: int
-    min_interval_minutes: int
-    retry_limit: int
-    worker_concurrency: int
-    job_claim_timeout_seconds: int
-    retry_backoff_seconds: int
-    lxc_live_enabled: bool
-
-
-@dataclass(frozen=True, slots=True)
-class ProxmoxRebalanceConfig:
-    migration_cost: float
+class ProxmoxCapacityConfig:
+    reassignment_cost: float
     peak_cpu_margin: float
     peak_memory_margin: float
     loadavg_warn_per_core: float
@@ -55,7 +43,7 @@ class ProxmoxRebalanceConfig:
     disk_contention_warn_share: float
     disk_contention_high_share: float
     disk_penalty_weight: float
-    search_max_relocations: int
+    search_max_reassignments: int
     search_depth: int
     cpu_peak_warn_share: float
     cpu_peak_high_share: float
@@ -99,32 +87,24 @@ class ProxmoxConfig(SQLModel, table=True):
     placement_strategy: str = Field(default="priority_dominant_share", max_length=64)
     cpu_overcommit_ratio: float = Field(default=2.0)
     disk_overcommit_ratio: float = Field(default=1.0)
-    migration_enabled: bool = Field(default=True)
-    migration_max_per_rebalance: int = Field(default=2, ge=0, le=20)
-    migration_min_interval_minutes: int = Field(default=60, ge=0, le=10080)
-    migration_retry_limit: int = Field(default=3, ge=0, le=10)
-    rebalance_migration_cost: float = Field(default=0.15, ge=0.0, le=5.0)
-    rebalance_peak_cpu_margin: float = Field(default=1.1, ge=1.0, le=2.0)
-    rebalance_peak_memory_margin: float = Field(default=1.05, ge=1.0, le=2.0)
-    rebalance_loadavg_warn_per_core: float = Field(default=0.8, ge=0.0, le=4.0)
-    rebalance_loadavg_max_per_core: float = Field(default=1.5, ge=0.1, le=8.0)
-    rebalance_loadavg_penalty_weight: float = Field(default=0.9, ge=0.0, le=5.0)
-    rebalance_disk_contention_warn_share: float = Field(default=0.7, ge=0.0, le=1.5)
-    rebalance_disk_contention_high_share: float = Field(default=0.9, ge=0.1, le=2.0)
-    rebalance_disk_penalty_weight: float = Field(default=0.75, ge=0.0, le=5.0)
-    rebalance_search_max_relocations: int = Field(default=2, ge=0, le=10)
-    rebalance_search_depth: int = Field(default=3, ge=0, le=10)
-    migration_worker_concurrency: int = Field(default=2, ge=1, le=20)
-    migration_job_claim_timeout_seconds: int = Field(default=300, ge=30, le=86400)
-    migration_retry_backoff_seconds: int = Field(default=120, ge=0, le=86400)
-    migration_lxc_live_enabled: bool = Field(default=False)
-    rebalance_cpu_peak_warn_share: float = Field(default=0.7, ge=0.0, le=2.0)
-    rebalance_cpu_peak_high_share: float = Field(default=1.2, ge=0.1, le=3.0)
-    rebalance_memory_peak_warn_share: float = Field(default=0.8, ge=0.0, le=2.0)
-    rebalance_memory_peak_high_share: float = Field(default=0.85, ge=0.1, le=3.0)
-    rebalance_resource_weight_cpu: float = Field(default=1.0, ge=0.0, le=10.0)
-    rebalance_resource_weight_memory: float = Field(default=1.0, ge=0.0, le=10.0)
-    rebalance_resource_weight_disk: float = Field(default=1.0, ge=0.0, le=10.0)
+    placement_reassignment_cost: float = Field(default=0.15, ge=0.0, le=5.0)
+    placement_peak_cpu_margin: float = Field(default=1.1, ge=1.0, le=2.0)
+    placement_peak_memory_margin: float = Field(default=1.05, ge=1.0, le=2.0)
+    placement_loadavg_warn_per_core: float = Field(default=0.8, ge=0.0, le=4.0)
+    placement_loadavg_max_per_core: float = Field(default=1.5, ge=0.1, le=8.0)
+    placement_loadavg_penalty_weight: float = Field(default=0.9, ge=0.0, le=5.0)
+    placement_disk_contention_warn_share: float = Field(default=0.7, ge=0.0, le=1.5)
+    placement_disk_contention_high_share: float = Field(default=0.9, ge=0.1, le=2.0)
+    placement_disk_penalty_weight: float = Field(default=0.75, ge=0.0, le=5.0)
+    placement_search_max_reassignments: int = Field(default=2, ge=0, le=10)
+    placement_search_depth: int = Field(default=3, ge=0, le=10)
+    placement_cpu_peak_warn_share: float = Field(default=0.7, ge=0.0, le=2.0)
+    placement_cpu_peak_high_share: float = Field(default=1.2, ge=0.1, le=3.0)
+    placement_memory_peak_warn_share: float = Field(default=0.8, ge=0.0, le=2.0)
+    placement_memory_peak_high_share: float = Field(default=0.85, ge=0.1, le=3.0)
+    placement_resource_weight_cpu: float = Field(default=1.0, ge=0.0, le=10.0)
+    placement_resource_weight_memory: float = Field(default=1.0, ge=0.0, le=10.0)
+    placement_resource_weight_disk: float = Field(default=1.0, ge=0.0, le=10.0)
     # Scheduled boot / auto-stop tuning. The scheduler reads these at every tick.
     scheduled_boot_batch_size: int = Field(default=5, ge=1, le=100)
     scheduled_boot_batch_interval_seconds: int = Field(default=10, ge=0, le=600)
@@ -164,39 +144,26 @@ class ProxmoxConfig(SQLModel, table=True):
         )
 
     @property
-    def migration(self) -> ProxmoxMigrationConfig:
-        return ProxmoxMigrationConfig(
-            enabled=self.migration_enabled,
-            max_per_rebalance=self.migration_max_per_rebalance,
-            min_interval_minutes=self.migration_min_interval_minutes,
-            retry_limit=self.migration_retry_limit,
-            worker_concurrency=self.migration_worker_concurrency,
-            job_claim_timeout_seconds=self.migration_job_claim_timeout_seconds,
-            retry_backoff_seconds=self.migration_retry_backoff_seconds,
-            lxc_live_enabled=self.migration_lxc_live_enabled,
-        )
-
-    @property
-    def rebalance(self) -> ProxmoxRebalanceConfig:
-        return ProxmoxRebalanceConfig(
-            migration_cost=self.rebalance_migration_cost,
-            peak_cpu_margin=self.rebalance_peak_cpu_margin,
-            peak_memory_margin=self.rebalance_peak_memory_margin,
-            loadavg_warn_per_core=self.rebalance_loadavg_warn_per_core,
-            loadavg_max_per_core=self.rebalance_loadavg_max_per_core,
-            loadavg_penalty_weight=self.rebalance_loadavg_penalty_weight,
-            disk_contention_warn_share=self.rebalance_disk_contention_warn_share,
-            disk_contention_high_share=self.rebalance_disk_contention_high_share,
-            disk_penalty_weight=self.rebalance_disk_penalty_weight,
-            search_max_relocations=self.rebalance_search_max_relocations,
-            search_depth=self.rebalance_search_depth,
-            cpu_peak_warn_share=self.rebalance_cpu_peak_warn_share,
-            cpu_peak_high_share=self.rebalance_cpu_peak_high_share,
-            memory_peak_warn_share=self.rebalance_memory_peak_warn_share,
-            memory_peak_high_share=self.rebalance_memory_peak_high_share,
-            resource_weight_cpu=self.rebalance_resource_weight_cpu,
-            resource_weight_memory=self.rebalance_resource_weight_memory,
-            resource_weight_disk=self.rebalance_resource_weight_disk,
+    def capacity(self) -> ProxmoxCapacityConfig:
+        return ProxmoxCapacityConfig(
+            reassignment_cost=self.placement_reassignment_cost,
+            peak_cpu_margin=self.placement_peak_cpu_margin,
+            peak_memory_margin=self.placement_peak_memory_margin,
+            loadavg_warn_per_core=self.placement_loadavg_warn_per_core,
+            loadavg_max_per_core=self.placement_loadavg_max_per_core,
+            loadavg_penalty_weight=self.placement_loadavg_penalty_weight,
+            disk_contention_warn_share=self.placement_disk_contention_warn_share,
+            disk_contention_high_share=self.placement_disk_contention_high_share,
+            disk_penalty_weight=self.placement_disk_penalty_weight,
+            search_max_reassignments=self.placement_search_max_reassignments,
+            search_depth=self.placement_search_depth,
+            cpu_peak_warn_share=self.placement_cpu_peak_warn_share,
+            cpu_peak_high_share=self.placement_cpu_peak_high_share,
+            memory_peak_warn_share=self.placement_memory_peak_warn_share,
+            memory_peak_high_share=self.placement_memory_peak_high_share,
+            resource_weight_cpu=self.placement_resource_weight_cpu,
+            resource_weight_memory=self.placement_resource_weight_memory,
+            resource_weight_disk=self.placement_resource_weight_disk,
         )
 
     @property
@@ -215,8 +182,7 @@ class ProxmoxConfig(SQLModel, table=True):
 __all__ = [
     "ProxmoxConfig",
     "ProxmoxConnectionConfig",
-    "ProxmoxMigrationConfig",
     "ProxmoxPlacementConfig",
-    "ProxmoxRebalanceConfig",
+    "ProxmoxCapacityConfig",
     "ProxmoxSchedulerConfig",
 ]

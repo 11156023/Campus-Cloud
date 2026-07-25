@@ -1,9 +1,26 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
+from types import SimpleNamespace
+
 import pytest
 
 from app.exceptions import ProxmoxError
 from app.infrastructure.proxmox import client as proxmox_client
+
+
+@pytest.fixture(autouse=True)
+def _reset_client_state():
+    with proxmox_client._proxmox_lock:
+        proxmox_client._state.client = None
+        proxmox_client._state.created_at = 0.0
+        proxmox_client._state.active_host = None
+        proxmox_client._state.failure_until = 0.0
+        proxmox_client._state.last_error = None
+        proxmox_client._state.connecting = False
+        proxmox_client._state.connection_event = None
+    yield
+    proxmox_client.invalidate_proxmox_client()
 
 
 class _FakeTaskLog:
@@ -79,3 +96,44 @@ def test_basic_blocking_task_status_includes_task_log_tail(monkeypatch: pytest.M
     message = str(exc_info.value)
     assert "terminated" in message
     assert "migration aborted by remote task" in message
+
+
+def test_failed_probe_is_cached(monkeypatch: pytest.MonkeyPatch) -> None:
+    nodes = [
+        SimpleNamespace(id=1, name="pve-a", host="10.0.0.1", port=8006),
+        SimpleNamespace(id=2, name="pve-b", host="10.0.0.2", port=8006),
+    ]
+    pinged: list[str] = []
+    monkeypatch.setattr(proxmox_client, "get_proxmox_settings", lambda: object())
+    monkeypatch.setattr(proxmox_client, "get_nodes_for_ha", lambda: nodes)
+    monkeypatch.setattr(
+        proxmox_client,
+        "_tcp_ping",
+        lambda host, _port: pinged.append(host) or False,
+    )
+    monkeypatch.setattr(proxmox_client, "update_node_online", lambda *_args: None)
+
+    with pytest.raises(ProxmoxError):
+        proxmox_client.get_proxmox_api()
+    with pytest.raises(ProxmoxError, match="temporarily unavailable"):
+        proxmox_client.get_proxmox_api()
+
+    assert pinged == ["10.0.0.1", "10.0.0.2"]
+
+
+def test_concurrent_callers_share_one_probe(monkeypatch: pytest.MonkeyPatch) -> None:
+    fake_client = object()
+    probes = 0
+
+    def connect():
+        nonlocal probes
+        probes += 1
+        return fake_client, "pve-a"
+
+    monkeypatch.setattr(proxmox_client, "_connect_proxmox", connect)
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        results = list(executor.map(lambda _i: proxmox_client.get_proxmox_api(), range(2)))
+
+    assert results == [fake_client, fake_client]
+    assert probes == 1

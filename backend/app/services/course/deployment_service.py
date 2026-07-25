@@ -23,7 +23,7 @@ from app.exceptions import (
 from app.models import (
     CourseDeployment,
     CourseRoom,
-    VMMigrationStatus,
+    VMProvisioningStatus,
     VMRequest,
     VMRequestStatus,
     VMTemplate,
@@ -55,7 +55,7 @@ def _derive_status(
     ):
         return "failed"
     if (
-        vm_request.migration_status == VMMigrationStatus.failed
+        vm_request.provisioning_status == VMProvisioningStatus.failed
         and vm_request.vmid is None
     ):
         return "failed"
@@ -74,7 +74,7 @@ def _to_public(
         vm_request_id=deployment.vm_request_id,
         vmid=vm_request.vmid,
         status=status,
-        error=vm_request.migration_error if status == "failed" else None,
+        error=vm_request.provisioning_error if status == "failed" else None,
         created_at=deployment.created_at,
         expires_at=deployment.expires_at,
     )

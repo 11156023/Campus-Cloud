@@ -157,3 +157,35 @@ describe("apiGet 的 401 自動續期", () => {
     expect(dispatched).not.toContain("auth:unauthorized");
   });
 });
+
+describe("apiGet cancellation and timeout", () => {
+  test("caller abort cancels the in-flight request", async () => {
+    const controller = new AbortController();
+    fetchMock.mockImplementationOnce((_url, init) => new Promise((_resolve, reject) => {
+      init.signal.addEventListener(
+        "abort",
+        () => reject(new DOMException("aborted", "AbortError")),
+        { once: true },
+      );
+    }));
+
+    const pending = apiGet("/api/v1/slow", { signal: controller.signal });
+    controller.abort();
+
+    await expect(pending).rejects.toMatchObject({ cancelled: true });
+  });
+
+  test("request timeout returns a normalized error", async () => {
+    fetchMock.mockImplementationOnce((_url, init) => new Promise((_resolve, reject) => {
+      init.signal.addEventListener(
+        "abort",
+        () => reject(new DOMException("aborted", "AbortError")),
+        { once: true },
+      );
+    }));
+
+    await expect(
+      apiGet("/api/v1/slow", { timeoutMs: 5 }),
+    ).rejects.toMatchObject({ status: 408, timeout: true });
+  });
+});

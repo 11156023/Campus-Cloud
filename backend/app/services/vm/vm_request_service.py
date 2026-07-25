@@ -21,7 +21,7 @@ from app.exceptions import (
 from app.infrastructure.worker import submit_sync
 from app.models import (
     User,
-    VMMigrationStatus,
+    VMProvisioningStatus,
     VMRequest,
     VMRequestStatus,
     VMTemplateStatus,
@@ -103,13 +103,9 @@ def _to_public(req: VMRequest, user_override=None) -> VMRequestPublic:
         desired_node=req.desired_node,
         actual_node=req.actual_node,
         placement_strategy_used=req.placement_strategy_used,
-        migration_status=req.migration_status,
-        migration_error=req.migration_error,
-        migration_pinned=req.migration_pinned,
+        provisioning_status=req.provisioning_status,
+        provisioning_error=req.provisioning_error,
         resource_warning=req.resource_warning,
-        rebalance_epoch=req.rebalance_epoch,
-        last_rebalanced_at=req.last_rebalanced_at,
-        last_migrated_at=req.last_migrated_at,
         created_at=req.created_at,
     )
 
@@ -161,8 +157,8 @@ def _approve_and_place(
         desired_node=None,
         actual_node=None,
         placement_strategy_used=None,
-        migration_status=VMMigrationStatus.idle,
-        migration_error=None,
+        provisioning_status=VMProvisioningStatus.idle,
+        provisioning_error=None,
         commit=False,
     )
 
@@ -189,14 +185,14 @@ def _approve_and_place(
             desired_node=selection.node,
             actual_node=db_request.actual_node,
             placement_strategy_used=selection.strategy,
-            migration_status=(
-                VMMigrationStatus.pending
+            provisioning_status=(
+                VMProvisioningStatus.pending
                 if db_request.vmid is not None
                 and db_request.actual_node
                 and db_request.actual_node != selection.node
-                else VMMigrationStatus.idle
+                else VMProvisioningStatus.idle
             ),
-            migration_error=None,
+            provisioning_error=None,
             commit=False,
         )
         return selection
@@ -213,6 +209,25 @@ def _approve_and_place(
         requests=approved_requests,
     )
     for request in approved_requests:
+        if request.vmid is not None:
+            current_node = request.actual_node or request.assigned_node
+            if not current_node:
+                raise BadRequestError(
+                    f"Provisioned request {request.id} has no known node."
+                )
+            vm_request_repo.update_vm_request_provisioning(
+                session=session,
+                db_request=request,
+                vmid=request.vmid,
+                assigned_node=current_node,
+                desired_node=current_node,
+                actual_node=current_node,
+                placement_strategy_used=request.placement_strategy_used,
+                provisioning_status=VMProvisioningStatus.completed,
+                provisioning_error=None,
+                commit=False,
+            )
+            continue
         selection = selections.get(request.id)
         if not selection or not selection.node:
             raise BadRequestError(
@@ -226,14 +241,14 @@ def _approve_and_place(
             desired_node=selection.node,
             actual_node=request.actual_node,
             placement_strategy_used=selection.strategy,
-            migration_status=(
-                VMMigrationStatus.pending
+            provisioning_status=(
+                VMProvisioningStatus.pending
                 if request.vmid is not None
                 and request.actual_node
                 and request.actual_node != selection.node
-                else VMMigrationStatus.idle
+                else VMProvisioningStatus.idle
             ),
-            migration_error=None,
+            provisioning_error=None,
             commit=False,
         )
 
@@ -676,7 +691,7 @@ def get_review_context(
                 actual_node=request.actual_node,
                 projected_node=projected_node,
                 projected_strategy=selection.strategy if selection else None,
-                migration_status=request.migration_status,
+                provisioning_status=request.provisioning_status,
                 is_current_request=request.id == db_request.id,
                 is_running_now=bool(request.vmid is not None and request.vmid in running_vmids),
                 is_provisioned=request.vmid is not None,
@@ -720,7 +735,7 @@ def get_review_context(
                 peak_penalty=b.peak_penalty,
                 loadavg_penalty=b.loadavg_penalty,
                 storage_penalty=b.storage_penalty,
-                migration_cost=b.migration_cost,
+                reassignment_cost=b.reassignment_cost,
                 priority=b.priority,
                 is_selected=b.is_selected,
                 reason=b.reason,
@@ -819,8 +834,8 @@ def review(
                 desired_node=None,
                 actual_node=None,
                 placement_strategy_used=None,
-                migration_status=VMMigrationStatus.idle,
-                migration_error=None,
+                provisioning_status=VMProvisioningStatus.idle,
+                provisioning_error=None,
                 commit=False,
             )
 
@@ -910,7 +925,7 @@ def cancel(
     - ``approved`` with ``vmid``: rejected. The machine is already provisioned
       and the scheduler manages it through the active-approved-request list;
       cancelling here would orphan the live VM (no start window, auto-shutdown
-      or migration). The resource deletion flow keeps the approval record
+      or lifecycle management). The resource deletion flow keeps the approval record
       intact and marks the request as no longer schedulable.
     """
     from app.infrastructure.worker import (  # noqa: PLC0415
@@ -974,8 +989,8 @@ def cancel(
         desired_node=None,
         actual_node=None,
         placement_strategy_used=None,
-        migration_status=VMMigrationStatus.idle,
-        migration_error=None,
+        provisioning_status=VMProvisioningStatus.idle,
+        provisioning_error=None,
         commit=False,
     )
 
@@ -1022,7 +1037,7 @@ def retry(
         raise BadRequestError(
             "This request has already been provisioned; control or delete the resource instead."
         )
-    if db_request.migration_status != VMMigrationStatus.failed:
+    if db_request.provisioning_status != VMProvisioningStatus.failed:
         raise BadRequestError(
             "Only failed provisioning attempts can be retried."
         )

@@ -6,6 +6,7 @@ pydantic-settings>=2.14.2
 python-dotenv>=1.2.2
 openai>=1.0
 httpx>=0.25
+PyYAML>=6.0
 
 # API Gateway 依賴
 fastapi>=0.115.0

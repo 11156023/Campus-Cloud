@@ -3,11 +3,11 @@
 Standalone AI API usage test script (no third-party dependencies).
 
 What it does:
-1) Reads AI_API_BASE_URL / AI_API_TIMEOUT / AI_API_PUBLIC_BASE_URL from environment variables and/or .env in repo root.
+1) Reads AI_API_TIMEOUT / AI_API_PUBLIC_BASE_URL from environment variables and/or .env in repo root.
 2) Prompts for a user API key and verifies it against /usage/my first.
-3) Prompts for the gateway API key used by /v1/models and /v1/chat/completions.
+3) Uses that same user key through Campus /ai-proxy/models and /chat/completions.
 4) Asks for model name in terminal.
-5) Calls /v1/chat/completions (non-stream) and prints response + usage tokens.
+5) Prints response + usage tokens.
 
 Usage examples:
   python test_ai_api_usage.py
@@ -32,7 +32,6 @@ from urllib import error, request
 
 @dataclass
 class Settings:
-    ai_api_base_url: str
     ai_api_timeout: int
     ai_api_public_base_url: str
 
@@ -65,7 +64,6 @@ def load_settings() -> Settings:
     def pick(name: str, default: str) -> str:
         return os.getenv(name) or dotenv_values.get(name) or default
 
-    base_url = pick("AI_API_BASE_URL", "http://localhost:3000").rstrip("/")
     timeout_raw = pick("AI_API_TIMEOUT", "120")
     public_base_url = pick("AI_API_PUBLIC_BASE_URL", "http://localhost:5000").rstrip("/")
 
@@ -78,7 +76,6 @@ def load_settings() -> Settings:
         timeout = 120
 
     return Settings(
-        ai_api_base_url=base_url,
         ai_api_timeout=timeout,
         ai_api_public_base_url=public_base_url,
     )
@@ -170,13 +167,13 @@ def verify_user_api_key(settings: Settings, user_api_key: str) -> bool:
     return True
 
 
-def list_models(settings: Settings, gateway_api_key: str) -> list[str]:
-    url = f"{settings.ai_api_base_url}/v1/models"
+def list_models(settings: Settings, user_api_key: str) -> list[str]:
+    url = f"{settings.ai_api_public_base_url}/api/v1/ai-proxy/models"
     status, data = request_json(
         method="GET",
         url=url,
         timeout=settings.ai_api_timeout,
-        headers=auth_headers(gateway_api_key),
+        headers=auth_headers(user_api_key),
     )
 
     if status != 200:
@@ -195,23 +192,23 @@ def list_models(settings: Settings, gateway_api_key: str) -> list[str]:
             models.append(str(model_id))
 
     if models:
-        print("\nAvailable models from gateway:")
+        print("\nAvailable public models:")
         for idx, mid in enumerate(models, start=1):
             print(f"  {idx:>2}. {mid}")
     else:
-        print("\n[WARN] No models returned by /v1/models")
+        print("\n[WARN] No models returned by Campus /ai-proxy/models")
 
     return models
 
 
 def run_chat_completion(
     settings: Settings,
-    gateway_api_key: str,
+    user_api_key: str,
     model: str,
     prompt: str,
     max_tokens: int,
 ) -> int:
-    url = f"{settings.ai_api_base_url}/v1/chat/completions"
+    url = f"{settings.ai_api_public_base_url}/api/v1/ai-proxy/chat/completions"
     payload = {
         "model": model,
         "messages": [{"role": "user", "content": prompt}],
@@ -223,7 +220,7 @@ def run_chat_completion(
         method="POST",
         url=url,
         timeout=settings.ai_api_timeout,
-        headers=auth_headers(gateway_api_key),
+        headers=auth_headers(user_api_key),
         payload=payload,
     )
 
@@ -293,7 +290,6 @@ def main() -> int:
     settings = load_settings()
 
     print("AI API test settings:")
-    print(f"  AI_API_BASE_URL:        {settings.ai_api_base_url}")
     print(f"  AI_API_PUBLIC_BASE_URL: {settings.ai_api_public_base_url}")
     print(f"  AI_API_TIMEOUT:         {settings.ai_api_timeout}")
 
@@ -305,12 +301,7 @@ def main() -> int:
     if not verify_user_api_key(settings, user_api_key):
         return 1
 
-    gateway_api_key = input("\nStep 2 - enter gateway AI_API_API_KEY: ").strip()
-    if not gateway_api_key:
-        print("[ERROR] gateway AI_API_API_KEY is required")
-        return 1
-
-    models = list_models(settings, gateway_api_key)
+    models = list_models(settings, user_api_key)
     default_model = models[0] if models else ""
 
     selected_model = args.model.strip()
@@ -326,7 +317,7 @@ def main() -> int:
 
     rc = run_chat_completion(
         settings=settings,
-        gateway_api_key=gateway_api_key,
+        user_api_key=user_api_key,
         model=selected_model,
         prompt=args.prompt,
         max_tokens=args.max_tokens,

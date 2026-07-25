@@ -16,7 +16,6 @@ const navGroups = [
     icon: "edit_note",
     items: [
       { key: "my-requests", label: "我的申請",    icon: "assignment" },
-      { key: "ai-api",      label: "AI API 申請", icon: "psychology" },
     ],
   },
   {
@@ -52,14 +51,26 @@ const navGroups = [
     ],
   },
   {
+    key: "ai",
+    label: "AI 服務",
+    icon: "smart_toy",
+    items: [
+      { key: "ai-api",        label: "AI API",   icon: "psychology" },
+      { key: "ai-api-review", label: "申請審核", icon: "rate_review", adminOnly: true },
+      { key: "ai-api-keys",   label: "金鑰管理", icon: "vpn_key", adminOnly: true },
+      { key: "ai-monitoring", label: "使用監控", icon: "monitor_heart", adminOnly: true },
+    ],
+  },
+  {
     key: "teaching",
     label: "教學",
     icon: "school",
     items: [
+      { key: "class-management", label: "班級管理（待開發）", icon: "groups_2" },
+      { key: "course-template-management", label: "上課機器模板（待開發）", icon: "view_quilt" },
       { key: "classroom",  label: "虛擬教室", icon: "cast_for_education" },
       { key: "teaching",   label: "教學面板", icon: "grid_view" },
       { key: "courses",    label: "課程學習", icon: "flag" },
-      { key: "course-cms", label: "課程管理", icon: "edit_note" },
     ],
   },
   {
@@ -69,7 +80,6 @@ const navGroups = [
     items: [
       { key: "groups",        label: "群組",       icon: "groups" },
       { key: "admin",         label: "使用者管理", icon: "admin_panel_settings" },
-      { key: "ai-management", label: "AI 管理",    icon: "smart_toy" },
       { key: "quotas",        label: "配額管理",   icon: "data_usage" },
       { key: "settings",      label: "系統設定",   icon: "settings" },
     ],
@@ -80,8 +90,6 @@ const navGroups = [
     icon: "insights",
     items: [
       { key: "monitoring",    label: "資源監控",       icon: "monitor_heart" },
-      { key: "ai-monitoring", label: "AI 監控",        icon: "monitor_heart" },
-      { key: "migration",     label: "Migration Jobs", icon: "move_down" },
       { key: "jobs",          label: "背景任務",       icon: "task_alt" },
       { key: "deploy-logs",   label: "部署日誌",       icon: "terminal" },
       { key: "audit",         label: "Audit Logs",     icon: "receipt_long" },
@@ -265,6 +273,13 @@ export default function Sidebar({ collapsed, mobileOpen, onToggle, onClose }) {
   const langBtnRef = useRef(null);
   const userBtnRef = useRef(null);
   const { user, logout } = useAuth();
+  const isAdmin = Boolean(user?.is_superuser || user?.role === "admin");
+  const visibleNavGroups = navGroups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => !item.adminOnly || isAdmin),
+    }))
+    .filter((group) => group.items.length > 0);
 
   const cls = [
     styles.sidebar,
@@ -309,7 +324,7 @@ export default function Sidebar({ collapsed, mobileOpen, onToggle, onClose }) {
             {!collapsed && <span className={styles.navLabel}>{item.label}</span>}
           </button>
         ))}
-        {navGroups.map((group) => (
+        {visibleNavGroups.map((group) => (
           <NavGroup
             key={group.key}
             group={group}

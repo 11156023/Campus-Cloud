@@ -72,3 +72,4 @@ vllm-service/
 ## 相關設計文件
 
 - `AI_API_DESIGN_PLAN.md`：AI API 高併發、公平性、reasoning/response_format 參數開放的設計建議與分階段計劃
+- `AI_API_PARAMETERS.md`：目前 Gateway / vLLM API 可用 request parameters、wrapper passthrough、capabilities 與範例

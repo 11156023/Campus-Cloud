@@ -81,14 +81,12 @@ ACTION_CATEGORY: dict[AuditAction, str] = {
     AuditAction.cloudflare_dns_record_create: "system",
     AuditAction.cloudflare_dns_record_update: "system",
     AuditAction.cloudflare_dns_record_delete: "system",
-    # Proxmox / Migration
+    # Proxmox
     AuditAction.proxmox_config_update: "system",
     AuditAction.proxmox_node_update: "system",
     AuditAction.proxmox_storage_update: "system",
     AuditAction.proxmox_sync_nodes: "system",
     AuditAction.proxmox_sync_now: "system",
-    AuditAction.migration_job_retry: "system",
-    AuditAction.migration_job_cancel: "system",
     # AI API credential
     AuditAction.ai_api_credential_rotate: "ai",
     AuditAction.ai_api_credential_delete: "ai",

@@ -57,16 +57,81 @@ function SelectField({ value, onChange, disabled, children, placeholder }) {
 /* ── Helpers ── */
 const DT_FMT = { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" };
 const formatDT = (iso) => new Date(iso).toLocaleString("zh-TW", DT_FMT);
+const formatDateOnly = (iso) => new Date(iso).toLocaleDateString("zh-TW", {
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
 const formatOstemplate = (v) => v.split("/").pop()?.replace(".tar.zst", "") ?? v;
+const toDateTimeLocalValue = (value) => {
+  if (!value) return "";
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const pad = (part) => String(part).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+};
+const fromDateTimeLocalValue = (value) => value ? new Date(value).toISOString() : "";
+const toDateInputValue = (value) => toDateTimeLocalValue(value).slice(0, 10);
+const fromDateInputValue = (value, endOfDay = false) => {
+  if (!value) return "";
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(
+    year,
+    month - 1,
+    day,
+    endOfDay ? 23 : 0,
+    endOfDay ? 59 : 0,
+    endOfDay ? 59 : 0,
+    0,
+  );
+  return date.toISOString();
+};
 const GPU_OPTIONS_DEBOUNCE_MS = 300;
-const ADVISE_DEBOUNCE_MS = 500;
-const CONFIDENCE_LABEL = { high: "高信心", medium: "中信心", low: "低信心" };
 const gpuLabel = (gpu) => {
   const vram = gpu.total_vram_mb > 0
     ? ` (${gpu.total_vram_mb >= 1024 ? `${(gpu.total_vram_mb / 1024).toFixed(0)} GB` : `${gpu.total_vram_mb} MB`})`
     : gpu.vram ? ` (${gpu.vram})` : "";
   return `${gpu.description || gpu.mapping_id}${vram} [${gpu.available_count}/${gpu.device_count} 可用]${gpu.available_count <= 0 ? " — 已滿" : ""}`;
 };
+
+function buildAiScheduleOptions(availability) {
+  const days = (availability?.days || [])
+    .filter((day) => (day.slots || []).some(
+      (slot) => slot.status === "available" || slot.status === "limited",
+    ))
+    .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  const runs = [];
+  for (const day of days) {
+    const previousRun = runs[runs.length - 1];
+    const previousDay = previousRun?.[previousRun.length - 1];
+    const expectedDate = previousDay
+      ? new Date(`${previousDay.date}T00:00:00`)
+      : null;
+    expectedDate?.setDate(expectedDate.getDate() + 1);
+    if (previousDay && toDateInputValue(expectedDate) === day.date) {
+      previousRun.push(day);
+    } else {
+      runs.push([day]);
+    }
+  }
+
+  const options = [];
+  for (const run of runs) {
+    for (const dayCount of [1, 3, 7, 14, 30]) {
+      if (run.length < dayCount) continue;
+      const selected = run.slice(0, dayCount);
+      const selectedSlots = selected.flatMap((day) => day.slots || []);
+      options.push({
+        start_at: fromDateInputValue(selected[0].date),
+        end_at: fromDateInputValue(selected[selected.length - 1].date, true),
+        status: selectedSlots.some((slot) => slot.status === "limited") ? "limited" : "available",
+        summary: `${dayCount} 天可用時段`,
+        recommended_nodes: selectedSlots.find((slot) => slot.recommended_nodes?.length)?.recommended_nodes || [],
+      });
+    }
+  }
+  return options.slice(0, 12);
+}
 
 /* ── Validation messages（對齊舊版 zh-TW locales）── */
 const MSG = {
@@ -79,10 +144,11 @@ const MSG = {
   templateRequired: "範本為必填項",
   osRequired:       "作業系統為必填項",
   usernameRequired: "使用者名稱為必填項",
-  startRequired:    "請選擇開始時間",
-  endRequired:      "請選擇結束時間",
-  endBeforeStart:   "結束時間必須晚於開始時間",
+  startRequired:    "請選擇開始日期",
+  endRequired:      "請選擇結束日期",
+  endBeforeStart:   "結束日期必須晚於開始日期",
   endInPast:        "結束時間必須晚於現在",
+  scheduleOutOfRange: "租借時段需在未來三個月內",
 };
 
 export default function RequestFormPage({ onBack, className }) {
@@ -101,11 +167,6 @@ export default function RequestFormPage({ onBack, className }) {
   const [sysTplLoading, setSysTplLoading] = useState(false);
   const [selectedTplId, setSelectedTplId] = useState("");
 
-  /* 類型選擇模式：manual = 手動選 LXC/VM；auto = 規則引擎自動判斷 */
-  const [typeMode, setTypeMode]           = useState("manual");
-  const [advice, setAdvice]               = useState(null);
-  const [adviseLoading, setAdviseLoading] = useState(false);
-
   /* Form state */
   const [resourceType, setResourceType] = useState("lxc");
   const [mode, setMode]                 = useState("scheduled");
@@ -119,6 +180,7 @@ export default function RequestFormPage({ onBack, className }) {
     memory:           2048,
     rootfs_size:      8,
     disk_size:        20,
+    service_template_slug: "",
     gpu_mapping_id:   "",
     start_at:         "",
     end_at:           "",
@@ -127,7 +189,17 @@ export default function RequestFormPage({ onBack, className }) {
   });
   const [errors, setErrors]           = useState({});
   const [submitting, setSubmitting]   = useState(false);
-  const [availabilityHint, setAvailabilityHint] = useState(null);
+  const [availabilityData, setAvailabilityData] = useState(null);
+  const scheduleBounds = useMemo(() => {
+    const minimum = new Date();
+    minimum.setSeconds(0, 0);
+    const maximum = new Date(minimum);
+    maximum.setDate(maximum.getDate() + 90);
+    return {
+      min: toDateTimeLocalValue(minimum),
+      max: toDateTimeLocalValue(maximum),
+    };
+  }, []);
 
   /* API data */
   const [lxcTemplates, setLxcTemplates] = useState([]);
@@ -140,22 +212,22 @@ export default function RequestFormPage({ onBack, className }) {
 
   /* ── API fetches ── */
   useEffect(() => {
-    if (resourceType !== "lxc" || lxcTemplates.length > 0) return;
+    if (lxcTemplates.length > 0) return;
     setLxcLoading(true);
     apiGet("/api/v1/lxc/templates")
       .then(setLxcTemplates)
       .catch(() => {})
       .finally(() => setLxcLoading(false));
-  }, [resourceType]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (resourceType !== "vm" || vmTemplates.length > 0) return;
+    if (vmTemplates.length > 0) return;
     setVmLoading(true);
     apiGet("/api/v1/vm/templates")
       .then(setVmTemplates)
       .catch(() => {})
       .finally(() => setVmLoading(false));
-  }, [resourceType]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     setSysTplLoading(true);
@@ -250,66 +322,45 @@ export default function RequestFormPage({ onBack, className }) {
     if (errors[key]) setErrors((prev) => ({ ...prev, [key]: "" }));
   }
 
-  /* ── VM vs LXC 自動判斷（Auto 模式）── */
-  const adviseRequest = useMemo(() => ({
-    os_info: resourceType === "lxc"
-      ? (selectedTpl?.name || (form.ostemplate ? formatOstemplate(form.ostemplate) : null))
-      : (vmTemplates.find((t) => String(t.vmid) === String(form.template_id))?.name || null),
-    reason: form.reason.trim() || null,
-    cores: Number(form.cores) || null,
-    memory: Number(form.memory) || null,
-    gpu_mapping_id: form.gpu_mapping_id?.trim() || null,
-  }), [
-    resourceType,
-    selectedTpl,
-    vmTemplates,
-    form.ostemplate,
-    form.template_id,
-    form.reason,
-    form.cores,
-    form.memory,
-    form.gpu_mapping_id,
-  ]);
-
-  /* 500ms debounce，避免每個按鍵都打 advise API */
-  useEffect(() => {
-    if (typeMode !== "auto") return;
-    let cancelled = false;
-    const timer = window.setTimeout(() => {
-      setAdviseLoading(true);
-      VmRequestsService.advise(adviseRequest)
-        .then((res) => { if (!cancelled) setAdvice(res); })
-        .catch(() => {
-          /* advisor 被管理員停用（400）→ 退回手動模式 */
-          if (cancelled) return;
-          setTypeMode("manual");
-          setAdvice(null);
-          toast.error("自動判斷目前未啟用，已切換為手動選擇。");
-        })
-        .finally(() => { if (!cancelled) setAdviseLoading(false); });
-    }, ADVISE_DEBOUNCE_MS);
-    return () => { cancelled = true; window.clearTimeout(timer); };
-  }, [typeMode, adviseRequest]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  /* 建議結果 → 同步 resource_type（範本欄位區隨之切換） */
-  useEffect(() => {
-    if (typeMode !== "auto" || !advice) return;
-    if (advice.resource_type !== resourceType) setResourceType(advice.resource_type);
-  }, [typeMode, advice, resourceType]);
-
   const recommendationContext = useMemo(() => ({
     resource_type: resourceType,
     mode,
+    hostname: form.hostname || null,
+    reason: form.reason || null,
+    service_template_slug: form.service_template_slug || null,
+    lxc_os_image: resourceType === "lxc" ? form.ostemplate || null : null,
+    vm_template_id: resourceType === "vm" && form.template_id ? Number(form.template_id) : null,
+    cores: Number(form.cores) || null,
+    memory_mb: Number(form.memory) || null,
+    disk_gb: Number(resourceType === "vm" ? form.disk_size : form.rootfs_size) || null,
+    storage: "local-lvm",
     start_at: form.start_at || null,
     end_at: form.end_at || null,
+    immediate_no_end: Boolean(form.immediate_no_end),
     selected_gpu_mapping_id: form.gpu_mapping_id || null,
     gpu_options: gpuOptions,
-  }), [resourceType, mode, form.start_at, form.end_at, form.gpu_mapping_id, gpuOptions]);
+    schedule_options: buildAiScheduleOptions(availabilityData),
+    lxc_os_options: lxcTemplates.map((template) => ({
+      value: template.volid,
+      label: formatOstemplate(template.volid),
+    })),
+    vm_os_options: vmTemplates.map((template) => ({
+      template_id: Number(template.vmid),
+      label: template.name || String(template.vmid),
+      node: template.node || "",
+    })),
+    resource_options_from_client: true,
+  }), [resourceType, mode, form, gpuOptions, availabilityData, lxcTemplates, vmTemplates]);
 
   function applyAiPrefill(prefill) {
     if (!prefill) return;
     const nextResourceType = prefill.resource_type === "vm" ? "vm" : "lxc";
     setResourceType(nextResourceType);
+    if (isPrivileged && (prefill.mode === "scheduled" || prefill.mode === "immediate")) {
+      setMode(prefill.mode);
+    } else if (!isPrivileged) {
+      setMode("scheduled");
+    }
 
     if (nextResourceType !== "lxc") setSelectedTplId("");
 
@@ -318,15 +369,15 @@ export default function RequestFormPage({ onBack, className }) {
       return {
         ...prev,
         hostname: prefill.hostname ? normalizeHostname(prefill.hostname) : prev.hostname,
+        service_template_slug: nextResourceType === "lxc"
+          ? (prefill.service_template_slug || "")
+          : "",
         ostemplate: nextResourceType === "lxc"
           ? (prefill.lxc_os_image || prev.ostemplate)
           : prev.ostemplate,
         template_id: nextResourceType === "vm" && prefill.vm_template_id
           ? String(prefill.vm_template_id)
           : prev.template_id,
-        username: nextResourceType === "vm" && prefill.username
-          ? prefill.username
-          : prev.username,
         cores: prefill.cores ? Number(prefill.cores) : prev.cores,
         memory: prefill.memory_mb ? Number(prefill.memory_mb) : prev.memory,
         rootfs_size: nextResourceType === "lxc" && disk
@@ -337,12 +388,25 @@ export default function RequestFormPage({ onBack, className }) {
           : prev.disk_size,
         gpu_mapping_id: nextResourceType === "vm" && prefill.gpu_mapping_id
           ? prefill.gpu_mapping_id
-          : prev.gpu_mapping_id,
+          : "",
+        start_at: prefill.start_at
+          ? fromDateInputValue(toDateInputValue(prefill.start_at))
+          : prev.start_at,
+        end_at: prefill.end_at
+          ? fromDateInputValue(toDateInputValue(prefill.end_at), true)
+          : prev.end_at,
+        immediate_no_end: typeof prefill.immediate_no_end === "boolean"
+          ? prefill.immediate_no_end
+          : prev.immediate_no_end,
         reason: prefill.reason || prev.reason,
       };
     });
     setErrors({});
-    toast.success("已匯入 AI 推薦配置，請確認欄位後送出。");
+    toast.success(
+      nextResourceType === "vm"
+        ? "已匯入 AI 推薦配置；VM 帳號與密碼不會由 AI 填入，請自行輸入。"
+        : "已匯入 AI 推薦配置；LXC Root 密碼不會由 AI 填入，請自行輸入。",
+    );
   }
 
   function handleBack() {
@@ -376,6 +440,11 @@ export default function RequestFormPage({ onBack, className }) {
       if (!form.end_at)   errs.end_at   = MSG.endRequired;
       if (form.start_at && form.end_at && new Date(form.start_at) >= new Date(form.end_at))
         errs.end_at = MSG.endBeforeStart;
+      const maximum = new Date(scheduleBounds.max);
+      if (form.start_at && new Date(form.start_at) > maximum)
+        errs.start_at = MSG.scheduleOutOfRange;
+      if (form.end_at && new Date(form.end_at) > maximum)
+        errs.end_at = MSG.scheduleOutOfRange;
     }
     if (mode === "immediate" && !form.immediate_no_end && form.end_at) {
       if (new Date(form.end_at) <= new Date()) errs.end_at = MSG.endInPast;
@@ -443,7 +512,6 @@ export default function RequestFormPage({ onBack, className }) {
         memory:    form.memory,
         reason:    form.reason.trim(),
         storage:   "local-lvm",
-        requested_mode: typeMode,
         ...(resourceType === "lxc"
           ? {
               rootfs_size: form.rootfs_size,
@@ -467,6 +535,9 @@ export default function RequestFormPage({ onBack, className }) {
                 null,
             }),
         ...(selectedGpuId ? { gpu_mapping_id: selectedGpuId } : {}),
+        ...(resourceType === "lxc" && form.service_template_slug
+          ? { service_template_slug: form.service_template_slug }
+          : {}),
         ...(mode === "scheduled"
           ? { start_at: form.start_at, end_at: form.end_at }
           : (!form.immediate_no_end && form.end_at ? { end_at: form.end_at } : {})),
@@ -543,75 +614,20 @@ export default function RequestFormPage({ onBack, className }) {
               <h2 className={styles.sectionTitle}>類型</h2>
               <div className={styles.typeToggle}>
                 {[
-                  { key: "auto",   label: "自動判斷（推薦）", icon: "auto_fix_high" },
-                  { key: "manual", label: "手動選擇",        icon: "tune" },
-                ].map((m) => (
+                  { key: "lxc", label: "LXC 容器",      icon: "dashboard" },
+                  { key: "vm",  label: "QEMU 虛擬機", icon: "computer"  },
+                ].map((t) => (
                   <button
-                    key={m.key}
+                    key={t.key}
                     type="button"
-                    className={`${styles.typeBtn} ${typeMode === m.key ? styles.typeBtnActive : ""}`}
-                    onClick={() => setTypeMode(m.key)}
+                    className={`${styles.typeBtn} ${resourceType === t.key ? styles.typeBtnActive : ""}`}
+                    onClick={() => setResourceType(t.key)}
                   >
-                    <MIcon name={m.icon} size={16} />
-                    {m.label}
+                    <MIcon name={t.icon} size={16} />
+                    {t.label}
                   </button>
                 ))}
               </div>
-
-              {typeMode === "auto" && (
-                <div className={styles.adviceCard}>
-                  {adviseLoading && !advice ? (
-                    <p className={styles.adviceEmpty}>
-                      <MIcon name="progress_activity" size={14} className={styles.adviceSpin} />
-                      分析工作負載中…
-                    </p>
-                  ) : advice ? (
-                    <>
-                      <div className={styles.adviceHeader}>
-                        <MIcon name={advice.resource_type === "vm" ? "computer" : "dashboard"} size={16} />
-                        <span className={styles.adviceTitle}>
-                          建議使用 {advice.resource_type === "vm" ? "QEMU 虛擬機" : "LXC 容器"}
-                        </span>
-                        <span className={styles.adviceBadge}>
-                          {CONFIDENCE_LABEL[advice.confidence] ?? advice.confidence}
-                        </span>
-                        {adviseLoading && (
-                          <MIcon name="progress_activity" size={13} className={styles.adviceSpin} />
-                        )}
-                      </div>
-                      <ul className={styles.adviceReasons}>
-                        {advice.reasons.map((reason) => (
-                          <li key={reason}>{reason}</li>
-                        ))}
-                      </ul>
-                      <p className={styles.adviceFootnote}>
-                        建議會依「用途說明、範本、規格、GPU」即時更新；如需固定類型請改用手動選擇。
-                      </p>
-                    </>
-                  ) : (
-                    <p className={styles.adviceEmpty}>填寫用途說明與規格後即會顯示建議。</p>
-                  )}
-                </div>
-              )}
-
-              {typeMode === "manual" && (
-                <div className={styles.typeToggle}>
-                  {[
-                    { key: "lxc", label: "LXC 容器",   icon: "dashboard" },
-                    { key: "vm",  label: "QEMU 虛擬機", icon: "computer"  },
-                  ].map((t) => (
-                    <button
-                      key={t.key}
-                      type="button"
-                      className={`${styles.typeBtn} ${resourceType === t.key ? styles.typeBtnActive : ""}`}
-                      onClick={() => setResourceType(t.key)}
-                    >
-                      <MIcon name={t.icon} size={16} />
-                      {t.label}
-                    </button>
-                  ))}
-                </div>
-              )}
             </div>
 
             {/* ── LXC 設定 ── */}
@@ -859,9 +875,6 @@ export default function RequestFormPage({ onBack, className }) {
                 <h2 className={styles.sectionTitle}>
                   {mode === "immediate" ? "立即模式設定" : "租借時段"}
                 </h2>
-                {mode === "scheduled" && availabilityHint && (
-                  <span className={styles.sectionHint}>{availabilityHint}</span>
-                )}
               </div>
 
               {mode === "immediate" ? (
@@ -881,17 +894,44 @@ export default function RequestFormPage({ onBack, className }) {
                   {!form.immediate_no_end && (
                     <FieldGroup label="結束時間" error={errors.end_at}>
                       <input
-                        type="datetime-local"
-                        className={styles.input}
-                        value={form.end_at}
-                        onChange={(e) => set("end_at", e.target.value)}
+                      type="datetime-local"
+                      className={styles.input}
+                      min={scheduleBounds.min}
+                      max={scheduleBounds.max}
+                      value={toDateTimeLocalValue(form.end_at)}
+                      onChange={(e) => set("end_at", fromDateTimeLocalValue(e.target.value))}
                       />
                     </FieldGroup>
                   )}
                 </>
               ) : (
                 <>
+                  <div className={styles.scheduleInputGrid}>
+                    <FieldGroup label="開始日期" required error={errors.start_at}>
+                      <input
+                        type="date"
+                        className={styles.input}
+                        min={scheduleBounds.min.slice(0, 10)}
+                        max={scheduleBounds.max.slice(0, 10)}
+                        value={toDateInputValue(form.start_at)}
+                        onChange={(e) => set("start_at", fromDateInputValue(e.target.value))}
+                      />
+                    </FieldGroup>
+                    <FieldGroup label="結束日期" required error={errors.end_at}>
+                      <input
+                        type="date"
+                        className={styles.input}
+                        min={toDateInputValue(form.start_at) || scheduleBounds.min.slice(0, 10)}
+                        max={scheduleBounds.max.slice(0, 10)}
+                        value={toDateInputValue(form.end_at)}
+                        onChange={(e) => set("end_at", fromDateInputValue(e.target.value, true))}
+                      />
+                    </FieldGroup>
+                  </div>
+                  <div className={styles.scheduleDivider}><span>或使用可用性月曆</span></div>
                   <AvailabilityPanel
+                    startAt={form.start_at}
+                    endAt={form.end_at}
                     draft={{
                       resource_type: resourceType,
                       cores:         form.cores,
@@ -908,11 +948,8 @@ export default function RequestFormPage({ onBack, className }) {
                       setForm((prev) => ({ ...prev, start_at: start_at ?? "", end_at: end_at ?? "" }));
                       setErrors((prev) => ({ ...prev, start_at: "", end_at: "" }));
                     }}
-                    onHintChange={setAvailabilityHint}
+                    onDataChange={setAvailabilityData}
                   />
-                  {(errors.start_at || errors.end_at) && (
-                    <p className={styles.fieldError}>{errors.start_at || errors.end_at}</p>
-                  )}
                 </>
               )}
             </div>
@@ -987,12 +1024,6 @@ export default function RequestFormPage({ onBack, className }) {
                   <MIcon name={resourceType === "lxc" ? "dashboard" : "computer"} size={12} />
                   {resourceType === "lxc" ? "LXC 容器" : "QEMU 虛擬機"}
                 </span>
-                {typeMode === "auto" && (
-                  <span className={`${styles.summaryChip} ${styles.summaryChipAuto}`}>
-                    <MIcon name="auto_fix_high" size={12} />
-                    自動判斷
-                  </span>
-                )}
                 {isPrivileged && (
                   <span className={`${styles.summaryChip} ${mode === "scheduled" ? styles.summaryChipScheduled : styles.summaryChipImmediate}`}>
                     <MIcon name={mode === "scheduled" ? "calendar_month" : "bolt"} size={12} />
@@ -1085,11 +1116,11 @@ export default function RequestFormPage({ onBack, className }) {
                 <>
                   <div className={styles.summaryRow}>
                     <span className={styles.summaryLabel}>開始</span>
-                    <span className={styles.summaryTimeValue}>{formatDT(form.start_at)}</span>
+                    <span className={styles.summaryTimeValue}>{formatDateOnly(form.start_at)}</span>
                   </div>
                   <div className={styles.summaryRow}>
                     <span className={styles.summaryLabel}>結束</span>
-                    <span className={styles.summaryTimeValue}>{formatDT(form.end_at)}</span>
+                    <span className={styles.summaryTimeValue}>{formatDateOnly(form.end_at)}</span>
                   </div>
                 </>
               ) : (

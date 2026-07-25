@@ -3,8 +3,8 @@ import { apiDelete, apiGet, apiPost, apiPut } from "./api";
 /** 資源配額：admin 管理群組/個人配額；所有登入者可查自己的用量。 */
 export const QuotasService = {
   /** 自己的配額與目前用量 */
-  getMyUsage() {
-    return apiGet("/api/v1/quotas/my-usage");
+  getMyUsage(options) {
+    return apiGet("/api/v1/quotas/my-usage", options);
   },
 
   /** 全部配額（admin） */

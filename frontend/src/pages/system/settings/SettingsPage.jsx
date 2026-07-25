@@ -22,15 +22,13 @@ const UPDATE_KEYS = [
   "api_timeout", "task_check_interval", "pool_name", "gateway_ip",
   "local_subnet", "default_node", "placement_strategy",
   "cpu_overcommit_ratio", "disk_overcommit_ratio",
-  "migration_enabled", "migration_max_per_rebalance",
-  "migration_min_interval_minutes", "migration_retry_limit",
-  "rebalance_migration_cost", "rebalance_peak_cpu_margin",
-  "rebalance_peak_memory_margin", "rebalance_loadavg_warn_per_core",
-  "rebalance_loadavg_max_per_core", "rebalance_loadavg_penalty_weight",
-  "rebalance_cpu_peak_warn_share", "rebalance_cpu_peak_high_share",
-  "rebalance_memory_peak_warn_share", "rebalance_memory_peak_high_share",
-  "rebalance_resource_weight_cpu", "rebalance_resource_weight_memory",
-  "rebalance_resource_weight_disk", "migration_lxc_live_enabled",
+  "placement_peak_cpu_margin",
+  "placement_peak_memory_margin", "placement_loadavg_warn_per_core",
+  "placement_loadavg_max_per_core", "placement_loadavg_penalty_weight",
+  "placement_cpu_peak_warn_share", "placement_cpu_peak_high_share",
+  "placement_memory_peak_warn_share", "placement_memory_peak_high_share",
+  "placement_resource_weight_cpu", "placement_resource_weight_memory",
+  "placement_resource_weight_disk",
   "scheduled_boot_batch_size", "scheduled_boot_batch_interval_seconds",
   "scheduled_boot_lead_time_minutes", "window_grace_period_minutes",
   "practice_session_hours", "practice_warning_minutes",
@@ -276,29 +274,20 @@ const SCHEDULER_GROUPS = [
     ],
   },
   {
-    title: "自動遷移",
+    title: "資源評估閾值",
     fields: [
-      { key: "migration_max_per_rebalance", label: "單次重平衡最大遷移數" },
-      { key: "migration_min_interval_minutes", label: "遷移最小間隔（分）" },
-      { key: "migration_retry_limit", label: "遷移重試上限" },
-      { key: "rebalance_migration_cost", label: "遷移成本權重", step: 0.01 },
-    ],
-  },
-  {
-    title: "重平衡閾值",
-    fields: [
-      { key: "rebalance_peak_cpu_margin", label: "CPU 峰值餘裕", step: 0.01 },
-      { key: "rebalance_peak_memory_margin", label: "RAM 峰值餘裕", step: 0.01 },
-      { key: "rebalance_loadavg_warn_per_core", label: "LoadAvg 警戒 / 核", step: 0.1 },
-      { key: "rebalance_loadavg_max_per_core", label: "LoadAvg 上限 / 核", step: 0.1 },
-      { key: "rebalance_loadavg_penalty_weight", label: "LoadAvg 懲罰權重", step: 0.01 },
-      { key: "rebalance_cpu_peak_warn_share", label: "CPU 峰值警戒占比", step: 0.01 },
-      { key: "rebalance_cpu_peak_high_share", label: "CPU 峰值高位占比", step: 0.01 },
-      { key: "rebalance_memory_peak_warn_share", label: "RAM 峰值警戒占比", step: 0.01 },
-      { key: "rebalance_memory_peak_high_share", label: "RAM 峰值高位占比", step: 0.01 },
-      { key: "rebalance_resource_weight_cpu", label: "資源權重 CPU", step: 0.01 },
-      { key: "rebalance_resource_weight_memory", label: "資源權重 RAM", step: 0.01 },
-      { key: "rebalance_resource_weight_disk", label: "資源權重 Disk", step: 0.01 },
+      { key: "placement_peak_cpu_margin", label: "CPU 峰值餘裕", step: 0.01 },
+      { key: "placement_peak_memory_margin", label: "RAM 峰值餘裕", step: 0.01 },
+      { key: "placement_loadavg_warn_per_core", label: "LoadAvg 警戒 / 核", step: 0.1 },
+      { key: "placement_loadavg_max_per_core", label: "LoadAvg 上限 / 核", step: 0.1 },
+      { key: "placement_loadavg_penalty_weight", label: "LoadAvg 懲罰權重", step: 0.01 },
+      { key: "placement_cpu_peak_warn_share", label: "CPU 峰值警戒占比", step: 0.01 },
+      { key: "placement_cpu_peak_high_share", label: "CPU 峰值高位占比", step: 0.01 },
+      { key: "placement_memory_peak_warn_share", label: "RAM 峰值警戒占比", step: 0.01 },
+      { key: "placement_memory_peak_high_share", label: "RAM 峰值高位占比", step: 0.01 },
+      { key: "placement_resource_weight_cpu", label: "資源權重 CPU", step: 0.01 },
+      { key: "placement_resource_weight_memory", label: "資源權重 RAM", step: 0.01 },
+      { key: "placement_resource_weight_disk", label: "資源權重 Disk", step: 0.01 },
     ],
   },
   {
@@ -343,24 +332,6 @@ function SchedulerTab({ form, setField, onSave, saving }) {
               <span className={styles.strategyDesc}>{opt.desc}</span>
             </button>
           ))}
-        </div>
-        <div className={styles.toggleGrid}>
-          <label className={styles.checkRow}>
-            <input
-              type="checkbox"
-              checked={Boolean(form.migration_enabled)}
-              onChange={(e) => setField("migration_enabled", e.target.checked)}
-            />
-            <span>啟用自動遷移（重平衡）</span>
-          </label>
-          <label className={styles.checkRow}>
-            <input
-              type="checkbox"
-              checked={Boolean(form.migration_lxc_live_enabled)}
-              onChange={(e) => setField("migration_lxc_live_enabled", e.target.checked)}
-            />
-            <span>允許 LXC 線上遷移</span>
-          </label>
         </div>
       </div>
 

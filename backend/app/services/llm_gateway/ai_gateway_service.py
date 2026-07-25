@@ -394,16 +394,31 @@ def delete_credential(
         session=session, credential_id=credential_id, current_user=current_user
     )
 
-    session.delete(credential)
+    # A credential referenced by AIAPIUsage is part of the audit trail and
+    # cannot be hard-deleted without violating its foreign key. Revoking it
+    # preserves accounting while immediately making the ccai_* key unusable.
+    usage_exists = session.exec(
+        select(AIAPIUsage.id)
+        .where(AIAPIUsage.credential_id == credential.id)
+        .limit(1)
+    ).first()
+    if usage_exists:
+        if credential.revoked_at is None:
+            credential.revoked_at = get_datetime_utc()
+            session.add(credential)
+        operation = "revoked"
+    else:
+        session.delete(credential)
+        operation = "deleted"
     audit_service.log_action(
         session=session,
         user_id=current_user.id,
         action="ai_api_credential_delete",
-        details=f"Deleted AI API credential {credential_id}",
+        details=f"{operation.title()} AI API credential {credential_id}",
         commit=False,
     )
     session.commit()
-    return Message(message="AI API credential deleted successfully")
+    return Message(message=f"AI API credential {operation} successfully")
 
 
 def update_credential_name(

@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from app.models import ProxmoxConfig, VMMigrationStatus, VMRequest, VMRequestStatus
+from app.models import ProxmoxConfig, VMProvisioningStatus, VMRequest, VMRequestStatus
 
 
 def test_proxmox_config_exposes_grouped_state_without_schema_split() -> None:
@@ -15,9 +15,7 @@ def test_proxmox_config_exposes_grouped_state_without_schema_split() -> None:
     assert config.connection.user == "root@pam"
     assert config.connection.data_storage == "local-lvm"
     assert config.placement.strategy == "priority_dominant_share"
-    assert config.migration.enabled is True
-    assert config.migration.retry_limit == 3
-    assert config.rebalance.resource_weight_cpu == 1.0
+    assert config.capacity.resource_weight_cpu == 1.0
     assert config.scheduler.boot_batch_size == 5
     assert config.scheduler.expiry_warning_hours == 24
 
@@ -42,13 +40,9 @@ def test_vm_request_exposes_grouped_state_without_schema_split() -> None:
         desired_node="pve-b",
         actual_node="pve-a",
         placement_strategy_used="priority_dominant_share",
-        migration_status=VMMigrationStatus.pending,
-        migration_error="waiting for capacity",
-        migration_pinned=True,
+        provisioning_status=VMProvisioningStatus.pending,
+        provisioning_error="waiting for capacity",
         resource_warning="high load",
-        rebalance_epoch=2,
-        last_rebalanced_at=now,
-        last_migrated_at=now,
         start_at=now,
         end_at=now,
         recurrence_rule="FREQ=WEEKLY",
@@ -66,5 +60,5 @@ def test_vm_request_exposes_grouped_state_without_schema_split() -> None:
     assert request.schedule.recurrence_duration_minutes == 120
     assert request.provisioning.vmid == 101
     assert request.provisioning.desired_node == "pve-b"
-    assert request.migration.status == VMMigrationStatus.pending
-    assert request.migration.rebalance_epoch == 2
+    assert request.provisioning.status == VMProvisioningStatus.pending
+    assert request.provisioning.error == "waiting for capacity"

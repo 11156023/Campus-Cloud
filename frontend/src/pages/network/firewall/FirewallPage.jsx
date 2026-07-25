@@ -71,13 +71,13 @@ export default function FirewallPage() {
   }, [showLabels, setEdges]);
 
   /* ── 載入拓撲（silent = true 時不觸發 loading / error state，供背景自動刷新使用） ── */
-  const fetchTopology = useCallback(async (silent = false) => {
+  const fetchTopology = useCallback(async (silent = false, signal) => {
     if (!silent) {
       setLoading(true);
       setError("");
     }
     try {
-      const data = await getTopology();
+      const data = await getTopology({ signal });
       setTopology(data);
       const { nodes: n, edges: e } = buildFlow(data, handleDeleteEdge, showLabels);
       setNodes(n);
@@ -85,11 +85,15 @@ export default function FirewallPage() {
     } catch (err) {
       if (!silent) setError(err?.message ?? "載入拓撲失敗");
     } finally {
-      if (!silent) setLoading(false);
+      if (!silent && !signal?.aborted) setLoading(false);
     }
   }, [handleDeleteEdge, showLabels, setNodes, setEdges]);
 
-  useEffect(() => { fetchTopology(); }, [fetchTopology]);
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchTopology(false, controller.signal);
+    return () => controller.abort();
+  }, [fetchTopology]);
   useAutoRefresh(() => fetchTopology(true));
 
   /* ── 自動排列 ── */

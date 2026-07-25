@@ -105,13 +105,47 @@ class GPUOptionContext(BaseModel):
     is_sriov: bool = False
 
 
+class ScheduleOptionContext(BaseModel):
+    start_at: datetime
+    end_at: datetime
+    status: Literal["available", "limited"] = "available"
+    summary: str = ""
+    recommended_nodes: list[str] = Field(default_factory=list)
+
+
+class LXCOSOptionContext(BaseModel):
+    value: str
+    label: str = ""
+
+
+class VMOSOptionContext(BaseModel):
+    template_id: int
+    label: str = ""
+    node: str = ""
+
+
 class RecommendationFormContext(BaseModel):
     resource_type: Literal["lxc", "vm"] | None = None
     mode: Literal["immediate", "scheduled"] | None = None
+    hostname: str | None = None
+    reason: str | None = None
+    service_template_slug: str | None = None
+    lxc_os_image: str | None = None
+    vm_template_id: int | None = None
+    username: str | None = None
+    cores: int | None = Field(default=None, ge=1)
+    memory_mb: int | None = Field(default=None, ge=128)
+    disk_gb: int | None = Field(default=None, ge=1)
+    storage: str | None = None
     start_at: datetime | None = None
     end_at: datetime | None = None
+    immediate_no_end: bool | None = None
     selected_gpu_mapping_id: str | None = None
     gpu_options: list[GPUOptionContext] = Field(default_factory=list)
+    schedule_options: list[ScheduleOptionContext] = Field(default_factory=list, max_length=12)
+    lxc_os_options: list[LXCOSOptionContext] = Field(default_factory=list, max_length=100)
+    vm_os_options: list[VMOSOptionContext] = Field(default_factory=list, max_length=100)
+    resource_options_from_client: bool = False
 
 
 class ChatRequest(BaseModel):

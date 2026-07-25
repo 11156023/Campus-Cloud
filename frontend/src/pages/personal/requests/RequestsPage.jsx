@@ -27,7 +27,7 @@ function canRetry(req) {
   return (
     req.status === "approved" &&
     req.vmid == null &&
-    req.migration_status === "failed"
+    req.provisioning_status === "failed"
   );
 }
 
@@ -38,12 +38,12 @@ function canCancel(req) {
   );
 }
 
-/* approved 在 UI 上再依開通進度細分（vmid 為空時 migration_status 反映的是開通流程） */
+/* approved 在 UI 上再依開通進度細分（vmid 為空時 provisioning_status 反映開通流程） */
 function getDisplayStatus(req) {
   if (req.status === "approved") {
     if (req.vmid != null)                    return { label: "已開通",   color: "success" };
-    if (req.migration_status === "failed")   return { label: "開通失敗", color: "danger"  };
-    if (req.migration_status === "running")  return { label: "開通中",   color: "info"    };
+    if (req.provisioning_status === "failed") return { label: "開通失敗", color: "danger" };
+    if (req.provisioning_status === "running") return { label: "開通中", color: "info" };
     return { label: "已核准", color: "success" };
   }
   return STATUS_MAP[req.status] ?? { label: req.status, color: "muted" };
@@ -174,7 +174,7 @@ function RequestRow({ req, onUpdated }) {
   const endFmt    = formatDatetime(req.end_at);
 
   const showRejection = req.status === "rejected" && req.review_comment;
-  const showFailure   = canRetry(req) && req.migration_status === "failed" && req.migration_error;
+  const showFailure = canRetry(req) && req.provisioning_status === "failed" && req.provisioning_error;
   const hasDetail =
     formItems.length > 0 || req.reason || startFmt || showRejection || showFailure;
 
@@ -283,7 +283,7 @@ function RequestRow({ req, onUpdated }) {
               {showFailure && (
                 <div className={styles.reviewComment}>
                   <MIcon name="error_outline" size={13} />
-                  <span>{req.migration_error}</span>
+                  <span>{req.provisioning_error}</span>
                 </div>
               )}
             </div>

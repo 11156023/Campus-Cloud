@@ -86,6 +86,11 @@ function planSummary(data) {
   const plan = data?.final_plan;
   const prefill = plan?.form_prefill ?? {};
   const target = plan?.application_target ?? {};
+  const credentialReminder = prefill.resource_type === "vm"
+    ? "提醒：套用配置不會填入 VM 帳號與密碼，請至表單自行輸入。"
+    : prefill.resource_type === "lxc"
+      ? "提醒：套用配置不會填入 LXC Root 密碼，請至表單自行輸入。"
+      : "提醒：基於安全考量，套用配置不會填入帳號或密碼。";
   const lines = [
     data?.summary,
     target.environment_reason,
@@ -95,7 +100,12 @@ function planSummary(data) {
     prefill.cores || prefill.memory_mb || prefill.disk_gb
       ? `建議規格：${prefill.cores ?? "-"} vCPU / ${prefill.memory_mb ?? "-"} MB RAM / ${prefill.disk_gb ?? "-"} GB Disk`
       : "",
+    prefill.gpu_mapping_id ? `建議 GPU：${prefill.gpu_mapping_id}` : "",
+    prefill.start_at && prefill.end_at
+      ? `建議日期：${new Date(prefill.start_at).toLocaleDateString("zh-TW")} ～ ${new Date(prefill.end_at).toLocaleDateString("zh-TW")}`
+      : prefill.mode === "immediate" ? "建議時段：立即使用" : "",
     prefill.reason ? `申請理由：${prefill.reason}` : "",
+    credentialReminder,
   ].filter(Boolean);
   return lines.join("\n");
 }
@@ -213,11 +223,10 @@ export default function AiSidePanel({
           </div>
         )}
         {latestPlan?.final_plan?.form_prefill && onImportPlan && (
-          <div className={styles.aiMsgRow}>
-            <div className={styles.aiAvatar}><MIcon name="auto_fix_high" size={13} /></div>
+          <div className={`${styles.aiMsgRow} ${styles.aiActionRow}`}>
             <button
               type="button"
-              className={styles.aiTemplateBtn}
+              className={`${styles.aiTemplateBtn} ${styles.aiImportBtn}`}
               onClick={() => onImportPlan(latestPlan.final_plan.form_prefill)}
             >
               <MIcon name="download" size={14} />

@@ -7,6 +7,7 @@ from types import SimpleNamespace
 from app.ai.template_recommendation import recommendation_service
 from app.ai.template_recommendation.recommendation_service import (
     _extract_user_signal_flags,
+    infer_intent_from_chat,
 )
 from app.ai.template_recommendation.schemas import ChatMessage, ChatRequest
 
@@ -74,4 +75,33 @@ def test_intent_extraction_can_override_gpu_keyword_hint(monkeypatch) -> None:
 
     assert "- Requires GPU: True" in captured_prompt
     assert "you MUST output false" in captured_prompt
+    assert result.requires_gpu is False
+
+
+def test_fast_intent_seed_keeps_recent_conversation_and_flags() -> None:
+    result = infer_intent_from_chat(
+        ChatRequest(
+            messages=[
+                ChatMessage(role="user", content="我要做課程網站"),
+                ChatMessage(role="assistant", content="是否需要 GPU？"),
+                ChatMessage(role="user", content="要用 PyTorch CUDA 做推論"),
+            ]
+        )
+    )
+
+    assert "課程網站" in result.goal_summary
+    assert "PyTorch CUDA" in result.goal_summary
+    assert result.requires_gpu is True
+
+
+def test_fast_intent_seed_honors_latest_gpu_negation() -> None:
+    result = infer_intent_from_chat(
+        ChatRequest(
+            messages=[
+                ChatMessage(role="user", content="原本要用 GPU 訓練"),
+                ChatMessage(role="user", content="後來改成不用 GPU"),
+            ]
+        )
+    )
+
     assert result.requires_gpu is False

@@ -1,0 +1,19 @@
+# This template contains only static LiteLLM policy.  Model deployments are
+# generated from ../models.json; secrets are injected by LiteLLM at runtime.
+router_settings:
+  routing_strategy: simple-shuffle
+  num_retries: 1
+  timeout: 300
+  optional_pre_call_checks:
+    - enforce_model_rate_limits
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  background_health_checks: true
+  health_check_interval: 60
+  health_check_details: false
+
+litellm_settings:
+  request_timeout: 300
+  json_logs: true
+  set_verbose: false

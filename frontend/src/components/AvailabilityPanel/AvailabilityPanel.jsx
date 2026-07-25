@@ -2,6 +2,7 @@
  * AvailabilityPanel — 月曆日期範圍選擇器版
  * Props:
  *   draft         { resource_type, cores, memory, disk_size?, rootfs_size?, gpu_required?, gpu_mapping_id? }
+ *   startAt/endAt Current form range; keeps direct input, AI import, and calendar selection in sync
  *   onChange      ({ start_at: string|null, end_at: string|null }) => void
  *   onHintChange  (hint: string|null) => void  — contextual UX hint for the parent to display
  */
@@ -31,6 +32,12 @@ function localDateAt(dateStr, hour, minute = 0, second = 0) {
   return new Date(year, month - 1, day, hour, minute, second, 0);
 }
 
+function dateStrFromValue(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : toDateStr(date);
+}
+
 function isDraftReady(draft) {
   if (!draft?.resource_type || !draft?.cores || !draft?.memory) return false;
   return draft.resource_type === "vm" ? Boolean(draft.disk_size) : Boolean(draft.rootfs_size);
@@ -43,19 +50,25 @@ function cacheAvailability(key, data) {
   }
 }
 
-export default function AvailabilityPanel({ draft, onChange, onHintChange }) {
+export default function AvailabilityPanel({ draft, startAt, endAt, onChange, onHintChange, onDataChange }) {
   const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState(false);
 
   const today = useMemo(() => new Date(), []);
   const todayStr = useMemo(() => toDateStr(today), [today]);
+  const maxDate = useMemo(() => {
+    const value = new Date(today);
+    value.setDate(value.getDate() + 90);
+    return value;
+  }, [today]);
+  const maxDateStr = useMemo(() => toDateStr(maxDate), [maxDate]);
 
   const [viewYear, setViewYear]   = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
 
-  const [startDate, setStartDate] = useState(null);
-  const [endDate, setEndDate]     = useState(null);
+  const [startDate, setStartDate] = useState(() => dateStrFromValue(startAt));
+  const [endDate, setEndDate]     = useState(() => dateStrFromValue(endAt));
   const [hoverDate, setHoverDate] = useState(null);
   const [picking, setPicking]     = useState(PICK_IDLE);
 
@@ -65,6 +78,22 @@ export default function AvailabilityPanel({ draft, onChange, onHintChange }) {
   const onHintChangeRef = useRef(onHintChange);
   useEffect(() => { onHintChangeRef.current = onHintChange; }, [onHintChange]);
 
+  const onDataChangeRef = useRef(onDataChange);
+  useEffect(() => { onDataChangeRef.current = onDataChange; }, [onDataChange]);
+
+  useEffect(() => {
+    const nextStartDate = dateStrFromValue(startAt);
+    const nextEndDate = dateStrFromValue(endAt);
+    if (startDate === nextStartDate && endDate === nextEndDate) return;
+    setStartDate(nextStartDate);
+    setEndDate(nextEndDate);
+    setPicking(PICK_IDLE);
+  }, [startAt, endAt]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    onDataChangeRef.current?.(data);
+  }, [data]);
+
   /* ── Fetch ── */
   const draftReady = isDraftReady(draft);
   const draftKey = draftReady
@@ -73,6 +102,7 @@ export default function AvailabilityPanel({ draft, onChange, onHintChange }) {
 
   useEffect(() => {
     if (!draftKey) {
+      setData(null);
       setLoading(false);
       return;
     }
@@ -87,6 +117,7 @@ export default function AvailabilityPanel({ draft, onChange, onHintChange }) {
     }
 
     const controller = new AbortController();
+    setData(null);
     setLoading(true);
     setError(false);
     const timeoutId = window.setTimeout(() => {
@@ -133,7 +164,7 @@ export default function AvailabilityPanel({ draft, onChange, onHintChange }) {
 
   function isDateSelectable(dateStr) {
     const level = getDayLevel(dateStr);
-    return Boolean(dateStr) && dateStr >= todayStr && level && level !== "none";
+    return Boolean(dateStr) && dateStr >= todayStr && dateStr <= maxDateStr && level && level !== "none";
   }
 
   useEffect(() => {
@@ -155,13 +186,20 @@ export default function AvailabilityPanel({ draft, onChange, onHintChange }) {
   }, [viewYear, viewMonth]);
 
   function prevMonth() {
+    if (viewYear === today.getFullYear() && viewMonth === today.getMonth()) return;
     if (viewMonth === 0) { setViewYear((y) => y - 1); setViewMonth(11); }
     else setViewMonth((m) => m - 1);
   }
   function nextMonth() {
+    if (viewYear === maxDate.getFullYear() && viewMonth === maxDate.getMonth()) return;
     if (viewMonth === 11) { setViewYear((y) => y + 1); setViewMonth(0); }
     else setViewMonth((m) => m + 1);
   }
+
+  const canGoPrevious = viewYear > today.getFullYear()
+    || (viewYear === today.getFullYear() && viewMonth > today.getMonth());
+  const canGoNext = viewYear < maxDate.getFullYear()
+    || (viewYear === maxDate.getFullYear() && viewMonth < maxDate.getMonth());
 
   /* ── Day click ── */
   function handleDayClick(dateStr, level) {
@@ -233,11 +271,11 @@ export default function AvailabilityPanel({ draft, onChange, onHintChange }) {
       {/* ── Calendar ── */}
       <div className={styles.calendar}>
         <div className={styles.calendarNav}>
-          <button type="button" className={styles.calendarNavBtn} onClick={prevMonth}>
+          <button type="button" className={styles.calendarNavBtn} onClick={prevMonth} disabled={!canGoPrevious}>
             <MIcon name="chevron_left" size={18} />
           </button>
           <span className={styles.calendarTitle}>{MONTH_NAMES[viewMonth]} {viewYear}</span>
-          <button type="button" className={styles.calendarNavBtn} onClick={nextMonth}>
+          <button type="button" className={styles.calendarNavBtn} onClick={nextMonth} disabled={!canGoNext}>
             <MIcon name="chevron_right" size={18} />
           </button>
         </div>
@@ -250,7 +288,7 @@ export default function AvailabilityPanel({ draft, onChange, onHintChange }) {
             const dateStr  = toDateStr(d);
             const level    = getDayLevel(dateStr);
             const isPast   = dateStr < todayStr;
-            const unavailable = isPast || !level || level === "none";
+            const unavailable = isPast || dateStr > maxDateStr || !level || level === "none";
             const disabled = unavailable;
             const isStart   = dateStr === startDate;
             const isEnd     = dateStr === endDate;

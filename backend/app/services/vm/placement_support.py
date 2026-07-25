@@ -126,7 +126,7 @@ def provisioned_current_node(request: VMRequest) -> str | None:
     return assigned or None
 
 
-def build_rebalance_baseline_nodes(
+def build_placement_baseline_nodes(
     *,
     session: Session,
     requests: list[VMRequest],
@@ -525,8 +525,8 @@ def build_preview_selection_reasons(
             f"因為 {selected_node} 的磁碟 contention 風險較低，可避免把壓力集中到 {runner_up_node}。"
         )
 
-    if selected_eval.movement_count < runner_up_eval.movement_count:
-        delta = runner_up_eval.movement_count - selected_eval.movement_count
+    if selected_eval.reassignment_count < runner_up_eval.reassignment_count:
+        delta = runner_up_eval.reassignment_count - selected_eval.reassignment_count
         reasons.append(f"因為不需要多搬 {delta} 台 VM。")
 
     selected_priority = priorities.get(selected_node, 5)
@@ -554,7 +554,7 @@ def placement_sort_key(
     current_node: str | None = None,
 ) -> tuple:
     tuning = tuning or PlacementTuning(
-        migration_cost=0.15,
+        reassignment_cost=0.15,
         peak_cpu_margin=1.1,
         peak_memory_margin=1.05,
         loadavg_warn_per_core=0.8,
@@ -563,7 +563,7 @@ def placement_sort_key(
         disk_contention_warn_share=0.7,
         disk_contention_high_share=0.9,
         disk_penalty_weight=0.75,
-        search_max_relocations=2,
+        search_max_reassignments=2,
         search_depth=3,
     )
     projected_cpu_share = placement_scorer.projected_share(
@@ -611,7 +611,7 @@ def placement_sort_key(
     memory_overflow_penalty = (
         tuning.memory_overflow_weight if projected_memory_share > 1.0 + 1e-9 else 0.0
     )
-    migration_penalty = tuning.migration_cost if current_node and current_node != node.node else 0.0
+    reassignment_penalty = tuning.reassignment_cost if current_node and current_node != node.node else 0.0
     disk_penalty = (
         storage_selection.contention_penalty * tuning.disk_penalty_weight
         if storage_selection is not None
@@ -623,7 +623,7 @@ def placement_sort_key(
         + cpu_contention_score
         + memory_overflow_penalty
         + (loadavg_penalty * tuning.loadavg_penalty_weight)
-        + migration_penalty
+        + reassignment_penalty
         + disk_penalty
     )
     placement_count = placements.get(node.node, 0)

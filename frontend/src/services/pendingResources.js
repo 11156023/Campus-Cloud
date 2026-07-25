@@ -30,7 +30,7 @@ export function cancelVmRequest(requestId) {
  */
 export function pendingSignature(items) {
   return items
-    .map((r) => `${r.id}:${r.status}:${r.vmid ?? ""}:${r.migration_status ?? ""}`)
+    .map((r) => `${r.id}:${r.status}:${r.vmid ?? ""}:${r.provisioning_status ?? ""}`)
     .sort()
     .join(",");
 }

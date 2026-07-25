@@ -225,8 +225,7 @@
 本次已接入設定層的建議欄位：
 
 - `SCHEDULING_POLICY`
-- `MAX_NUM_PARTIAL_PREFILLS`
-- `MAX_LONG_PARTIAL_PREFILLS`
+- `ENABLE_CHUNKED_PREFILL`
 - `LONG_PREFILL_TOKEN_THRESHOLD`
 - `ENABLE_REQUEST_ID_HEADERS`
 
@@ -234,8 +233,7 @@
 
 ```env
 SCHEDULING_POLICY=priority
-MAX_NUM_PARTIAL_PREFILLS=4
-MAX_LONG_PARTIAL_PREFILLS=1
+ENABLE_CHUNKED_PREFILL=true
 LONG_PREFILL_TOKEN_THRESHOLD=4096
 ENABLE_REQUEST_ID_HEADERS=true
 ```
@@ -243,6 +241,7 @@ ENABLE_REQUEST_ID_HEADERS=true
 注意：
 
 - 這組配置偏互動延遲與公平性，不是純吞吐最大化
+- vLLM 0.22.1 目前不支援 Concurrent Partial Prefill；不要設定 `MAX_NUM_PARTIAL_PREFILLS` 或 `MAX_LONG_PARTIAL_PREFILLS`
 - 實際數值仍需依模型大小、GPU 顯存與平均 prompt 長度做壓測微調
 
 ### 5.3 Reasoning / Response Format / 額外參數設計
@@ -350,7 +349,7 @@ ENABLE_REQUEST_ID_HEADERS=true
 
 1. 啟用 `SCHEDULING_POLICY=priority`
 2. 導入 `priority` request 欄位與驗證
-3. 調整 partial prefill 相關參數
+3. 顯式啟用 `ENABLE_CHUNKED_PREFILL`，並避免設定 concurrent partial prefill 參數
 4. 建立 queue timeout 與 overload 回應策略
 
 驗收：
@@ -430,13 +429,13 @@ ENABLE_REQUEST_ID_HEADERS=true
 主要風險：
 
 1. 啟用 priority scheduling 後，若 queue class 設計不當，可能造成低優先請求飢餓。
-2. partial prefill 參數過度偏 fairness，可能降低總吞吐。
+2. 誤用 concurrent partial prefill 參數會導致 vLLM 啟動時丟出 `NotImplementedError`。
 3. reasoning parser / chat template / structured output 若組合不完整，容易出現模型特定錯誤。
 
 回退策略：
 
 1. `SCHEDULING_POLICY` 可先保留 `fcfs`
-2. partial prefill 相關設定可逐步打開
+2. `ENABLE_CHUNKED_PREFILL` 可交由 vLLM 預設自動判斷；不要打開 concurrent partial prefill 參數
 3. reasoning 功能先在單模型 smoke test 通過後再推到 Gateway
 4. `/v1/responses` 可先標示為 beta 入口
 

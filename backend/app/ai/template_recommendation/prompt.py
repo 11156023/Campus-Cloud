@@ -122,6 +122,7 @@ def build_chat_runtime_context(
     *,
     resource_type: str | None = None,
     gpu_options: list[dict[str, Any]] | None = None,
+    form_context: dict[str, Any] | None = None,
 ) -> str:
     gpu_items = list(gpu_options or [])
 
@@ -147,10 +148,15 @@ def build_chat_runtime_context(
 
     gpu_section = "\n".join(gpu_lines) if gpu_lines else "(none)"
     current_resource_type = str(resource_type or "unspecified").strip() or "unspecified"
+    current_form = json.dumps(form_context or {}, ensure_ascii=False, default=str)
 
     return f"""# Runtime Resource Context
 - If workload planning clearly needs GPU acceleration, prefer VM in recommendation.
 - Current form resource_type: {current_resource_type}
+- The current form snapshot below is authoritative. Use it to understand fields the user already selected.
+
+## Current Form Snapshot
+{current_form}
 
 ## Current GPU Options
 {gpu_section}
@@ -264,6 +270,7 @@ def build_ai_plan_prompt(
     prompt_bundle: dict[str, Any],
     resource_options: dict[str, Any],
     plan_schema: dict[str, Any],
+    conversation_history: list[dict[str, str]] | None = None,
 ) -> str:
     return f"""# Role
 You are an expert infrastructure planning AI for a SkyLab platform.
@@ -295,6 +302,8 @@ Generate a complete deployment recommendation based on the user's intent, availa
 - **VM Environment Rule**: VM is for operating system or environment requirements such as Windows, GUI, driver isolation, full-system compatibility, and any GPU-accelerated workloads. VM is not a template choice.
 - **Template Output Rule**: If the final main path is VM, do not force a service template into `recommended_templates` just for completeness. In VM cases it is valid for the user-facing template recommendation to be empty.
 - **Requirement Flags Rule**: You must strictly honor `needs_public_web`, `needs_database`, `requires_gpu`, and `needs_windows` from `User Context`.
+- **Conversation Memory Rule**: Use the recent conversation as the primary source of intent. If messages conflict, the latest user message wins. Do not treat an assistant suggestion as a confirmed user requirement.
+- **Existing Form Rule**: Preserve valid non-empty values from `form_context` unless the user explicitly asks to change them or they conflict with a hard requirement.
 - **Deployment Type Decision Tree**:
   1. If `needs_windows=true` and this is the primary core service, use `deployment_type: "vm"`.
   2. If a machine needs GPU, GUI, or is an AI-heavy interactive workload, prefer `deployment_type: "vm"`.
@@ -314,6 +323,9 @@ Generate a complete deployment recommendation based on the user's intent, availa
 - **Application Target Rule**: `application_target.service_name` must be a user-facing service label, not just a slug.
 - **Form Prefill Rule**: In `form_prefill`, `service_template_slug` is only for LXC service templates. `lxc_os_image` must come from the provided real LXC OS image list. `vm_os_choice` and `vm_template_id` must come from the provided VM operating system list. Do not treat VM operating system as a service template.
 - **GPU Prefill Rule**: If the input includes GPU options and the workload needs GPU or is a VM compute workload, you may set `form_prefill.gpu_mapping_id` to one of the provided GPU `mapping_id` values. Do not invent GPU IDs.
+- **GPU Availability Rule**: Never select a GPU whose `available_count` is zero. Prefer sufficient VRAM first, then higher availability, and use only a provided mapping ID.
+- **Schedule Prefill Rule**: Preserve an existing valid start/end window. If no window is selected, you may choose exactly one entry from `form_context.schedule_options`; never invent a time outside those options. For immediate mode, do not set `start_at`.
+- **Complete Form Rule**: Return every key in `form_prefill`. Use an empty string, zero, or false only when a field is not applicable. Never generate a password or secret.
 - **Examples**:
   Bad: `service_name = "n8n-template"`
   Bad: `resource_type = "vm"` with `service_template_slug = "n8n"`
@@ -332,6 +344,9 @@ Generate a complete deployment recommendation based on the user's intent, availa
 ## User Context (Extracted summary)
 {json.dumps(user_context, ensure_ascii=False)}
 
+## Recent Conversation (latest messages last)
+{json.dumps(conversation_history or [], ensure_ascii=False)}
+
 ## Node Capacity Summary
 {json.dumps(node_capacity_summary, ensure_ascii=False)}
 
@@ -342,5 +357,67 @@ Generate a complete deployment recommendation based on the user's intent, availa
 {json.dumps(resource_options, ensure_ascii=False)}
 
 # Output Schema
+{json.dumps(plan_schema, ensure_ascii=False)}"""
+
+
+def build_fast_ai_plan_prompt(
+    *,
+    user_context: dict[str, Any],
+    prompt_bundle: dict[str, Any],
+    resource_options: dict[str, Any],
+    plan_schema: dict[str, Any],
+    conversation_history: list[dict[str, str]],
+) -> str:
+    """Compact planner prompt for latency-sensitive form prefill."""
+    def _compact_template(item: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "slug": item.get("slug"),
+            "name": item.get("name"),
+            "type": item.get("type"),
+            "default_resources": item.get("default_resources") or {},
+        }
+
+    compact_catalog = {
+        "explicit_matches": [
+            _compact_template(item)
+            for item in list(prompt_bundle.get("explicit_matches") or [])[:5]
+        ],
+        "candidate_templates": [
+            _compact_template(item)
+            for item in list(prompt_bundle.get("candidate_templates") or [])[:8]
+        ],
+    }
+    compact_resources = {
+        "lxc_os_images": list(resource_options.get("lxc_os_images") or [])[:20],
+        "vm_operating_systems": list(resource_options.get("vm_operating_systems") or [])[:20],
+        "gpu_options": list(resource_options.get("gpu_options") or [])[:10],
+    }
+    return f"""You are SkyLab's configuration planner. Return ONLY one valid JSON object.
+
+Rules:
+- All human-readable text must be concise Traditional Chinese.
+- Latest user message overrides earlier messages. Assistant suggestions are not user requirements.
+- Preserve valid non-empty form values unless the user explicitly asks to change them.
+- Prefer LXC for ordinary Linux services; use VM for Windows, GUI, GPU, driver isolation, or full OS control.
+- Use only listed template slugs, OS images, VM template IDs, GPU mapping IDs, and schedule options.
+- Never select a GPU with available_count=0. If GPU is required but unavailable, return an empty gpu_mapping_id.
+- Preserve an existing schedule. Otherwise choose exactly one listed schedule option; never invent a time.
+- Recommend the minimum reasonable CPU, memory, and disk. VM disk >=20 GB; LXC disk >=8 GB.
+- Fill every schema key with short values. Summary and reasons must each be one short sentence.
+- Never generate passwords, secrets, extra machines, tutorials, or markdown.
+
+Recent conversation:
+{json.dumps(conversation_history[-10:], ensure_ascii=False)}
+
+User and form context:
+{json.dumps(user_context, ensure_ascii=False)}
+
+Verified catalog:
+{json.dumps(compact_catalog, ensure_ascii=False)}
+
+Valid resource options:
+{json.dumps(compact_resources, ensure_ascii=False)}
+
+Output schema:
 {json.dumps(plan_schema, ensure_ascii=False)}"""
 

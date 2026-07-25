@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from time import perf_counter
 from typing import Any
 
@@ -15,7 +16,7 @@ from app.ai.template_recommendation.catalog_service import (
 from app.ai.template_recommendation.config import settings
 from app.ai.template_recommendation.node_service import summarize_device_nodes
 from app.ai.template_recommendation.prompt import (
-    build_ai_plan_prompt,
+    build_fast_ai_plan_prompt,
     build_intent_extraction_prompt,
 )
 from app.ai.template_recommendation.schemas import (
@@ -126,6 +127,50 @@ def _extract_user_signal_flags(messages: list[ChatMessage]) -> dict[str, bool]:
     }
 
 
+def infer_intent_from_chat(request: ChatRequest) -> ExtractedIntent:
+    """Build a fast intent seed locally; the planner still interprets full chat context."""
+    recent = request.messages[-12:]
+    user_texts = [
+        str(message.content).strip()
+        for message in recent
+        if str(message.role).strip().lower() == "user" and str(message.content).strip()
+    ]
+    goal_summary = "\n".join(user_texts)[-4000:] or "請依目前表單內容提供完整配置建議"
+    flags = _extract_user_signal_flags(recent)
+    normalized = _normalize_user_text_for_intent(goal_summary)
+    latest_user_text = _normalize_user_text_for_intent(user_texts[-1] if user_texts else "")
+    negations = ("不需要", "不要", "不用", "不必", "無需", "取消", "no", "without")
+
+    def _latest_explicitly_negates(keywords: tuple[str, ...]) -> bool:
+        for keyword in keywords:
+            index = latest_user_text.find(keyword)
+            if index < 0:
+                continue
+            prefix = latest_user_text[max(0, index - 12):index].strip()
+            if any(prefix.endswith(word) for word in negations):
+                return True
+        return False
+
+    if _latest_explicitly_negates(GPU_KEYWORDS):
+        flags["requires_gpu"] = False
+    if _latest_explicitly_negates(WINDOWS_KEYWORDS):
+        flags["needs_windows"] = False
+    if _latest_explicitly_negates(DATABASE_KEYWORDS):
+        flags["needs_database"] = False
+    if _latest_explicitly_negates(PUBLIC_WEB_KEYWORDS):
+        flags["needs_public_web"] = False
+    role = "teacher" if any(word in normalized for word in ("teacher", "教授", "老師", "教學")) else "student"
+    course_context = "teaching" if role == "teacher" else ("research" if any(word in normalized for word in ("research", "研究", "實驗")) else "coursework")
+    budget_mode = "performance" if any(word in normalized for word in ("performance", "效能", "速度優先")) else ("resource-saving" if any(word in normalized for word in ("省資源", "低成本", "節省")) else "balanced")
+    return ExtractedIntent(
+        goal_summary=goal_summary,
+        role=role,
+        course_context=course_context,
+        budget_mode=budget_mode,
+        **flags,
+    )
+
+
 def _normalize_user_text_for_intent(text: str) -> str:
     return str(text or "").casefold().replace("　", " ")
 
@@ -227,7 +272,6 @@ async def extract_intent_from_chat(request: ChatRequest) -> ExtractedIntent:
 
 async def generate_ai_plan(
     request: RecommendationRequest,
-    nodes: list[DeviceNode],
     template_catalog: TemplateCatalog,
     chat_history: list[ChatMessage],
     *,
@@ -239,8 +283,6 @@ async def generate_ai_plan(
             status_code=503,
             detail="AI model binding is missing in config/system-ai.json.",
         )
-
-    del chat_history
 
     prompt_bundle = build_catalog_prompt_bundle(
         template_catalog,
@@ -262,7 +304,19 @@ async def generate_ai_plan(
         "needs_database": request.needs_database,
         "requires_gpu": request.requires_gpu,
         "needs_windows": request.needs_windows,
-        "form_context": request.form_context.model_dump(mode="json") if request.form_context else None,
+        "form_context": (
+            request.form_context.model_dump(
+                mode="json",
+                exclude={
+                    "gpu_options",
+                    "lxc_os_options",
+                    "vm_os_options",
+                    "resource_options_from_client",
+                },
+            )
+            if request.form_context
+            else None
+        ),
     }
     resource_options = resource_options or {
         "lxc_os_images": [],
@@ -272,7 +326,6 @@ async def generate_ai_plan(
     gpu_options = list(resource_options.get("gpu_options") or [])
     plan_schema = {
         "summary": "Traditional Chinese summary",
-        "workload_profile": "one of: lightweight | moderate | compute-intensive | gpu-required | storage-heavy",
         "application_target": {
             "service_name": "string",
             "service_slug": "template-slug-or-empty",
@@ -281,60 +334,19 @@ async def generate_ai_plan(
         },
         "form_prefill": {
             "resource_type": "lxc|vm",
+            "mode": "immediate|scheduled",
             "hostname": "string",
             "service_template_slug": "lxc-service-template-slug-or-empty",
             "lxc_os_image": "real-lxc-os-image-or-empty",
-            "vm_os_choice": "real-vm-os-label-or-empty",
             "vm_template_id": "integer-or-0",
             "gpu_mapping_id": "gpu-mapping-id-or-empty",
+            "start_at": "ISO-8601-datetime-or-empty",
+            "end_at": "ISO-8601-datetime-or-empty",
+            "immediate_no_end": "boolean",
             "cores": "integer",
             "memory_mb": "integer",
             "disk_gb": "integer",
-            "username": "string-or-empty",
-            "reason": "Traditional Chinese short application reason",
         },
-        "gpu_recommendation": {
-            "should_use_gpu": "boolean",
-            "selected_gpu_mapping_id": "gpu-mapping-id-or-empty",
-            "selected_gpu_label": "Traditional Chinese label-or-empty",
-            "reason": "Traditional Chinese short reason",
-            "candidates": [
-                {
-                    "mapping_id": "gpu-mapping-id",
-                    "label": "Traditional Chinese label",
-                    "reason": "Traditional Chinese reason",
-                }
-            ],
-        },
-        "recommended_templates": [
-            {"slug": "template-slug", "name": "template-name", "why": "Traditional Chinese reason"}
-        ],
-        "possible_needed_templates": [
-            {"slug": "template-slug", "name": "template-name", "why": "Traditional Chinese reason"}
-        ],
-        "machines": [
-            {
-                "name": "string",
-                "purpose": "Traditional Chinese short phrase",
-                "template_slug": "string",
-                "deployment_type": "lxc|vm",
-                "cpu": "integer",
-                "memory_mb": "integer",
-                "disk_gb": "integer",
-                "gpu": "integer",
-                "assigned_node": "node-name-or-null",
-                "why": "Traditional Chinese reason",
-            }
-        ],
-        "overall_config": {
-            "deployment_strategy": "Traditional Chinese short sentence",
-            "machine_count": "integer",
-            "total_cpu": "integer",
-            "total_memory_mb": "integer",
-            "total_disk_gb": "integer",
-        },
-        "decision_factors": ["Traditional Chinese short bullet"],
-        "upgrade_when": "Traditional Chinese upgrade timing with measurable thresholds",
     }
     payload = apply_thinking_control(
         {
@@ -342,15 +354,19 @@ async def generate_ai_plan(
             "messages": [
                 {
                     "role": "user",
-                    "content": build_ai_plan_prompt(
+                    "content": build_fast_ai_plan_prompt(
                         user_context=user_context,
-                        node_capacity_summary=summarize_device_nodes(nodes),
                         prompt_bundle=prompt_bundle,
                         resource_options={
                             **resource_options,
                             "gpu_options": gpu_options,
                         },
                         plan_schema=plan_schema,
+                        conversation_history=[
+                            {"role": str(item.role), "content": str(item.content)}
+                            for item in chat_history[-12:]
+                            if str(item.role).strip().lower() in {"user", "assistant"}
+                        ],
                     ),
                 }
             ],
@@ -402,6 +418,7 @@ def normalize_ai_result(
     vm_operating_systems = list(resource_options.get("vm_operating_systems") or [])
     gpu_options = list(resource_options.get("gpu_options") or [])
     form_context = request.form_context
+    raw_prefill = dict(ai_result.get("form_prefill") or {})
 
     recommended_templates: list[dict[str, Any]] = []
     for item in list(ai_result.get("recommended_templates") or []):
@@ -478,7 +495,7 @@ def normalize_ai_result(
     primary_machine = machines[0] if machines else {}
     primary_template = recommended_templates[0] if recommended_templates else {}
     resource_type = str(
-        ai_result.get("form_prefill", {}).get("resource_type")
+        raw_prefill.get("resource_type")
         or primary_machine.get("deployment_type")
         or ("vm" if request.needs_windows else "lxc")
     ).lower()
@@ -486,7 +503,8 @@ def normalize_ai_result(
         resource_type = "vm" if request.needs_windows else "lxc"
 
     hostname_seed = str(
-        ai_result.get("form_prefill", {}).get("hostname")
+        raw_prefill.get("hostname")
+        or (form_context.hostname if form_context else "")
         or primary_machine.get("name")
         or primary_template.get("slug")
         or "ai-generated-host"
@@ -496,15 +514,18 @@ def normalize_ai_result(
         hostname = "ai-generated-host"
 
     service_template_slug = str(
-        ai_result.get("form_prefill", {}).get("service_template_slug")
+        raw_prefill.get("service_template_slug")
+        or (form_context.service_template_slug if form_context else "")
         or primary_template.get("slug")
         or primary_machine.get("template_slug")
         or ""
     ).strip().lower()
+    if service_template_slug not in lookup:
+        service_template_slug = ""
 
     selected_lxc_image = ""
     if resource_type == "lxc" and lxc_os_images:
-        requested_image = str(ai_result.get("form_prefill", {}).get("lxc_os_image") or "").strip()
+        requested_image = str(raw_prefill.get("lxc_os_image") or (form_context.lxc_os_image if form_context else "") or "").strip()
         selected_lxc_image = next(
             (item["value"] for item in lxc_os_images if item["value"] == requested_image),
             lxc_os_images[0]["value"],
@@ -513,7 +534,7 @@ def normalize_ai_result(
     selected_vm_template_id = 0
     selected_vm_os = ""
     if resource_type == "vm" and vm_operating_systems:
-        requested_vm_template_id = safe_int(ai_result.get("form_prefill", {}).get("vm_template_id"), 0, minimum=0, extract_digits=True)
+        requested_vm_template_id = safe_int(raw_prefill.get("vm_template_id") or (form_context.vm_template_id if form_context else 0), 0, minimum=0, extract_digits=True)
         selected_vm = next(
             (item for item in vm_operating_systems if int(item.get("template_id") or 0) == requested_vm_template_id),
             vm_operating_systems[0],
@@ -522,7 +543,7 @@ def normalize_ai_result(
         selected_vm_os = str(selected_vm.get("label") or "").strip()
 
     requested_gpu_mapping_id = str(
-        ai_result.get("form_prefill", {}).get("gpu_mapping_id")
+        raw_prefill.get("gpu_mapping_id")
         or (form_context.selected_gpu_mapping_id if form_context else "")
         or ""
     ).strip()
@@ -534,6 +555,7 @@ def normalize_ai_result(
                     option
                     for option in gpu_options
                     if str(option.get("mapping_id") or "").strip() == requested_gpu_mapping_id
+                    and int(option.get("available_count") or 0) > 0
                 ),
                 None,
             )
@@ -564,17 +586,55 @@ def normalize_ai_result(
         selected_gpu_mapping_id = str(selected_gpu.get("mapping_id") or "").strip()
         selected_gpu_label = _gpu_option_label(selected_gpu)
 
-    cores = safe_int(ai_result.get("form_prefill", {}).get("cores") or primary_machine.get("cpu"), 2, minimum=1, extract_digits=True)
-    memory_mb = safe_int(ai_result.get("form_prefill", {}).get("memory_mb") or primary_machine.get("memory_mb"), 2048, minimum=512, extract_digits=True)
+    cores = safe_int(raw_prefill.get("cores") or (form_context.cores if form_context else None) or primary_machine.get("cpu"), 2, minimum=1, extract_digits=True)
+    memory_mb = safe_int(raw_prefill.get("memory_mb") or (form_context.memory_mb if form_context else None) or primary_machine.get("memory_mb"), 2048, minimum=512, extract_digits=True)
     disk_gb = safe_int(
-        ai_result.get("form_prefill", {}).get("disk_gb") or primary_machine.get("disk_gb"),
+        raw_prefill.get("disk_gb") or (form_context.disk_gb if form_context else None) or primary_machine.get("disk_gb"),
         _minimum_disk_gb(resource_type),
         minimum=_minimum_disk_gb(resource_type),
         extract_digits=True,
     )
     username = ""
     if resource_type == "vm":
-        username = str(ai_result.get("form_prefill", {}).get("username") or "student").strip() or "student"
+        username = str(raw_prefill.get("username") or (form_context.username if form_context else "") or "student").strip() or "student"
+
+    mode = str(raw_prefill.get("mode") or (form_context.mode if form_context else "") or "scheduled").strip().lower()
+    if mode not in {"immediate", "scheduled"}:
+        mode = "scheduled"
+
+    def _parse_datetime(value: Any) -> datetime | None:
+        if isinstance(value, datetime):
+            return value
+        text = str(value or "").strip()
+        if not text:
+            return None
+        try:
+            return datetime.fromisoformat(text.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+
+    start_at = form_context.start_at if form_context and form_context.start_at else None
+    end_at = form_context.end_at if form_context and form_context.end_at else None
+    if mode == "scheduled" and not (start_at and end_at):
+        requested_start = _parse_datetime(raw_prefill.get("start_at"))
+        requested_end = _parse_datetime(raw_prefill.get("end_at"))
+        schedule_options = list(form_context.schedule_options) if form_context else []
+        selected_schedule = next(
+            (
+                option for option in schedule_options
+                if option.start_at == requested_start and option.end_at == requested_end
+            ),
+            schedule_options[0] if schedule_options else None,
+        )
+        if selected_schedule:
+            start_at, end_at = selected_schedule.start_at, selected_schedule.end_at
+    if mode == "immediate":
+        start_at = None
+        if bool(raw_prefill.get("immediate_no_end", form_context.immediate_no_end if form_context else True)):
+            end_at = None
+
+    immediate_no_end = mode == "immediate" and end_at is None
+    storage = str(raw_prefill.get("storage") or (form_context.storage if form_context else "") or "local-lvm").strip() or "local-lvm"
 
     service_name = str(
         ai_result.get("application_target", {}).get("service_name")
@@ -584,15 +644,20 @@ def normalize_ai_result(
 
     form_prefill = {
         "resource_type": resource_type,
+        "mode": mode,
         "hostname": hostname,
         "service_template_slug": service_template_slug if resource_type == "lxc" else "",
         "lxc_os_image": selected_lxc_image if resource_type == "lxc" else "",
         "vm_os_choice": selected_vm_os if resource_type == "vm" else "",
         "vm_template_id": selected_vm_template_id if resource_type == "vm" else 0,
         "gpu_mapping_id": selected_gpu_mapping_id if resource_type == "vm" else "",
+        "start_at": start_at.isoformat() if start_at else "",
+        "end_at": end_at.isoformat() if end_at else "",
+        "immediate_no_end": immediate_no_end,
         "cores": cores,
         "memory_mb": memory_mb,
         "disk_gb": disk_gb,
+        "storage": storage,
         "username": username,
         "reason": _build_submission_reason(
             request=request,

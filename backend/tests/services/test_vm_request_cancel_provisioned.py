@@ -5,7 +5,7 @@ already provisioned) be cancelled: the request was marked ``cancelled`` and
 its node fields cleared while the live VM and its Resource record stayed
 around. The scheduler only manages machines through the active approved
 request list, so the orphaned VM lost its start window, auto-shutdown and
-migration handling.
+provisioning handling.
 
 New behaviour under test:
 - ``pending`` requests are cancellable (standard flow);

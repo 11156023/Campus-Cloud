@@ -25,7 +25,7 @@ class VMRequestStatus(str, enum.Enum):
     cancelled = "cancelled"
 
 
-class VMMigrationStatus(str, enum.Enum):
+class VMProvisioningStatus(str, enum.Enum):
     idle = "idle"
     pending = "pending"
     running = "running"
@@ -61,17 +61,9 @@ class VMRequestProvisioningState:
     desired_node: str | None
     actual_node: str | None
     placement_strategy_used: str | None
-
-
-@dataclass(frozen=True, slots=True)
-class VMRequestMigrationState:
-    status: "VMMigrationStatus"
+    status: "VMProvisioningStatus"
     error: str | None
-    pinned: bool
     resource_warning: str | None
-    rebalance_epoch: int
-    last_rebalanced_at: datetime | None
-    last_migrated_at: datetime | None
 
 
 class VMRequest(SQLModel, table=True):
@@ -149,26 +141,16 @@ class VMRequest(SQLModel, table=True):
     desired_node: str | None = Field(default=None)
     actual_node: str | None = Field(default=None)
     placement_strategy_used: str | None = Field(default=None)
-    migration_status: VMMigrationStatus = Field(
-        default=VMMigrationStatus.idle,
+    provisioning_status: VMProvisioningStatus = Field(
+        default=VMProvisioningStatus.idle,
         sa_column=Column(
-            Enum(VMMigrationStatus),
+            Enum(VMProvisioningStatus),
             nullable=False,
-            default=VMMigrationStatus.idle,
+            default=VMProvisioningStatus.idle,
         ),
     )
-    migration_error: str | None = Field(default=None)
-    migration_pinned: bool = Field(default=False)
+    provisioning_error: str | None = Field(default=None)
     resource_warning: str | None = Field(default=None)
-    rebalance_epoch: int = Field(default=0)
-    last_rebalanced_at: datetime | None = Field(
-        default=None,
-        sa_column=Column(DateTime(timezone=True), nullable=True),
-    )
-    last_migrated_at: datetime | None = Field(
-        default=None,
-        sa_column=Column(DateTime(timezone=True), nullable=True),
-    )
 
     # Recurrence schedule (RFC 5545 RRULE; e.g. FREQ=WEEKLY;BYDAY=FR;BYHOUR=13;BYMINUTE=0).
     # When set, the scheduler computes the next active window and powers on/off accordingly.
@@ -233,26 +215,16 @@ class VMRequest(SQLModel, table=True):
             desired_node=self.desired_node,
             actual_node=self.actual_node,
             placement_strategy_used=self.placement_strategy_used,
-        )
-
-    @property
-    def migration(self) -> VMRequestMigrationState:
-        return VMRequestMigrationState(
-            status=self.migration_status,
-            error=self.migration_error,
-            pinned=self.migration_pinned,
+            status=self.provisioning_status,
+            error=self.provisioning_error,
             resource_warning=self.resource_warning,
-            rebalance_epoch=self.rebalance_epoch,
-            last_rebalanced_at=self.last_rebalanced_at,
-            last_migrated_at=self.last_migrated_at,
         )
 
 
 __all__ = [
-    "VMMigrationStatus",
+    "VMProvisioningStatus",
     "VMRequestStatus",
     "VMRequest",
-    "VMRequestMigrationState",
     "VMRequestProvisioningState",
     "VMRequestReviewState",
     "VMRequestScheduleState",

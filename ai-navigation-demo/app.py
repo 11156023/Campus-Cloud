@@ -289,17 +289,6 @@ PAGES: list[PageCapability] = [
         actions=["調整政策", "保存設定", "檢查環境"],
     ),
     PageCapability(
-        key="migration",
-        title="Migration Jobs",
-        summary="查看資源遷移工作、狀態與失敗原因。",
-        keywords=["migration", "遷移", "搬移", "移轉", "job"],
-        roles=["teacher", "admin"],
-        group="系統管理",
-        stage="ops",
-        page_type="jobs",
-        actions=["查看遷移工作", "重試失敗任務", "檢查節點"],
-    ),
-    PageCapability(
         key="jobs",
         title="背景任務",
         summary="查看建立、刪除、同步與部署等背景任務。",

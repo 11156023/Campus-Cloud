@@ -22,7 +22,7 @@ from app.domain.placement.scorer import (
 
 def _tuning(**overrides) -> PlacementTuning:
     defaults = dict(
-        migration_cost=0.5,
+        reassignment_cost=0.5,
         peak_cpu_margin=0.1,
         peak_memory_margin=0.1,
         loadavg_warn_per_core=1.0,
@@ -31,7 +31,7 @@ def _tuning(**overrides) -> PlacementTuning:
         disk_contention_warn_share=0.7,
         disk_contention_high_share=0.9,
         disk_penalty_weight=1.0,
-        search_max_relocations=10,
+        search_max_reassignments=10,
         search_depth=5,
         cpu_peak_warn_share=0.7,
         cpu_peak_high_share=0.9,

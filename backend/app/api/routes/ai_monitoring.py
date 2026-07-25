@@ -4,12 +4,16 @@ AI Monitoring Routes — Admin 全局 AI 使用監控
 掛載在 /ai-api/monitoring/ 前綴下
 """
 
+import asyncio
+import logging
 import uuid
 from datetime import datetime
 
-from fastapi import APIRouter, Query
+import httpx
+from fastapi import APIRouter, HTTPException, Query
 
 from app.api.deps import AIAPIViewAllUser, SessionDep
+from app.features.ai.config import settings as ai_api_settings
 from app.schemas.ai_monitoring import (
     AIMonitoringStats,
     AIProxyCallsResponse,
@@ -18,7 +22,56 @@ from app.schemas.ai_monitoring import (
 )
 from app.services.llm_gateway import ai_gateway_service
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/ai-api/monitoring", tags=["ai-monitoring"])
+
+
+@router.get(
+    "/litellm-runtime",
+    summary="LiteLLM runtime snapshot",
+)
+async def get_litellm_runtime_snapshot(_current_user: AIAPIViewAllUser):
+    """Return staging LiteLLM health to an authorised Campus administrator.
+
+    The public `ai-proxy` relay never exposes LiteLLM health or management
+    endpoints. This deliberately returns a compact, secret-free snapshot and
+    fails closed when the optional internal observation credential is absent.
+    """
+    api_key = ai_api_settings.litellm_runtime_api_key
+    if not api_key:
+        raise HTTPException(status_code=503, detail="LiteLLM runtime monitoring is not configured")
+
+    base_url = ai_api_settings.litellm_runtime_base_url.rstrip("/")
+    headers = {"Authorization": f"Bearer {api_key}"}
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            liveliness, readiness, deployments = await asyncio.gather(
+                client.get(f"{base_url}/health/liveliness"),
+                client.get(f"{base_url}/health/readiness"),
+                client.get(f"{base_url}/health", headers=headers),
+            )
+    except httpx.RequestError:
+        logger.warning("LiteLLM runtime snapshot request failed")
+        raise HTTPException(status_code=503, detail="LiteLLM runtime is unavailable") from None
+
+    try:
+        deployment_health = deployments.json() if deployments.is_success else {}
+    except ValueError:
+        deployment_health = {}
+
+    # `/health` has changed shape across LiteLLM versions. Preserve only the
+    # status counts here, never a raw upstream response that could reveal an
+    # internal URL or a future sensitive field.
+    healthy = deployment_health.get("healthy_endpoints", [])
+    unhealthy = deployment_health.get("unhealthy_endpoints", [])
+    return {
+        "liveliness": liveliness.is_success,
+        "readiness": readiness.is_success,
+        "healthy_deployment_count": len(healthy) if isinstance(healthy, list) else 0,
+        "unhealthy_deployment_count": len(unhealthy) if isinstance(unhealthy, list) else 0,
+        "deployment_status_code": deployments.status_code,
+    }
 
 
 @router.get(

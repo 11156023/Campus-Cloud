@@ -48,7 +48,6 @@ const NAV_GROUPS = [
       { key: "groups", label: "群組" },
       { key: "admin", label: "使用者管理" },
       { key: "settings", label: "系統設定" },
-      { key: "migration", label: "Migration Jobs" },
       { key: "jobs", label: "背景任務" },
       { key: "audit", label: "Audit Logs" },
     ],
@@ -145,7 +144,6 @@ function renderPage(page) {
     groups: ["CS101", "AI Lab", "Docker Workshop"],
     admin: ["teacher@example", "student@example", "admin@example"],
     settings: ["資源上限", "審核政策", "SMTP / Gateway"],
-    migration: ["job migrate-12 running", "job migrate-09 failed", "job migrate-08 done"],
     jobs: ["provision running", "delete queued", "sync completed"],
     audit: ["login success", "role changed", "resource deleted"],
   }

@@ -19,6 +19,13 @@ class AIAPIEnvSettings(BaseSettings):
     ai_api_base_url: str = "http://localhost:3000"
     ai_api_api_key: str = "ai-api-secret-key-change-me"
     ai_api_timeout: int = 120
+    ai_api_max_request_body_bytes: int = 1_048_576
+
+    # Phase 2 only: this is an admin-only runtime-observation connection to
+    # LiteLLM, separate from the legacy AI API upstream until Phase 5 switches
+    # traffic. Leave the key unset to disable the snapshot endpoint safely.
+    litellm_runtime_base_url: str = "http://host.docker.internal:4000"
+    litellm_runtime_api_key: str | None = None
 
     ai_api_rate_limit_per_minute: int = 20
     ai_api_rate_limit_window_seconds: int = 60
@@ -39,6 +46,5 @@ class AIAPIEnvSettings(BaseSettings):
     @property
     def ai_api_upstream_api_key(self) -> str:
         return self.ai_api_api_key
-
 
 settings = AIAPIEnvSettings()

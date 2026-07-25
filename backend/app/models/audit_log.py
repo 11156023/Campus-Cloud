@@ -113,7 +113,7 @@ class AuditAction(str, enum.Enum):
     proxmox_sync_nodes = "proxmox_sync_nodes"
     proxmox_sync_now = "proxmox_sync_now"
 
-    # Migration jobs
+    # Historical values retained so archived audit rows remain readable.
     migration_job_retry = "migration_job_retry"
     migration_job_cancel = "migration_job_cancel"
 

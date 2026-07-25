@@ -24,9 +24,7 @@ from app.models import (
     SpecChangeRequest,
     SpecChangeRequestStatus,
     User,
-    VMMigrationJob,
-    VMMigrationJobStatus,
-    VMMigrationStatus,
+    VMProvisioningStatus,
     VMRequest,
     VMRequestStatus,
 )
@@ -49,15 +47,6 @@ _PER_SOURCE_FETCH_LIMIT = 200
 
 
 # ─── 狀態 mapping ─────────────────────────────────────────────────────────────
-
-_MIGRATION_STATUS_MAP: dict[VMMigrationJobStatus, JobStatus] = {
-    VMMigrationJobStatus.pending: JobStatus.pending,
-    VMMigrationJobStatus.running: JobStatus.running,
-    VMMigrationJobStatus.completed: JobStatus.completed,
-    VMMigrationJobStatus.failed: JobStatus.failed,
-    VMMigrationJobStatus.blocked: JobStatus.blocked,
-    VMMigrationJobStatus.cancelled: JobStatus.cancelled,
-}
 
 _VM_REQUEST_STATUS_MAP: dict[VMRequestStatus, JobStatus] = {
     VMRequestStatus.pending: JobStatus.pending,
@@ -120,47 +109,6 @@ def _parse_progress(text: str | None) -> int | None:
 # ─── 各來源 → JobItem ──────────────────────────────────────────────────────────
 
 
-def _migration_to_job(job: VMMigrationJob, *, user_email: str | None = None,
-                      user_id: uuid.UUID | None = None) -> JobItem:
-    title_parts = []
-    if job.vmid is not None:
-        title_parts.append(f"VM {job.vmid}")
-    title_parts.append(f"遷移 → {job.target_node}")
-    title = " ".join(title_parts)
-
-    status = _MIGRATION_STATUS_MAP.get(job.status, JobStatus.pending)
-    progress: int | None = None
-    if status == JobStatus.completed:
-        progress = 100
-    elif status == JobStatus.running:
-        progress = 50  # 無細節進度，給個視覺值
-    elif status == JobStatus.pending:
-        progress = 0
-
-    return JobItem(
-        id=f"migration:{job.id}",
-        kind=JobKind.migration,
-        title=title,
-        status=status,
-        progress=progress,
-        message=job.last_error,
-        user_id=user_id,
-        user_email=user_email,
-        created_at=_coerce_aware(job.requested_at) or _now(),
-        updated_at=_coerce_aware(job.updated_at) or _now(),
-        completed_at=_coerce_aware(job.finished_at),
-        detail_url=f"/jobs?focus=migration:{job.id}",
-        meta={
-            "request_id": str(job.request_id),
-            "source_node": job.source_node,
-            "target_node": job.target_node,
-            "vmid": job.vmid,
-            "attempt_count": job.attempt_count,
-            "rebalance_epoch": job.rebalance_epoch,
-        },
-    )
-
-
 def _script_deploy_to_job(log: ScriptDeployLog, *,
                           user_email: str | None = None) -> JobItem:
     name = log.template_name or log.template_slug
@@ -203,11 +151,11 @@ def _vm_request_to_job(req: VMRequest) -> JobItem:
     title = f"開機申請：{req.hostname}（{req.cores} cores / {req.memory} MB）"
     status = _VM_REQUEST_STATUS_MAP.get(req.status, JobStatus.pending)
     if req.status == VMRequestStatus.approved:
-        if req.migration_status == VMMigrationStatus.failed or req.migration_error:
+        if req.provisioning_status == VMProvisioningStatus.failed or req.provisioning_error:
             status = JobStatus.failed
         elif req.vmid is not None:
             status = JobStatus.completed
-        elif req.migration_status == VMMigrationStatus.running:
+        elif req.provisioning_status == VMProvisioningStatus.running:
             status = JobStatus.running
     progress: int | None = None
     if status == JobStatus.completed:
@@ -231,7 +179,7 @@ def _vm_request_to_job(req: VMRequest) -> JobItem:
                 overdue = True
                 overdue_minutes = int(delta // 60)
 
-    base_message = req.review_comment or req.migration_error
+    base_message = req.review_comment or req.provisioning_error
     if overdue:
         overdue_label = (
             f"{overdue_minutes // 60} 小時"
@@ -296,26 +244,6 @@ def _spec_change_to_job(req: SpecChangeRequest) -> JobItem:
 
 
 # ─── 來源查詢（已根據 user 過濾） ────────────────────────────────────────────
-
-
-def _fetch_migration_jobs(
-    session: Session, *, user: User, since: datetime
-) -> list[JobItem]:
-    is_admin = bool(user.is_superuser or getattr(user, "role", None) == "admin")
-    stmt = (
-        select(VMMigrationJob, VMRequest, User)
-        .join(VMRequest, VMRequest.id == VMMigrationJob.request_id)
-        .join(User, User.id == VMRequest.user_id)
-        .where(VMMigrationJob.updated_at >= since)
-    )
-    if not is_admin:
-        stmt = stmt.where(VMRequest.user_id == user.id)
-    stmt = stmt.order_by(VMMigrationJob.updated_at.desc()).limit(_PER_SOURCE_FETCH_LIMIT)
-    rows = session.exec(stmt).all()
-    return [
-        _migration_to_job(job, user_email=u.email, user_id=u.id)
-        for (job, _req, u) in rows
-    ]
 
 
 def _fetch_script_deploy(
@@ -436,7 +364,6 @@ def _fetch_deletions(
 
 
 _FETCHERS = {
-    JobKind.migration: _fetch_migration_jobs,
     JobKind.script_deploy: _fetch_script_deploy,
     JobKind.vm_request: _fetch_vm_requests,
     JobKind.spec_change: _fetch_spec_changes,
@@ -543,43 +470,6 @@ def _ensure_owner_or_admin(user: User, owner_id: uuid.UUID | None) -> None:
         raise JobAccessDeniedError("Not allowed to view this job")
 
 
-def _detail_migration(session: Session, raw_id: str, user: User) -> JobDetail:
-    try:
-        job_uuid = uuid.UUID(raw_id)
-    except ValueError as e:
-        raise JobNotFoundError(f"invalid migration id {raw_id}") from e
-    job = session.get(VMMigrationJob, job_uuid)
-    if job is None:
-        raise JobNotFoundError("migration job not found")
-    req = session.get(VMRequest, job.request_id)
-    owner_email: str | None = None
-    owner_id: uuid.UUID | None = None
-    hostname: str | None = None
-    if req is not None:
-        owner_id = req.user_id
-        hostname = req.hostname
-        if req.user is not None:
-            owner_email = req.user.email
-    _ensure_owner_or_admin(user, owner_id)
-    item = _migration_to_job(job, user_email=owner_email, user_id=owner_id)
-    extra = {
-        "request_id": str(job.request_id),
-        "vmid": job.vmid,
-        "source_node": job.source_node,
-        "target_node": job.target_node,
-        "attempt_count": job.attempt_count,
-        "rebalance_epoch": job.rebalance_epoch,
-        "claimed_by": job.claimed_by,
-        "requested_at": _isoformat(job.requested_at),
-        "available_at": _isoformat(job.available_at),
-        "claimed_at": _isoformat(job.claimed_at),
-        "started_at": _isoformat(job.started_at),
-        "finished_at": _isoformat(job.finished_at),
-        "hostname": hostname,
-    }
-    return JobDetail(item=item, error=job.last_error, extra=extra)
-
-
 def _detail_script_deploy(session: Session, raw_id: str, user: User) -> JobDetail:
     log = session.exec(
         select(ScriptDeployLog).where(ScriptDeployLog.task_id == raw_id)
@@ -634,14 +524,14 @@ def _detail_vm_request(session: Session, raw_id: str, user: User) -> JobDetail:
         "assigned_node": req.assigned_node,
         "actual_node": req.actual_node,
         "desired_node": req.desired_node,
-        "migration_status": req.migration_status.value,
+        "provisioning_status": req.provisioning_status.value,
         "expiry_date": req.expiry_date.isoformat() if req.expiry_date else None,
         "start_at": _isoformat(req.start_at),
         "end_at": _isoformat(req.end_at),
         "reason": req.reason,
         "review_comment": req.review_comment,
     }
-    return JobDetail(item=item, error=req.migration_error, extra=extra)
+    return JobDetail(item=item, error=req.provisioning_error, extra=extra)
 
 
 def _detail_spec_change(session: Session, raw_id: str, user: User) -> JobDetail:
@@ -704,7 +594,6 @@ def _detail_deletion(session: Session, raw_id: str, user: User) -> JobDetail:
 
 
 _DETAIL_FETCHERS = {
-    JobKind.migration: _detail_migration,
     JobKind.script_deploy: _detail_script_deploy,
     JobKind.vm_request: _detail_vm_request,
     JobKind.spec_change: _detail_spec_change,

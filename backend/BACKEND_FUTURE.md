@@ -46,7 +46,7 @@
 不要在 route 內加入大量：
 
 - 排程判斷
-- placement/migration 規則
+- placement/capacity 規則
 - Proxmox 流程控制
 - 跨資源授權判斷細節
 
@@ -54,7 +54,7 @@
 
 ### 2.2 Domain 保持純規則
 
-`domain/placement`、`domain/migration`、`domain/scheduling` 的設計目標應是：
+`domain/placement`、`domain/scheduling` 的設計目標應是：
 
 - 不依賴 FastAPI
 - 不依賴 route schema
@@ -176,7 +176,6 @@
 ### scheduling
 
 - `runtime.py`
-- `migration_jobs.py`
 - `reconcile.py`
 - `stop_tasks.py`
 - `start_tasks.py`
@@ -185,7 +184,7 @@
 
 - `plan_builder.py`
 - `reservation_solver.py`
-- `rebalance_solver.py`
+- `capacity_solver.py`
 - `preview.py`
 - `storage_selection.py`
 
@@ -201,7 +200,7 @@
 
 目前為了降低風險，仍保留一些相容層，例如：
 
-- `domain/pve_*` 與 `domain/{placement,migration,scheduling}` 並存
+- `domain/pve_*` 與 `domain/{placement,scheduling}` 並存
 - `services/ai` / `services/infra` 這類兼容 package
 
 這是合理的過渡，但不應永久保留。
@@ -228,7 +227,7 @@
 例子：
 
 - placement 評分規則
-- migration eligibility
+- placement eligibility
 - scheduling window 決策
 - quota / balance policy
 
@@ -276,7 +275,7 @@
 2. `services` workflow regression
 3. `api` contract 測試
 4. `infrastructure` adapter mock test
-5. scheduler / migration queue 狀態機測試
+5. scheduler / provisioning queue 狀態機測試
 
 未來每次重構前，應先補足該區域最少一條 regression 測試，再動手。
 

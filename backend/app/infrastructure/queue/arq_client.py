@@ -28,6 +28,9 @@ async def init_arq_pool() -> None:
     global _pool
     if _pool is not None:
         return
+    if not settings.redis_enabled:
+        logger.info("arq pool is disabled (REDIS_ENABLED=false)")
+        return
     try:
         _pool = await create_pool(get_redis_settings())
         logger.info("arq pool connected: %s", settings.redis_url)
@@ -37,6 +40,8 @@ async def init_arq_pool() -> None:
 
 
 async def get_arq_pool() -> ArqRedis:
+    if not settings.redis_enabled:
+        raise RuntimeError("arq pool is disabled (REDIS_ENABLED=false)")
     if _pool is None:
         await init_arq_pool()
     if _pool is None:

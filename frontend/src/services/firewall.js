@@ -7,8 +7,8 @@
 import { apiGet, apiPost, apiPut, apiDeleteJson } from "./api";
 
 /** 取得拓撲（節點 + 連線） */
-export function getTopology() {
-  return apiGet("/api/v1/firewall/topology");
+export function getTopology(options) {
+  return apiGet("/api/v1/firewall/topology", options);
 }
 
 /**

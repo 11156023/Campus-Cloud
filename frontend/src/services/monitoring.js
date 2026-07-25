@@ -2,8 +2,8 @@ import { apiGet, apiPost } from "./api";
 
 export const MonitoringService = {
   /** 全域監控匯總：叢集容量/用量、節點與 VM 統計（管理員） */
-  getOverview() {
-    return apiGet("/api/v1/monitoring/overview");
+  getOverview(options) {
+    return apiGet("/api/v1/monitoring/overview", options);
   },
 
   /** 節點 RRD 趨勢（timeframe: hour|day|week） */

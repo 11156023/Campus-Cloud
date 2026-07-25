@@ -38,13 +38,10 @@ from app.domain.placement.storage import (
 )
 from app.models import VMRequest
 from app.repositories import vm_request as vm_request_repo
-from app.services.scheduling import policy as scheduling_policy
-from app.services.scheduling import support as scheduling_support
 from app.services.vm import placement_support
 
 GIB = 1024**3
 DEFAULT_PLACEMENT_STRATEGY = placement_policy.DEFAULT_PLACEMENT_STRATEGY
-_MigrationPolicy = scheduling_policy.MigrationPolicy
 
 
 @dataclass
@@ -96,7 +93,7 @@ def _provisioned_current_node(request: VMRequest) -> str | None:
 
 def _is_quick_template_request(request: VMRequest) -> bool:
     # course（課程實驗機）與 quick_template 同屬短 TTL 快速通道：
-    # 一樣釘住節點、不參與 cohort rebalance。
+    # 一樣釘住節點、不參與 cohort optimization。
     return getattr(request, "request_kind", "research") in {
         "quick_template",
         "course",
@@ -113,55 +110,18 @@ def _fixed_node_for_quick_template(request: VMRequest) -> str | None:
     )
 
 
-def _build_rebalance_baseline_nodes(
+def _build_placement_baseline_nodes(
     *,
     session: Session,
     requests: list[VMRequest],
 ) -> list[NodeCapacity]:
-    return placement_support.build_rebalance_baseline_nodes(
+    return placement_support.build_placement_baseline_nodes(
         session=session,
         requests=requests,
         get_overcommit_ratios_fn=get_overcommit_ratios,
         release_request_from_capacities_fn=_release_request_from_capacities,
     )
 
-
-def _build_active_rebalance_allowed_target_nodes(
-    *,
-    ordered_requests: list[VMRequest],
-    baseline_nodes: list[NodeCapacity],
-    policy: _MigrationPolicy,
-    now: datetime,
-) -> dict[uuid.UUID, set[str]]:
-    candidate_nodes = [item.node for item in baseline_nodes]
-    target_storages_by_node: dict[str, set[str]] = {}
-    for node_name in candidate_nodes:
-        try:
-            target_storages_by_node[node_name] = (
-                scheduling_support.shared_storage_ids_on_node(
-                    node=node_name
-                )
-            )
-        except Exception:
-            target_storages_by_node[node_name] = set()
-
-    allowed_target_nodes: dict[uuid.UUID, set[str]] = {}
-    for request in ordered_requests:
-        fixed_node = _fixed_node_for_quick_template(request)
-        if fixed_node:
-            allowed_target_nodes[request.id] = {fixed_node}
-            continue
-        allowed, _ = scheduling_support.migration_allowed_target_nodes_for_request(
-            request=request,
-            candidate_nodes=candidate_nodes,
-            current_node=_provisioned_current_node(request),
-            policy=policy,
-            now=now,
-            safe=True,
-            target_storages_by_node=target_storages_by_node,
-        )
-        allowed_target_nodes[request.id] = allowed
-    return allowed_target_nodes
 
 
 def _build_preview_vm_request(
@@ -302,7 +262,7 @@ def select_reserved_target_node(
         start_at=start_at,
         end_at=end_at,
         reserved_requests=reserved_requests,
-        allow_cohort_rebalance=not _is_quick_template_request(db_request),
+        allow_cohort_optimization=False,
     )
 
 
@@ -313,7 +273,7 @@ def select_reserved_target_node_for_request(
     start_at: datetime | None,
     end_at: datetime | None,
     reserved_requests: list[VMRequest] | None = None,
-    allow_cohort_rebalance: bool = True,
+    allow_cohort_optimization: bool = True,
 ) -> CurrentPlacementSelection:
     if not start_at or not end_at:
         nodes, resources = placement_advisor._load_cluster_state()
@@ -433,107 +393,15 @@ def select_reserved_target_node_for_request(
         placement_strategy=strategy,
         node_priorities=get_node_priorities(session),
     )
-    if not allow_cohort_rebalance:
-        return CurrentPlacementSelection(
-            node=plan.recommended_node,
-            strategy=strategy,
-            plan=plan.model_copy(
-                update={
-                    "summary": (
-                        "Selected from currently available reserved capacity "
-                        "without previewing cohort rebalance."
-                    ),
-                }
-            ),
-        )
-
-    overlapping_start_requests = [
-        item
-        for item in reserved_requests
-        if (window := _request_window(item))[0] is not None
-        and window[1] is not None
-        and window[0] <= start_at < window[1]
-    ]
-    preview_request = _build_preview_vm_request(
-        request=request,
-        start_at=start_at,
-        end_at=end_at,
-    )
-    preview_cohort = overlapping_start_requests + [preview_request]
-    preview_ordered_requests = sorted(
-        preview_cohort,
-        key=lambda item: (
-            _normalize_datetime(item.start_at) or datetime.min.replace(tzinfo=UTC),
-            _normalize_datetime(item.reviewed_at) or datetime.min.replace(tzinfo=UTC),
-            _normalize_datetime(item.created_at) or datetime.min.replace(tzinfo=UTC),
-            str(item.id),
-        ),
-    )
-    preview_baseline_nodes = _build_rebalance_baseline_nodes(
-        session=session,
-        requests=preview_ordered_requests,
-    )
-    preview_baseline_nodes = [
-        item.model_copy(deep=True)
-        for item in preview_baseline_nodes
-        if item.node in feasible_nodes
-    ]
-    priorities = get_node_priorities(session)
-    tuning = _get_placement_tuning(session=session)
-    best_preview_node = plan.recommended_node
-    best_preview_objective: tuple[float, float, float, int] | None = None
-    candidate_evals: dict[str, _AssignmentEvaluation] = {}
-    for candidate_node in sorted(feasible_nodes):
-        try:
-            preview_assignments = _solve_rebalance_assignments(
-                session=session,
-                ordered_requests=preview_ordered_requests,
-                baseline_nodes=preview_baseline_nodes,
-                strategy=strategy,
-                priorities=priorities,
-                tuning=tuning,
-                fixed_assignments={preview_request.id: candidate_node},
-            )
-            preview_eval = _evaluate_active_assignment_map(
-                session=session,
-                ordered_requests=preview_ordered_requests,
-                baseline_nodes=preview_baseline_nodes,
-                assignments=preview_assignments,
-                priorities=priorities,
-                tuning=tuning,
-            )
-        except ValueError:
-            continue
-        if not preview_eval.feasible:
-            continue
-        candidate_evals[candidate_node] = preview_eval
-        if (
-            best_preview_objective is None
-            or preview_eval.objective < best_preview_objective
-        ):
-            best_preview_objective = preview_eval.objective
-            best_preview_node = candidate_node
-    preview_reasons = (
-        _build_preview_selection_reasons(
-            selected_node=best_preview_node,
-            selected_eval=candidate_evals[best_preview_node],
-            candidate_evals=candidate_evals,
-            priorities=priorities,
-        )
-        if best_preview_node and best_preview_node in candidate_evals
-        else list(plan.rationale or [])
-    )
     return CurrentPlacementSelection(
-        node=best_preview_node,
+        node=plan.recommended_node,
         strategy=strategy,
         plan=plan.model_copy(
             update={
-                "recommended_node": best_preview_node,
                 "summary": (
-                    "Reservation preview selected the best feasible node "
-                    "using the same active-window rebalance objective."
+                    "Selected the best feasible node from projected capacity "
+                    "for the requested rental window."
                 ),
-                "rationale": preview_reasons,
             }
         ),
     )
@@ -548,7 +416,7 @@ def _evaluate_active_assignment_map(
     priorities: dict[str, int],
     tuning: _PlacementTuning,
     allowed_target_nodes_by_request: dict[uuid.UUID, set[str]] | None = None,
-    max_migrations: int | None = None,
+    max_reassignments: int | None = None,
 ) -> _AssignmentEvaluation:
     working_nodes = [item.model_copy(deep=True) for item in baseline_nodes]
     by_node = {item.node: item for item in working_nodes}
@@ -559,7 +427,7 @@ def _evaluate_active_assignment_map(
     _, disk_overcommit_ratio = get_overcommit_ratios(session)
     storage_penalty_total = 0.0
     priority_total = 0.0
-    movement_count = 0
+    reassignment_count = 0
     storage_speed_rank_total = 0.0
     storage_user_priority_total = 0.0
     _INFEASIBLE_OBJECTIVE: tuple[float, ...] = (
@@ -651,9 +519,9 @@ def _evaluate_active_assignment_map(
             storage_user_priority_total += float(storage_selection.user_priority)
         priority_total += float(priorities.get(target_node, 5))
         if _provisioned_current_node(request) not in {None, target_node}:
-            movement_count += 1
+            reassignment_count += 1
 
-    if max_migrations is not None and movement_count > max(max_migrations, 0):
+    if max_reassignments is not None and reassignment_count > max(max_reassignments, 0):
         return _AssignmentEvaluation(
             feasible=False,
             objective=_INFEASIBLE_OBJECTIVE,
@@ -666,7 +534,7 @@ def _evaluate_active_assignment_map(
     total_score = (
         sum(node_score_map.values())
         + (storage_penalty_total * tuning.disk_penalty_weight)
-        + (movement_count * tuning.migration_cost)
+        + (reassignment_count * tuning.reassignment_cost)
     )
     return _AssignmentEvaluation(
         feasible=True,
@@ -674,14 +542,14 @@ def _evaluate_active_assignment_map(
             max_node_score,
             total_score,
             priority_total,
-            float(movement_count),
+            float(reassignment_count),
             storage_speed_rank_total,
             storage_user_priority_total,
         ),
         max_node_score=max_node_score,
         total_score=total_score,
         priority_total=priority_total,
-        movement_count=movement_count,
+        reassignment_count=reassignment_count,
         node_scores=node_score_map,
         storage_penalties={
             node_name: sum(
@@ -712,7 +580,7 @@ def _initial_active_assignment_map(
     tuning: _PlacementTuning,
     fixed_assignments: dict[uuid.UUID, str] | None = None,
     allowed_target_nodes_by_request: dict[uuid.UUID, set[str]] | None = None,
-    max_migrations: int | None = None,
+    max_reassignments: int | None = None,
 ) -> dict[uuid.UUID, str]:
     working_nodes = [item.model_copy(deep=True) for item in baseline_nodes]
     storage_pools_by_node, has_managed_storage = _build_storage_pool_state(
@@ -723,7 +591,7 @@ def _initial_active_assignment_map(
     placements: dict[str, int] = {item.node: 0 for item in working_nodes}
     assignments: dict[uuid.UUID, str] = {}
     locked_nodes = fixed_assignments or {}
-    movement_count = 0
+    reassignment_count = 0
 
     for request in ordered_requests:
         placement_request = _to_placement_request(request)
@@ -748,9 +616,9 @@ def _initial_active_assignment_map(
         )
         current_node = _provisioned_current_node(request)
         movement_budget_exhausted = (
-            max_migrations is not None
+            max_reassignments is not None
             and current_node is not None
-            and movement_count >= max(max_migrations, 0)
+            and reassignment_count >= max(max_reassignments, 0)
         )
         candidates: list[tuple[NodeCapacity, _StorageSelection | None]] = []
         for item in working_nodes:
@@ -787,8 +655,8 @@ def _initial_active_assignment_map(
             candidates.append((item, storage_selection))
 
         if not candidates:
-            # Try relief relocation before giving up
-            relief = _try_relief_relocation(
+            # Try relief reassignment before giving up
+            relief = _try_relief_reassignment(
                 session=session,
                 stuck_request=request,
                 ordered_requests_so_far=[r for r in ordered_requests if r.id in assignments],
@@ -802,7 +670,7 @@ def _initial_active_assignment_map(
                 locked_request_ids=set(locked_nodes.keys()),
                 disk_overcommit_ratio=disk_overcommit_ratio,
                 allowed_target_nodes_by_request=allowed_target_nodes_by_request,
-                max_migrations=max_migrations,
+                max_reassignments=max_reassignments,
             )
             if relief is not None:
                 # Adopt the relief assignments and continue
@@ -821,7 +689,7 @@ def _initial_active_assignment_map(
                 for node_name in assignments.values():
                     placements[node_name] = placements.get(node_name, 0) + 1
                 continue
-            raise ValueError(f"No feasible active rebalance exists for request {request.id}")
+            raise ValueError(f"No feasible active-window planning exists for request {request.id}")
 
         chosen, chosen_storage = min(
             candidates,
@@ -841,7 +709,7 @@ def _initial_active_assignment_map(
         assignments[request.id] = chosen.node
         placements[chosen.node] += 1
         if current_node is not None and chosen.node != current_node:
-            movement_count += 1
+            reassignment_count += 1
         _reserve_request_on_capacities(
             node_capacities=working_nodes,
             db_request=request,
@@ -857,7 +725,7 @@ def _initial_active_assignment_map(
     return assignments
 
 
-def _run_local_rebalance_search(
+def _run_local_placement_search(
     *,
     session: Session,
     ordered_requests: list[VMRequest],
@@ -867,17 +735,13 @@ def _run_local_rebalance_search(
     tuning: _PlacementTuning,
     locked_request_ids: set[uuid.UUID] | None = None,
     allowed_target_nodes_by_request: dict[uuid.UUID, set[str]] | None = None,
-    max_migrations: int | None = None,
+    max_reassignments: int | None = None,
 ) -> dict[uuid.UUID, str]:
-    if tuning.search_depth <= 0 or tuning.search_max_relocations <= 0:
+    if tuning.search_depth <= 0 or tuning.search_max_reassignments <= 0:
         return initial_assignments
 
     current_assignments = dict(initial_assignments)
     locked_ids = set(locked_request_ids or ())
-    # Also lock requests that are migration-pinned
-    for req in ordered_requests:
-        if getattr(req, 'migration_pinned', False):
-            locked_ids.add(req.id)
     current_eval = _evaluate_active_assignment_map(
         session=session,
         ordered_requests=ordered_requests,
@@ -886,7 +750,7 @@ def _run_local_rebalance_search(
         priorities=priorities,
         tuning=tuning,
         allowed_target_nodes_by_request=allowed_target_nodes_by_request,
-        max_migrations=max_migrations,
+        max_reassignments=max_reassignments,
     )
     if not current_eval.feasible:
         return initial_assignments
@@ -895,7 +759,7 @@ def _run_local_rebalance_search(
     used_moves = 0
 
     for _ in range(tuning.search_depth):
-        if used_moves >= tuning.search_max_relocations:
+        if used_moves >= tuning.search_max_reassignments:
             break
 
         best_assignments: dict[uuid.UUID, str] | None = None
@@ -924,7 +788,7 @@ def _run_local_rebalance_search(
                     priorities=priorities,
                     tuning=tuning,
                     allowed_target_nodes_by_request=allowed_target_nodes_by_request,
-                    max_migrations=max_migrations,
+                    max_reassignments=max_reassignments,
                 )
                 if not trial_eval.feasible or trial_eval.objective >= current_eval.objective:
                     continue
@@ -933,7 +797,7 @@ def _run_local_rebalance_search(
                     best_eval = trial_eval
                     best_move_cost = 1
 
-        if used_moves + 2 <= tuning.search_max_relocations:
+        if used_moves + 2 <= tuning.search_max_reassignments:
             for index, request_a in enumerate(ordered_requests):
                 if request_a.id in locked_ids:
                     continue
@@ -957,7 +821,7 @@ def _run_local_rebalance_search(
                         priorities=priorities,
                         tuning=tuning,
                         allowed_target_nodes_by_request=allowed_target_nodes_by_request,
-                        max_migrations=max_migrations,
+                        max_reassignments=max_reassignments,
                     )
                     if not trial_eval.feasible or trial_eval.objective >= current_eval.objective:
                         continue
@@ -978,7 +842,7 @@ def _run_local_rebalance_search(
 _RELIEF_MAX_EVALUATIONS = 50
 
 
-def _try_relief_relocation(
+def _try_relief_reassignment(
     *,
     session: Session,
     stuck_request: VMRequest,
@@ -993,7 +857,7 @@ def _try_relief_relocation(
     locked_request_ids: set[uuid.UUID],
     disk_overcommit_ratio: float,
     allowed_target_nodes_by_request: dict[uuid.UUID, set[str]] | None = None,
-    max_migrations: int | None = None,
+    max_reassignments: int | None = None,
 ) -> dict[uuid.UUID, str] | None:
     """Try 1-move or 2-move relief to make room for a stuck request.
 
@@ -1001,7 +865,7 @@ def _try_relief_relocation(
     to other nodes to free capacity for the stuck request.
     Returns updated assignment map or None if no relief found.
     """
-    if tuning.search_max_relocations <= 0:
+    if tuning.search_max_reassignments <= 0:
         return None
 
     node_names = [n.node for n in working_nodes]
@@ -1051,7 +915,7 @@ def _try_relief_relocation(
                     priorities=priorities,
                     tuning=tuning,
                     allowed_target_nodes_by_request=allowed_target_nodes_by_request,
-                    max_migrations=max_migrations,
+                    max_reassignments=max_reassignments,
                 )
             except (ValueError, KeyError):
                 continue
@@ -1066,7 +930,7 @@ def _try_relief_relocation(
     return best_result
 
 
-def _solve_rebalance_assignments(
+def _solve_placement_assignments(
     *,
     session: Session,
     ordered_requests: list[VMRequest],
@@ -1076,7 +940,7 @@ def _solve_rebalance_assignments(
     tuning: _PlacementTuning,
     fixed_assignments: dict[uuid.UUID, str] | None = None,
     allowed_target_nodes_by_request: dict[uuid.UUID, set[str]] | None = None,
-    max_migrations: int | None = None,
+    max_reassignments: int | None = None,
 ) -> dict[uuid.UUID, str]:
     initial_assignments = _initial_active_assignment_map(
         session=session,
@@ -1087,21 +951,18 @@ def _solve_rebalance_assignments(
         tuning=tuning,
         fixed_assignments=fixed_assignments,
         allowed_target_nodes_by_request=allowed_target_nodes_by_request,
-        max_migrations=max_migrations,
+        max_reassignments=max_reassignments,
     )
-    final_assignments = _run_local_rebalance_search(
+    final_assignments = _run_local_placement_search(
         session=session,
         ordered_requests=ordered_requests,
         baseline_nodes=baseline_nodes,
         initial_assignments=initial_assignments,
         priorities=priorities,
         tuning=tuning,
-        locked_request_ids=(
-            set((fixed_assignments or {}).keys())
-            | {r.id for r in ordered_requests if getattr(r, 'migration_pinned', False)}
-        ),
+        locked_request_ids=set((fixed_assignments or {}).keys()),
         allowed_target_nodes_by_request=allowed_target_nodes_by_request,
-        max_migrations=max_migrations,
+        max_reassignments=max_reassignments,
     )
     final_eval = _evaluate_active_assignment_map(
         session=session,
@@ -1111,10 +972,10 @@ def _solve_rebalance_assignments(
         priorities=priorities,
         tuning=tuning,
         allowed_target_nodes_by_request=allowed_target_nodes_by_request,
-        max_migrations=max_migrations,
+        max_reassignments=max_reassignments,
     )
     if not final_eval.feasible:
-        raise ValueError("No feasible active rebalance exists for the current request cohort")
+        raise ValueError("No feasible active-window planning exists for the current request cohort")
     return final_assignments
 
 
@@ -1161,8 +1022,8 @@ def _build_preview_selection_reasons(
             f"{selected_node} has lower storage contention than {runner_up_node}."
         )
 
-    if selected_eval.movement_count < runner_up_eval.movement_count:
-        delta = runner_up_eval.movement_count - selected_eval.movement_count
+    if selected_eval.reassignment_count < runner_up_eval.reassignment_count:
+        delta = runner_up_eval.reassignment_count - selected_eval.reassignment_count
         reasons.append(f"It avoids {delta} extra VM movement(s).")
 
     selected_priority = priorities.get(selected_node, 5)
@@ -1197,6 +1058,13 @@ def rebuild_reserved_assignments(
     selections: dict[uuid.UUID, CurrentPlacementSelection] = {}
 
     for request in ordered_requests:
+        # 已建立的 VM/LXC 只作為租借容量占用，不再重新指派節點。
+        current_node = _provisioned_current_node(request)
+        if request.vmid is not None and current_node:
+            request.assigned_node = current_node
+            request.desired_node = current_node
+            reserved_so_far.append(request)
+            continue
         selection = select_reserved_target_node(
             session=session,
             db_request=request,
@@ -1214,85 +1082,6 @@ def rebuild_reserved_assignments(
     return selections
 
 
-def rebalance_active_assignments(
-    *,
-    session: Session,
-    requests: list[VMRequest],
-) -> dict[uuid.UUID, CurrentPlacementSelection]:
-    ordered_requests = sorted(
-        requests,
-        key=lambda item: (
-            _normalize_datetime(item.start_at) or datetime.min.replace(tzinfo=UTC),
-            _normalize_datetime(item.reviewed_at) or datetime.min.replace(tzinfo=UTC),
-            _normalize_datetime(item.created_at) or datetime.min.replace(tzinfo=UTC),
-            str(item.id),
-        ),
-    )
-    working_nodes = _build_rebalance_baseline_nodes(
-        session=session,
-        requests=ordered_requests,
-    )
-    migration_policy = scheduling_policy.get_migration_policy(session=session)
-    strategy = get_placement_strategy(session)
-    priorities = get_node_priorities(session)
-    tuning = _get_placement_tuning(session=session)
-
-    baseline_nodes = [item.model_copy(deep=True) for item in working_nodes]
-    allowed_target_nodes_by_request = _build_active_rebalance_allowed_target_nodes(
-        ordered_requests=ordered_requests,
-        baseline_nodes=baseline_nodes,
-        policy=migration_policy,
-        now=_utc_now(),
-    )
-    fixed_assignments = {
-        request.id: fixed_node
-        for request in ordered_requests
-        if (fixed_node := _fixed_node_for_quick_template(request))
-    }
-    final_assignments = _solve_rebalance_assignments(
-        session=session,
-        ordered_requests=ordered_requests,
-        baseline_nodes=baseline_nodes,
-        strategy=strategy,
-        priorities=priorities,
-        tuning=tuning,
-        fixed_assignments=fixed_assignments,
-        allowed_target_nodes_by_request=allowed_target_nodes_by_request,
-        max_migrations=migration_policy.max_per_rebalance,
-    )
-
-    selections: dict[uuid.UUID, CurrentPlacementSelection] = {}
-    for request in ordered_requests:
-        placement_request = _to_placement_request(request)
-        effective_resource_type, resource_type_reason = placement_advisor._decide_resource_type(
-            placement_request
-        )
-        chosen_node = final_assignments.get(request.id)
-        if not chosen_node:
-            raise ValueError(f"No feasible active rebalance exists for request {request.id}")
-        selections[request.id] = CurrentPlacementSelection(
-            node=chosen_node,
-            strategy=strategy,
-            plan=PlacementPlan(
-                feasible=True,
-                requested_resource_type=placement_request.resource_type,
-                effective_resource_type=effective_resource_type,
-                resource_type_reason=resource_type_reason,
-                assigned_instances=1,
-                unassigned_instances=0,
-                recommended_node=chosen_node,
-                summary=(
-                    "Active window rebalance selected the best feasible node "
-                    "after greedy placement and local rebalance search."
-                ),
-                rationale=[],
-                warnings=[],
-                placements=[],
-                candidate_nodes=baseline_nodes,
-            ),
-        )
-
-    return selections
 
 def compute_node_score_breakdown(
     *,
@@ -1318,7 +1107,7 @@ def compute_node_score_breakdown(
             peak_penalty=0.0,
             loadavg_penalty=0.0,
             storage_penalty=round(storage_pen * tuning.disk_penalty_weight, 4),
-            migration_cost=round(evaluation.movement_count * tuning.migration_cost, 4),
+            reassignment_cost=round(evaluation.reassignment_count * tuning.reassignment_cost, 4),
             priority=priorities.get(node_name, 5),
             is_selected=node_name == selected_node,
             reason=(
@@ -1420,7 +1209,7 @@ def get_preview_node_scores(
             str(item.id),
         ),
     )
-    preview_baseline = _build_rebalance_baseline_nodes(
+    preview_baseline = _build_placement_baseline_nodes(
         session=session, requests=preview_ordered,
     )
     preview_baseline = [
@@ -1437,7 +1226,7 @@ def get_preview_node_scores(
     best_obj = None
     for candidate_node in sorted(feasible_nodes):
         try:
-            assignments = _solve_rebalance_assignments(
+            assignments = _solve_placement_assignments(
                 session=session,
                 ordered_requests=preview_ordered,
                 baseline_nodes=preview_baseline,

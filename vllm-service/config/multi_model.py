@@ -20,6 +20,7 @@ class ModelInstanceConfig:
     """單一模型實例設定。"""
 
     alias: str
+    served_model_name: str
     model_config: dict[str, Any]
     settings: Settings
 
@@ -42,6 +43,8 @@ class GatewayConfig:
     port: int
     request_timeout: int
     max_inflight: int
+    per_model_max_inflight: int
+    queue_timeout: float
     default_model: str
 
 
@@ -53,6 +56,10 @@ class GatewayRoute:
     model_name: str
     base_url: str
     api_key: str
+    max_inflight: int
+    queue_timeout: float
+    scheduling_policy: str
+    capabilities: dict[str, Any]
 
 
 def _resolve_path(file_path: str | Path) -> Path:
@@ -87,6 +94,8 @@ def load_gateway_config(base_env_file: str | Path | None = None) -> GatewayConfi
         port=int(os.getenv("GATEWAY_PORT", "3000")),
         request_timeout=int(os.getenv("GATEWAY_REQUEST_TIMEOUT", "300")),
         max_inflight=int(os.getenv("GATEWAY_MAX_INFLIGHT", "48")),
+        per_model_max_inflight=int(os.getenv("GATEWAY_PER_MODEL_MAX_INFLIGHT", "16")),
+        queue_timeout=float(os.getenv("GATEWAY_QUEUE_TIMEOUT", "30")),
         default_model=os.getenv("GATEWAY_DEFAULT_MODEL", ""),
     )
 
@@ -127,6 +136,7 @@ def load_model_instances(
     
     instances: list[ModelInstanceConfig] = []
     seen_alias: set[str] = set()
+    seen_served_model_name: set[str] = set()
     seen_port: set[int] = set()
     
     for idx, model_config in enumerate(models_config):
@@ -149,6 +159,12 @@ def load_model_instances(
         
         if alias in seen_alias:
             raise ValueError(f"MODEL_ALIAS 重複: {alias}")
+
+        served_model_name = effective_model_config.get("served_model_name", "").strip()
+        if not served_model_name:
+            raise ValueError(f"模型配置 #{idx} 缺少 'served_model_name' 欄位")
+        if served_model_name in seen_served_model_name:
+            raise ValueError(f"served_model_name 重複: {served_model_name}")
         
         # 建立 Settings，使用模型配置覆蓋 .env 的值
         # 需要將 JSON 的 snake_case 轉為環境變數格式
@@ -157,6 +173,7 @@ def load_model_instances(
         # 對應關係
         field_mapping = {
             "model_name": "MODEL_NAME",
+            "served_model_name": "SERVED_MODEL_NAME",
             "api_port": "API_PORT",
             "max_model_len": "MAX_MODEL_LEN",
             "gpu_memory_utilization": "GPU_MEMORY_UTILIZATION",
@@ -182,8 +199,7 @@ def load_model_instances(
             "generation_config": "GENERATION_CONFIG",
             "enable_request_id_headers": "ENABLE_REQUEST_ID_HEADERS",
             "scheduling_policy": "SCHEDULING_POLICY",
-            "max_num_partial_prefills": "MAX_NUM_PARTIAL_PREFILLS",
-            "max_long_partial_prefills": "MAX_LONG_PARTIAL_PREFILLS",
+            "enable_chunked_prefill": "ENABLE_CHUNKED_PREFILL",
             "long_prefill_token_threshold": "LONG_PREFILL_TOKEN_THRESHOLD",
             "limit_mm_per_prompt": "LIMIT_MM_PER_PROMPT",
             "moe_backend": "MOE_BACKEND",
@@ -213,11 +229,13 @@ def load_model_instances(
             raise ValueError(f"API_PORT 重複: {settings.api_port} (模型: {alias})")
         
         seen_alias.add(alias)
+        seen_served_model_name.add(served_model_name)
         seen_port.add(settings.api_port)
         
         instances.append(
             ModelInstanceConfig(
                 alias=alias,
+                served_model_name=served_model_name,
                 model_config=effective_model_config,
                 settings=settings,
             )
@@ -226,15 +244,43 @@ def load_model_instances(
     return instances
 
 
-def build_gateway_routes(instances: list[ModelInstanceConfig]) -> dict[str, GatewayRoute]:
+def build_gateway_routes(
+    instances: list[ModelInstanceConfig],
+    default_max_inflight: int | None = None,
+    default_queue_timeout: float | None = None,
+) -> dict[str, GatewayRoute]:
     """由模型實例建立 Gateway 路由表。"""
     routes: dict[str, GatewayRoute] = {}
     for instance in instances:
+        max_inflight = int(
+            instance.model_config.get(
+                "gateway_max_inflight",
+                default_max_inflight if default_max_inflight is not None else instance.settings.max_num_seqs,
+            )
+        )
+        queue_timeout = float(
+            instance.model_config.get(
+                "gateway_queue_timeout",
+                default_queue_timeout if default_queue_timeout is not None else 30,
+            )
+        )
+        capabilities = instance.model_config.get("capabilities", {})
+        if not isinstance(capabilities, dict):
+            raise ValueError(f"模型 {instance.alias} 的 capabilities 必須為物件")
+
         routes[instance.alias] = GatewayRoute(
             alias=instance.alias,
-            model_name=instance.settings.resolved_model_path,
+            # vLLM is started with --served-model-name. The legacy Gateway
+            # must forward that stable upstream ID, never the host-local model
+            # directory used before Phase 1; otherwise its rollback path
+            # receives a 404 after the cluster has been decoupled.
+            model_name=instance.served_model_name,
             base_url=instance.upstream_base_url,
             api_key=instance.settings.api_key,
+            max_inflight=max(1, max_inflight),
+            queue_timeout=max(0.0, queue_timeout),
+            scheduling_policy=instance.settings.scheduling_policy,
+            capabilities=dict(capabilities),
         )
     return routes
 

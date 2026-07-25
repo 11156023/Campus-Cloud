@@ -1,55 +1,62 @@
+import { lazy } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { useAuth } from "./contexts/AuthContext";
 import DashboardLayout from "./layout/DashboardLayout";
 import LoginPage from "./pages/login/LoginPage";
 
 // 個人
-import DashboardPage         from "./pages/personal/dashboard/DashboardPage";
-import QuickTemplateFormPage from "./pages/personal/dashboard/QuickTemplateFormPage";
-import ResourcesPage         from "./pages/personal/resources/ResourcesPage";
-import ResourceDetailPage    from "./pages/personal/resources/detail/ResourceDetailPage";
-import RequestsPage          from "./pages/personal/requests/RequestsPage";
-import AccountSettingsPage   from "./pages/personal/account/AccountSettingsPage";
+const DashboardPage = lazy(() => import("./pages/personal/dashboard/DashboardPage"));
+const QuickTemplateFormPage = lazy(() => import("./pages/personal/dashboard/QuickTemplateFormPage"));
+const ResourcesPage = lazy(() => import("./pages/personal/resources/ResourcesPage"));
+const ResourceDetailPage = lazy(() => import("./pages/personal/resources/detail/ResourceDetailPage"));
+const RequestsPage = lazy(() => import("./pages/personal/requests/RequestsPage"));
+const AccountSettingsPage = lazy(() => import("./pages/personal/account/AccountSettingsPage"));
 
 // 資源
-import ResourceMgmtPage  from "./pages/resource/resource-mgmt/ResourceMgmtPage";
-import RequestReviewPage from "./pages/resource/request-review/RequestReviewPage";
-import GpuMgmtPage       from "./pages/resource/gpu-mgmt/GpuMgmtPage";
-import BatchReviewPage   from "./pages/resource/batch-review/BatchReviewPage";
-import TemplatesPage     from "./pages/resource/templates/TemplatesPage";
+const ResourceMgmtPage = lazy(() => import("./pages/resource/resource-mgmt/ResourceMgmtPage"));
+const RequestReviewPage = lazy(() => import("./pages/resource/request-review/RequestReviewPage"));
+const GpuMgmtPage = lazy(() => import("./pages/resource/gpu-mgmt/GpuMgmtPage"));
+const BatchReviewPage = lazy(() => import("./pages/resource/batch-review/BatchReviewPage"));
+const TemplatesPage = lazy(() => import("./pages/resource/templates/TemplatesPage"));
 
 // AI
-import AiApiPage       from "./pages/ai/ai-api/AiApiPage";
-import AiMonitoringPage from "./pages/ai/ai-monitoring/AiMonitoringPage";
-import AiManagementPage from "./pages/ai/ai-management/AiManagementPage";
+const AiApiPage = lazy(() => import("./pages/ai/ai-api/AiApiPage"));
+const AiApiReviewPage = lazy(() => import("./pages/ai/ai-api-review/AiApiReviewPage"));
+const AiApiKeysPage = lazy(() => import("./pages/ai/ai-api-keys/AiApiKeysPage"));
+const AiMonitoringPage = lazy(() => import("./pages/ai/ai-monitoring/AiMonitoringPage"));
 
 // 教學
-import TeachingPage from "./pages/teaching/TeachingPage";
-import ClassroomPage from "./pages/classroom/ClassroomPage";
-import CoursePathsPage from "./pages/courses/paths/CoursePathsPage";
-import CourseRoomPage from "./pages/courses/room/CourseRoomPage";
-import CourseCmsPage from "./pages/teaching/course-cms/CourseCmsPage";
+const TeachingPage = lazy(() => import("./pages/teaching/TeachingPage"));
+const ClassroomPage = lazy(() => import("./pages/classroom/ClassroomPage"));
+const CoursePathsPage = lazy(() => import("./pages/courses/paths/CoursePathsPage"));
+const CourseRoomPage = lazy(() => import("./pages/courses/room/CourseRoomPage"));
+const CourseCmsPage = lazy(() => import("./pages/teaching/course-cms/CourseCmsPage"));
+const CourseTemplateManagementPage = lazy(() => import("./pages/course-operations/CourseTemplateManagementPage"));
+const CourseTemplateEditorPage = lazy(() => import("./pages/course-operations/CourseTemplateEditorPage"));
+const ClassManagementPage = lazy(() => import("./pages/course-operations/ClassManagementPage"));
+const ClassCreatePage = lazy(() => import("./pages/course-operations/ClassCreatePage"));
+const ClassWorkspacePage = lazy(() => import("./pages/course-operations/ClassWorkspacePage"));
 
 // 系統管理
-import GroupsPage    from "./pages/system/groups/GroupsPage";
-import AdminPage     from "./pages/system/admin/AdminPage";
-import SettingsPage  from "./pages/system/settings/SettingsPage";
-import MonitoringPage from "./pages/system/monitoring/MonitoringPage";
-import MigrationPage from "./pages/system/migration/MigrationPage";
-import QuotasPage    from "./pages/system/quotas/QuotasPage";
-import AuditPage     from "./pages/system/audit/AuditPage";
-import JobsPage      from "./pages/system/jobs/JobsPage";
-import DeployLogsPage from "./pages/system/deploy-logs/DeployLogsPage";
+const GroupsPage = lazy(() => import("./pages/system/groups/GroupsPage"));
+const AdminPage = lazy(() => import("./pages/system/admin/AdminPage"));
+const SettingsPage = lazy(() => import("./pages/system/settings/SettingsPage"));
+const MonitoringPage = lazy(() => import("./pages/system/monitoring/MonitoringPage"));
+const QuotasPage = lazy(() => import("./pages/system/quotas/QuotasPage"));
+const AuditPage = lazy(() => import("./pages/system/audit/AuditPage"));
+const JobsPage = lazy(() => import("./pages/system/jobs/JobsPage"));
+const DeployLogsPage = lazy(() => import("./pages/system/deploy-logs/DeployLogsPage"));
 
 // 網路
-import FirewallPage       from "./pages/network/firewall/FirewallPage";
-import DomainPage         from "./pages/network/domain/DomainPage";
-import GatewayPage        from "./pages/network/gateway/GatewayPage";
-import ReverseProxyPage   from "./pages/network/reverse-proxy/ReverseProxyPage";
-import IpManagementPage   from "./pages/network/ip-management/IpManagementPage";
+const FirewallPage = lazy(() => import("./pages/network/firewall/FirewallPage"));
+const DomainPage = lazy(() => import("./pages/network/domain/DomainPage"));
+const GatewayPage = lazy(() => import("./pages/network/gateway/GatewayPage"));
+const ReverseProxyPage = lazy(() => import("./pages/network/reverse-proxy/ReverseProxyPage"));
+const IpManagementPage = lazy(() => import("./pages/network/ip-management/IpManagementPage"));
 
 function App() {
   const { user, loading } = useAuth();
+  const isAdmin = Boolean(user?.is_superuser || user?.role === "admin");
 
   if (loading) return null;
 
@@ -82,11 +89,17 @@ function App() {
 
           {/* AI */}
           <Route path="/ai-api"         element={<AiApiPage />} />
-          {/* 舊路由：AI API 審核併入申請審核、金鑰管理併入 AI 管理 */}
-          <Route path="/ai-api-review"  element={<Navigate to="/request-review" replace />} />
-          <Route path="/ai-api-keys"    element={<Navigate to="/ai-management" replace />} />
-          <Route path="/ai-monitoring"  element={<AiMonitoringPage />} />
-          <Route path="/ai-management"  element={<AiManagementPage />} />
+          {isAdmin && (
+            <>
+              <Route path="/ai-api-review" element={<AiApiReviewPage />} />
+              <Route path="/ai-api-keys" element={<AiApiKeysPage />} />
+              <Route path="/ai-monitoring" element={<AiMonitoringPage />} />
+            </>
+          )}
+          <Route
+            path="/ai-management"
+            element={<Navigate to={isAdmin ? "/ai-monitoring" : "/ai-api"} replace />}
+          />
 
           {/* 教學 */}
           <Route path="/teaching"  element={<TeachingPage />} />
@@ -95,13 +108,21 @@ function App() {
           <Route path="/courses/rooms/:roomId" element={<CourseRoomPage />} />
           <Route path="/course-cms"            element={<CourseCmsPage />} />
 
+          {/* 課務管理 */}
+          <Route path="/course-template-management" element={<CourseTemplateManagementPage />} />
+          <Route path="/course-template-management/new" element={<CourseTemplateEditorPage />} />
+          <Route path="/course-template-management/:templateId" element={<CourseTemplateEditorPage />} />
+          <Route path="/class-management" element={<ClassManagementPage />} />
+          <Route path="/class-management/new" element={<ClassCreatePage />} />
+          <Route path="/class-management/:classId" element={<ClassWorkspacePage />} />
+          <Route path="/class-management/:classId/:section" element={<ClassWorkspacePage />} />
+
           {/* 系統管理 */}
           <Route path="/groups"    element={<GroupsPage />} />
           <Route path="/admin"     element={<AdminPage />} />
           <Route path="/settings"  element={<SettingsPage />} />
           <Route path="/quotas"    element={<QuotasPage />} />
           <Route path="/monitoring" element={<MonitoringPage />} />
-          <Route path="/migration" element={<MigrationPage />} />
           <Route path="/audit"     element={<AuditPage />} />
           <Route path="/jobs"      element={<JobsPage />} />
           <Route path="/deploy-logs" element={<DeployLogsPage />} />

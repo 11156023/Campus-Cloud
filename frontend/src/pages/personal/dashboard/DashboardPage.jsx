@@ -148,14 +148,20 @@ export default function DashboardPage() {
   const [templates, setTemplates] = useState([]);
   const [tplLoading, setTplLoading] = useState(true);
   useEffect(() => {
-    TemplatesService.list()
+    const controller = new AbortController();
+    TemplatesService.list({ signal: controller.signal })
       .then((res) => setTemplates(
         (res?.data ?? []).filter(
           (t) => t.resource_type === "lxc" && t.status === "ready" && t.pve_exists !== false,
         ),
       ))
-      .catch(() => setTemplates([]))
-      .finally(() => setTplLoading(false));
+      .catch((err) => {
+        if (!err?.cancelled) setTemplates([]);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setTplLoading(false);
+      });
+    return () => controller.abort();
   }, []);
 
   useDragScroll(scrollRef, { draggingClass: styles.dragging });

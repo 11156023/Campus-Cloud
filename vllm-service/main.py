@@ -478,7 +478,8 @@ def quick_start_cluster(
     logger = get_logger("ClusterLauncher")
     base_env_path = resolve_env_file(base_env)
     os.environ[SERVICE_ENV_FILE_VAR] = str(base_env_path)
-    os.environ[GATEWAY_ENV_FILE_VAR] = str(base_env_path)
+    if start_gateway:
+        os.environ[GATEWAY_ENV_FILE_VAR] = str(base_env_path)
 
     try:
         cli_overrides = {
@@ -493,8 +494,13 @@ def quick_start_cluster(
             cli_overrides=cli_overrides,
         )
         validate_cluster_resources(instances)
-        gateway_config = load_gateway_config(base_env_file=base_env)
-        routes = build_gateway_routes(instances)
+        gateway_config = None
+        routes = {}
+        # --no-gateway 是 LiteLLM 遷移期的正式 cluster 路徑；它不得因
+        # 舊 Gateway 的 env 或 route metadata 缺失而無法啟動模型。
+        if start_gateway:
+            gateway_config = load_gateway_config(base_env_file=base_env)
+            routes = build_gateway_routes(instances)
     except Exception as exc:
         logger.error(f"載入集群設定失敗: {exc}")
         return None
@@ -525,12 +531,12 @@ def quick_start_cluster(
         )
         manager.print_status()
 
-        logger.section("Gateway 路由")
-        logger.info(f"Gateway: http://{gateway_config.host}:{gateway_config.port}")
-        for alias, route in routes.items():
-            logger.info(f"{alias} -> {route.base_url} (model={route.model_name})")
-
         if start_gateway:
+            assert gateway_config is not None
+            logger.section("Gateway 路由")
+            logger.info(f"Gateway: http://{gateway_config.host}:{gateway_config.port}")
+            for alias, route in routes.items():
+                logger.info(f"{alias} -> {route.base_url} (model={route.model_name})")
             logger.section("Gateway 啟動")
             gateway_runtime = _start_gateway_process(
                 gateway_host=gateway_config.host,
@@ -632,10 +638,10 @@ def _run_single_mode(args) -> None:
 
 
 def _run_cluster_mode(args) -> None:
-    """執行多模型 cluster/gateway 模式並阻塞到收到信號。"""
+    """執行多模型 cluster 模式，必要時啟動舊 Gateway。"""
     logger = get_logger("Main")
 
-    logger.info("啟動模式: gateway/cluster（多模型 API Gateway 服務）")
+    logger.info("啟動模式: 多模型 vLLM cluster")
     logger.info(f"共用設定檔: {args.base_env}")
     logger.info(f"模型配置檔: {args.models_json}")
     logger.info(f"啟動 Gateway: {'否' if args.no_gateway else '是'}")
@@ -697,7 +703,7 @@ def main() -> None:
     import argparse
     
     parser = argparse.ArgumentParser(
-        description="vLLM 啟動腳本：支援單模型主服務與多模型 Gateway"
+        description="vLLM 啟動腳本：支援單模型與多模型 cluster（可選舊 Gateway）"
     )
     parser.add_argument(
         "mode",
@@ -706,7 +712,7 @@ def main() -> None:
         default=None,
         help=(
             "啟動模式：single=單模型主服務，"
-            "gateway/cluster=多模型 Gateway（預設）"
+            "cluster=多模型 vLLM，gateway=多模型加舊 Gateway（預設 cluster）"
         ),
     )
     parser.add_argument(
@@ -740,7 +746,7 @@ def main() -> None:
         "--base-env",
         type=str,
         default=".env.API",
-        help="Gateway/cluster 共用設定檔路徑（預設 .env.API）"
+        help="cluster 共用設定檔路徑（預設 .env.API）"
     )
     parser.add_argument(
         "--models-json",

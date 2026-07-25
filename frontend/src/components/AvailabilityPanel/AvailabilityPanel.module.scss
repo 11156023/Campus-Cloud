@@ -58,6 +58,12 @@
   transition: background $transition-base;
 
   &:hover { background: var(--color-hover); }
+
+  &:disabled {
+    opacity: 0.28;
+    cursor: not-allowed;
+    background: transparent;
+  }
 }
 
 .calendarTitle {

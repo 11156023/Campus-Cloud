@@ -206,7 +206,7 @@ export default function AiMonitoringPage() {
     <div className={styles.page}>
       <div className={styles.pageHeader}>
         <div className={styles.pageHeading}>
-          <h1 className={styles.pageTitle}>AI 監控</h1>
+          <h1 className={styles.pageTitle}>AI API 使用監控</h1>
           <p className={styles.pageSubtitle}>檢視 AI Proxy 與 Template 服務的呼叫紀錄與用量統計</p>
         </div>
         <div className={styles.pageActions}>

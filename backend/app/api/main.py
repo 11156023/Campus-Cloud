@@ -20,7 +20,6 @@ from app.api.routes import (
     ldap_config,
     login,
     lxc,
-    migration_jobs,
     mining_incidents,
     monitoring,
     pair_sessions,
@@ -55,7 +54,6 @@ api_router.include_router(vm.router)
 api_router.include_router(lxc.router)
 api_router.include_router(vm_requests.router)
 api_router.include_router(deletion_requests.router)
-api_router.include_router(migration_jobs.router)
 api_router.include_router(monitoring.router)
 api_router.include_router(governance.router)
 api_router.include_router(quotas.router)

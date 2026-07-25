@@ -1,6 +1,6 @@
 """Scheduler tick handlers for recurrence-based boot/stop.
 
-These are registered alongside the existing migration handlers in
+These are registered alongside the request lifecycle handlers in
 :func:`app.services.scheduling.coordinator.run_scheduler`. Each handler
 runs once per tick (default 60s) inside a worker thread.
 

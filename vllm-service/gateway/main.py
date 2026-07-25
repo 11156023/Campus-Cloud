@@ -13,6 +13,8 @@ import os
 import sys
 import tempfile
 import time
+import uuid
+from dataclasses import dataclass
 from pathlib import Path
 from typing import AsyncGenerator
 
@@ -51,12 +53,17 @@ client = ModelClient(settings)
 try:
     _gateway_cfg = load_gateway_config(gateway_env_file)
     _gateway_instances = load_model_instances(gateway_env_file)
-    gateway_routes: dict[str, GatewayRoute] = build_gateway_routes(_gateway_instances)
+    gateway_routes: dict[str, GatewayRoute] = build_gateway_routes(
+        _gateway_instances,
+        default_max_inflight=_gateway_cfg.per_model_max_inflight,
+        default_queue_timeout=_gateway_cfg.queue_timeout,
+    )
     gateway_default_model = _gateway_cfg.default_model or next(iter(gateway_routes))
     gateway_host = _gateway_cfg.host
     gateway_port = _gateway_cfg.port
     gateway_request_timeout = _gateway_cfg.request_timeout
     gateway_max_inflight = _gateway_cfg.max_inflight
+    gateway_queue_timeout = _gateway_cfg.queue_timeout
 except Exception as exc:
     logger.warning("Gateway 多模型設定載入失敗，回退單模型路由: %s", exc)
     gateway_routes = {
@@ -65,6 +72,10 @@ except Exception as exc:
             model_name=settings.resolved_model_path,
             base_url=f"http://127.0.0.1:{settings.api_port}/v1",
             api_key=settings.api_key,
+            max_inflight=settings.max_num_seqs,
+            queue_timeout=30.0,
+            scheduling_policy=settings.scheduling_policy,
+            capabilities={},
         )
     }
     gateway_default_model = "default"
@@ -72,12 +83,17 @@ except Exception as exc:
     gateway_port = 3000
     gateway_request_timeout = settings.request_timeout
     gateway_max_inflight = 32
+    gateway_queue_timeout = 30.0
 
 gateway_http_client = httpx.AsyncClient(
     timeout=gateway_request_timeout,
     limits=httpx.Limits(max_connections=200, max_keepalive_connections=50, keepalive_expiry=30.0),
 )
 gateway_semaphore = asyncio.Semaphore(gateway_max_inflight)
+gateway_model_semaphores = {
+    alias: asyncio.Semaphore(route.max_inflight)
+    for alias, route in gateway_routes.items()
+}
 
 # 模型列表快取（60秒有效期）
 _models_cache: dict = {"data": None, "time": 0.0}
@@ -231,6 +247,101 @@ class ChatResponse(BaseModel):
     response: str
 
 
+@dataclass
+class GatewayAdmission:
+    """Gateway admission state that must be released after upstream work finishes."""
+
+    route: GatewayRoute
+    request_id: str
+    queue_class: str
+    queue_wait_ms: float
+    started_at: float
+    released: bool = False
+
+    def release(self, status_code: int | None = None, timed_out: bool = False) -> None:
+        if self.released:
+            return
+        self.released = True
+        duration_ms = (time.perf_counter() - self.started_at) * 1000
+        _record_request_end(
+            alias=self.route.alias,
+            queue_class=self.queue_class,
+            duration_ms=duration_ms,
+            status_code=status_code,
+            timed_out=timed_out,
+        )
+        gateway_model_semaphores[self.route.alias].release()
+        gateway_semaphore.release()
+
+
+_VALID_QUEUE_CLASSES = {"interactive", "stream", "batch"}
+_BAD_QUEUE_CLASS_MESSAGE = "gateway_queue_class must be one of: batch, interactive, stream"
+_STANDARD_CAPABILITY_FIELDS = {
+    "reasoning_effort": "reasoning",
+    "structured_outputs": "structured_outputs",
+    "tools": "tool_use",
+    "tool_choice": "tool_use",
+}
+
+gateway_metrics = {
+    "requests_total": 0,
+    "requests_rejected": 0,
+    "queue_timeouts_total": 0,
+    "upstream_timeouts_total": 0,
+    "stream_active": 0,
+    "inflight": {
+        "global": 0,
+        "per_model": {alias: 0 for alias in gateway_routes},
+        "by_queue_class": {queue_class: 0 for queue_class in _VALID_QUEUE_CLASSES},
+    },
+    "last_queue_wait_ms": {},
+    "last_request_duration_ms": {},
+    "status_codes": {},
+}
+
+
+def _get_metric_bucket(metric_name: str, alias: str) -> dict:
+    buckets = gateway_metrics.setdefault(metric_name, {})
+    return buckets.setdefault(alias, {})
+
+
+def _record_request_start(alias: str, queue_class: str, queue_wait_ms: float) -> None:
+    gateway_metrics["requests_total"] += 1
+    gateway_metrics["inflight"]["global"] += 1
+    gateway_metrics["inflight"]["per_model"][alias] += 1
+    gateway_metrics["inflight"]["by_queue_class"][queue_class] += 1
+    _get_metric_bucket("last_queue_wait_ms", alias)[queue_class] = round(queue_wait_ms, 2)
+
+
+def _record_request_end(
+    alias: str,
+    queue_class: str,
+    duration_ms: float,
+    status_code: int | None,
+    timed_out: bool,
+) -> None:
+    gateway_metrics["inflight"]["global"] = max(0, gateway_metrics["inflight"]["global"] - 1)
+    gateway_metrics["inflight"]["per_model"][alias] = max(0, gateway_metrics["inflight"]["per_model"][alias] - 1)
+    gateway_metrics["inflight"]["by_queue_class"][queue_class] = max(
+        0,
+        gateway_metrics["inflight"]["by_queue_class"][queue_class] - 1,
+    )
+    _get_metric_bucket("last_request_duration_ms", alias)[queue_class] = round(duration_ms, 2)
+    if timed_out:
+        gateway_metrics["upstream_timeouts_total"] += 1
+    if status_code is not None:
+        status_key = str(status_code)
+        gateway_metrics["status_codes"][status_key] = gateway_metrics["status_codes"].get(status_key, 0) + 1
+
+
+def _record_rejection(reason: str, alias: str | None = None) -> None:
+    gateway_metrics["requests_rejected"] += 1
+    if reason == "queue_timeout":
+        gateway_metrics["queue_timeouts_total"] += 1
+    if alias:
+        _get_metric_bucket("rejections", alias)[reason] = _get_metric_bucket("rejections", alias).get(reason, 0) + 1
+
+
 def _openai_error(
     status_code: int,
     message: str,
@@ -255,6 +366,134 @@ def _resolve_model_route(model: str | None) -> GatewayRoute | None:
     return find_route_for_model(model=model, routes=gateway_routes)
 
 
+def _capability_enabled(route: GatewayRoute, capability: str) -> bool:
+    return bool(route.capabilities.get(capability, False))
+
+
+def _infer_queue_class(payload: dict, stream_mode: bool) -> str:
+    explicit = payload.pop("gateway_queue_class", None)
+    if explicit is None:
+        metadata = payload.get("metadata")
+        if isinstance(metadata, dict):
+            explicit = metadata.get("gateway_queue_class")
+
+    if explicit is not None:
+        queue_class = str(explicit).strip().lower()
+        if queue_class not in _VALID_QUEUE_CLASSES:
+            raise ValueError(_BAD_QUEUE_CLASS_MESSAGE)
+        return queue_class
+
+    if stream_mode:
+        return "stream"
+    return "interactive"
+
+
+def _validate_model_capabilities(route: GatewayRoute, payload: dict) -> JSONResponse | None:
+    """Validate only explicitly declared unsupported capabilities."""
+    capabilities = route.capabilities
+    if not capabilities:
+        return None
+
+    for field, capability in _STANDARD_CAPABILITY_FIELDS.items():
+        if field in payload and capability in capabilities and not _capability_enabled(route, capability):
+            return _openai_error(
+                400,
+                f"Model '{route.alias}' does not support '{field}' ({capability}=false)",
+                code="unsupported_model_capability",
+            )
+
+    response_format = payload.get("response_format")
+    if (
+        isinstance(response_format, dict)
+        and response_format.get("type") == "json_schema"
+        and "response_format_json_schema" in capabilities
+        and not _capability_enabled(route, "response_format_json_schema")
+    ):
+        return _openai_error(
+            400,
+            f"Model '{route.alias}' does not support response_format=json_schema",
+            code="unsupported_model_capability",
+        )
+
+    priority = payload.get("priority")
+    if priority is not None:
+        try:
+            int(priority)
+        except (TypeError, ValueError):
+            return _openai_error(400, "priority must be an integer", code="invalid_priority")
+        if route.scheduling_policy != "priority" or not _capability_enabled(route, "priority_scheduling"):
+            return _openai_error(
+                400,
+                f"Model '{route.alias}' does not accept priority; enable scheduling_policy=priority and priority_scheduling",
+                code="unsupported_priority",
+            )
+
+    return None
+
+
+async def _acquire_gateway_admission(
+    route: GatewayRoute,
+    payload: dict,
+    stream_mode: bool,
+    request: Request | None,
+) -> GatewayAdmission:
+    queue_class = _infer_queue_class(payload, stream_mode=stream_mode)
+    request_id = (
+        request.headers.get("x-request-id")
+        if request is not None
+        else None
+    ) or str(uuid.uuid4())
+    timeout = route.queue_timeout if route.queue_timeout > 0 else gateway_queue_timeout
+    deadline = time.perf_counter() + timeout if timeout > 0 else None
+    started_wait = time.perf_counter()
+    global_acquired = False
+
+    try:
+        if deadline is None:
+            await gateway_semaphore.acquire()
+        else:
+            await asyncio.wait_for(gateway_semaphore.acquire(), timeout=max(0.0, deadline - time.perf_counter()))
+        global_acquired = True
+
+        model_semaphore = gateway_model_semaphores[route.alias]
+        if deadline is None:
+            await model_semaphore.acquire()
+        else:
+            await asyncio.wait_for(model_semaphore.acquire(), timeout=max(0.0, deadline - time.perf_counter()))
+    except asyncio.TimeoutError:
+        if global_acquired:
+            gateway_semaphore.release()
+        _record_rejection("queue_timeout", alias=route.alias)
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "error": {
+                    "message": f"Gateway queue timeout for model '{route.alias}'",
+                    "type": "rate_limit_error",
+                    "code": "gateway_queue_timeout",
+                }
+            },
+        )
+
+    queue_wait_ms = (time.perf_counter() - started_wait) * 1000
+    _record_request_start(route.alias, queue_class, queue_wait_ms)
+    logger.info(
+        "gateway admission request_id=%s model=%s queue_class=%s wait_ms=%.2f inflight_model=%s",
+        request_id,
+        route.alias,
+        queue_class,
+        queue_wait_ms,
+        gateway_metrics["inflight"]["per_model"][route.alias],
+    )
+    return GatewayAdmission(
+        route=route,
+        request_id=request_id,
+        queue_class=queue_class,
+        queue_wait_ms=queue_wait_ms,
+        started_at=time.perf_counter(),
+    )
+
+
 def _normalize_openai_payload(payload: dict) -> dict:
     """將 SDK 風格 extra_body 正規化為直接 HTTP payload。"""
     normalized = dict(payload)
@@ -267,12 +506,18 @@ def _normalize_openai_payload(payload: dict) -> dict:
     return normalized
 
 
-def _build_upstream_headers(route: GatewayRoute, request: Request | None = None) -> dict[str, str]:
+def _build_upstream_headers(
+    route: GatewayRoute,
+    request: Request | None = None,
+    request_id: str | None = None,
+) -> dict[str, str]:
     headers = {
         "Authorization": f"Bearer {route.api_key}",
         "Content-Type": "application/json",
     }
-    if request is not None:
+    if request_id:
+        headers["x-request-id"] = request_id
+    elif request is not None:
         request_id = request.headers.get("x-request-id")
         if request_id:
             headers["x-request-id"] = request_id
@@ -300,20 +545,43 @@ async def _proxy_openai_post(path: str, payload: dict, request: Request | None =
             code="model_not_found",
         )
 
+    capability_error = _validate_model_capabilities(route, normalized_payload)
+    if capability_error is not None:
+        _record_rejection("capability", alias=route.alias)
+        return capability_error
+
     upstream_payload = dict(normalized_payload)
+    try:
+        stream_mode = bool(upstream_payload.get("stream", False))
+        admission = await _acquire_gateway_admission(route, upstream_payload, stream_mode, request)
+    except ValueError as exc:
+        _record_rejection("bad_queue_class", alias=route.alias)
+        logger.warning("Rejected invalid gateway queue class: %s", exc)
+        return _openai_error(400, _BAD_QUEUE_CLASS_MESSAGE, code="bad_queue_class")
+    except HTTPException as exc:
+        if exc.status_code == 429:
+            return _openai_error(
+                429,
+                "Gateway queue timeout",
+                error_type="rate_limit_error",
+                code="gateway_queue_timeout",
+            )
+        logger.error("Unexpected gateway admission failure: status_code=%s", exc.status_code)
+        return _openai_error(
+            500,
+            "Gateway admission failed",
+            error_type="server_error",
+            code="gateway_admission_failed",
+        )
+
     upstream_payload["model"] = route.model_name
 
-    headers = _build_upstream_headers(route, request)
+    headers = _build_upstream_headers(route, request, request_id=admission.request_id)
     upstream_url = f"{route.base_url}{path}"
-    stream_mode = bool(upstream_payload.get("stream", False))
-    acquired = False
     release_in_stream = False
     resp: httpx.Response | None = None
 
     try:
-        await gateway_semaphore.acquire()
-        acquired = True
-
         if stream_mode:
             req = gateway_http_client.build_request(
                 method="POST",
@@ -323,15 +591,19 @@ async def _proxy_openai_post(path: str, payload: dict, request: Request | None =
             )
             resp = await gateway_http_client.send(req, stream=True)
             response_headers = _build_downstream_headers(resp.headers)
+            response_headers.setdefault("x-request-id", admission.request_id)
             if resp.status_code >= 400:
                 body = await resp.aread()
                 await resp.aclose()
+                admission.release(status_code=resp.status_code)
                 return Response(
                     content=body,
                     status_code=resp.status_code,
                     media_type=resp.headers.get("content-type", "application/json"),
                     headers=response_headers,
                 )
+
+            gateway_metrics["stream_active"] += 1
 
             async def _stream_bytes() -> AsyncGenerator[bytes, None]:
                 try:
@@ -340,7 +612,8 @@ async def _proxy_openai_post(path: str, payload: dict, request: Request | None =
                             yield chunk
                 finally:
                     await resp.aclose()
-                    gateway_semaphore.release()
+                    gateway_metrics["stream_active"] = max(0, gateway_metrics["stream_active"] - 1)
+                    admission.release(status_code=resp.status_code)
 
             release_in_stream = True
             return StreamingResponse(
@@ -354,22 +627,28 @@ async def _proxy_openai_post(path: str, payload: dict, request: Request | None =
             json=upstream_payload,
             headers=headers,
         )
+        response_headers = _build_downstream_headers(resp.headers)
+        response_headers.setdefault("x-request-id", admission.request_id)
         return Response(
             content=resp.content,
             status_code=resp.status_code,
             media_type=resp.headers.get("content-type", "application/json"),
-            headers=_build_downstream_headers(resp.headers),
+            headers=response_headers,
         )
     except httpx.TimeoutException:
+        admission.release(status_code=504, timed_out=True)
+        release_in_stream = True
         return _openai_error(504, f"Upstream timeout for model '{route.alias}'", code="upstream_timeout")
     except httpx.HTTPError:
         logger.exception("Gateway upstream error")
+        admission.release(status_code=503)
+        release_in_stream = True
         return _openai_error(503, f"Upstream unavailable for model '{route.alias}'", code="upstream_unavailable")
     finally:
         if resp is not None and stream_mode and not release_in_stream:
             await resp.aclose()
-        if acquired and not release_in_stream:
-            gateway_semaphore.release()
+        if not release_in_stream:
+            admission.release(status_code=resp.status_code if resp is not None else None)
 
 
 def _build_text_chat_payload(request: ChatRequest, stream: bool) -> dict:
@@ -429,6 +708,28 @@ async def health() -> dict:
         "status": "ok",
         "routes": sorted(gateway_routes.keys()),
         "default_model": gateway_default_model,
+        "inflight": gateway_metrics["inflight"],
+    }
+
+
+@app.get("/metrics")
+async def metrics() -> dict:
+    """Gateway lightweight JSON metrics for queueing and admission control."""
+    return {
+        "gateway": {
+            "max_inflight": gateway_max_inflight,
+            "queue_timeout": gateway_queue_timeout,
+        },
+        "routes": {
+            alias: {
+                "max_inflight": route.max_inflight,
+                "queue_timeout": route.queue_timeout,
+                "scheduling_policy": route.scheduling_policy,
+                "capabilities": route.capabilities,
+            }
+            for alias, route in sorted(gateway_routes.items())
+        },
+        "metrics": gateway_metrics,
     }
 
 
@@ -494,6 +795,7 @@ async def openai_list_models() -> dict:
             "id": route.alias,
             "object": "model",
             "owned_by": "vllm",
+            "capabilities": route.capabilities,
         }
         for route in gateway_routes.values()
     ]
@@ -563,6 +865,10 @@ async def model_info():
         "api_base": f"http://{gateway_host}:{gateway_port}",
         "default_model": gateway_default_model,
         "available_models": sorted(gateway_routes.keys()),
+        "capabilities": {
+            alias: route.capabilities
+            for alias, route in sorted(gateway_routes.items())
+        },
     }
 
 
@@ -585,11 +891,11 @@ async def get_config():
 
 
 @app.post("/api/chat")
-async def chat(request: ChatRequest) -> ChatResponse:
+async def chat(request: Request, chat_request: ChatRequest) -> ChatResponse:
     """
     文字聊天 (非流式)
     """
-    payload = _build_text_chat_payload(request, stream=False)
+    payload = _build_text_chat_payload(chat_request, stream=False)
     route = _resolve_model_route(payload.get("model"))
     if route is None:
         available = ", ".join(sorted(gateway_routes.keys()))
@@ -599,15 +905,28 @@ async def chat(request: ChatRequest) -> ChatResponse:
             detail=f"Model '{payload.get('model')}' not found. Available: {available}\n\n{detail_help}",
         )
 
+    capability_error = _validate_model_capabilities(route, payload)
+    if capability_error is not None:
+        _record_rejection("capability", alias=route.alias)
+        error_content = json.loads(capability_error.body.decode("utf-8"))
+        raise HTTPException(status_code=capability_error.status_code, detail=error_content["error"])
+
     upstream_payload = dict(payload)
+    try:
+        admission = await _acquire_gateway_admission(route, upstream_payload, stream_mode=False, request=request)
+    except ValueError as exc:
+        _record_rejection("bad_queue_class", alias=route.alias)
+        logger.warning("Rejected invalid gateway queue class: %s", exc)
+        raise HTTPException(status_code=400, detail=_BAD_QUEUE_CLASS_MESSAGE) from None
+
     upstream_payload["model"] = route.model_name
     try:
-        async with gateway_semaphore:
-            resp = await gateway_http_client.post(
-                url=f"{route.base_url}/chat/completions",
-                json=upstream_payload,
-                headers=_build_upstream_headers(route),
-            )
+        resp = await gateway_http_client.post(
+            url=f"{route.base_url}/chat/completions",
+            json=upstream_payload,
+            headers=_build_upstream_headers(route, request, request_id=admission.request_id),
+        )
+        admission.release(status_code=resp.status_code)
         if resp.status_code >= 400:
             raise HTTPException(status_code=resp.status_code, detail=resp.text)
 
@@ -616,8 +935,12 @@ async def chat(request: ChatRequest) -> ChatResponse:
         return ChatResponse(response=content or "")
     except HTTPException:
         raise
+    except httpx.TimeoutException:
+        admission.release(status_code=504, timed_out=True)
+        raise HTTPException(status_code=504, detail=f"Upstream timeout for model '{route.alias}'")
     except Exception:
         logger.exception("文字聊天處理失敗")
+        admission.release(status_code=500)
         raise HTTPException(status_code=500, detail="處理請求時發生內部錯誤")
 
 

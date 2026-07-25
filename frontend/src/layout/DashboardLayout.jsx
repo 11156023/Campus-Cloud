@@ -1,5 +1,6 @@
 ﻿import { createContext, useEffect, useState } from "react";
 import { Outlet } from "react-router-dom";
+import { Suspense } from "react";
 import MIcon from "../components/MIcon";
 import Sidebar from "../components/Sidebar/Sidebar";
 import AiFloatingChat from "../components/AiFloatingChat/AiFloatingChat";
@@ -19,6 +20,7 @@ export default function DashboardLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [compactFooter, setCompactFooter] = useState(false);
+  const [assistantOpen, setAssistantOpen] = useState(false);
   const { active: sessionWarning, dismiss, dismissPermanent } = useSessionWarning();
 
   useEffect(() => {
@@ -55,27 +57,36 @@ export default function DashboardLayout() {
       <main className={styles.main}>
         {/* 教室學生層：直播橫幅 / 觀看視窗 / 接管狀態（模組 E） */}
         <ClassroomStudentLayer>
-          <div className={styles.mobileTopBar}>
-            <button
-              className={styles.mobileMenuBtn}
-              onClick={() => setMobileOpen(true)}
-              aria-label="開啟選單"
-              type="button"
-            >
-              <MIcon name="segment" size={22} />
-            </button>
+          <div className={styles.workspace}>
+            <div className={styles.pageColumn}>
+              <div className={styles.mobileTopBar}>
+                <button
+                  className={styles.mobileMenuBtn}
+                  onClick={() => setMobileOpen(true)}
+                  aria-label="開啟選單"
+                  type="button"
+                >
+                  <MIcon name="segment" size={22} />
+                </button>
+              </div>
+              <SubnetBanner />
+              <ErrorBoundary>
+                <Suspense fallback={<div className={styles.routeLoading}>載入頁面中…</div>}>
+                  <Outlet />
+                </Suspense>
+              </ErrorBoundary>
+              <div className={`${styles.footer} ${compactFooter ? styles.footerCompact : ""}`}>SkyLab · 2026</div>
+            </div>
+            <AiFloatingChat
+              open={assistantOpen}
+              onOpenChange={setAssistantOpen}
+            />
           </div>
-          <SubnetBanner />
           <SessionWarningDialog
             status={sessionWarning}
             onClose={dismiss}
             onDismissPermanent={dismissPermanent}
           />
-          <ErrorBoundary>
-            <Outlet />
-          </ErrorBoundary>
-          <div className={`${styles.footer} ${compactFooter ? styles.footerCompact : ""}`}>SkyLab · 2026</div>
-          <AiFloatingChat />
         </ClassroomStudentLayer>
       </main>
     </div>

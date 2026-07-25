@@ -9,7 +9,6 @@ import useAutoRefresh from "../../../hooks/useAutoRefresh";
 const COLUMNS = ["任務", "類型", "狀態", "進度", "建立時間", "更新時間", "申請人"];
 
 const KIND_LABELS = {
-  migration:     "遷移",
   script_deploy: "腳本部署",
   vm_request:    "VM 申請",
   spec_change:   "規格變更",
@@ -44,7 +43,7 @@ function EmptyState() {
       </div>
       <h2 className={styles.emptyTitle}>沒有符合條件的任務</h2>
       <p className={styles.emptyDesc}>
-        所有遷移、部署與規格變更等背景任務將顯示在這裡
+        所有部署、申請與規格變更等背景任務將顯示在這裡
       </p>
     </div>
   );
@@ -119,7 +118,7 @@ export default function JobsPage() {
       <div className={styles.pageHeader}>
         <div className={styles.pageHeading}>
           <h1 className={styles.pageTitle}>背景任務</h1>
-          <p className={styles.pageSubtitle}>追蹤遷移、部署與資源配置等長時間執行的任務</p>
+          <p className={styles.pageSubtitle}>追蹤部署、申請與資源配置等長時間執行的任務</p>
         </div>
       </div>
 

@@ -8,7 +8,7 @@ from typing import Literal
 from sqlmodel import Session
 
 from app.exceptions import BadRequestError, ProxmoxError
-from app.models.vm_request import VMMigrationStatus, VMRequestStatus
+from app.models.vm_request import VMProvisioningStatus, VMRequestStatus
 from app.repositories import audit_log as audit_log_repo
 from app.repositories import batch_provision as batch_provision_repo
 from app.repositories import resource as resource_repo
@@ -93,7 +93,7 @@ def _normalize_live_resource_status(value: object) -> ResourceStatus:
 
 
 def _placeholder_resource_status(req) -> ResourceStatus:
-    if req.migration_status == VMMigrationStatus.failed or req.migration_error:
+    if req.provisioning_status == VMProvisioningStatus.failed or req.provisioning_error:
         return "failed"
     start_at = _ensure_utc(req.start_at)
     if start_at is not None and start_at > _utc_now():
@@ -186,7 +186,7 @@ def list_all(
 
 DELETED_TOMBSTONE_DAYS = 30
 
-# Marker written onto a VMRequest's resource_warning / migration_error /
+# Marker written onto a VMRequest's resource_warning / provisioning_error /
 # review_comment when the user explicitly deletes the live resource. Used
 # by list_by_user to suppress the now-defunct approved request from being
 # resurrected as a "failed" placeholder, and by the frontend to hide the
@@ -584,8 +584,8 @@ def delete(
             session=session, vmid=vmid,
         )
         if linked_request is not None:
-            linked_request.migration_status = VMMigrationStatus.failed
-            linked_request.migration_error = RESOURCE_DELETED_BY_USER_MARKER
+            linked_request.provisioning_status = VMProvisioningStatus.failed
+            linked_request.provisioning_error = RESOURCE_DELETED_BY_USER_MARKER
             linked_request.resource_warning = RESOURCE_DELETED_BY_USER_MARKER
             linked_request.review_comment = RESOURCE_DELETED_BY_USER_MARKER
             session.add(linked_request)
@@ -645,8 +645,8 @@ def delete_orphan_db_record(
 
     linked_request = vm_request_repo.get_latest_approved_vm_request_by_vmid(session=session, vmid=vmid)
     if linked_request is not None:
-        linked_request.migration_status = VMMigrationStatus.failed
-        linked_request.migration_error = RESOURCE_DELETED_ORPHAN_MARKER
+        linked_request.provisioning_status = VMProvisioningStatus.failed
+        linked_request.provisioning_error = RESOURCE_DELETED_ORPHAN_MARKER
         linked_request.resource_warning = RESOURCE_DELETED_ORPHAN_MARKER
         linked_request.review_comment = RESOURCE_DELETED_ORPHAN_MARKER
         session.add(linked_request)

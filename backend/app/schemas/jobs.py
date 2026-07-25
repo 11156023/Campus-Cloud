@@ -1,7 +1,6 @@
 """統一背景任務 (Jobs) 的 API schemas。
 
 聚合來自不同領域的「需要等待的任務」：
-- migration:      VM 遷移任務 (vm_migration_jobs)
 - script_deploy:  服務模板部署 (script_deploy_logs)
 - vm_request:     VM/LXC 開機申請 (vm_requests)
 - spec_change:    規格變更申請 (spec_change_requests)
@@ -20,7 +19,6 @@ from pydantic import BaseModel, Field
 
 
 class JobKind(str, enum.Enum):
-    migration = "migration"
     script_deploy = "script_deploy"
     vm_request = "vm_request"
     spec_change = "spec_change"
@@ -62,7 +60,7 @@ class JobItem(BaseModel):
     completed_at: datetime | None = None
     detail_url: str | None = Field(
         default=None,
-        description="前端可點擊跳轉的相對路徑（例：/jobs?focus=migration:xxx）",
+        description="前端可點擊跳轉的相對路徑",
     )
     meta: dict[str, Any] = Field(default_factory=dict)
 
@@ -80,12 +78,12 @@ class JobDetail(BaseModel):
     # 各 kind 特定的詳細欄位（前端按 kind 渲染對應區塊）
     output: str | None = Field(
         default=None,
-        description="完整文字輸出（script_deploy 的 stdout/stderr；migration 的 last_error）",
+        description="完整文字輸出（例如 script_deploy 的 stdout/stderr）",
     )
     error: str | None = None
     extra: dict[str, Any] = Field(
         default_factory=dict,
-        description="kind 特定附加資訊（如 spec_change diff、vm_request 規格、migration 時間戳記）",
+        description="kind 特定附加資訊（如 spec_change diff、vm_request 規格）",
     )
 
 

@@ -14,6 +14,7 @@ import { AuthStorage } from "./auth";
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? "";
 const REFRESH_PATH = "/api/v1/login/refresh-token";
+const DEFAULT_REQUEST_TIMEOUT_MS = 15_000;
 
 /** 進行中的 refresh 請求；多個 401 同時發生時共用同一次 refresh */
 let refreshPromise = null;
@@ -60,12 +61,49 @@ function buildHeaders(extra = {}, isFormData = false) {
   return headers;
 }
 
+async function fetchWithTimeout(url, init, timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const upstreamSignal = init.signal;
+  let timedOut = false;
+
+  const abortFromUpstream = () => controller.abort(upstreamSignal?.reason);
+  if (upstreamSignal?.aborted) abortFromUpstream();
+  else upstreamSignal?.addEventListener("abort", abortFromUpstream, { once: true });
+
+  const timeoutId = timeoutMs > 0
+    ? setTimeout(() => {
+        timedOut = true;
+        controller.abort();
+      }, timeoutMs)
+    : null;
+
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } catch (error) {
+    if (controller.signal.aborted) {
+      if (timedOut) {
+        throw { status: 408, message: "Request timed out", timeout: true };
+      }
+      throw { status: 0, message: "Request cancelled", cancelled: true };
+    }
+    throw error;
+  } finally {
+    if (timeoutId !== null) clearTimeout(timeoutId);
+    upstreamSignal?.removeEventListener("abort", abortFromUpstream);
+  }
+}
+
 /** 統一處理 response；401 時先嘗試續期再重試一次 */
 async function request(path, init, isRetry = false) {
-  const res = await fetch(`${BASE_URL}${path}`, {
-    ...init,
-    headers: buildHeaders(init.headers, init.body instanceof FormData),
-  });
+  const { timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS, ...fetchInit } = init;
+  const res = await fetchWithTimeout(
+    `${BASE_URL}${path}`,
+    {
+      ...fetchInit,
+      headers: buildHeaders(fetchInit.headers, fetchInit.body instanceof FormData),
+    },
+    timeoutMs,
+  );
 
   if (res.ok) {
     // 204 No Content 不會有 body
@@ -93,8 +131,12 @@ async function request(path, init, isRetry = false) {
 }
 
 /** GET */
-export function apiGet(path) {
-  return request(path, { method: "GET" });
+export function apiGet(path, options = {}) {
+  return request(path, {
+    method: "GET",
+    signal: options.signal,
+    timeoutMs: options.timeoutMs,
+  });
 }
 
 /** GET（回傳 Blob，檔案下載用；同樣支援 401 續期重試） */

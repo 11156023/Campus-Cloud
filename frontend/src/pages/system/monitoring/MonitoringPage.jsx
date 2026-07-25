@@ -278,21 +278,25 @@ export default function MonitoringPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (signal) => {
     try {
-      setOverview(await MonitoringService.getOverview());
+      setOverview(await MonitoringService.getOverview({ signal }));
       setError(false);
-    } catch {
-      setError(true);
+    } catch (err) {
+      if (!err?.cancelled) setError(true);
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    load();
-    const timer = setInterval(load, 30_000);
-    return () => clearInterval(timer);
+    const controller = new AbortController();
+    load(controller.signal);
+    const timer = setInterval(() => load(), 30_000);
+    return () => {
+      controller.abort();
+      clearInterval(timer);
+    };
   }, [load]);
 
   if (loading) {

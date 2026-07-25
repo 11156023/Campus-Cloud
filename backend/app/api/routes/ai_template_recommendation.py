@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections import Counter
 from copy import deepcopy
@@ -21,8 +22,8 @@ from app.ai.template_recommendation.prompt import (
     build_chat_system_prompt,
 )
 from app.ai.template_recommendation.recommendation_service import (
-    extract_intent_from_chat,
     generate_ai_plan,
+    infer_intent_from_chat,
     normalize_ai_result,
 )
 from app.ai.template_recommendation.schemas import (
@@ -41,7 +42,7 @@ logger = logging.getLogger(__name__)
 
 _GPU_OPTIONS_CACHE_TTL_SECONDS = 20.0
 _LIVE_NODES_CACHE_TTL_SECONDS = 15.0
-_RESOURCE_OPTIONS_CACHE_TTL_SECONDS = 20.0
+_RESOURCE_OPTIONS_CACHE_TTL_SECONDS = 300.0
 _gpu_options_cache: dict[str, Any] = {"at": 0.0, "items": []}
 _live_nodes_cache: dict[str, Any] = {"at": 0.0, "items": []}
 _base_resource_options_cache: dict[str, Any] = {"at": 0.0, "items": None}
@@ -113,6 +114,14 @@ def _get_live_device_nodes_cached() -> list[Any]:
     return [item.model_copy() for item in fresh_items]
 
 
+async def _get_live_device_nodes_safely() -> list[Any]:
+    try:
+        return await asyncio.to_thread(_get_live_device_nodes_cached)
+    except Exception as exc:
+        logger.warning("Unable to refresh live nodes for AI recommendation: %s", exc)
+        return []
+
+
 def _get_base_resource_options_cached() -> dict[str, Any]:
     now = monotonic()
     cached_at = float(_base_resource_options_cache.get("at") or 0.0)
@@ -131,6 +140,24 @@ def _build_resource_options_with_gpu(gpu_options: list[dict[str, Any]]) -> dict[
     resource_options = _get_base_resource_options_cached()
     resource_options["gpu_options"] = [dict(item) for item in gpu_options]
     return resource_options
+
+
+def _resolve_resource_options(
+    request: ChatRequest,
+    gpu_options: list[dict[str, Any]],
+) -> dict[str, Any]:
+    form_context = request.form_context
+    if form_context and form_context.resource_options_from_client:
+        return {
+            "lxc_os_images": [
+                item.model_dump(mode="json") for item in form_context.lxc_os_options
+            ],
+            "vm_operating_systems": [
+                item.model_dump(mode="json") for item in form_context.vm_os_options
+            ],
+            "gpu_options": [dict(item) for item in gpu_options],
+        }
+    return _build_resource_options_with_gpu(gpu_options)
 
 
 def _resolve_recommend_gpu_options(request: ChatRequest, *, requires_gpu: bool) -> list[dict[str, Any]]:
@@ -215,8 +242,21 @@ async def chat(
         build_chat_runtime_context(
             resource_type=(form_context.resource_type if form_context else None),
             gpu_options=gpu_options,
+            form_context=(
+                form_context.model_dump(
+                    mode="json",
+                    exclude={
+                        "gpu_options",
+                        "lxc_os_options",
+                        "vm_os_options",
+                        "resource_options_from_client",
+                    },
+                )
+                if form_context
+                else None
+            ),
         )
-        if gpu_options
+        if gpu_options or form_context
         else ""
     )
     system_prompt = build_chat_system_prompt(
@@ -307,8 +347,10 @@ async def recommend(
     model_name = settings.VLLM_MODEL_NAME or "unknown"
     started_at = perf_counter()
 
-    extracted_intent = await extract_intent_from_chat(request)
-    live_nodes = _get_live_device_nodes_cached()
+    # Keep recommendation to one model round-trip. The planner receives recent
+    # conversation verbatim and resolves final intent there.
+    extracted_intent = infer_intent_from_chat(request)
+    live_nodes_task = asyncio.create_task(_get_live_device_nodes_safely())
     form_context = request.form_context
     gpu_options = _resolve_recommend_gpu_options(
         request,
@@ -323,22 +365,30 @@ async def recommend(
         needs_database=extracted_intent.needs_database,
         requires_gpu=extracted_intent.requires_gpu,
         needs_windows=extracted_intent.needs_windows,
-        device_nodes=live_nodes or request.device_nodes,
+        device_nodes=request.device_nodes,
         form_context=form_context,
         top_k=request.top_k,
     )
 
     catalog = get_catalog()
-    resource_options = _build_resource_options_with_gpu(gpu_options)
+    resource_options = _resolve_resource_options(request, gpu_options)
 
     try:
         ai_result, ai_metrics = await generate_ai_plan(
             merged_request,
-            merged_request.device_nodes,
             catalog,
             request.messages,
             resource_options=resource_options,
         )
+        try:
+            live_nodes = await asyncio.wait_for(
+                asyncio.shield(live_nodes_task),
+                timeout=0.25,
+            )
+        except TimeoutError:
+            live_nodes = []
+        if live_nodes:
+            merged_request.device_nodes = live_nodes
         result = normalize_ai_result(
             ai_result,
             merged_request,

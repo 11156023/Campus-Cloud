@@ -12,7 +12,7 @@ SkyLab 是一個面向校園資源管理的全端 Proxmox VE（PVE）虛擬化�
 | AI Template Recommendation | `ai-template-recommendation/` | 基於 vLLM 的模板/規格推薦服務 |
 | AI Teacher Judge | `ai-teacher-judge/` | 評分量表（rubric）解析、可偵測度分析與精煉服務 |
 | PVE Resource Simulator | `pve_ resource_simulator/` | 離線放置策略模擬器（port 8012） |
-| vLLM Service | `vllm-service/` | 單模型主服務 + 多模型 API Gateway canonical 入口 |
+| vLLM Service | `vllm-service/` | 單模型主服務 + 多模型 vLLM cluster（由 LiteLLM 對外選路） |
 | vLLM Legacy Inference | `vllm-inference/` | 舊單模型 vLLM 部署，遷移參考 |
 | vLLM Legacy API Gateway | `vllm-API/` | 舊多模型 vLLM Gateway，遷移參考 |
 | Gateway 安裝腳本 | `gateway/` | 校內出口閘道安裝腳本 |
@@ -32,14 +32,14 @@ SkyLab 是一個面向校園資源管理的全端 Proxmox VE（PVE）虛擬化�
 
 - VM / LXC 生命週期管理（建立、查詢、規格調整、快照、刪除）
 - 透過 WebSocket 代理 Proxmox VNC 與 LXC Terminal（xterm.js + noVNC）
-- VM 申請工作流：學生提交 → 審核 → 自動排程供應 → 自動遷移與再平衡
+- VM 申請工作流：學生提交 → 審核 → 租借時段容量評估 → 自動排程供應
 - AI 放置建議（PVE Placement Advisor）與模板推薦
 - 防火牆拓撲視覺化、NAT 規則、Reverse Proxy 規則管理
 - 閘道 VM 管理：HAProxy / Traefik / FRP（client/server）設定
 - 多重 Proxmox cluster 連線設定與 HA failover
 - 群組（班級）管理、CSV 大量匯入、自動寄發初始密碼信
 - AI API 憑證管理 + 申請審核 + Redis sliding-window 流量限制
-- OpenAI 相容 AI Proxy：使用者呼叫 `/api/v1/ai-proxy/chat/completions`，Backend 轉發至 `{AI_API_BASE_URL}/v1/chat/completions`；內部系統 AI 直接走 `{VLLM_BASE_URL}/chat/completions`
+- OpenAI 相容 AI Proxy：使用者透過 Campus `/api/v1/ai-proxy/{models,chat/completions,completions,responses}` 呼叫；Backend 驗證 `ccai_*` 後轉發至受限 LiteLLM service key。內部 System AI 仍直接走 `{VLLM_BASE_URL}/chat/completions`
 - 規格變更申請（vCPU / RAM / Disk）審核流程
 - 完整 Audit Log（操作來源、目標 VM、時間）
 - 角色權限：admin / instructor / student / superuser
@@ -65,7 +65,7 @@ docker compose watch
 | MailCatcher | http://localhost:1080 |
 | Traefik Dashboard | http://localhost:8090 |
 
-> vLLM 推論請優先使用 `vllm-service/`。`start_single_model.sh` 啟動單模型主服務，`start_multi_model_gateway.sh` 啟動多模型 API Gateway。
+> vLLM 推論請優先使用 `vllm-service/`。`start_single_model.sh` 啟動單模型主服務；AI API 遷移期以 `start_multi_model_cluster.sh` 啟動多模型 vLLM，並由 LiteLLM routing。`start_multi_model_gateway.sh` 僅保留為 P5/P6 的回滾入口。
 
 ## 本地開發
 

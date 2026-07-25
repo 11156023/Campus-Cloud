@@ -518,23 +518,25 @@ export default function ResourceMgmtPage() {
   }
 
   /** silent = true 時不觸發 loading / error state，供背景自動刷新使用 */
-  const fetchResources = useCallback(async (silent = false) => {
+  const fetchResources = useCallback(async (silent = false, signal) => {
     if (!silent) {
       setLoading(true);
       setError(false);
     }
     try {
-      const data = await ResourcesService.listAll();
+      const data = await ResourcesService.listAll({ signal });
       setResources(data ?? []);
-    } catch {
-      if (!silent) setError(true);
+    } catch (err) {
+      if (!silent && !err?.cancelled) setError(true);
     } finally {
-      if (!silent) setLoading(false);
+      if (!silent && !signal?.aborted) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchResources();
+    const controller = new AbortController();
+    fetchResources(false, controller.signal);
+    return () => controller.abort();
   }, [fetchResources]);
   useAutoRefresh(() => fetchResources(true));
 

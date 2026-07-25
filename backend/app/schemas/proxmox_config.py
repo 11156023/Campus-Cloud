@@ -25,32 +25,21 @@ class ProxmoxConfigPublic(BaseModel):
     placement_strategy: str = DEFAULT_PLACEMENT_STRATEGY
     cpu_overcommit_ratio: float = 2.0
     disk_overcommit_ratio: float = 1.0
-    migration_enabled: bool = True
-    migration_max_per_rebalance: int = 2
-    migration_min_interval_minutes: int = 60
-    migration_retry_limit: int = 3
-    rebalance_migration_cost: float = 0.15
-    rebalance_peak_cpu_margin: float = 1.1
-    rebalance_peak_memory_margin: float = 1.05
-    rebalance_loadavg_warn_per_core: float = 0.8
-    rebalance_loadavg_max_per_core: float = 1.5
-    rebalance_loadavg_penalty_weight: float = 0.9
-    rebalance_disk_contention_warn_share: float = 0.7
-    rebalance_disk_contention_high_share: float = 0.9
-    rebalance_disk_penalty_weight: float = 0.75
-    rebalance_search_max_relocations: int = 2
-    rebalance_search_depth: int = 3
-    migration_worker_concurrency: int = 2
-    migration_job_claim_timeout_seconds: int = 300
-    migration_retry_backoff_seconds: int = 120
-    migration_lxc_live_enabled: bool = False
-    rebalance_cpu_peak_warn_share: float = 0.7
-    rebalance_cpu_peak_high_share: float = 1.2
-    rebalance_memory_peak_warn_share: float = 0.8
-    rebalance_memory_peak_high_share: float = 0.85
-    rebalance_resource_weight_cpu: float = 1.0
-    rebalance_resource_weight_memory: float = 1.0
-    rebalance_resource_weight_disk: float = 1.0
+    placement_peak_cpu_margin: float = 1.1
+    placement_peak_memory_margin: float = 1.05
+    placement_loadavg_warn_per_core: float = 0.8
+    placement_loadavg_max_per_core: float = 1.5
+    placement_loadavg_penalty_weight: float = 0.9
+    placement_disk_contention_warn_share: float = 0.7
+    placement_disk_contention_high_share: float = 0.9
+    placement_disk_penalty_weight: float = 0.75
+    placement_cpu_peak_warn_share: float = 0.7
+    placement_cpu_peak_high_share: float = 1.2
+    placement_memory_peak_warn_share: float = 0.8
+    placement_memory_peak_high_share: float = 0.85
+    placement_resource_weight_cpu: float = 1.0
+    placement_resource_weight_memory: float = 1.0
+    placement_resource_weight_disk: float = 1.0
     scheduled_boot_batch_size: int = 5
     scheduled_boot_batch_interval_seconds: int = 10
     scheduled_boot_lead_time_minutes: int = 5
@@ -82,32 +71,21 @@ class ProxmoxConfigUpdate(BaseModel):
     placement_strategy: str = DEFAULT_PLACEMENT_STRATEGY
     cpu_overcommit_ratio: float = Field(default=2.0, ge=1.0, le=8.0)
     disk_overcommit_ratio: float = Field(default=1.0, ge=1.0, le=5.0)
-    migration_enabled: bool = True
-    migration_max_per_rebalance: int = Field(default=2, ge=0, le=20)
-    migration_min_interval_minutes: int = Field(default=60, ge=0, le=10080)
-    migration_retry_limit: int = Field(default=3, ge=0, le=10)
-    rebalance_migration_cost: float = Field(default=0.15, ge=0.0, le=5.0)
-    rebalance_peak_cpu_margin: float = Field(default=1.1, ge=1.0, le=2.0)
-    rebalance_peak_memory_margin: float = Field(default=1.05, ge=1.0, le=2.0)
-    rebalance_loadavg_warn_per_core: float = Field(default=0.8, ge=0.0, le=4.0)
-    rebalance_loadavg_max_per_core: float = Field(default=1.5, ge=0.1, le=8.0)
-    rebalance_loadavg_penalty_weight: float = Field(default=0.9, ge=0.0, le=5.0)
-    rebalance_disk_contention_warn_share: float = Field(default=0.7, ge=0.0, le=1.5)
-    rebalance_disk_contention_high_share: float = Field(default=0.9, ge=0.1, le=2.0)
-    rebalance_disk_penalty_weight: float = Field(default=0.75, ge=0.0, le=5.0)
-    rebalance_search_max_relocations: int = Field(default=2, ge=0, le=10)
-    rebalance_search_depth: int = Field(default=3, ge=0, le=10)
-    migration_worker_concurrency: int = Field(default=2, ge=1, le=20)
-    migration_job_claim_timeout_seconds: int = Field(default=300, ge=30, le=86400)
-    migration_retry_backoff_seconds: int = Field(default=120, ge=0, le=86400)
-    migration_lxc_live_enabled: bool = False
-    rebalance_cpu_peak_warn_share: float = Field(default=0.7, ge=0.0, le=2.0)
-    rebalance_cpu_peak_high_share: float = Field(default=1.2, ge=0.1, le=3.0)
-    rebalance_memory_peak_warn_share: float = Field(default=0.8, ge=0.0, le=2.0)
-    rebalance_memory_peak_high_share: float = Field(default=0.85, ge=0.1, le=3.0)
-    rebalance_resource_weight_cpu: float = Field(default=1.0, ge=0.0, le=10.0)
-    rebalance_resource_weight_memory: float = Field(default=1.0, ge=0.0, le=10.0)
-    rebalance_resource_weight_disk: float = Field(default=1.0, ge=0.0, le=10.0)
+    placement_peak_cpu_margin: float = Field(default=1.1, ge=1.0, le=2.0)
+    placement_peak_memory_margin: float = Field(default=1.05, ge=1.0, le=2.0)
+    placement_loadavg_warn_per_core: float = Field(default=0.8, ge=0.0, le=4.0)
+    placement_loadavg_max_per_core: float = Field(default=1.5, ge=0.1, le=8.0)
+    placement_loadavg_penalty_weight: float = Field(default=0.9, ge=0.0, le=5.0)
+    placement_disk_contention_warn_share: float = Field(default=0.7, ge=0.0, le=1.5)
+    placement_disk_contention_high_share: float = Field(default=0.9, ge=0.1, le=2.0)
+    placement_disk_penalty_weight: float = Field(default=0.75, ge=0.0, le=5.0)
+    placement_cpu_peak_warn_share: float = Field(default=0.7, ge=0.0, le=2.0)
+    placement_cpu_peak_high_share: float = Field(default=1.2, ge=0.1, le=3.0)
+    placement_memory_peak_warn_share: float = Field(default=0.8, ge=0.0, le=2.0)
+    placement_memory_peak_high_share: float = Field(default=0.85, ge=0.1, le=3.0)
+    placement_resource_weight_cpu: float = Field(default=1.0, ge=0.0, le=10.0)
+    placement_resource_weight_memory: float = Field(default=1.0, ge=0.0, le=10.0)
+    placement_resource_weight_disk: float = Field(default=1.0, ge=0.0, le=10.0)
     scheduled_boot_batch_size: int = Field(default=5, ge=1, le=100)
     scheduled_boot_batch_interval_seconds: int = Field(default=10, ge=0, le=600)
     scheduled_boot_lead_time_minutes: int = Field(default=5, ge=0, le=120)

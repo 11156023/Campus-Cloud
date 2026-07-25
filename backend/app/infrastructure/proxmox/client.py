@@ -20,6 +20,7 @@ from app.infrastructure.proxmox.tls import _tcp_ping
 logger = logging.getLogger(__name__)
 
 PROXMOX_TICKET_TTL = 7000
+PROXMOX_FAILURE_CACHE_TTL = 15.0
 
 class _ProxmoxClientState:
     """共享的 Proxmox 連線快取狀態。"""
@@ -28,6 +29,10 @@ class _ProxmoxClientState:
         self.client: ProxmoxAPI | None = None
         self.created_at = 0.0
         self.active_host: str | None = None
+        self.failure_until = 0.0
+        self.last_error: str | None = None
+        self.connecting = False
+        self.connection_event: threading.Event | None = None
 
 
 _state = _ProxmoxClientState()
@@ -39,6 +44,59 @@ def invalidate_proxmox_client() -> None:
         _state.client = None
         _state.created_at = 0.0
         _state.active_host = None
+        _state.failure_until = 0.0
+        _state.last_error = None
+
+
+def _connect_proxmox() -> tuple[ProxmoxAPI, str]:
+    """Probe configured nodes and return a validated client and active host.
+
+    Network I/O deliberately happens outside ``_proxmox_lock``.  Callers are
+    coordinated by ``get_proxmox_api`` so only one probe is active at a time.
+    """
+    cfg = get_proxmox_settings()
+    nodes = get_nodes_for_ha()
+
+    if nodes:
+        last_error: Exception | None = None
+        unreachable: list[str] = []
+        for node in nodes:
+            if not _tcp_ping(node.host, node.port):
+                unreachable.append(f"{node.name} ({node.host})")
+                logger.info(
+                    "Skipping unreachable Proxmox node %s (%s)",
+                    node.name,
+                    node.host,
+                )
+                update_node_online(node.id, False)
+                continue
+
+            try:
+                client = try_connect(node.host, cfg)
+                update_node_online(node.id, True)
+                logger.info(
+                    "Connected to Proxmox node %s (%s)",
+                    node.name,
+                    node.host,
+                )
+                return client, node.host
+            except Exception as exc:
+                last_error = exc
+                logger.warning(
+                    "Failed to connect Proxmox node %s (%s): %s",
+                    node.name,
+                    node.host,
+                    exc,
+                )
+                update_node_online(node.id, False)
+
+        detail = str(last_error) if last_error else (
+            "TCP connection failed for " + ", ".join(unreachable)
+        )
+        raise ProxmoxError(f"All Proxmox nodes are unavailable. {detail}")
+
+    logger.info("Using configured single Proxmox host %s", cfg.host)
+    return try_connect(cfg.host, cfg), cfg.host
 
 
 def get_proxmox_api() -> ProxmoxAPI:
@@ -46,56 +104,58 @@ def get_proxmox_api() -> ProxmoxAPI:
     if _state.client is not None and (now - _state.created_at) < PROXMOX_TICKET_TTL:
         return _state.client
 
+    while True:
+        with _proxmox_lock:
+            now = time.monotonic()
+            if (
+                _state.client is not None
+                and (now - _state.created_at) < PROXMOX_TICKET_TTL
+            ):
+                return _state.client
+            if now < _state.failure_until:
+                retry_in = max(_state.failure_until - now, 0.0)
+                raise ProxmoxError(
+                    "Proxmox is temporarily unavailable; "
+                    f"retry in {retry_in:.1f}s. {_state.last_error or ''}".strip()
+                )
+            if _state.connecting:
+                connection_event = _state.connection_event
+                is_probe_owner = False
+            else:
+                connection_event = threading.Event()
+                _state.connection_event = connection_event
+                _state.connecting = True
+                is_probe_owner = True
+
+        if is_probe_owner:
+            break
+        if connection_event is not None:
+            connection_event.wait()
+
+    try:
+        client, active_host = _connect_proxmox()
+    except Exception as exc:
+        with _proxmox_lock:
+            _state.client = None
+            _state.created_at = 0.0
+            _state.active_host = None
+            _state.failure_until = time.monotonic() + PROXMOX_FAILURE_CACHE_TTL
+            _state.last_error = str(exc)
+            _state.connecting = False
+            if _state.connection_event is not None:
+                _state.connection_event.set()
+        raise
+
     with _proxmox_lock:
-        if _state.client is not None and (now - _state.created_at) < PROXMOX_TICKET_TTL:
-            return _state.client
-
-        cfg = get_proxmox_settings()
-        nodes = get_nodes_for_ha()
-
-        if nodes:
-            last_error: Exception | None = None
-            for node in nodes:
-                if not _tcp_ping(node.host, node.port):
-                    logger.info(
-                        "Skipping unreachable Proxmox node %s (%s)",
-                        node.name,
-                        node.host,
-                    )
-                    update_node_online(node.id, False)
-                    continue
-
-                try:
-                    client = try_connect(node.host, cfg)
-                    update_node_online(node.id, True)
-                    _state.client = client
-                    _state.created_at = time.monotonic()
-                    _state.active_host = node.host
-                    logger.info(
-                        "Connected to Proxmox node %s (%s)",
-                        node.name,
-                        node.host,
-                    )
-                    return _state.client
-                except Exception as exc:
-                    last_error = exc
-                    logger.warning(
-                        "Failed to connect Proxmox node %s (%s): %s",
-                        node.name,
-                        node.host,
-                        exc,
-                    )
-                    update_node_online(node.id, False)
-
-            raise ProxmoxError(
-                f"All Proxmox nodes are unavailable. Last error: {last_error}"
-            )
-
-        logger.info("Using configured single Proxmox host %s", cfg.host)
-        _state.client = try_connect(cfg.host, cfg)
+        _state.client = client
         _state.created_at = time.monotonic()
-        _state.active_host = cfg.host
-        return _state.client
+        _state.active_host = active_host
+        _state.failure_until = 0.0
+        _state.last_error = None
+        _state.connecting = False
+        if _state.connection_event is not None:
+            _state.connection_event.set()
+        return client
 
 
 def get_active_host() -> str:

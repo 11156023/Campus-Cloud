@@ -2,8 +2,8 @@ import { apiDelete, apiGet, apiPost, apiPut } from "./api";
 
 export const ResourcesService = {
   /** 取得我的資源列表 */
-  list() {
-    return apiGet("/api/v1/resources/my");
+  list(options) {
+    return apiGet("/api/v1/resources/my", options);
   },
 
   /** 取得單一資源 */
@@ -17,8 +17,8 @@ export const ResourcesService = {
   },
 
   /** 取得所有資源列表（管理員） */
-  listAll() {
-    return apiGet("/api/v1/resources/");
+  listAll(options) {
+    return apiGet("/api/v1/resources/", options);
   },
 
   /** 啟動 */
