@@ -16,6 +16,7 @@ from app.schemas.classroom import (
     ClassroomSessionCreate,
     ClassroomSessionPublic,
     ClassroomStudent,
+    ClassroomVm,
 )
 from app.schemas.common import Message
 from app.services.classroom import classroom_service
@@ -32,6 +33,7 @@ def _to_public(session: ClassroomSession) -> ClassroomSessionPublic:
         vmid=session.vmid,
         mode=session.mode.value,
         group_id=session.group_id,
+        class_id=session.class_id,
         started_by=session.started_by,
         controller_user_id=session.controller_user_id,
         subscriber_count=session.subscriber_count,
@@ -58,6 +60,30 @@ async def list_classroom_students(
     )
 
 
+@router.get("/classes/{class_id}/students", response_model=list[ClassroomStudent])
+async def list_teaching_class_students(
+    class_id: uuid.UUID,
+    session: SessionDep,
+    current_user: InstructorUser,
+) -> list[ClassroomStudent]:
+    cluster_resources = await _safe_cluster_listing()
+    return classroom_service.list_class_students(
+        session, class_id, current_user, cluster_resources=cluster_resources
+    )
+
+
+@router.get("/classes/{class_id}/broadcast-sources", response_model=list[ClassroomVm])
+async def list_teaching_class_broadcast_sources(
+    class_id: uuid.UUID,
+    session: SessionDep,
+    current_user: InstructorUser,
+) -> list[ClassroomVm]:
+    cluster_resources = await _safe_cluster_listing()
+    return classroom_service.list_class_broadcast_sources(
+        session, class_id, current_user, cluster_resources=cluster_resources
+    )
+
+
 @router.post("/sessions", response_model=ClassroomSessionPublic)
 async def create_classroom_session(
     body: ClassroomSessionCreate,
@@ -65,10 +91,19 @@ async def create_classroom_session(
     current_user: CurrentUser,
 ) -> ClassroomSessionPublic:
     if body.mode == "broadcast":
-        if body.group_id is None:
-            raise BadRequestError("group_id is required for broadcast sessions")
-        live = await classroom_service.start_broadcast(
-            session, current_user, body.vmid, body.group_id
+        if body.class_id is not None:
+            live = await classroom_service.start_class_broadcast(
+                session, current_user, body.vmid, body.class_id
+            )
+        elif body.group_id is not None:
+            live = await classroom_service.start_broadcast(
+                session, current_user, body.vmid, body.group_id
+            )
+        else:
+            raise BadRequestError("class_id or group_id is required for broadcast")
+    elif body.class_id is not None:
+        live = await classroom_service.start_class_watch(
+            session, current_user, body.vmid, body.class_id
         )
     else:
         live = await classroom_service.start_watch(session, current_user, body.vmid)

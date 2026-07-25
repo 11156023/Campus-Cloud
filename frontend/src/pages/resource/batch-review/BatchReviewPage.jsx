@@ -136,7 +136,7 @@ export default function BatchReviewPage() {
         (b.hostname_prefix ?? "").toLowerCase().includes(q) ||
         (b.initiated_by_email ?? "").toLowerCase().includes(q) ||
         (b.initiated_by_name ?? "").toLowerCase().includes(q) ||
-        (b.group_name ?? "").toLowerCase().includes(q)
+        (b.group_name ?? b.teaching_class_name ?? "").toLowerCase().includes(q)
       );
     });
   }, [batches, status, query]);
@@ -259,7 +259,7 @@ export default function BatchReviewPage() {
                         </div>
                       </td>
                       <td className={styles.td}>{b.initiated_by_email ?? b.initiated_by_name ?? "—"}</td>
-                      <td className={styles.td}>{b.group_name ?? "—"}</td>
+                      <td className={styles.td}>{b.teaching_class_name ?? b.group_name ?? "—"}</td>
                       <td className={styles.td}>{b.total}</td>
                       <td className={styles.td}>
                         <ProgressInline

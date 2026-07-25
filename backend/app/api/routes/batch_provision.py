@@ -12,7 +12,7 @@ from sqlmodel import select
 from app.api.deps import AdminUser, InstructorUser, SessionDep, rate_limit_by_user
 from app.core.authorizers import require_group_access
 from app.exceptions import BadRequestError, NotFoundError
-from app.models import User
+from app.models import TeachingClass, User
 from app.repositories import batch_provision as bp_repo
 from app.repositories import group as group_repo
 from app.services.vm import batch_provision_service
@@ -27,7 +27,9 @@ class BatchProvisionRequest(BaseModel):
 
     resource_type: str = Field(..., pattern="^(lxc|qemu)$")
     hostname_prefix: str = Field(
-        ..., min_length=1, max_length=50,
+        ...,
+        min_length=1,
+        max_length=50,
         pattern=r"^[a-zA-Z0-9][a-zA-Z0-9-]*$",
         description="Hostname prefix: ASCII letters, digits, hyphens; cannot start with hyphen",
     )
@@ -94,8 +96,10 @@ class BatchProvisionJobSpec(BaseModel):
 
 class BatchProvisionJobPublic(BaseModel):
     id: uuid.UUID
-    group_id: uuid.UUID
+    group_id: uuid.UUID | None = None
     group_name: str | None = None
+    teaching_class_id: uuid.UUID | None = None
+    teaching_class_name: str | None = None
     resource_type: str
     hostname_prefix: str
     status: str
@@ -166,7 +170,16 @@ def _build_job_public(session: SessionDep, job) -> BatchProvisionJobPublic:
         users = {user.id: user for user in rows}
 
     # Resolve group name in one extra query (cheap, single row).
-    group = group_repo.get_group_by_id(session=session, group_id=job.group_id)
+    group = (
+        group_repo.get_group_by_id(session=session, group_id=job.group_id)
+        if job.group_id
+        else None
+    )
+    teaching_class = (
+        session.get(TeachingClass, job.teaching_class_id)
+        if job.teaching_class_id
+        else None
+    )
 
     # Parse the JSON-encoded spec snapshot.
     try:
@@ -210,6 +223,8 @@ def _build_job_public(session: SessionDep, job) -> BatchProvisionJobPublic:
         id=job.id,
         group_id=job.group_id,
         group_name=group.name if group else None,
+        teaching_class_id=job.teaching_class_id,
+        teaching_class_name=teaching_class.name if teaching_class else None,
         resource_type=job.resource_type,
         hostname_prefix=job.hostname_prefix,
         status=job.status,
@@ -237,11 +252,7 @@ def _build_job_public(session: SessionDep, job) -> BatchProvisionJobPublic:
     "/{group_id}",
     response_model=BatchProvisionJobPublic,
     dependencies=[
-        Depends(
-            rate_limit_by_user(
-                scope="batch-provision", limit=5, window_seconds=60
-            )
-        )
+        Depends(rate_limit_by_user(scope="batch-provision", limit=5, window_seconds=60))
     ],
 )
 def start_batch_provision(
@@ -298,11 +309,17 @@ def get_batch_status(
     job = bp_repo.get_job(session=session, job_id=job_id)
     if not job:
         raise NotFoundError("Batch provision job not found")
-    _require_group_job_access(
-        session=session,
-        current_user=current_user,
-        group_id=job.group_id,
-    )
+    if job.group_id:
+        _require_group_job_access(
+            session=session, current_user=current_user, group_id=job.group_id
+        )
+    elif job.teaching_class_id:
+        teaching_class = session.get(TeachingClass, job.teaching_class_id)
+        if not teaching_class:
+            raise NotFoundError("Teaching class not found")
+        require_group_access(current_user, teaching_class.owner_id)
+    else:
+        raise NotFoundError("Batch provision scope not found")
     return _build_job_public(session, job)
 
 

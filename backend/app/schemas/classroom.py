@@ -14,6 +14,7 @@ class ClassroomSessionCreate(BaseModel):
     vmid: int
     mode: Literal["monitor", "broadcast"]
     group_id: uuid.UUID | None = None  # broadcast 必填
+    class_id: uuid.UUID | None = None
 
 
 class ClassroomControlRequest(BaseModel):
@@ -51,6 +52,7 @@ class ClassroomSessionPublic(BaseModel):
     vmid: int
     mode: str
     group_id: uuid.UUID | None = None
+    class_id: uuid.UUID | None = None
     started_by: uuid.UUID
     controller_user_id: uuid.UUID | None = None
     subscriber_count: int = 0

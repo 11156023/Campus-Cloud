@@ -7,9 +7,20 @@ export const ClassroomService = {
     return apiGet(`/api/v1/classroom/groups/${groupId}/students`);
   },
 
+  listClassStudents(classId) {
+    return apiGet(`/api/v1/classroom/classes/${classId}/students`);
+  },
+
+  listClassBroadcastSources(classId) {
+    return apiGet(`/api/v1/classroom/classes/${classId}/broadcast-sources`);
+  },
+
   /** 開啟 session（mode: "broadcast" 需帶 group_id；"monitor" 只看單台） */
-  createSession({ vmid, mode, group_id = null }) {
-    return apiPost("/api/v1/classroom/sessions", { vmid, mode, group_id });
+  createSession({ vmid, mode, group_id = null, class_id = null }) {
+    const body = { vmid, mode };
+    if (group_id != null) body.group_id = group_id;
+    if (class_id != null) body.class_id = class_id;
+    return apiPost("/api/v1/classroom/sessions", body);
   },
 
   /** 結束 session */
