@@ -26,6 +26,7 @@ class PresenceSocket(Protocol):
 class _Connection:
     user_id: uuid.UUID
     group_ids: set[uuid.UUID]
+    class_ids: set[uuid.UUID]
     websocket: PresenceSocket
     # dataclass eq=False 效果：以身分比較，同一 user 多分頁各是一條連線
     key: object = field(default_factory=object)
@@ -41,9 +42,15 @@ class ClassroomPresenceHub:
         user_id: uuid.UUID,
         group_ids: set[uuid.UUID],
         websocket: PresenceSocket,
+        class_ids: set[uuid.UUID] | None = None,
     ) -> None:
         """註冊連線並常駐讀取直到斷線（訊息內容忽略，僅偵測斷線）。"""
-        conn = _Connection(user_id=user_id, group_ids=set(group_ids), websocket=websocket)
+        conn = _Connection(
+            user_id=user_id,
+            group_ids=set(group_ids),
+            class_ids=set(class_ids or set()),
+            websocket=websocket,
+        )
         self._connections[conn.key] = conn
         try:
             while True:
@@ -60,9 +67,21 @@ class ClassroomPresenceHub:
             if group_id in conn.group_ids
         }
 
+    def online_user_ids_for_class(self, class_id: uuid.UUID) -> set[uuid.UUID]:
+        return {
+            conn.user_id
+            for conn in self._connections.values()
+            if class_id in conn.class_ids
+        }
+
     async def broadcast_to_group(self, group_id: uuid.UUID, event: dict[str, Any]) -> None:
         await self._send_to(
             [c for c in self._connections.values() if group_id in c.group_ids], event
+        )
+
+    async def broadcast_to_class(self, class_id: uuid.UUID, event: dict[str, Any]) -> None:
+        await self._send_to(
+            [c for c in self._connections.values() if class_id in c.class_ids], event
         )
 
     async def send_to_user(self, user_id: uuid.UUID, event: dict[str, Any]) -> None:

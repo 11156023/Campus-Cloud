@@ -76,6 +76,15 @@ from .teacher_judge_script_run import (
     TeacherJudgeScriptRunTargetScope,
 )
 from .teacher_judge_template_command import TeacherJudgeTemplateCommand
+from .teaching_class import (
+    TeachingClass,
+    TeachingClassMachineNode,
+    TeachingClassStatus,
+    TeachingClassStudent,
+    TeachingClassStudentMachine,
+    TeachingClassTaskFile,
+    TeachingClassWeek,
+)
 from .tunnel_proxy import TunnelProxy
 from .user import User, UserBase, UserRole
 from .vm_request import (
@@ -190,6 +199,13 @@ __all__ = [
     # Task Record (背景任務)
     "TaskRecord",
     "TaskRecordStatus",
+    "TeachingClass",
+    "TeachingClassStatus",
+    "TeachingClassMachineNode",
+    "TeachingClassWeek",
+    "TeachingClassTaskFile",
+    "TeachingClassStudent",
+    "TeachingClassStudentMachine",
     # Course Lab (互動式實作教學)
     "CoursePath",
     "CoursePathStatus",

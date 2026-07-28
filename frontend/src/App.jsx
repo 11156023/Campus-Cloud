@@ -34,7 +34,6 @@ const CourseCmsPage = lazy(() => import("./pages/teaching/course-cms/CourseCmsPa
 const CourseTemplateManagementPage = lazy(() => import("./pages/course-operations/CourseTemplateManagementPage"));
 const CourseTemplateEditorPage = lazy(() => import("./pages/course-operations/CourseTemplateEditorPage"));
 const ClassManagementPage = lazy(() => import("./pages/course-operations/ClassManagementPage"));
-const ClassCreatePage = lazy(() => import("./pages/course-operations/ClassCreatePage"));
 const ClassWorkspacePage = lazy(() => import("./pages/course-operations/ClassWorkspacePage"));
 
 // 系統管理
@@ -113,7 +112,7 @@ function App() {
           <Route path="/course-template-management/new" element={<CourseTemplateEditorPage />} />
           <Route path="/course-template-management/:templateId" element={<CourseTemplateEditorPage />} />
           <Route path="/class-management" element={<ClassManagementPage />} />
-          <Route path="/class-management/new" element={<ClassCreatePage />} />
+          <Route path="/class-management/new" element={<ClassManagementPage openCreate />} />
           <Route path="/class-management/:classId" element={<ClassWorkspacePage />} />
           <Route path="/class-management/:classId/:section" element={<ClassWorkspacePage />} />
 

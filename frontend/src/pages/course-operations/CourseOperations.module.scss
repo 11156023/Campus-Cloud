@@ -74,13 +74,11 @@
 .field input:focus, .field textarea:focus, .field select:focus, .compactSelect:focus, .machineTitle input:focus, .machineFields input:focus { border-color: var(--color-primary); }
 .field textarea { resize: vertical; }
 .field input[readonly] { color: var(--color-text-muted); background: var(--color-hover); }
-.inlineBuilder { display: grid; grid-template-columns: minmax(260px, 1fr) auto; align-items: end; gap: 12px; padding: 0 16px 16px; }
-.inlineBuilder .helperText { grid-column: 1 / -1; }
 .helperText { color: var(--color-text-muted); font-size: 12px; }
 .actionFooter { display: flex; justify-content: flex-end; gap: 8px; padding: 16px; border-top: 1px solid var(--color-border); }
 .formActions { padding: 4px 0 24px; }
 
-.blueprintCanvas { display: flex; align-items: stretch; min-width: max-content; padding: 0 16px 16px; overflow-x: auto; }
+.blueprintCanvas { display: flex; width: 100%; min-width: 0; align-items: stretch; padding: 0 16px 16px; overflow-x: auto; }
 .blueprintItem { display: flex; align-items: center; }
 .machineBlock { width: 260px; overflow: hidden; border: 1px solid var(--color-border); border-radius: 12px; background: var(--color-surface); }
 .machineTitle { display: flex; align-items: center; gap: 9px; padding: 12px; }
@@ -98,11 +96,6 @@
 .connection { display: flex; width: 105px; flex-direction: column; align-items: center; color: var(--color-text-muted); font-size: 10px; }
 .connection i { width: 68px; height: 1px; margin-top: 5px; background: var(--color-border); }
 .connection svg { margin-top: -10px; color: var(--color-primary); background: var(--color-surface); }
-.metricGrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
-.metricGrid > div { display: flex; flex-direction: column; gap: 3px; padding: 16px; border: 1px solid var(--color-border); border-radius: 12px; background: var(--color-surface); box-shadow: var(--shadow-sm); }
-.metricGrid span { color: var(--color-text-secondary); font-size: 12px; }
-.metricGrid strong { color: var(--color-text-primary); font-size: 18px; }
-.metricGrid small { color: var(--color-text-muted); font-size: 11px; }
 
 .splitContent, .twoColumns { display: grid; grid-template-columns: minmax(280px, .8fr) minmax(0, 1.2fr); gap: 16px; align-items: start; }
 .weekNav { display: flex; flex-direction: column; gap: 4px; padding: 0 12px 12px; }
@@ -122,11 +115,12 @@
 
 .sectionNo { display: inline-grid; width: 24px; height: 24px; margin-right: 8px; place-items: center; border-radius: 50%; color: var(--color-surface); background: var(--color-text); font-size: 11px; font-weight: 700; }
 .templateChoices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding: 0 16px 16px; }
-.templateChoices label { display: flex; align-items: flex-start; gap: 11px; padding: 14px; border: 1px solid var(--color-border); border-radius: 12px; cursor: pointer; transition: border-color .15s, background .15s; }
-.templateChoices label:hover, .templateChoices label.templateSelected { border-color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 5%, var(--color-surface)); }
+.templateChoices label, .templateChoices button { display: flex; align-items: flex-start; width: 100%; gap: 11px; padding: 14px; border: 1px solid var(--color-border); border-radius: 12px; color: inherit; text-align: left; background: var(--color-surface); font: inherit; cursor: pointer; transition: border-color .15s, background .15s; }
+.templateChoices label:hover, .templateChoices label.templateSelected, .templateChoices button:hover, .templateChoices button.templateSelected { border-color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 5%, var(--color-surface)); }
+.templateChoices button:disabled { opacity: .65; cursor: not-allowed; }
 .templateChoices input { position: absolute; opacity: 0; }
-.templateChoices label > span { display: grid; flex: 0 0 auto; width: 38px; height: 38px; place-items: center; border-radius: 8px; color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 10%, transparent); }
-.templateChoices label > div { min-width: 0; }
+.templateChoices label > span, .templateChoices button > span { display: grid; flex: 0 0 auto; width: 38px; height: 38px; place-items: center; border-radius: 8px; color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 10%, transparent); }
+.templateChoices label > div, .templateChoices button > div { min-width: 0; }
 .templateChoices strong { color: var(--color-text-primary); font-size: 13px; }
 .templateChoices p { margin: 4px 0; color: var(--color-text-secondary); font-size: 11px; line-height: 1.4; }
 .templateChoices small { color: var(--color-text-muted); font-size: 10px; }
@@ -157,9 +151,65 @@
 .studentTools form, .csvArea { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
 .csvArea { padding-left: 20px; border-left: 1px solid var(--color-border); }
 .inlineMessage { margin: 0 16px 16px; padding: 9px 12px; border-radius: 8px; color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 8%, transparent); font-size: 12px; }
+.errorMessage { margin: 0; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--color-danger) 30%, var(--color-border)); border-radius: 8px; color: var(--color-danger); background: color-mix(in srgb, var(--color-danger) 7%, var(--color-surface)); font-size: 13px; }
 .dot { display: inline-block; width: 7px; height: 7px; margin-right: 7px; border-radius: 50%; }
 .dotGood { background: var(--color-success); }
 .dotWarn { background: #d99a00; }
+.memberPageHeader { display: flex; align-items: center; justify-content: space-between; gap: 18px; min-height: 54px; }
+.memberPageHeader > div:first-child { display: flex; align-items: baseline; gap: 8px; }
+.memberPageHeader h2 { margin: 0; font-size: 20px; font-weight: 650; }
+.memberPageHeader > div:first-child span { color: var(--color-text-muted); font-size: 11px; }
+.memberActions { display: flex; align-items: center; gap: 8px; }
+.hiddenFileInput { position: fixed; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.memberPanel { overflow: hidden; border: 1px solid var(--color-border); border-radius: 13px; background: var(--color-surface); }
+.memberPanelHead { display: flex; align-items: center; justify-content: space-between; min-height: 56px; padding: 12px 20px; border-bottom: 1px solid var(--color-border); }
+.memberPanelHead strong { font-size: 14px; font-weight: 650; }
+.memberPanelHead span { color: var(--color-text-muted); font-size: 10px; font-variant-numeric: tabular-nums; }
+.memberList { display: flex; flex-direction: column; gap: 8px; padding: 12px 20px 18px; }
+.memberRow { display: grid; grid-template-columns: minmax(220px, 1.5fr) minmax(120px, .8fr) 110px 110px 34px; align-items: center; gap: 16px; min-height: 60px; padding: 10px 14px; border: 1px solid var(--color-border); border-radius: 9px; background: color-mix(in srgb, var(--color-hover) 22%, var(--color-surface)); }
+.memberIdentity { display: flex; min-width: 0; flex-direction: column; gap: 4px; }
+.memberIdentity strong { overflow: hidden; font-size: 13px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.memberIdentity span, .memberRow > span { overflow: hidden; color: var(--color-text-muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.memberMachineState { justify-self: start; padding: 4px 8px; border-radius: 999px; background: var(--color-hover); }
+.memberReady { color: var(--color-success) !important; background: color-mix(in srgb, var(--color-success) 8%, var(--color-surface)); }
+.memberRemove { display: grid; width: 30px; height: 30px; place-items: center; padding: 0; border: 0; border-radius: 7px; color: var(--color-danger); background: transparent; cursor: pointer; }
+.memberRemove:hover { background: color-mix(in srgb, var(--color-danger) 8%, transparent); }
+.studentDialog { width: min(520px, 100%); }
+.studentDialogBody { padding: 20px 22px; }
+.classroomPanel { overflow: hidden; border: 1px solid var(--color-border); border-radius: 13px; background: var(--color-surface); }
+.classroomHeader { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 18px 20px; border-bottom: 1px solid var(--color-border); }
+.classroomHeader h2 { margin: 0; font-size: 18px; font-weight: 650; }
+.classroomHeader p { margin: 4px 0 0; color: var(--color-text-secondary); font-size: 12px; }
+.classroomStats { display: flex; overflow: hidden; border: 1px solid var(--color-border); border-radius: 8px; }
+.classroomStats span { padding: 7px 11px; color: var(--color-text-muted); font-size: 10px; white-space: nowrap; }
+.classroomStats span + span { border-left: 1px solid var(--color-border); }
+.classroomStats strong { color: var(--color-text-primary); font-size: 12px; font-variant-numeric: tabular-nums; }
+.broadcastTools { display: flex; min-height: 52px; align-items: center; gap: 9px; padding: 8px 20px; border-bottom: 1px solid var(--color-border); color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 4%, var(--color-surface)); }
+.broadcastTools strong { color: var(--color-text-primary); font-size: 12px; }
+.broadcastTools > span { color: var(--color-text-secondary); font-size: 11px; }
+.broadcastTools select { width: min(360px, 100%); min-height: 34px; margin-left: 8px; padding: 5px 9px; border: 1px solid var(--color-border); border-radius: 7px; color: var(--color-text); background: var(--color-surface); font: inherit; font-size: 11px; }
+.broadcastTools .btnSecondary { margin-left: auto; }
+.classroomLoading { display: grid; min-height: 150px; place-items: center; color: var(--color-text-muted); font-size: 12px; }
+.classroomList { display: flex; flex-direction: column; }
+.classroomStudentRow { display: grid; grid-template-columns: minmax(180px, .8fr) 70px minmax(0, 2fr); align-items: center; gap: 16px; min-height: 76px; padding: 10px 20px; border-bottom: 1px solid var(--color-divider); }
+.classroomStudentRow:last-child { border-bottom: 0; }
+.classroomStudentIdentity { display: flex; min-width: 0; flex-direction: column; gap: 3px; }
+.classroomStudentIdentity strong, .classroomStudentIdentity span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.classroomStudentIdentity strong { font-size: 13px; font-weight: 600; }
+.classroomStudentIdentity span { color: var(--color-text-muted); font-size: 10px; }
+.classroomPresence { display: inline-flex; align-items: center; gap: 5px; color: var(--color-text-muted); font-size: 10px; }
+.classroomPresence i { width: 7px; height: 7px; border-radius: 50%; background: var(--color-text-muted); }
+.classroomOnline { color: var(--color-success); }
+.classroomOnline i { background: var(--color-success); }
+.classroomMachines { display: grid; grid-template-columns: repeat(3, minmax(130px, 1fr)); gap: 7px; }
+.classroomMachine { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 8px; border: 1px solid var(--color-border); border-radius: 8px; background: color-mix(in srgb, var(--color-hover) 22%, var(--color-surface)); }
+.classroomMachine > span { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
+.classroomMachine strong, .classroomMachine small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.classroomMachine strong { font-size: 11px; font-weight: 600; }
+.classroomMachine small { color: var(--color-text-muted); font-size: 9px; }
+.classroomMachine button { flex: 0 0 auto; padding: 4px 7px; border: 1px solid var(--color-border); border-radius: 6px; color: var(--color-primary); background: var(--color-surface); font: inherit; font-size: 10px; font-weight: 600; cursor: pointer; }
+.classroomMachine button:disabled { color: var(--color-text-muted); opacity: .55; cursor: not-allowed; }
+.classroomNoMachine { color: var(--color-text-muted); font-size: 11px; }
 .confirmBar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px; border: 1px solid color-mix(in srgb, #d99a00 28%, var(--color-border)); border-radius: 12px; background: color-mix(in srgb, #d99a00 7%, var(--color-surface)); }
 .confirmBar > div { display: flex; align-items: center; gap: 10px; color: #9a6700; }
 .confirmBar span { display: flex; flex-direction: column; gap: 3px; }
@@ -167,6 +217,9 @@
 .confirmBar small { color: var(--color-text-secondary); font-size: 11px; }
 
 .weekTimeline { display: grid; grid-template-columns: repeat(4, minmax(180px, 1fr)); gap: 8px; padding: 0 16px 16px; overflow-x: auto; }
+.weekBuilder { display: grid; grid-template-columns: 1.4fr 1fr 1fr; align-items: end; gap: 12px; padding: 0 16px 16px; }
+.weekBuilder .fieldFull { grid-column: 1 / -1; }
+.weekBuilder > button { justify-self: start; }
 .weekTimeline button { display: flex; flex-direction: column; gap: 4px; padding: 12px; border: 1px solid var(--color-border); border-radius: 10px; text-align: left; color: var(--color-text); background: var(--color-surface); font: inherit; cursor: pointer; }
 .weekTimeline button:hover, .weekTimeline button.weekActive { border-color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 5%, var(--color-surface)); }
 .weekTimeline b { color: var(--color-primary); font-size: 11px; }
@@ -198,5 +251,280 @@
 .textMuted { color: var(--color-text-muted) !important; font-weight: 400 !important; }
 
 @media (min-width: 768px) { .page { padding: 0; } .pageTitle { font-size: 28px; } }
-@media (max-width: 1050px) { .templateChoices { grid-template-columns: 1fr; } .splitContent, .twoColumns { grid-template-columns: 1fr; } .metricGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .weekTimeline { grid-template-columns: repeat(4, minmax(200px, 1fr)); } }
-@media (max-width: 720px) { .pageHeader, .workspaceHeader, .cardHeader, .toolbar, .integrationStrip, .confirmBar { align-items: flex-start; flex-direction: column; } .formGrid, .studentTools, .metricGrid, .weekDetail { grid-template-columns: 1fr; } .inlineBuilder { grid-template-columns: 1fr; } .csvArea { padding-top: 16px; padding-left: 0; border-top: 1px solid var(--color-border); border-left: 0; } .compactSelect { width: 100%; min-width: 0; } .ruleGrid { grid-template-columns: 1fr; } .integrationStrip .btnSecondary { align-self: stretch; } }
+@media (max-width: 1050px) { .templateChoices { grid-template-columns: 1fr; } .splitContent, .twoColumns { grid-template-columns: 1fr; } .weekTimeline { grid-template-columns: repeat(4, minmax(200px, 1fr)); } }
+@media (max-width: 720px) { .pageHeader, .workspaceHeader, .cardHeader, .toolbar, .integrationStrip, .confirmBar { align-items: flex-start; flex-direction: column; } .formGrid, .studentTools, .weekDetail, .weekBuilder { grid-template-columns: 1fr; } .csvArea { padding-top: 16px; padding-left: 0; border-top: 1px solid var(--color-border); border-left: 0; } .compactSelect { width: 100%; min-width: 0; } .ruleGrid { grid-template-columns: 1fr; } .integrationStrip .btnSecondary { align-self: stretch; } }
+
+/* Product-design pass: calm, task-led teacher workspace. */
+.page { width: 100%; max-width: 1440px; margin: 0 auto; gap: 20px; }
+.pageHeader { min-height: 76px; padding-bottom: 16px; border-bottom: 1px solid var(--color-border); }
+.pageHeading { gap: 7px; }
+.pageTitle { font-size: clamp(25px, 2.2vw, 32px); font-weight: 650; letter-spacing: -.025em; }
+.pageSubtitle { max-width: 760px; line-height: 1.6; }
+.pageKicker { color: var(--color-primary); font-size: 10px; font-weight: 750; letter-spacing: .12em; }
+.btnPrimary, .btnSecondary { min-height: 40px; border-radius: 9px; }
+.btnPrimary { box-shadow: 0 1px 2px color-mix(in srgb, var(--color-text-primary) 18%, transparent); }
+.card { border-radius: 12px; box-shadow: none; }
+.cardHeader { padding: 20px 22px 16px; }
+.cardHeader h2 { font-size: 17px; letter-spacing: -.01em; }
+.integrationStrip { padding: 14px 16px; border-color: var(--color-border); border-radius: 10px; color: var(--color-text-secondary); background: color-mix(in srgb, var(--color-hover) 58%, var(--color-surface)); }
+.integrationStrip > svg { color: var(--color-primary); }
+.toolbar { padding: 14px 16px; background: color-mix(in srgb, var(--color-hover) 35%, var(--color-surface)); }
+.table th { height: 38px; padding-inline: 18px; background: color-mix(in srgb, var(--color-hover) 58%, var(--color-surface)); font-size: 11px; letter-spacing: .035em; text-transform: uppercase; }
+.table td { height: 62px; padding-inline: 18px; }
+.rowLink:hover { background: color-mix(in srgb, var(--color-primary) 3.5%, var(--color-surface)); }
+.listSummary { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 38px; padding: 8px 18px; border-bottom: 1px solid var(--color-border); color: var(--color-text-muted); font-size: 11px; }
+.listSummary span { display: inline-flex; align-items: center; gap: 6px; }
+.listSummary i { width: 6px; height: 6px; border-radius: 50%; background: #d99a00; }
+.classToolbar { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 2px 0; }
+.classToolbar .searchInput { flex: 0 1 340px; border: 1px solid var(--color-border); border-radius: 9px; background: var(--color-surface); }
+.classToolbar .pillTabs { overflow-x: auto; }
+.classLoading { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 220px; color: var(--color-text-muted); font-size: 12px; }
+.classLoading span { width: 16px; height: 16px; border: 2px solid var(--color-border); border-top-color: var(--color-primary); border-radius: 50%; animation: classSpin .8s linear infinite; }
+@keyframes classSpin { to { transform: rotate(360deg); } }
+.classCardGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 420px)); gap: 14px; align-items: start; }
+.classCard { min-width: 0; overflow: hidden; border: 1px solid var(--color-border); border-radius: 13px; background: var(--color-surface); transition: border-color .15s, box-shadow .15s, transform .15s; }
+.classCard:hover { border-color: color-mix(in srgb, var(--color-primary) 28%, var(--color-border)); box-shadow: 0 7px 24px color-mix(in srgb, var(--color-text-primary) 8%, transparent); transform: translateY(-1px); }
+.classCardMain { display: flex; width: 100%; flex-direction: column; gap: 12px; padding: 16px 16px 14px; border: 0; color: inherit; text-align: left; background: transparent; font: inherit; cursor: pointer; }
+.classCardTop { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.classCardTop > div { min-width: 0; }
+.classCardTop > div > span { color: var(--color-text-muted); font-size: 10px; font-weight: 650; letter-spacing: .04em; }
+.classCardTop h2 { overflow: hidden; margin: 5px 0 0; font-size: 17px; font-weight: 650; letter-spacing: -.015em; text-overflow: ellipsis; white-space: nowrap; }
+.classSchedule { display: flex; align-items: center; gap: 9px; padding: 9px 10px; border-radius: 8px; color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 6%, var(--color-surface)); }
+.classSchedule > div { display: flex; min-width: 0; flex-direction: column; gap: 3px; }
+.classSchedule strong { color: var(--color-text-primary); font-size: 12px; }
+.classSchedule small { overflow: hidden; color: var(--color-text-secondary); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.classProgress { display: flex; flex-direction: column; gap: 7px; }
+.classProgress > div { display: flex; justify-content: space-between; color: var(--color-text-secondary); font-size: 10px; }
+.classProgress > div strong { color: var(--color-text-primary); font-variant-numeric: tabular-nums; }
+.classProgress > i { height: 5px; overflow: hidden; border-radius: 99px; background: var(--color-hover); }
+.classProgress > i > b { display: block; height: 100%; border-radius: inherit; background: var(--color-primary); }
+.classInfoLine { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 14px; min-height: 34px; padding: 7px 16px; border-top: 1px solid var(--color-border); color: var(--color-text-secondary); font-size: 10px; }
+.classInfoLine span { position: relative; white-space: nowrap; }
+.classInfoLine span + span::before { position: absolute; top: 50%; left: -8px; width: 2px; height: 2px; border-radius: 50%; background: var(--color-text-muted); content: ""; transform: translateY(-50%); }
+.classCardAction { display: flex; align-items: center; justify-content: space-between; min-height: 44px; gap: 12px; padding: 7px 10px 7px 16px; border-top: 1px solid var(--color-border); background: color-mix(in srgb, var(--color-hover) 35%, var(--color-surface)); }
+.classCardAction > span { color: var(--color-text-muted); font-size: 10px; }
+.classCardAction button { display: inline-flex; align-items: center; gap: 5px; padding: 7px 9px; border: 0; border-radius: 7px; color: var(--color-primary); background: transparent; font: inherit; font-size: 11px; font-weight: 650; cursor: pointer; }
+.classCardAction button:hover { background: color-mix(in srgb, var(--color-primary) 8%, transparent); }
+.readinessInline { display: flex; min-width: 130px; flex-direction: column; gap: 5px; }
+.readinessInline > i { display: block; width: 100%; max-width: 120px; height: 4px; overflow: hidden; border-radius: 99px; background: var(--color-hover); }
+.readinessInline > i > b { display: block; height: 100%; border-radius: inherit; background: var(--color-primary); }
+.readinessInline small { margin: 0 !important; }
+.statusBadge { padding: 3px 9px; border: 1px solid transparent; }
+.status_planning, .status_draft { border-color: color-mix(in srgb, #d99a00 20%, var(--color-border)); background: transparent; }
+.status_active, .status_published { border-color: color-mix(in srgb, var(--color-success) 20%, var(--color-border)); background: transparent; }
+.status_pending_review { border-color: color-mix(in srgb, #b7791f 35%, var(--color-border)); color: #9a6700; background: color-mix(in srgb, #d99a00 6%, var(--color-surface)); }
+.status_provisioning { border-color: color-mix(in srgb, var(--color-primary) 35%, var(--color-border)); color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 6%, var(--color-surface)); }
+.status_partial_failed { border-color: color-mix(in srgb, var(--color-danger) 35%, var(--color-border)); color: var(--color-danger); background: color-mix(in srgb, var(--color-danger) 6%, var(--color-surface)); }
+.stepTabs { align-self: flex-start; padding: 4px; border-radius: 10px; box-shadow: none; }
+.stepTabs button { min-width: 170px; justify-content: flex-start; }
+.fullPageForm { width: min(920px, 100%); }
+.createPageHeader { padding: 2px 0 8px; }
+.compactCreateForm { display: flex; width: min(900px, 100%); flex-direction: column; gap: 14px; }
+.compactFormSection { padding: 20px 22px 22px; }
+.compactFormSection + .compactFormSection { border-top: 1px solid var(--color-border); }
+.compactFormSection h2, .compactFormSection h3 { margin: 0 0 16px; font-size: 14px; font-weight: 650; }
+.createFormGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.createNameField { grid-column: span 2; }
+.compactCreateForm .formActions { padding-top: 0; }
+.createDialogOverlay { position: fixed; z-index: 1200; inset: 0; display: grid; padding: 24px; place-items: center; background: color-mix(in srgb, #101828 46%, transparent); backdrop-filter: blur(3px); }
+.createDialog { width: min(820px, 100%); max-height: min(820px, calc(100vh - 48px)); overflow: hidden; border: 1px solid var(--color-border); border-radius: 14px; background: var(--color-surface); box-shadow: 0 24px 70px rgba(15, 23, 42, .22); }
+.createDialogHeader { display: flex; align-items: center; justify-content: space-between; min-height: 58px; padding: 12px 18px 12px 22px; border-bottom: 1px solid var(--color-border); }
+.createDialogHeader h2 { margin: 0; font-size: 18px; font-weight: 650; }
+.createDialog form { display: flex; min-height: 0; flex-direction: column; }
+.createDialogBody { max-height: calc(100vh - 190px); overflow-y: auto; }
+.createDialogBody .errorMessage { margin: 0 22px 18px; }
+.createDialogFooter { display: flex; align-items: center; justify-content: flex-end; gap: 9px; min-height: 66px; padding: 12px 18px; border-top: 1px solid var(--color-border); background: color-mix(in srgb, var(--color-hover) 38%, var(--color-surface)); }
+.formGrid { gap: 20px; padding: 4px 22px 22px; }
+.field > span { margin-bottom: 3px; font-weight: 600; }
+.field input, .field textarea, .field select, .compactSelect { border-radius: 8px; background: color-mix(in srgb, var(--color-hover) 22%, var(--color-surface)); }
+.field input:focus, .field textarea:focus, .field select:focus { background: var(--color-surface); box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 12%, transparent); }
+
+.workspaceHeader { padding: 4px 0 18px; border: 0; border-bottom: 1px solid var(--color-border); border-radius: 0; background: transparent; box-shadow: none; }
+.workspaceContent { min-width: 0; overflow: hidden; }
+.workflowTabsBar { display: flex; align-items: stretch; min-width: 0; overflow: hidden; border: 1px solid var(--color-border); border-radius: 12px; background: var(--color-surface); }
+.workflowTabsBar .workspaceTabs { display: flex; flex: 1; min-width: 0; overflow-x: auto; padding: 5px; border: 0; scrollbar-width: thin; }
+.workflowTabsBar .workspaceTabs button { position: relative; display: flex; flex: 1 0 max-content; align-items: center; justify-content: center; gap: 7px; min-width: 126px; height: 44px; padding: 0 15px; border: 0; border-radius: 8px; color: var(--color-text-secondary); background: transparent; cursor: pointer; }
+.workflowTabsBar .workspaceTabs button::after { position: absolute; right: 0; bottom: -5px; left: 0; height: 2px; border-radius: 2px 2px 0 0; background: transparent; content: ""; }
+.workflowTabsBar .workspaceTabs button:hover:not(:disabled) { color: var(--color-text-primary); background: var(--color-hover); }
+.workflowTabsBar .workspaceTabs button strong { color: inherit; font-size: 13px; font-weight: 600; white-space: nowrap; }
+.workflowTabsBar .workspaceTabs button.workspaceTabActive { color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 8%, var(--color-surface)); }
+.workflowTabsBar .workspaceTabs button.workspaceTabActive::after { background: var(--color-primary); }
+.workflowTabsBar .workspaceTabs button.workspaceTabLocked { opacity: .42; cursor: not-allowed; }
+.workflowProgress { display: flex; flex: 0 0 auto; min-width: 120px; flex-direction: column; justify-content: center; gap: 2px; padding: 0 18px; border-left: 1px solid var(--color-border); background: color-mix(in srgb, var(--color-hover) 34%, var(--color-surface)); }
+.workflowProgress span { color: var(--color-text-muted); font-size: 10px; }
+.workflowProgress strong { font-size: 12px; font-weight: 650; white-space: nowrap; }
+
+.readinessPanel { overflow: hidden; border: 1px solid var(--color-border); border-radius: 14px; background: var(--color-surface); }
+.setupSummary { display: grid; grid-template-columns: 42px minmax(0, 1fr) auto; align-items: center; gap: 14px; padding: 22px 24px; }
+.setupSummaryIcon { display: grid; width: 42px; height: 42px; place-items: center; border-radius: 10px; color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 9%, var(--color-surface)); }
+.setupSummary > div { min-width: 0; }
+.setupSummary > div > span { color: var(--color-text-muted); font-size: 11px; font-weight: 550; }
+.setupSummary h2 { margin: 3px 0 2px; font-size: 20px; font-weight: 650; letter-spacing: -.015em; }
+.setupSummary p { margin: 0; color: var(--color-text-secondary); font-size: 13px; line-height: 1.5; }
+.setupChecklist { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-top: 1px solid var(--color-border); }
+.setupChecklist > div { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; align-items: center; gap: 10px; min-height: 66px; padding: 11px 20px; }
+.setupChecklist > div + div { border-left: 1px solid var(--color-border); }
+.setupChecklist > div > span { display: grid; width: 28px; height: 28px; place-items: center; border-radius: 8px; }
+.setupChecklist > div > div { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
+.setupChecklist strong { font-size: 13px; font-weight: 600; }
+.setupChecklist small { overflow: hidden; color: var(--color-text-muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.setupChecklist em { padding: 3px 7px; border-radius: 99px; font-size: 10px; font-style: normal; font-weight: 600; white-space: nowrap; }
+.setupItemDone > span { color: var(--color-success); background: color-mix(in srgb, var(--color-success) 9%, var(--color-surface)); }
+.setupItemDone em { color: var(--color-text-muted); background: var(--color-hover); }
+.setupItemTodo { background: color-mix(in srgb, var(--color-primary) 3%, var(--color-surface)); }
+.setupItemTodo > span, .setupItemTodo em { color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 9%, var(--color-surface)); }
+.overviewDetailGrid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(320px, .85fr); gap: 16px; }
+.overviewInfoCard { overflow: hidden; border: 1px solid var(--color-border); border-radius: 12px; background: var(--color-surface); }
+.overviewCardHeader { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; padding: 10px 18px; border-bottom: 1px solid var(--color-border); }
+.overviewCardHeader h2 { margin: 0; font-size: 14px; font-weight: 650; }
+.overviewCardHeader button { display: inline-flex; align-items: center; gap: 4px; padding: 5px 0; border: 0; color: var(--color-primary); background: transparent; font: inherit; font-size: 11px; font-weight: 600; cursor: pointer; }
+.classFacts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.classFacts > div { display: flex; min-width: 0; flex-direction: column; gap: 3px; padding: 12px 18px; border-bottom: 1px solid var(--color-divider); }
+.classFacts > div:nth-child(odd) { border-right: 1px solid var(--color-divider); }
+.classFacts > div:nth-last-child(-n + 2) { border-bottom: 0; }
+.classFacts span { color: var(--color-text-muted); font-size: 10px; }
+.classFacts strong { overflow: hidden; font-size: 12px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.currentWeekSummary { display: flex; min-height: 130px; align-items: center; justify-content: space-between; gap: 18px; padding: 18px; }
+.currentWeekSummary > div { display: flex; min-width: 0; flex-direction: column; gap: 5px; }
+.currentWeekSummary > div > span { color: var(--color-primary); font-size: 11px; font-weight: 650; }
+.currentWeekSummary > div > strong { overflow: hidden; font-size: 16px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.currentWeekSummary small { color: var(--color-text-secondary); font-size: 11px; }
+.weekFileCount { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 4px; padding: 5px 8px; border-radius: 7px; color: var(--color-text-secondary); background: var(--color-hover); font-size: 10px; white-space: nowrap; }
+.currentWeekEmpty { display: grid; min-height: 130px; place-items: center; color: var(--color-text-muted); font-size: 12px; }
+.persistentFeedback { display: flex; align-items: flex-start; gap: 8px; margin: 0 28px 18px; padding: 10px 12px; border-radius: 8px; color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 7%, var(--color-surface)); font-size: 12px; line-height: 1.5; }
+.lockedFeature { display: flex; align-items: flex-start; gap: 16px; padding: 28px; border: 1px dashed var(--color-border); border-radius: 12px; background: color-mix(in srgb, var(--color-hover) 35%, var(--color-surface)); }
+.lockedFeature > span { display: grid; flex: 0 0 auto; width: 42px; height: 42px; place-items: center; border: 1px solid var(--color-border); border-radius: 10px; color: var(--color-text-muted); background: var(--color-surface); }
+.lockedFeature h2 { margin: 6px 0; font-size: 18px; }
+.lockedFeature p { max-width: 620px; margin: 0; color: var(--color-text-secondary); font-size: 13px; line-height: 1.6; }
+
+.templateChoices { grid-template-columns: 1fr; gap: 0; padding: 0; border-top: 1px solid var(--color-border); }
+.templateChoices label, .templateChoices button { align-items: center; min-height: 82px; padding: 14px 20px; border: 0; border-bottom: 1px solid var(--color-divider); border-radius: 0; }
+.templateChoices label:last-child, .templateChoices button:last-child { border-bottom: 0; }
+.templateChoices label:hover, .templateChoices label.templateSelected, .templateChoices button:hover, .templateChoices button.templateSelected { border-color: var(--color-divider); background: color-mix(in srgb, var(--color-primary) 5%, var(--color-surface)); }
+.templateChoices label.templateSelected, .templateChoices button.templateSelected { box-shadow: inset 3px 0 var(--color-primary); }
+.templateChoices button.templateSuggested { background: color-mix(in srgb, var(--color-primary) 7%, var(--color-surface)); box-shadow: inset 3px 0 var(--color-primary); }
+.templateChoices label > span, .templateChoices button > span { width: 34px; height: 34px; border: 1px solid var(--color-border); color: var(--color-text-secondary); background: var(--color-surface); }
+.templateChoices strong { font-size: 14px; }
+.machineBlock { border-radius: 10px; box-shadow: none; }
+.blueprintCanvas { padding: 4px 22px 22px; }
+.blueprintItem { flex: 0 0 auto; }
+.templateMachineWorkspace { min-height: 430px; }
+.machineWorkspaceHeader { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 20px 22px; border-bottom: 1px solid var(--color-border); }
+.machineWorkspaceHeader h2 { margin: 0; font-size: 18px; font-weight: 650; }
+.machineWorkspaceHeader p { margin: 4px 0 0; color: var(--color-text-secondary); font-size: 13px; }
+.machineTotals { display: flex; flex: 0 0 auto; align-items: center; overflow: hidden; border: 1px solid var(--color-border); border-radius: 9px; background: color-mix(in srgb, var(--color-hover) 30%, var(--color-surface)); }
+.machineTotals span { padding: 8px 12px; color: var(--color-text-muted); font-size: 11px; white-space: nowrap; }
+.machineTotals span + span { border-left: 1px solid var(--color-border); }
+.machineTotals strong { margin-right: 3px; color: var(--color-text-primary); font-size: 13px; font-variant-numeric: tabular-nums; }
+.machineAddBar { display: grid; grid-template-columns: minmax(280px, 560px) max-content; align-items: end; justify-content: start; gap: 10px; padding: 13px 22px; border-bottom: 1px solid var(--color-border); background: color-mix(in srgb, var(--color-hover) 24%, var(--color-surface)); }
+.machineAddBar .field { gap: 3px; }
+.machineAddBar .field > span { color: var(--color-text-secondary); font-size: 11px; }
+.machineAddBar .btnPrimary { min-width: 138px; min-height: 40px; }
+.templateMachineWorkspace .blueprintCanvas { box-sizing: border-box; max-width: 100%; min-height: 260px; align-items: center; justify-content: center; padding: 30px 28px 34px; }
+.templateMachineWorkspace .machineBlock { width: 300px; border-radius: 12px; background: var(--color-surface); }
+.templateMachineWorkspace .machineTitle { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; padding: 16px; }
+.templateMachineWorkspace .machineTitle > span { width: 40px; height: 40px; }
+.templateMachineWorkspace .machineTitle input { min-width: 0; min-height: 34px; font-size: 14px; }
+.templateMachineWorkspace .machineTitle em { max-width: 42px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.templateMachineWorkspace .machineFields { gap: 12px; padding: 0 16px 16px; }
+.templateMachineWorkspace .machineFields label { font-size: 11px; }
+.templateMachineWorkspace .machineFields input { min-height: 34px; padding: 7px 9px; font-size: 12px; }
+.templateMachineWorkspace .machineSpecs { min-height: 40px; gap: 12px; padding: 9px 16px; font-size: 11px; }
+.templateMachineWorkspace .machineSpecs button { font-size: 11px; }
+.templateMachineWorkspace .connection { width: 92px; }
+.templateMachineWorkspace .connection i { width: 60px; }
+.templateMachineWorkspace .connection span { display: block; width: 82px; overflow: hidden; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
+.table { min-width: 720px; }
+.studentTools { grid-template-columns: minmax(0, 1.2fr) minmax(260px, .8fr); }
+.headerState { flex-wrap: wrap; justify-content: flex-end; }
+.confirmBar { border-color: var(--color-border); background: color-mix(in srgb, var(--color-hover) 45%, var(--color-surface)); }
+.weekBuilder { padding: 4px 22px 22px; }
+.weekTimeline { padding: 2px 22px 20px; }
+.weekTimeline button { min-height: 110px; border-radius: 8px; }
+.weekTimeline button:hover, .weekTimeline button.weekActive { border-color: color-mix(in srgb, var(--color-primary) 55%, var(--color-border)); background: color-mix(in srgb, var(--color-primary) 4%, var(--color-surface)); }
+.jobGrid span { color: var(--color-text-muted); font-size: 10px; }
+.jobGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; padding: 16px 28px; border-bottom: 1px solid var(--color-border); background: color-mix(in srgb, var(--color-hover) 34%, var(--color-surface)); }
+.jobGrid article { display: flex; flex-direction: column; gap: 3px; padding: 10px 12px; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-surface); }
+.jobGrid strong { font-size: 12px; }
+.jobGrid small { color: var(--color-text-secondary); font-size: 10px; }
+.weekRows { display: flex; flex-direction: column; border-top: 1px solid var(--color-border); }
+.weekRows article { display: grid; grid-template-columns: 120px minmax(260px, 1.1fr) minmax(320px, 1fr); align-items: center; gap: 18px; padding: 18px 22px; border-bottom: 1px solid var(--color-divider); }
+.weekDate { display: flex; flex-direction: column; align-self: center; gap: 4px; }
+.weekDate strong { color: var(--color-primary); font-size: 12px; }
+.weekDate span { color: var(--color-text-secondary); font-size: 11px; font-variant-numeric: tabular-nums; }
+.weekFiles { display: flex; min-width: 0; flex-direction: column; gap: 6px; }
+.weekFiles > span { color: var(--color-text-secondary); font-size: 11px; font-weight: 600; }
+.weekFileList { display: flex; min-height: 40px; align-items: center; flex-wrap: wrap; gap: 6px; }
+.weekFileChip { display: inline-flex; min-width: 0; max-width: 220px; align-items: center; gap: 5px; height: 32px; padding: 0 7px 0 9px; border: 1px solid var(--color-border); border-radius: 8px; color: var(--color-text-secondary); background: color-mix(in srgb, var(--color-hover) 32%, var(--color-surface)); }
+.weekFileChip b { overflow: hidden; font-size: 11px; font-weight: 550; text-overflow: ellipsis; white-space: nowrap; }
+.weekFileChip button { display: grid; flex: 0 0 auto; width: 20px; height: 20px; place-items: center; padding: 0; border: 0; border-radius: 5px; color: var(--color-text-muted); background: transparent; cursor: pointer; }
+.weekFileChip button:hover { color: var(--color-danger); background: var(--color-hover); }
+.weekUploadButton { display: inline-flex; width: max-content; height: 32px; align-items: center; gap: 6px; padding: 0 10px; border: 1px dashed color-mix(in srgb, var(--color-primary) 45%, var(--color-border)); border-radius: 8px; color: var(--color-primary); font-size: 11px; font-weight: 600; cursor: pointer; }
+.weekUploadButton:hover { background: color-mix(in srgb, var(--color-primary) 6%, var(--color-surface)); }
+.weekUploadButton input { position: absolute; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none; }
+
+@media (max-width: 1050px) {
+  .workflowTabsBar .workspaceTabs button { flex: 0 0 auto; }
+  .overviewDetailGrid { grid-template-columns: 1fr; }
+  .classroomStudentRow { grid-template-columns: minmax(180px, .8fr) 70px minmax(0, 1.5fr); }
+  .classroomMachines { grid-template-columns: repeat(2, minmax(130px, 1fr)); }
+  .machineWorkspaceHeader { align-items: flex-start; flex-direction: column; }
+  .templateMachineWorkspace .blueprintCanvas { justify-content: flex-start; }
+  .templateMachineWorkspace .machineBlock { width: 280px; }
+  .weekRows article { grid-template-columns: 100px minmax(220px, 1fr); }
+  .weekFiles { grid-column: 2; }
+  .memberRow { grid-template-columns: minmax(200px, 1.3fr) minmax(100px, .7fr) 100px 34px; }
+  .memberRow > span:nth-of-type(3) { display: none; }
+}
+
+@media (max-width: 720px) {
+  .page { gap: 16px; }
+  .pageHeader { min-height: 0; }
+  .workflowTabsBar { align-items: stretch; flex-direction: column-reverse; }
+  .workflowProgress { min-height: 48px; flex-direction: row; align-items: center; justify-content: space-between; padding: 0 14px; border-bottom: 1px solid var(--color-border); border-left: 0; }
+  .workflowTabsBar .workspaceTabs button { min-width: 112px; padding-inline: 12px; }
+  .setupSummary { grid-template-columns: 38px minmax(0, 1fr); padding: 18px; }
+  .setupSummaryIcon { width: 38px; height: 38px; }
+  .setupSummary .btnPrimary { grid-column: 1 / -1; width: 100%; }
+  .setupChecklist { grid-template-columns: 1fr; }
+  .setupChecklist > div + div { border-top: 1px solid var(--color-border); border-left: 0; }
+  .persistentFeedback { margin-inline: 18px; }
+  .stepTabs { align-self: stretch; }
+  .stepTabs button { flex: 1; min-width: 0; }
+  .studentTools { grid-template-columns: 1fr; }
+  .memberPageHeader { align-items: stretch; flex-direction: column; }
+  .memberActions { display: grid; grid-template-columns: 1fr 1fr; }
+  .classroomHeader { align-items: flex-start; flex-direction: column; }
+  .broadcastTools { align-items: stretch; flex-wrap: wrap; }
+  .broadcastTools select { width: 100%; margin-left: 0; }
+  .classroomStudentRow { grid-template-columns: minmax(0, 1fr) auto; gap: 7px 12px; }
+  .classroomMachines { grid-column: 1 / -1; grid-template-columns: 1fr; }
+  .memberList { padding: 10px 12px 14px; }
+  .memberRow { grid-template-columns: minmax(0, 1fr) auto 30px; gap: 8px 12px; }
+  .memberIdentity { grid-column: 1 / -1; }
+  .memberRow > span:first-of-type { display: none; }
+  .memberRow > span:nth-of-type(3) { display: block; }
+  .listSummary { align-items: flex-start; flex-direction: column; }
+  .classToolbar { align-items: stretch; flex-direction: column; }
+  .classToolbar .searchInput { flex-basis: auto; width: 100%; }
+  .classCardGrid { grid-template-columns: 1fr; }
+  .classCardTop h2 { white-space: normal; }
+  .classFacts { grid-template-columns: 1fr; }
+  .classFacts > div, .classFacts > div:nth-child(odd), .classFacts > div:nth-last-child(-n + 2) { border-right: 0; border-bottom: 1px solid var(--color-divider); }
+  .classFacts > div:last-child { border-bottom: 0; }
+  .currentWeekSummary { align-items: flex-start; flex-direction: column; }
+  .createFormGrid { grid-template-columns: 1fr; }
+  .createNameField { grid-column: auto; }
+  .compactFormSection { padding: 18px; }
+  .createDialogOverlay { align-items: end; padding: 0; }
+  .createDialog { width: 100%; max-height: calc(100vh - 24px); border-radius: 16px 16px 0 0; }
+  .createDialogBody { max-height: calc(100vh - 156px); }
+  .machineWorkspaceHeader { padding: 18px; }
+  .machineTotals { width: 100%; overflow-x: auto; }
+  .machineTotals span { flex: 1 0 auto; text-align: center; }
+  .machineAddBar { grid-template-columns: 1fr; justify-content: stretch; padding: 14px 18px; }
+  .machineAddBar .btnPrimary { width: 100%; }
+  .templateMachineWorkspace .blueprintCanvas { padding: 22px 18px 28px; }
+  .weekRows article { grid-template-columns: 1fr; align-items: stretch; padding: 16px 18px; }
+  .weekFiles { grid-column: auto; }
+}

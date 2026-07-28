@@ -52,6 +52,38 @@ def submit_batch_job(
     if not member_rows:
         raise BadRequestError("群組沒有成員，無法執行批量建立")
 
+    return submit_batch_job_for_users(
+        session=session,
+        member_user_ids=[row.user_id for row in member_rows],
+        initiated_by_id=initiated_by_id,
+        resource_type=resource_type,
+        hostname_prefix=hostname_prefix,
+        params=params,
+        group_id=group_id,
+        recurrence_rule=recurrence_rule,
+        recurrence_duration_minutes=recurrence_duration_minutes,
+        schedule_timezone=schedule_timezone,
+    )
+
+
+def submit_batch_job_for_users(
+    *,
+    session: Session,
+    member_user_ids: list[uuid.UUID],
+    initiated_by_id: uuid.UUID,
+    resource_type: str,
+    hostname_prefix: str,
+    params: dict,
+    group_id: uuid.UUID | None = None,
+    teaching_class_id: uuid.UUID | None = None,
+    recurrence_rule: str | None = None,
+    recurrence_duration_minutes: int | None = None,
+    schedule_timezone: str | None = None,
+) -> uuid.UUID:
+    """Create a reviewed batch for an explicit class-student roster."""
+    if not member_user_ids:
+        raise BadRequestError("班級沒有學生，無法執行批量建立")
+
     # 範本系統 2.0：指定 vm_template_id 時走克隆路徑，範本必須存在且 ready
     if params.get("vm_template_id"):
         template = vm_template_repo.get_template(
@@ -66,13 +98,11 @@ def submit_batch_job(
 
     # 檢查可用 IP 是否足夠
     stats = ip_management_service.get_ip_stats(session)
-    if stats["available"] < len(member_rows):
+    if stats["available"] < len(member_user_ids):
         raise BadRequestError(
-            f"可用 IP 不足：需要 {len(member_rows)} 個，"
+            f"可用 IP 不足：需要 {len(member_user_ids)} 個，"
             f"但僅剩 {stats['available']} 個可用"
         )
-
-    member_user_ids = [row.user_id for row in member_rows]
 
     if recurrence_rule and not recurrence_duration_minutes:
         raise BadRequestError(
@@ -82,6 +112,7 @@ def submit_batch_job(
     job = bp_repo.create_job(
         session=session,
         group_id=group_id,
+        teaching_class_id=teaching_class_id,
         initiated_by=initiated_by_id,
         resource_type=resource_type,
         hostname_prefix=hostname_prefix,
@@ -95,7 +126,10 @@ def submit_batch_job(
 
     logger.info(
         "Batch provision job %s submitted (pending_review): %d members, type=%s prefix=%s",
-        job.id, len(member_user_ids), resource_type, hostname_prefix,
+        job.id,
+        len(member_user_ids),
+        resource_type,
+        hostname_prefix,
     )
     return job.id
 
@@ -227,7 +261,9 @@ def _run_queue(job_id: uuid.UUID) -> None:
         bp_repo.update_job_status(session=session, job_id=job_id, status=final)
         logger.info(
             "Batch provision job %s finished: done=%d failed=%d",
-            job_id, job.done, job.failed_count,
+            job_id,
+            job.done,
+            job.failed_count,
         )
 
 

@@ -77,6 +77,7 @@ class ClassroomSession:
     started_by: uuid.UUID
     controller_user_id: uuid.UUID | None
     subscriber_count: int
+    class_id: uuid.UUID | None = None
 
 
 @dataclass
@@ -94,6 +95,7 @@ class _SessionState:
         vmid: int,
         mode: SessionMode,
         group_id: uuid.UUID | None,
+        class_id: uuid.UUID | None,
         started_by: uuid.UUID,
         upstream: UpstreamConnection,
         init: ServerInitInfo,
@@ -102,6 +104,7 @@ class _SessionState:
         self.vmid = vmid
         self.mode = mode
         self.group_id = group_id
+        self.class_id = class_id
         self.started_by = started_by
         self.upstream = upstream
         self.init = init
@@ -126,6 +129,7 @@ class _SessionState:
             started_by=self.started_by,
             controller_user_id=self.controller_user_id,
             subscriber_count=len(self.subscribers),
+            class_id=self.class_id,
         )
 
 
@@ -151,6 +155,7 @@ class VncSessionManager:
         mode: SessionMode,
         group_id: uuid.UUID | None,
         started_by: uuid.UUID,
+        class_id: uuid.UUID | None = None,
     ) -> ClassroomSession:
         if vmid in self._vmid_index:
             raise ConflictError(f"VM {vmid} already has an active classroom session")
@@ -167,6 +172,7 @@ class VncSessionManager:
             vmid=vmid,
             mode=mode,
             group_id=group_id,
+            class_id=class_id,
             started_by=started_by,
             upstream=upstream,
             init=init,
@@ -196,6 +202,14 @@ class VncSessionManager:
     ) -> ClassroomSession | None:
         for state in self._sessions.values():
             if state.mode is SessionMode.broadcast and state.group_id in group_ids:
+                return state.snapshot()
+        return None
+
+    def find_broadcast_for_classes(
+        self, class_ids: set[uuid.UUID]
+    ) -> ClassroomSession | None:
+        for state in self._sessions.values():
+            if state.mode is SessionMode.broadcast and state.class_id in class_ids:
                 return state.snapshot()
         return None
 
