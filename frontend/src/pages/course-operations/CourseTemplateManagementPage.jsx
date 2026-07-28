@@ -17,7 +17,7 @@ export default function CourseTemplateManagementPage() {
     return matchesQuery && (status === "all" || template.status === status);
   }), [query, status, templates]);
 
-  return <div className={styles.page}>
+  return <div className={`${styles.page} ${styles.listPage}`}>
     <div className={styles.pageHeader}>
       <div className={styles.pageHeading}>
         <div className={styles.titleLine}><h1 className={styles.pageTitle}>環境模板</h1></div>

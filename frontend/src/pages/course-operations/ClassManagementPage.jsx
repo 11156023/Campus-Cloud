@@ -73,7 +73,7 @@ export default function ClassManagementPage({ openCreate = false }) {
     [classes, query, status],
   );
 
-  return <div className={styles.page}>
+  return <div className={`${styles.page} ${styles.listPage}`}>
     <header className={styles.pageHeader}>
       <div className={styles.pageHeading}>
         <h1 className={styles.pageTitle}>我的班級</h1>
