@@ -39,6 +39,16 @@ def apply() -> None:
     SQLModel.metadata.create_all(engine, tables=new_tables, checkfirst=True)
 
     _add_column(
+        "course_environment_nodes",
+        "position_x",
+        "position_x DOUBLE PRECISION NOT NULL DEFAULT 80",
+    )
+    _add_column(
+        "course_environment_nodes",
+        "position_y",
+        "position_y DOUBLE PRECISION NOT NULL DEFAULT 120",
+    )
+    _add_column(
         "teaching_classes",
         "course_version_id",
         "course_version_id UUID NULL REFERENCES "

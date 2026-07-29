@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import {
   Background,
-  MarkerType,
+  Handle,
+  Position,
   ReactFlow,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
@@ -10,6 +11,7 @@ import MIcon from "../../components/MIcon";
 import { CourseEnvironmentsService } from "../../services/courseEnvironments";
 import { apiGet } from "../../services/api";
 import { TemplatesService } from "../../services/templates";
+import ConnectionEdge from "../network/firewall/edges/ConnectionEdge";
 import styles from "./CourseOperations.module.scss";
 
 const TABS = [
@@ -20,6 +22,23 @@ const TABS = [
 const emptyTemplate = { id: "new", name: "", code: "", description: "", status: "draft", classes: 0, updatedAt: "尚未儲存", nodes: [], edges: [] };
 
 const FIREWALL_PROTOCOLS = ["tcp", "udp", "icmp", "icmpv6", "sctp"];
+
+function TopologyMachineNode({ data, selected, isConnectable }) {
+  const node = data.node;
+  return <div className={`${styles.flowMachineNode} ${selected ? styles.flowMachineNodeSelected : ""}`}>
+    <Handle type="target" position={Position.Left} isConnectable={isConnectable} />
+    <div className={styles.flowNodeIcon}><MIcon name={node.type === "lxc" ? "deployed_code" : "dns"} size={18} /></div>
+    <div className={styles.flowNodeLabel}>
+      <strong>{node.name}</strong>
+      <span>{node.sourceType === "custom" ? "自訂" : "範本"} · {String(node.type).toUpperCase()}</span>
+      <small>{node.cpu} CPU · {node.memory} GB RAM · {node.disk} GB</small>
+    </div>
+    <Handle type="source" position={Position.Right} isConnectable={isConnectable} />
+  </div>;
+}
+
+const TOPOLOGY_NODE_TYPES = { courseMachine: TopologyMachineNode };
+const TOPOLOGY_EDGE_TYPES = { connection: ConnectionEdge };
 
 function MachineEditor({ value, edges, onChange, onEdgesChange, pveTemplates, vmImages, lxcImages, locked = false }) {
   const [sourceMode, setSourceMode] = useState("template");
@@ -39,16 +58,17 @@ function MachineEditor({ value, edges, onChange, onEdgesChange, pveTemplates, vm
         id: nodeId, sourceType: "template", sourceTemplateId: source.id, name: source.name, role: "課程機器",
         type: String(source.resource_type).toLowerCase() === "lxc" ? "lxc" : "qemu", image: source.name, cpu: source.default_cores ?? 2,
         memory: Math.max(1, Math.round((source.default_memory ?? 2048) / 1024)), disk: source.default_disk ?? 24,
-        network: "lab-net", icon: "dns",
+        network: "lab-net", icon: "dns", positionX: 60 + value.length * 260, positionY: 120,
       }]);
     } else {
       const source = (customType === "lxc" ? lxcImages : vmImages).find((item) => String(item.value) === sourceId);
       if (!source) return;
       onChange([...value, {
         id: nodeId, sourceType: "custom", sourceTemplateId: null, customImageRef: source.value,
-        customStorage: "local-lvm", customUsername: "student", customUnprivileged: true,
+        customUsername: "student", customUnprivileged: true,
         name: source.label.split(" · ")[0], role: "課程機器", type: customType, image: source.label,
         cpu: 2, memory: 2, disk: customType === "lxc" ? 8 : 20, network: "lab-net", icon: "dns",
+        positionX: 60 + value.length * 260, positionY: 120,
       }]);
     }
     setSelectedNodeId(nodeId);
@@ -93,27 +113,53 @@ function MachineEditor({ value, edges, onChange, onEdgesChange, pveTemplates, vm
     onEdgesChange(edges.map((edge) => edge.id === selectedEdgeId ? { ...edge, ...patch } : edge));
   }
 
+  function removeEdge(edgeId) {
+    onEdgesChange(edges.filter((edge) => edge.id !== edgeId));
+    setSelectedEdgeId("");
+  }
+
+  function handleGraphNodesChange(changes) {
+    const positions = new Map(
+      changes
+        .filter((change) => change.type === "position" && change.position)
+        .map((change) => [change.id, change.position]),
+    );
+    if (!positions.size) return;
+    onChange(value.map((node) => {
+      const position = positions.get(String(node.id));
+      return position
+        ? { ...node, positionX: Math.round(position.x), positionY: Math.round(position.y) }
+        : node;
+    }));
+  }
+
   const selectedEdge = edges.find((edge) => edge.id === selectedEdgeId);
   const selectedNode = value.find((node) => node.id === selectedNodeId) ?? (!selectedEdge ? value[0] : null);
   const graphNodes = value.map((node, index) => ({
     id: String(node.id),
-    position: { x: 60 + index * 260, y: 95 + (index % 2) * 45 },
-    data: {
-      label: <div className={styles.flowNodeLabel}>
-        <strong>{node.name}</strong>
-        <span>{node.sourceType === "custom" ? "自訂" : "範本"} · {String(node.type).toUpperCase()}</span>
-        <small>{node.cpu} CPU · {node.memory} GB</small>
-      </div>,
+    type: "courseMachine",
+    position: {
+      x: Number(node.positionX ?? (60 + index * 260)),
+      y: Number(node.positionY ?? (120 + (index % 2) * 45)),
     },
+    data: { node },
     selected: selectedNode?.id === node.id,
-    style: { width: 190, border: "1px solid var(--color-primary)", borderRadius: 10 },
   }));
   const graphEdges = edges.map((edge) => ({
     ...edge,
-    label: `${edge.direction === "bidirectional" ? "雙向" : "單向"} · ${edge.protocol}${edge.port ? `/${edge.port}` : ""}`,
-    markerEnd: { type: MarkerType.ArrowClosed },
-    markerStart: edge.direction === "bidirectional" ? { type: MarkerType.ArrowClosed } : undefined,
-    style: { strokeWidth: 2 },
+    type: "connection",
+    data: {
+      edge: {
+        course_edge_id: edge.id,
+        source_vmid: edge.source,
+        target_vmid: edge.target,
+      },
+      label: `${edge.direction === "bidirectional" ? "雙向" : "單向"} · ${edge.protocol}${edge.port ? `/${edge.port}` : ""}`,
+      showLabel: true,
+      onSelect: () => { setSelectedEdgeId(edge.id); setSelectedNodeId(""); },
+      onDelete: locked ? null : () => removeEdge(edge.id),
+    },
+    zIndex: 5,
   }));
 
   return <section className={`${styles.card} ${styles.templateMachineWorkspace}`}>
@@ -128,16 +174,20 @@ function MachineEditor({ value, edges, onChange, onEdgesChange, pveTemplates, vm
         <button type="button" className={styles.btnPrimary} disabled={locked || atLimit || !sourceId} onClick={addMachine}><MIcon name={atLimit ? "check" : "add"} size={16} />{atLimit ? "已達上限" : "加入機器"}</button>
       </div>
       {value.length ? <>
-        <div className={styles.topologyHelp}><MIcon name="account_tree" size={17} /><span>拖曳節點圓點建立連線；點節點或連線進行設定。</span></div>
+        <div className={styles.topologyHelp}><MIcon name="account_tree" size={17} /><span>從來源節點右側圓點拖到目標節點左側圓點；節點本體可直接拖曳移動。</span></div>
         <div className={styles.topologyWorkspace}>
           <div className={styles.topologyCanvas}><ReactFlow
             nodes={graphNodes}
             edges={graphEdges}
+            nodeTypes={TOPOLOGY_NODE_TYPES}
+            edgeTypes={TOPOLOGY_EDGE_TYPES}
             onConnect={connect}
+            onNodesChange={handleGraphNodesChange}
             onNodeClick={(_, node) => { setSelectedNodeId(node.id); setSelectedEdgeId(""); }}
             onEdgeClick={(_, edge) => { setSelectedEdgeId(edge.id); setSelectedNodeId(""); }}
-            nodesDraggable={false}
+            nodesDraggable={!locked}
             nodesConnectable={!locked}
+            connectionLineStyle={{ stroke: "#4f6fdc", strokeWidth: 3 }}
             elementsSelectable
             minZoom={0.7}
             maxZoom={1.4}
@@ -154,7 +204,7 @@ function MachineEditor({ value, edges, onChange, onEdgesChange, pveTemplates, vm
                 <label>Port<input disabled={locked || selectedEdge.protocol === "any"} type="number" min="1" max="65535" value={selectedEdge.port ?? ""} onChange={(event) => patchEdge({ port: event.target.value })} /></label>
               </div>
               <p className={styles.inspectorHint}>單向會建立來源 OUT 與目標 IN 規則；雙向會再建立反向規則。</p>
-              {!locked && <button type="button" className={styles.inspectorDanger} onClick={() => { onEdgesChange(edges.filter((edge) => edge.id !== selectedEdge.id)); setSelectedEdgeId(""); }}><MIcon name="delete_outline" size={16} />刪除連線</button>}
+              {!locked && <button type="button" className={styles.inspectorDanger} onClick={() => removeEdge(selectedEdge.id)}><MIcon name="delete_outline" size={16} />刪除連線</button>}
             </> : selectedNode ? <>
               <div className={styles.inspectorTitle}><MIcon name="dns" size={18} /><div><strong>{selectedNode.name}</strong><small>{selectedNode.sourceType === "custom" ? "自訂規格" : "既有範本"} · {String(selectedNode.type).toUpperCase()}</small></div></div>
               <label>名稱<input disabled={locked} value={selectedNode.name} onChange={(event) => patchNode(selectedNode.id, { name: event.target.value })} /></label>
@@ -164,7 +214,7 @@ function MachineEditor({ value, edges, onChange, onEdgesChange, pveTemplates, vm
                 <label>RAM (GB)<input disabled={locked || selectedNode.sourceType !== "custom"} type="number" min="1" max="64" value={selectedNode.memory} onChange={(event) => patchNode(selectedNode.id, { memory: Number(event.target.value) })} /></label>
               </div>
               <label>Disk (GB)<input disabled={locked || selectedNode.sourceType !== "custom"} type="number" min={selectedNode.type === "lxc" ? 1 : 10} max="1000" value={selectedNode.disk} onChange={(event) => patchNode(selectedNode.id, { disk: Number(event.target.value) })} /></label>
-              {selectedNode.sourceType === "custom" && <label>儲存區<input disabled={locked} value={selectedNode.customStorage} onChange={(event) => patchNode(selectedNode.id, { customStorage: event.target.value })} /></label>}
+              <p className={styles.inspectorHint}>儲存區由系統依容量、相容類型與管理優先序自動選擇。</p>
               {!locked && <button type="button" className={styles.inspectorDanger} onClick={() => removeMachine(selectedNode.id)}><MIcon name="delete_outline" size={16} />移除節點</button>}
             </> : null}
           </aside>

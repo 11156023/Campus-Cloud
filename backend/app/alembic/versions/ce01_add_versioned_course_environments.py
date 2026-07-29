@@ -108,6 +108,12 @@ def upgrade():
         sa.Column("memory_mb", sa.Integer(), nullable=False),
         sa.Column("disk_gb", sa.Integer(), nullable=False),
         sa.Column("network", sa.String(255), nullable=False),
+        sa.Column(
+            "position_x", sa.Float(), nullable=False, server_default="80"
+        ),
+        sa.Column(
+            "position_y", sa.Float(), nullable=False, server_default="120"
+        ),
         sa.Column("sort_order", sa.Integer(), nullable=False),
         sa.UniqueConstraint(
             "version_id", "node_key", name="uq_course_environment_version_node"

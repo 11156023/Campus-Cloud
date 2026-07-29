@@ -48,7 +48,6 @@ describe("CourseEnvironmentsService", () => {
       source_type: "template",
       source_template_id: "tpl-id",
       custom_image_ref: null,
-      custom_storage: null,
       custom_username: null,
       custom_unprivileged: true,
       name: "Web",
@@ -58,6 +57,8 @@ describe("CourseEnvironmentsService", () => {
       memory_mb: 4096,
       disk_gb: 30,
       network: "lab-net",
+      position_x: 80,
+      position_y: 120,
     });
   });
 
@@ -66,8 +67,8 @@ describe("CourseEnvironmentsService", () => {
       code: "NET",
       name: "Network Lab",
       nodes: [
-        { id: "fw", sourceType: "custom", customImageRef: "local:vztmpl/debian.tar.zst", customStorage: "local-lvm", customUnprivileged: true, name: "Firewall", role: "gateway", type: "lxc", cpu: 2, memory: 2, disk: 8, network: "lab-net" },
-        { id: "web", sourceType: "custom", customImageRef: "9000", customStorage: "local-lvm", customUsername: "student", name: "Web", role: "server", type: "qemu", cpu: 2, memory: 4, disk: 20, network: "lab-net" },
+        { id: "fw", sourceType: "custom", customImageRef: "local:vztmpl/debian.tar.zst", customUnprivileged: true, name: "Firewall", role: "gateway", type: "lxc", cpu: 2, memory: 2, disk: 8, network: "lab-net" },
+        { id: "web", sourceType: "custom", customImageRef: "9000", customUsername: "student", name: "Web", role: "server", type: "qemu", cpu: 2, memory: 4, disk: 20, network: "lab-net" },
       ],
       edges: [{ source: "fw", target: "web", direction: "one_way", protocol: "tcp", port: "443" }],
     });

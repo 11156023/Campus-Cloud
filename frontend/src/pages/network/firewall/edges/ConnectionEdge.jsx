@@ -42,6 +42,8 @@ export default function ConnectionEdge(props) {
         fill="none"
         stroke="transparent"
         strokeWidth={20}
+        style={{ cursor: data?.onSelect ? "pointer" : "default" }}
+        onClick={() => data?.onSelect?.(id)}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
       />
@@ -59,7 +61,9 @@ export default function ConnectionEdge(props) {
           animation: "flow-fwd 1.2s linear infinite",
           opacity: 0.9,
           transition: "stroke 0.2s",
+          cursor: data?.onSelect ? "pointer" : "default",
         }}
+        onClick={() => data?.onSelect?.(id)}
       />
 
       <EdgeLabelRenderer>
@@ -80,14 +84,16 @@ export default function ConnectionEdge(props) {
               {data.label}
             </span>
           )}
-          <button
-            type="button"
-            className={styles.edgeDeleteBtn}
-            onClick={() => data?.onDelete?.(data.edge)}
-            title="刪除連線"
-          >
-            <MIcon name="close" size={12} />
-          </button>
+          {data?.onDelete && (
+            <button
+              type="button"
+              className={styles.edgeDeleteBtn}
+              onClick={() => data.onDelete(data.edge)}
+              title="刪除連線"
+            >
+              <MIcon name="close" size={12} />
+            </button>
+          )}
         </div>
       </EdgeLabelRenderer>
     </g>

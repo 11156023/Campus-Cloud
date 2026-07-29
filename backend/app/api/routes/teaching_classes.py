@@ -481,7 +481,7 @@ def select_course(
                 source_type=node.source_type,
                 source_template_id=node.source_template_id,
                 custom_image_ref=node.custom_image_ref,
-                custom_storage=node.custom_storage,
+                custom_storage=None,
                 custom_username=node.custom_username,
                 custom_unprivileged=node.custom_unprivileged,
                 name=node.name,
@@ -677,13 +677,15 @@ def provision_class(
             else (
                 {
                     "ostemplate": node.custom_image_ref,
-                    "storage": node.custom_storage or "local-lvm",
+                    # Same hidden fallback used by the ordinary resource
+                    # request flow. Managed-storage placement overrides it.
+                    "storage": "local-lvm",
                     "unprivileged": node.custom_unprivileged,
                 }
                 if node.resource_type.lower() == "lxc"
                 else {
                     "template_id": int(node.custom_image_ref or "0"),
-                    "storage": node.custom_storage or "local-lvm",
+                    "storage": "local-lvm",
                     "username": node.custom_username or "student",
                 }
             )

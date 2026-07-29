@@ -33,7 +33,6 @@ class EnvironmentNodeIn(BaseModel):
     source_type: Literal["template", "custom"] = "template"
     source_template_id: uuid.UUID | None = None
     custom_image_ref: str | None = Field(default=None, max_length=500)
-    custom_storage: str | None = Field(default=None, max_length=120)
     custom_username: str | None = Field(default=None, max_length=32)
     custom_unprivileged: bool = True
     name: str = Field(min_length=1, max_length=255)
@@ -43,6 +42,8 @@ class EnvironmentNodeIn(BaseModel):
     memory_mb: int = Field(ge=128, le=131072)
     disk_gb: int = Field(ge=1, le=2000)
     network: str = Field(default="lab-net", min_length=1, max_length=255)
+    position_x: float = Field(default=80.0, ge=-5000, le=5000)
+    position_y: float = Field(default=120.0, ge=-5000, le=5000)
 
     @model_validator(mode="after")
     def validate_source(self) -> "EnvironmentNodeIn":

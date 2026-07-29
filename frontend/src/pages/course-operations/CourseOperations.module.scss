@@ -438,8 +438,17 @@
 .topologyHelp { display: flex; align-items: center; gap: 7px; padding: 12px 22px 8px; color: var(--color-text-secondary); font-size: 11px; }
 .topologyWorkspace { display: grid; grid-template-columns: minmax(0, 1fr) 270px; gap: 12px; padding: 0 22px 22px; }
 .topologyCanvas { height: 360px; overflow: hidden; border: 1px solid var(--color-border); border-radius: 12px; background: color-mix(in srgb, var(--color-hover) 24%, var(--color-surface)); }
+.topologyCanvas :global(.react-flow) { background: transparent; }
+.topologyCanvas :global(.react-flow) svg { max-width: none; }
+.topologyCanvas :global(.react-flow__edge path) { stroke-opacity: 1 !important; }
 .topologyCanvas :global(.react-flow__node.selected) { box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 35%, transparent); }
 .topologyCanvas :global(.react-flow__edge.selected path) { stroke: var(--color-primary); }
+.flowMachineNode { position: relative; display: grid; width: 210px; grid-template-columns: 34px minmax(0, 1fr); align-items: center; gap: 9px; box-sizing: border-box; padding: 12px 14px; border: 1px solid color-mix(in srgb, var(--color-primary) 55%, var(--color-border)); border-radius: 11px; background: var(--color-surface); box-shadow: 0 5px 18px color-mix(in srgb, var(--color-primary) 8%, transparent); }
+.flowMachineNodeSelected { border-color: var(--color-primary); box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 16%, transparent), 0 6px 20px color-mix(in srgb, var(--color-primary) 10%, transparent); }
+.flowMachineNode :global(.react-flow__handle) { width: 12px; height: 12px; border: 2px solid var(--color-surface); background: var(--color-primary); }
+.flowMachineNode :global(.react-flow__handle-left) { left: -7px; }
+.flowMachineNode :global(.react-flow__handle-right) { right: -7px; }
+.flowNodeIcon { display: grid; width: 34px; height: 34px; place-items: center; border-radius: 9px; color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 9%, var(--color-surface)); }
 .flowNodeLabel { display: flex; min-width: 0; flex-direction: column; gap: 3px; padding: 3px 1px; text-align: left; }
 .flowNodeLabel strong { overflow: hidden; color: var(--color-text-primary); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .flowNodeLabel span, .flowNodeLabel small { color: var(--color-text-muted); font-size: 9px; }

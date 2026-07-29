@@ -11,8 +11,7 @@ from app.api.routes.course_environments import (
 )
 from app.api.routes.teaching_classes import _recurrence
 from app.exceptions import BadRequestError
-from app.services.teaching import class_capacity_service
-from app.services.teaching.class_network_service import _segments
+from app.services.teaching import class_capacity_service, class_network_service
 from app.services.vm import batch_provision_service
 
 
@@ -147,10 +146,56 @@ def test_reserved_class_batch_does_not_repeat_per_node_ip_check(monkeypatch):
 
 
 def test_network_labels_accept_ui_slash_or_comma_notation():
-    assert _segments("lab-net / backend-net, management") == {
+    assert class_network_service._segments("lab-net / backend-net, management") == {
         "lab-net",
         "backend-net",
         "management",
+    }
+
+
+def test_course_connection_creates_matching_source_out_and_target_in(monkeypatch):
+    rules = []
+    monkeypatch.setattr(
+        class_network_service,
+        "_ip_by_vmid",
+        lambda _session, vmid: {101: "10.0.0.11", 102: "10.0.0.12"}[vmid],
+    )
+    monkeypatch.setattr(
+        class_network_service.proxmox_service,
+        "find_resource",
+        lambda vmid: {"node": "pve1", "type": "qemu", "vmid": vmid},
+    )
+    monkeypatch.setattr(
+        class_network_service,
+        "_ensure_rule",
+        lambda **kwargs: rules.append(kwargs),
+    )
+
+    class_network_service._allow_one_way(
+        object(),
+        class_id=uuid.uuid4(),
+        source_vmid=101,
+        target_vmid=102,
+        protocol="tcp",
+        port=443,
+    )
+
+    assert rules[0]["vmid"] == 101
+    assert rules[0]["rule"] == {
+        "type": "out",
+        "action": "ACCEPT",
+        "pos": 0,
+        "dest": "10.0.0.12",
+        "proto": "tcp",
+        "dport": "443",
+    }
+    assert rules[1]["vmid"] == 102
+    assert rules[1]["rule"] == {
+        "type": "in",
+        "action": "ACCEPT",
+        "source": "10.0.0.11",
+        "proto": "tcp",
+        "dport": "443",
     }
 
 

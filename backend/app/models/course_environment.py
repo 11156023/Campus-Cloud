@@ -150,6 +150,8 @@ class CourseEnvironmentNode(SQLModel, table=True):
     # Comma-separated logical segments. Students get independent instances of
     # segments with the same name; it is not a raw PVE bridge name.
     network: str = Field(default="lab-net", max_length=255)
+    position_x: float = Field(default=80.0, ge=-5000, le=5000)
+    position_y: float = Field(default=120.0, ge=-5000, le=5000)
     sort_order: int = Field(default=0)
 
 
