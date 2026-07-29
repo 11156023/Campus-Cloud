@@ -55,6 +55,18 @@ def list_task_records_by_user(
     return list(session.exec(stmt).all())
 
 
+def get_latest_template_task(
+    *,
+    session: Session,
+    template_id: uuid.UUID,
+) -> TaskRecord | None:
+    return session.exec(
+        select(TaskRecord)
+        .where(TaskRecord.template_id == template_id)
+        .order_by(TaskRecord.created_at.desc())  # type: ignore[attr-defined]
+    ).first()
+
+
 def mark_task_running(*, session: Session, task_id: uuid.UUID) -> None:
     record = session.get(TaskRecord, task_id)
     if record is None:

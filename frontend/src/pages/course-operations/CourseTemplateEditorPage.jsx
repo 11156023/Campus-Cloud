@@ -40,7 +40,7 @@ function TopologyMachineNode({ data, selected, isConnectable }) {
 const TOPOLOGY_NODE_TYPES = { courseMachine: TopologyMachineNode };
 const TOPOLOGY_EDGE_TYPES = { connection: ConnectionEdge };
 
-function MachineEditor({ value, edges, onChange, onEdgesChange, pveTemplates, vmImages, lxcImages, locked = false }) {
+function MachineEditor({ value, edges, onChange, onEdgesChange, pveTemplates, vmImages, lxcImages, sourceNotice, locked = false }) {
   const [sourceMode, setSourceMode] = useState("template");
   const [sourceId, setSourceId] = useState("");
   const [customType, setCustomType] = useState("qemu");
@@ -167,6 +167,7 @@ function MachineEditor({ value, edges, onChange, onEdgesChange, pveTemplates, vm
         <div><h2>每位學生的上課環境</h2><p>新增節點，再用連線定義可互通的服務。</p></div>
         <span className={styles.nodeLimit}>{value.length} / 3 節點</span>
       </div>
+      {sourceNotice && <p className={styles.persistentFeedback}><MIcon name="info" size={17} />{sourceNotice}</p>}
       <div className={styles.machineAddBar}>
         <label className={styles.field}><span>來源方式</span><select value={sourceMode} disabled={locked || atLimit} onChange={(event) => { setSourceMode(event.target.value); setSourceId(""); }}><option value="template">① 選擇既有範本</option><option value="custom">② 新增 VM/LXC 規格</option></select></label>
         {sourceMode === "custom" && <label className={styles.field}><span>機器類型</span><select value={customType} disabled={locked || atLimit} onChange={(event) => { setCustomType(event.target.value); setSourceId(""); }}><option value="qemu">VM</option><option value="lxc">LXC</option></select></label>}
@@ -234,6 +235,7 @@ export default function CourseTemplateEditorPage() {
   const [pveTemplates, setPveTemplates] = useState([]);
   const [vmImages, setVmImages] = useState([]);
   const [lxcImages, setLxcImages] = useState([]);
+  const [sourceNotice, setSourceNotice] = useState("");
   const [loading, setLoading] = useState(Boolean(templateId));
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -243,6 +245,17 @@ export default function CourseTemplateEditorPage() {
     edge.protocol !== "any"
     && (!Number.isInteger(Number(edge.port)) || Number(edge.port) < 1 || Number(edge.port) > 65535)
   ));
+  const saveBlockReason = !template.name.trim()
+    ? "請先輸入環境名稱"
+    : !template.code.trim()
+      ? "請先輸入環境代碼"
+      : template.nodes.length === 0
+        ? "請到「機器配置」加入至少一台機器"
+        : template.nodes.length > 3
+          ? "每位學生最多只能配置三台機器"
+          : invalidTopology
+            ? "請修正拓撲連線的 Port"
+            : "";
   useEffect(() => {
     if (!templateId) { setTemplate(structuredClone(emptyTemplate)); setLoading(false); return undefined; }
     let active = true;
@@ -253,7 +266,28 @@ export default function CourseTemplateEditorPage() {
       .finally(() => active && setLoading(false));
     return () => { active = false; };
   }, [templateId]);
-  useEffect(() => { let active = true; TemplatesService.list().then((result) => { const rows = result?.data ?? result ?? []; if (active) setPveTemplates(rows.filter((item) => item.status === "ready")); }).catch(() => {}); return () => { active = false; }; }, []);
+  useEffect(() => {
+    let active = true;
+    TemplatesService.list()
+      .then((result) => {
+        if (!active) return;
+        const rows = result?.data ?? result ?? [];
+        const ready = rows.filter((item) => item.status === "ready");
+        setPveTemplates(ready);
+        if (ready.length) setSourceNotice("");
+        else if (rows.some((item) => item.status === "creating" || item.status === "updating")) {
+          setSourceNotice("機器範本仍在處理中；可等待完成，或改用「② 新增 VM/LXC 規格」。");
+        } else if (rows.some((item) => item.status === "failed")) {
+          setSourceNotice("機器範本轉換失敗，請先到機器範本重新轉換，或改用「② 新增 VM/LXC 規格」。");
+        } else {
+          setSourceNotice("目前沒有可用的機器範本；仍可使用「② 新增 VM/LXC 規格」建立課程環境。");
+        }
+      })
+      .catch((reason) => {
+        if (active) setSourceNotice(reason?.message ?? "無法讀取機器範本；仍可改用自訂 VM/LXC 規格。");
+      });
+    return () => { active = false; };
+  }, []);
   useEffect(() => {
     let active = true;
     Promise.all([apiGet("/api/v1/vm/templates"), apiGet("/api/v1/lxc/templates")])
@@ -262,7 +296,9 @@ export default function CourseTemplateEditorPage() {
         setVmImages((vms ?? []).map((item) => ({ value: String(item.vmid), label: `${item.name} · VMID ${item.vmid} · ${item.node}` })));
         setLxcImages((lxcs ?? []).map((item) => ({ value: item.volid, label: item.volid.split("/").pop() ?? item.volid })));
       })
-      .catch(() => {});
+      .catch((reason) => {
+        if (active) setSourceNotice(reason?.message ?? "無法讀取 VM/LXC 基礎映像，請稍後重試。");
+      });
     return () => { active = false; };
   }, []);
   function update(patch) { setTemplate((current) => ({ ...current, ...patch })); }
@@ -302,8 +338,9 @@ export default function CourseTemplateEditorPage() {
     <button type="button" className={styles.backLink} onClick={() => navigate(returnTo ?? "/course-template-management")}><MIcon name="arrow_back" size={18} />{returnTo ? "返回班級上課環境" : "返回課程環境"}</button>
     <div className={styles.pageHeader}><div className={styles.pageHeading}><div className={styles.titleLine}><h1 className={styles.pageTitle}>{isNew ? "建立課程環境" : template.name}</h1></div><p className={styles.pageSubtitle}>{isNew ? "定義可重複套用到班級的學生機器組合。" : `${template.code} · v${template.version} · ${template.updatedAt}`}</p></div><div className={styles.pageActions}><button type="button" className={styles.btnSecondary} onClick={() => navigate(returnTo ?? "/course-template-management")}>返回</button>{locked ? <button type="button" className={styles.btnPrimary} disabled={saving} onClick={newVersion}><MIcon name="content_copy" size={16} />建立新版本</button> : <><button type="button" className={styles.btnSecondary} disabled={isNew || saving || !template.name.trim() || !template.code.trim() || template.nodes.length === 0 || template.nodes.length > 3 || invalidTopology} onClick={publish}><MIcon name="lock" size={16} />儲存、發布並鎖定</button><button type="button" className={styles.btnPrimary} disabled={saving || !template.name.trim() || !template.code.trim() || template.nodes.length === 0 || template.nodes.length > 3 || invalidTopology} onClick={save}><MIcon name="save" size={16} />{saving ? "儲存中…" : "儲存草稿"}</button></>}</div></div>
     {message && <p className={styles.persistentFeedback}><MIcon name="info" size={17} />{message}</p>}
+    {!locked && saveBlockReason && <p className={styles.persistentFeedback}><MIcon name="info" size={17} />尚不能儲存：{saveBlockReason}。</p>}
     <div className={styles.stepTabs}>{TABS.map(([key, label], index) => <button type="button" key={key} className={tab === key ? styles.stepActive : ""} onClick={() => changeTab(key)}><span>{index + 1}</span>{label}</button>)}</div>
     {tab === "basic" && <section className={styles.card}><div className={styles.cardHeader}><div><h2>基本資料</h2><p>{locked ? "這個版本已發布並鎖定；需要調整時請建立新版本。" : "課程環境只定義機器組合，不包含班級名單、每週任務或進度。"}</p></div></div><div className={styles.formGrid}><label className={styles.field}><span>環境名稱</span><input disabled={locked} value={template.name} onChange={(event) => update({ name: event.target.value })} placeholder="例如：Linux 三層式上課環境" /></label><label className={styles.field}><span>環境代碼</span><input disabled={locked} value={template.code} onChange={(event) => update({ code: event.target.value })} placeholder="LINUX-3TIER" /></label><label className={`${styles.field} ${styles.fieldFull}`}><span>環境用途</span><textarea disabled={locked} rows={5} value={template.description ?? ""} onChange={(event) => update({ description: event.target.value })} /></label></div><div className={styles.actionFooter}><button type="button" className={styles.btnPrimary} onClick={() => changeTab("machines")}>查看機器配置<MIcon name="arrow_forward" size={16} /></button></div></section>}
-    {tab === "machines" && <MachineEditor value={template.nodes} edges={template.edges ?? []} onChange={(nodes) => update({ nodes })} onEdgesChange={(edges) => update({ edges })} pveTemplates={pveTemplates} vmImages={vmImages} lxcImages={lxcImages} locked={locked} />}
+    {tab === "machines" && <MachineEditor value={template.nodes} edges={template.edges ?? []} onChange={(nodes) => update({ nodes })} onEdgesChange={(edges) => update({ edges })} pveTemplates={pveTemplates} vmImages={vmImages} lxcImages={lxcImages} sourceNotice={sourceNotice} locked={locked} />}
   </div>;
 }

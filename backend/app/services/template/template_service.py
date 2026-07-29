@@ -27,10 +27,12 @@ from app.infrastructure.queue import enqueue_task, report_progress
 from app.models import (
     Resource,
     TaskRecord,
+    TaskRecordStatus,
     User,
     VMTemplate,
     VMTemplateStatus,
 )
+from app.repositories import task_record as task_record_repo
 from app.repositories import vm_template as template_repo
 from app.schemas.template import (
     VMTemplateCreate,
@@ -78,6 +80,7 @@ def list_templates(*, session: Session, user: User) -> list[VMTemplatePublic]:
             user_id=user.id,
             only_ready=not _can_manage(user),
         )
+    _reconcile_failed_template_tasks(session, templates)
     pve_vmids = _pve_template_vmids()
     return [
         _to_public(t, pve_vmids=pve_vmids) for t in templates
@@ -89,7 +92,33 @@ def get_template_for_user(
 ) -> VMTemplatePublic:
     template = _get_or_404(session, template_id)
     _require_view(session, user, template)
+    _reconcile_failed_template_tasks(session, [template])
     return _to_public(template, pve_vmids=_pve_template_vmids())
+
+
+def _reconcile_failed_template_tasks(
+    session: Session,
+    templates: list[VMTemplate],
+) -> None:
+    changed = False
+    for template in templates:
+        if template.status not in {
+            VMTemplateStatus.creating,
+            VMTemplateStatus.updating,
+        }:
+            continue
+        task = task_record_repo.get_latest_template_task(
+            session=session,
+            template_id=template.id,
+        )
+        if task is None or task.status != TaskRecordStatus.failed:
+            continue
+        template.status = VMTemplateStatus.failed
+        template.error_message = task.error or "背景任務執行失敗"
+        template_repo.touch(session=session, template=template, commit=False)
+        changed = True
+    if changed:
+        session.commit()
 
 
 def _get_or_404(session: Session, template_id: uuid.UUID) -> VMTemplate:
@@ -183,18 +212,95 @@ async def create_template(
         default_disk=data.default_disk,
         source_vmid=data.source_vmid,
     )
-    record = await enqueue_task(
-        session=session,
-        task_type=TASK_CONVERT,
-        user_id=user.id,
-        template_id=template.id,
-        payload={
-            "template_id": str(template.id),
-            "pve_vmid": template.pve_vmid,
-            "resource_type": resource_type,
-            "node": node,
-        },
+    try:
+        record = await enqueue_task(
+            session=session,
+            task_type=TASK_CONVERT,
+            user_id=user.id,
+            template_id=template.id,
+            payload={
+                "template_id": str(template.id),
+                "pve_vmid": template.pve_vmid,
+                "resource_type": resource_type,
+                "node": node,
+            },
+        )
+    except Exception as exc:
+        template.status = VMTemplateStatus.failed
+        template.error_message = f"無法啟動轉換任務: {exc}"[:1000]
+        template_repo.touch(session=session, template=template)
+        raise
+    return _to_public(template), record
+
+
+async def retry_template_conversion(
+    *,
+    session: Session,
+    user: User,
+    template_id: uuid.UUID,
+) -> tuple[VMTemplatePublic, TaskRecord]:
+    template = _get_or_404(session, template_id)
+    _require_owner(user, template)
+    _reconcile_failed_template_tasks(session, [template])
+    if template.status != VMTemplateStatus.failed:
+        raise ConflictError("Only failed template conversions can be retried")
+
+    try:
+        pve_resource = proxmox_ops.find_resource(template.pve_vmid)
+    except NotFoundError:
+        raise NotFoundError(
+            f"Source VM {template.pve_vmid} no longer exists"
+        )
+    if pve_resource.get("template") == 1:
+        template.status = VMTemplateStatus.ready
+        template.error_message = None
+        template_repo.touch(session=session, template=template)
+        record = task_record_repo.create_task_record(
+            session=session,
+            task_type=TASK_CONVERT,
+            user_id=user.id,
+            template_id=template.id,
+            payload={
+                "template_id": str(template.id),
+                "pve_vmid": template.pve_vmid,
+                "resource_type": template.resource_type,
+                "node": template.node,
+            },
+        )
+        task_record_repo.mark_task_finished(
+            session=session,
+            task_id=record.id,
+            status=TaskRecordStatus.succeeded,
+            result={"vmid": template.pve_vmid, "already_converted": True},
+            resource_vmid=template.pve_vmid,
+        )
+        return _to_public(template), session.get(TaskRecord, record.id) or record
+
+    template.node = str(pve_resource["node"])
+    template.resource_type = (
+        "lxc" if pve_resource.get("type") == "lxc" else "qemu"
     )
+    template.status = VMTemplateStatus.creating
+    template.error_message = None
+    template_repo.touch(session=session, template=template)
+    try:
+        record = await enqueue_task(
+            session=session,
+            task_type=TASK_CONVERT,
+            user_id=user.id,
+            template_id=template.id,
+            payload={
+                "template_id": str(template.id),
+                "pve_vmid": template.pve_vmid,
+                "resource_type": template.resource_type,
+                "node": template.node,
+            },
+        )
+    except Exception as exc:
+        template.status = VMTemplateStatus.failed
+        template.error_message = f"無法啟動轉換任務: {exc}"[:1000]
+        template_repo.touch(session=session, template=template)
+        raise
     return _to_public(template), record
 
 

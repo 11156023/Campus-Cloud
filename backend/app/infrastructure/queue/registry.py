@@ -121,3 +121,22 @@ def registered_functions() -> list[Function]:
         arq_func(_wrap(name, handler), name=name, timeout=timeout)
         for name, (handler, timeout) in _registry.items()
     ]
+
+
+async def run_registered_task_locally(
+    name: str,
+    record_id: str,
+    payload: dict[str, Any],
+) -> None:
+    """Run a registered queue task through the same TaskRecord state machine.
+
+    Development and small single-process installations may intentionally run
+    with Redis disabled.  They still need template conversion and clone tasks
+    to execute instead of leaving templates permanently in ``creating``.
+    """
+    registered = _registry.get(name)
+    if registered is None:
+        raise RuntimeError(f"queue task '{name}' is not registered")
+    handler, _ = registered
+    runner = _wrap(name, handler)
+    await runner({}, record_id, payload)
