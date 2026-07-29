@@ -68,7 +68,7 @@ const navGroups = [
     items: [
       { key: "class-management", label: "班級管理", icon: "groups_2" },
       { key: "course-template-management", label: "環境模板", icon: "view_quilt" },
-      { key: "teaching",   label: "教學面板", icon: "grid_view" },
+      { key: "teaching",   label: "教學面板（非正式）", icon: "grid_view" },
       { key: "courses",    label: "課程學習", icon: "flag" },
     ],
   },
