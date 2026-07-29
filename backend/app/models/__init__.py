@@ -33,6 +33,14 @@ from .course import (
     CourseTask,
     UserCourseProgress,
 )
+from .course_environment import (
+    ClassCapacityReservation,
+    CourseEnvironment,
+    CourseEnvironmentEdge,
+    CourseEnvironmentNode,
+    CourseEnvironmentVersion,
+    CourseEnvironmentVersionStatus,
+)
 from .deletion_request import DeletionRequest, DeletionRequestStatus
 from .firewall_layout import FirewallLayout
 from .gateway_config import GatewayConfig
@@ -165,6 +173,12 @@ __all__ = [
     "GatewayConfig",
     # Cloudflare Config
     "CloudflareConfig",
+    "CourseEnvironment",
+    "CourseEnvironmentEdge",
+    "CourseEnvironmentVersion",
+    "CourseEnvironmentVersionStatus",
+    "CourseEnvironmentNode",
+    "ClassCapacityReservation",
     # Reverse Proxy Rules
     "ReverseProxyRule",
     # Batch Provision

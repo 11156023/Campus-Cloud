@@ -416,7 +416,7 @@
 .machineTotals span { padding: 8px 12px; color: var(--color-text-muted); font-size: 11px; white-space: nowrap; }
 .machineTotals span + span { border-left: 1px solid var(--color-border); }
 .machineTotals strong { margin-right: 3px; color: var(--color-text-primary); font-size: 13px; font-variant-numeric: tabular-nums; }
-.machineAddBar { display: grid; grid-template-columns: minmax(280px, 560px) max-content; align-items: end; justify-content: start; gap: 10px; padding: 13px 22px; border-bottom: 1px solid var(--color-border); background: color-mix(in srgb, var(--color-hover) 24%, var(--color-surface)); }
+.machineAddBar { display: grid; grid-template-columns: repeat(3, minmax(150px, 1fr)) max-content; align-items: end; justify-content: start; gap: 10px; padding: 13px 22px; border-bottom: 1px solid var(--color-border); background: color-mix(in srgb, var(--color-hover) 24%, var(--color-surface)); }
 .machineAddBar .field { gap: 3px; }
 .machineAddBar .field > span { color: var(--color-text-secondary); font-size: 11px; }
 .machineAddBar .btnPrimary { min-width: 138px; min-height: 40px; }
@@ -434,6 +434,15 @@
 .templateMachineWorkspace .connection { width: 92px; }
 .templateMachineWorkspace .connection i { width: 60px; }
 .templateMachineWorkspace .connection span { display: block; width: 82px; overflow: hidden; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
+.topologyHelp { display: flex; align-items: center; gap: 8px; padding: 14px 22px 8px; color: var(--color-text-secondary); font-size: 12px; }
+.topologyCanvas { height: 330px; margin: 0 22px 14px; overflow: hidden; border: 1px solid var(--color-border); border-radius: 12px; background: color-mix(in srgb, var(--color-hover) 24%, var(--color-surface)); }
+.topologyCanvas :global(.react-flow__node.selected) { box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 35%, transparent); }
+.topologyCanvas :global(.react-flow__edge.selected path) { stroke: var(--color-primary); }
+.edgeEditor { display: flex; min-height: 62px; align-items: end; gap: 12px; margin: 0 22px 14px; padding: 12px 14px; border: 1px solid color-mix(in srgb, var(--color-primary) 30%, var(--color-border)); border-radius: 10px; background: color-mix(in srgb, var(--color-primary) 4%, var(--color-surface)); }
+.edgeEditor strong { align-self: center; margin-right: 4px; font-size: 12px; }
+.edgeEditor label { display: flex; min-width: 135px; flex-direction: column; gap: 4px; color: var(--color-text-secondary); font-size: 10px; }
+.edgeEditor select, .edgeEditor input { min-height: 34px; padding: 6px 9px; border: 1px solid var(--color-border); border-radius: 7px; color: var(--color-text); background: var(--color-surface); }
+.edgeEditor button { display: inline-flex; min-height: 34px; align-items: center; gap: 5px; padding: 0 10px; border: 1px solid var(--color-border); border-radius: 7px; color: var(--color-danger); background: var(--color-surface); cursor: pointer; }
 .table { min-width: 720px; }
 .studentTools { grid-template-columns: minmax(0, 1.2fr) minmax(260px, .8fr); }
 .headerState { flex-wrap: wrap; justify-content: flex-end; }
@@ -471,6 +480,8 @@
   .machineWorkspaceHeader { align-items: flex-start; flex-direction: column; }
   .templateMachineWorkspace .blueprintCanvas { justify-content: flex-start; }
   .templateMachineWorkspace .machineBlock { width: 280px; }
+  .machineAddBar { grid-template-columns: repeat(2, minmax(180px, 1fr)); }
+  .edgeEditor { align-items: stretch; flex-wrap: wrap; }
   .weekRows article { grid-template-columns: 100px minmax(220px, 1fr); }
   .weekFiles { grid-column: 2; }
   .memberRow { grid-template-columns: minmax(200px, 1.3fr) minmax(100px, .7fr) 100px 34px; }
@@ -524,6 +535,8 @@
   .machineTotals span { flex: 1 0 auto; text-align: center; }
   .machineAddBar { grid-template-columns: 1fr; justify-content: stretch; padding: 14px 18px; }
   .machineAddBar .btnPrimary { width: 100%; }
+  .topologyCanvas { height: 280px; margin-inline: 18px; }
+  .edgeEditor { margin-inline: 18px; }
   .templateMachineWorkspace .blueprintCanvas { padding: 22px 18px 28px; }
   .weekRows article { grid-template-columns: 1fr; align-items: stretch; padding: 16px 18px; }
   .weekFiles { grid-column: auto; }

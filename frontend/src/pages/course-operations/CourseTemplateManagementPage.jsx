@@ -1,17 +1,26 @@
-import { useMemo, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import MIcon from "../../components/MIcon";
-import { listCourseTemplates } from "./courseOperationsStore";
+import { CourseEnvironmentsService } from "../../services/courseEnvironments";
 import styles from "./CourseOperations.module.scss";
 
-const STATUS_LABEL = { published: "已發布", draft: "草稿", archived: "已封存" };
+const STATUS_LABEL = { published: "已發布", draft: "草稿", retired: "已停用" };
 
 export default function CourseTemplateManagementPage() {
   const navigate = useNavigate();
-  const location = useLocation();
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
-  const templates = useMemo(() => listCourseTemplates(), [location.key]);
+  const [templates, setTemplates] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    let active = true;
+    CourseEnvironmentsService.list()
+      .then((rows) => active && setTemplates(rows))
+      .catch((reason) => active && setError(reason?.message ?? "無法讀取環境模板"))
+      .finally(() => active && setLoading(false));
+    return () => { active = false; };
+  }, []);
   const rows = useMemo(() => templates.filter((template) => {
     const matchesQuery = `${template.name} ${template.code}`.toLowerCase().includes(query.toLowerCase());
     return matchesQuery && (status === "all" || template.status === status);
@@ -31,7 +40,8 @@ export default function CourseTemplateManagementPage() {
         <label className={styles.searchInput}><MIcon name="search" size={18} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜尋模板名稱或代碼" /></label>
         <div className={styles.pillTabs}>{[["all", "全部"], ["published", "已發布"], ["draft", "草稿"]].map(([key, label]) => <button type="button" key={key} className={status === key ? styles.pillActive : ""} onClick={() => setStatus(key)}>{label}</button>)}</div>
       </div>
-      <div className={styles.listSummary}><span>顯示 {rows.length} 個可重複使用模板</span><span>模板只定義機器，不包含上課內容</span></div><div className={styles.tableWrap}><table className={styles.table}><thead><tr><th>模板名稱</th><th>每位學生的機器</th><th>資源合計</th><th>版本</th><th>使用班級</th><th>狀態</th><th /></tr></thead><tbody>{rows.map((template) => <tr key={template.id} className={styles.rowLink} onClick={() => navigate(`/course-template-management/${template.id}`)}>
+      {error && <p className={styles.errorMessage}>{error}</p>}
+      <div className={styles.listSummary}><span>{loading ? "正在讀取…" : `顯示 ${rows.length} 個可重複使用模板`}</span><span>模板只定義機器，不包含上課內容</span></div><div className={styles.tableWrap}><table className={styles.table}><thead><tr><th>模板名稱</th><th>每位學生的機器</th><th>資源合計</th><th>版本</th><th>使用班級</th><th>狀態</th><th /></tr></thead><tbody>{rows.map((template) => <tr key={template.id} className={styles.rowLink} onClick={() => navigate(`/course-template-management/${template.id}`)}>
         <td><strong>{template.name}</strong><small>{template.code}<br />{template.description}</small></td>
         <td><strong>{template.nodes.length} 台／每位學生</strong><small>{template.nodes.map((node) => node.name).join("、")}</small></td>
         <td>{template.nodes.reduce((sum, node) => sum + node.cpu, 0)} CPU · {template.nodes.reduce((sum, node) => sum + node.memory, 0)} GB RAM</td><td>v{template.version}</td><td>{template.classes} 個班級</td>

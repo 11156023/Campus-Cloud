@@ -14,6 +14,7 @@ export const TeachingClassesService = {
   },
   generateWeeks(classId) { return apiPost(`/api/v1/teaching-classes/${classId}/generate-weeks`, {}); },
   replaceMachines(classId, nodes) { return apiPut(`/api/v1/teaching-classes/${classId}/machines`, nodes); },
+  selectCourse(classId, courseVersionId) { return apiPut(`/api/v1/teaching-classes/${classId}/course`, { course_version_id: courseVersionId }); },
   replaceWeeks(classId, weeks) { return apiPut(`/api/v1/teaching-classes/${classId}/weeks`, weeks); },
   uploadWeekFile(classId, weekId, file) {
     const body = new FormData();

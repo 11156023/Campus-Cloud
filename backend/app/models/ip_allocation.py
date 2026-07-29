@@ -29,6 +29,20 @@ class IpAllocation(SQLModel, table=True):
         description="Linked resource VMID; vmid remains available for reserved IP snapshots",
     )
     description: str | None = Field(default=None, max_length=255)
+    reservation_key: str | None = Field(
+        default=None,
+        sa_column=sa.Column(sa.String(200), nullable=True, unique=True, index=True),
+        description="Stable class/student/node key used before a VMID exists",
+    )
+    teaching_class_id: uuid.UUID | None = Field(
+        default=None,
+        sa_column=sa.Column(
+            sa.Uuid,
+            sa.ForeignKey("teaching_classes.id", ondelete="CASCADE"),
+            nullable=True,
+            index=True,
+        ),
+    )
     allocated_at: datetime = Field(
         default_factory=get_datetime_utc,
         sa_type=sa.DateTime(timezone=True),

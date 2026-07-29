@@ -41,6 +41,19 @@ class TeachingClass(SQLModel, table=True):
     timezone: str = Field(default="Asia/Taipei", max_length=64)
     boot_lead_minutes: int = Field(default=10, ge=0, le=120)
     shutdown_grace_minutes: int = Field(default=30, ge=0, le=240)
+    course_version_id: uuid.UUID | None = Field(
+        default=None,
+        sa_column=Column(
+            sa.Uuid,
+            sa.ForeignKey("course_environment_versions.id", ondelete="RESTRICT"),
+            nullable=True,
+            index=True,
+        ),
+    )
+    locked_at: datetime | None = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True), nullable=True),
+    )
     status: TeachingClassStatus = Field(
         default=TeachingClassStatus.planning,
         sa_column=Column(sa.Enum(TeachingClassStatus), nullable=False, index=True),
@@ -70,11 +83,17 @@ class TeachingClassMachineNode(SQLModel, table=True):
         )
     )
     node_key: str = Field(max_length=80)
-    source_template_id: uuid.UUID = Field(
+    source_type: str = Field(default="template", max_length=16)
+    source_template_id: uuid.UUID | None = Field(
+        default=None,
         sa_column=Column(
-            sa.ForeignKey("vm_templates.id", ondelete="RESTRICT"), nullable=False
-        )
+            sa.ForeignKey("vm_templates.id", ondelete="RESTRICT"), nullable=True
+        ),
     )
+    custom_image_ref: str | None = Field(default=None, max_length=500)
+    custom_storage: str | None = Field(default=None, max_length=120)
+    custom_username: str | None = Field(default=None, max_length=32)
+    custom_unprivileged: bool = Field(default=True)
     name: str = Field(max_length=255)
     role: str = Field(max_length=120)
     resource_type: str = Field(max_length=10)

@@ -189,7 +189,78 @@ def _reserve_system_ips(session: Session, config: SubnetConfig) -> None:
 # ─── IP 分配與釋放 ──────────────────────────────────────────────────────────
 
 
-def allocate_ip(session: Session, vmid: int, purpose: str) -> str:
+def reserve_ips(
+    session: Session,
+    *,
+    teaching_class_id,
+    reservation_keys: list[str],
+) -> dict[str, str]:
+    """Atomically reserve concrete IPs for a complete class before provisioning."""
+    config = session.exec(
+        select(SubnetConfig).where(SubnetConfig.id == 1).with_for_update()
+    ).first()
+    if config is None:
+        raise BadRequestError("請先設定 IP 管理網段才能進行此操作")
+
+    existing_rows = session.exec(
+        select(IpAllocation).where(
+            IpAllocation.teaching_class_id == teaching_class_id,
+            IpAllocation.reservation_key.isnot(None),  # type: ignore[union-attr]
+        )
+    ).all()
+    result = {
+        str(row.reservation_key): row.ip_address
+        for row in existing_rows
+        if row.reservation_key
+    }
+    missing = [key for key in reservation_keys if key not in result]
+    if not missing:
+        return result
+
+    network = ipaddress.IPv4Network(config.cidr, strict=False)
+    allocated = set(session.exec(select(IpAllocation.ip_address)).all())
+    available = [str(ip) for ip in network.hosts() if str(ip) not in allocated]
+    if len(available) < len(missing):
+        raise ConflictError(
+            f"全班需要再預留 {len(missing)} 個 IP，但目前只剩 {len(available)} 個"
+        )
+    for key, ip_address in zip(
+        missing, available[: len(missing)], strict=True
+    ):
+        session.add(
+            IpAllocation(
+                ip_address=ip_address,
+                purpose="class_reserved",
+                reservation_key=key,
+                teaching_class_id=teaching_class_id,
+                description=f"班級預留 {key}",
+            )
+        )
+        result[key] = ip_address
+    session.flush()
+    return result
+
+
+def release_class_reservations(session: Session, teaching_class_id) -> int:
+    rows = session.exec(
+        select(IpAllocation).where(
+            IpAllocation.teaching_class_id == teaching_class_id,
+            IpAllocation.vmid.is_(None),  # type: ignore[union-attr]
+        )
+    ).all()
+    for row in rows:
+        session.delete(row)
+    session.flush()
+    return len(rows)
+
+
+def allocate_ip(
+    session: Session,
+    vmid: int,
+    purpose: str,
+    *,
+    reservation_key: str | None = None,
+) -> str:
     """為 VM/LXC 分配下一個可用 IP。
 
     使用 SELECT FOR UPDATE 鎖定 subnet_config 防止並發衝突，
@@ -201,6 +272,26 @@ def allocate_ip(session: Session, vmid: int, purpose: str) -> str:
     ).first()
     if config is None:
         raise BadRequestError("請先設定 IP 管理網段才能進行此操作")
+
+    if reservation_key:
+        reserved = session.exec(
+            select(IpAllocation)
+            .where(IpAllocation.reservation_key == reservation_key)
+            .with_for_update()
+        ).first()
+        if reserved is None:
+            raise ConflictError("找不到這台課程機器的預留 IP")
+        if reserved.vmid not in (None, vmid):
+            raise ConflictError("這個課程預留 IP 已被其他機器使用")
+        reserved.vmid = vmid
+        reserved.resource_vmid = (
+            vmid if session.get(Resource, vmid) is not None else None
+        )
+        reserved.purpose = purpose
+        reserved.description = f"VMID {vmid}（課程預留）"
+        session.add(reserved)
+        session.flush()
+        return reserved.ip_address
 
     network = ipaddress.IPv4Network(config.cidr, strict=False)
 
@@ -228,7 +319,12 @@ def allocate_ip(session: Session, vmid: int, purpose: str) -> str:
     raise ConflictError("IP 地址已耗盡，無法分配新的 IP")
 
 
-def release_ip(session: Session, vmid: int) -> str | None:
+def release_ip(
+    session: Session,
+    vmid: int,
+    *,
+    restore_reservation: bool = False,
+) -> str | None:
     """釋放指定 VMID 的 IP 分配，回傳被釋放的 IP 或 None。"""
     alloc = session.exec(
         select(IpAllocation).where(IpAllocation.vmid == vmid)
@@ -238,7 +334,14 @@ def release_ip(session: Session, vmid: int) -> str | None:
         return None
 
     ip = alloc.ip_address
-    session.delete(alloc)
+    if restore_reservation and alloc.reservation_key:
+        alloc.vmid = None
+        alloc.resource_vmid = None
+        alloc.purpose = "class_reserved"
+        alloc.description = f"班級預留 {alloc.reservation_key}"
+        session.add(alloc)
+    else:
+        session.delete(alloc)
     session.flush()
     _forget_ssh_host_key(ip)
     logger.info("已釋放 VMID %s 的 IP %s", vmid, ip)
