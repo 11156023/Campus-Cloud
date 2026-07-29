@@ -143,10 +143,10 @@ def upgrade():
             "direction",
             sa.String(16),
             nullable=False,
-            server_default="bidirectional",
+            server_default="one_way",
         ),
-        sa.Column("protocol", sa.String(8), nullable=False, server_default="any"),
-        sa.Column("port", sa.Integer()),
+        sa.Column("protocol", sa.String(8), nullable=False, server_default="tcp"),
+        sa.Column("port", sa.Integer(), server_default="22"),
         sa.UniqueConstraint(
             "version_id",
             "source_node_key",

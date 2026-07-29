@@ -66,16 +66,18 @@ class EnvironmentNodeIn(BaseModel):
 class EnvironmentEdgeIn(BaseModel):
     source_node_key: str = Field(min_length=1, max_length=80)
     target_node_key: str = Field(min_length=1, max_length=80)
-    direction: Literal["one_way", "bidirectional"] = "bidirectional"
-    protocol: Literal["any", "tcp", "udp", "icmp"] = "any"
-    port: int | None = Field(default=None, ge=1, le=65535)
+    direction: Literal["one_way", "bidirectional"] = "one_way"
+    protocol: Literal["any", "tcp", "udp", "icmp", "icmpv6", "sctp"] = "tcp"
+    port: int | None = Field(default=22, ge=1, le=65535)
 
     @model_validator(mode="after")
     def validate_edge(self) -> "EnvironmentEdgeIn":
         if self.source_node_key == self.target_node_key:
             raise ValueError("連線的來源與目標不可相同")
-        if self.protocol in {"any", "icmp"}:
+        if self.protocol == "any":
             self.port = None
+        elif self.port is None:
+            raise ValueError("防火牆連線必須指定 Port")
         return self
 
 

@@ -184,9 +184,9 @@ class CourseEnvironmentEdge(SQLModel, table=True):
     )
     source_node_key: str = Field(max_length=80)
     target_node_key: str = Field(max_length=80)
-    direction: str = Field(default="bidirectional", max_length=16)
-    protocol: str = Field(default="any", max_length=8)
-    port: int | None = Field(default=None, ge=1, le=65535)
+    direction: str = Field(default="one_way", max_length=16)
+    protocol: str = Field(default="tcp", max_length=8)
+    port: int | None = Field(default=22, ge=1, le=65535)
 
 
 class ClassCapacityReservation(SQLModel, table=True):

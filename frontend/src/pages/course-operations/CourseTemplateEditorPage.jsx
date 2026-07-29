@@ -1,7 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Background,
-  Controls,
   MarkerType,
   ReactFlow,
 } from "@xyflow/react";
@@ -20,12 +19,16 @@ const TABS = [
 
 const emptyTemplate = { id: "new", name: "", code: "", description: "", status: "draft", classes: 0, updatedAt: "尚未儲存", nodes: [], edges: [] };
 
+const FIREWALL_PROTOCOLS = ["tcp", "udp", "icmp", "icmpv6", "sctp"];
+
 function MachineEditor({ value, edges, onChange, onEdgesChange, pveTemplates, vmImages, lxcImages, locked = false }) {
   const [sourceMode, setSourceMode] = useState("template");
   const [sourceId, setSourceId] = useState("");
   const [customType, setCustomType] = useState("qemu");
+  const [selectedNodeId, setSelectedNodeId] = useState("");
   const [selectedEdgeId, setSelectedEdgeId] = useState("");
   const atLimit = value.length >= 3;
+
   function addMachine() {
     if (atLimit || !sourceId) return;
     const nodeId = `node-${Date.now()}`;
@@ -44,43 +47,66 @@ function MachineEditor({ value, edges, onChange, onEdgesChange, pveTemplates, vm
       onChange([...value, {
         id: nodeId, sourceType: "custom", sourceTemplateId: null, customImageRef: source.value,
         customStorage: "local-lvm", customUsername: "student", customUnprivileged: true,
-        name: source.label, role: "課程機器", type: customType, image: source.label,
+        name: source.label.split(" · ")[0], role: "課程機器", type: customType, image: source.label,
         cpu: 2, memory: 2, disk: customType === "lxc" ? 8 : 20, network: "lab-net", icon: "dns",
       }]);
     }
+    setSelectedNodeId(nodeId);
+    setSelectedEdgeId("");
     setSourceId("");
   }
+
   function removeMachine(nodeId) {
     onChange(value.filter((item) => item.id !== nodeId));
     onEdgesChange(edges.filter((edge) => edge.source !== nodeId && edge.target !== nodeId));
+    setSelectedNodeId("");
   }
+
   function connect(connection) {
     if (locked || connection.source === connection.target) return;
-    const duplicate = edges.some((edge) => edge.source === connection.source && edge.target === connection.target);
+    const duplicate = edges.some((edge) => (
+      edge.source === connection.source
+      && edge.target === connection.target
+      && edge.direction === "one_way"
+      && edge.protocol === "tcp"
+      && Number(edge.port) === 22
+    ));
     if (duplicate) return;
     const edge = {
       id: `edge-${Date.now()}`,
       source: connection.source,
       target: connection.target,
-      direction: "bidirectional",
-      protocol: "any",
-      port: null,
+      direction: "one_way",
+      protocol: "tcp",
+      port: 22,
     };
     onEdgesChange([...edges, edge]);
     setSelectedEdgeId(edge.id);
+    setSelectedNodeId("");
   }
+
   function patchNode(nodeId, patch) {
     onChange(value.map((item) => item.id === nodeId ? { ...item, ...patch } : item));
   }
+
   function patchEdge(patch) {
     onEdgesChange(edges.map((edge) => edge.id === selectedEdgeId ? { ...edge, ...patch } : edge));
   }
+
   const selectedEdge = edges.find((edge) => edge.id === selectedEdgeId);
+  const selectedNode = value.find((node) => node.id === selectedNodeId) ?? (!selectedEdge ? value[0] : null);
   const graphNodes = value.map((node, index) => ({
     id: String(node.id),
-    position: { x: 80 + index * 280, y: 85 + (index % 2) * 70 },
-    data: { label: `${node.name}\n${node.sourceType === "custom" ? "自訂" : "範本"} · ${String(node.type).toUpperCase()}` },
-    style: { width: 190, whiteSpace: "pre-line", border: "1px solid var(--color-primary)", borderRadius: 10, fontSize: 12 },
+    position: { x: 60 + index * 260, y: 95 + (index % 2) * 45 },
+    data: {
+      label: <div className={styles.flowNodeLabel}>
+        <strong>{node.name}</strong>
+        <span>{node.sourceType === "custom" ? "自訂" : "範本"} · {String(node.type).toUpperCase()}</span>
+        <small>{node.cpu} CPU · {node.memory} GB</small>
+      </div>,
+    },
+    selected: selectedNode?.id === node.id,
+    style: { width: 190, border: "1px solid var(--color-primary)", borderRadius: 10 },
   }));
   const graphEdges = edges.map((edge) => ({
     ...edge,
@@ -89,11 +115,11 @@ function MachineEditor({ value, edges, onChange, onEdgesChange, pveTemplates, vm
     markerStart: edge.direction === "bidirectional" ? { type: MarkerType.ArrowClosed } : undefined,
     style: { strokeWidth: 2 },
   }));
-  const totals = useMemo(() => ({ cpu: value.reduce((sum, node) => sum + node.cpu, 0), ram: value.reduce((sum, node) => sum + node.memory, 0), disk: value.reduce((sum, node) => sum + node.disk, 0) }), [value]);
+
   return <section className={`${styles.card} ${styles.templateMachineWorkspace}`}>
       <div className={styles.machineWorkspaceHeader}>
-        <div><h2>每位學生的上課環境</h2><p>下方這組機器會套用給班級中的每一位學生。</p></div>
-        <div className={styles.machineTotals}><span><strong>{value.length}</strong> 台機器</span><span><strong>{totals.cpu}</strong> CPU</span><span><strong>{totals.ram}</strong> GB RAM</span><span><strong>{totals.disk}</strong> GB 磁碟</span></div>
+        <div><h2>每位學生的上課環境</h2><p>新增節點，再用連線定義可互通的服務。</p></div>
+        <span className={styles.nodeLimit}>{value.length} / 3 節點</span>
       </div>
       <div className={styles.machineAddBar}>
         <label className={styles.field}><span>來源方式</span><select value={sourceMode} disabled={locked || atLimit} onChange={(event) => { setSourceMode(event.target.value); setSourceId(""); }}><option value="template">① 選擇既有範本</option><option value="custom">② 新增 VM/LXC 規格</option></select></label>
@@ -102,16 +128,48 @@ function MachineEditor({ value, edges, onChange, onEdgesChange, pveTemplates, vm
         <button type="button" className={styles.btnPrimary} disabled={locked || atLimit || !sourceId} onClick={addMachine}><MIcon name={atLimit ? "check" : "add"} size={16} />{atLimit ? "已達上限" : "加入機器"}</button>
       </div>
       {value.length ? <>
-        <div className={styles.topologyHelp}><MIcon name="account_tree" size={18} /><span>從節點圓點拖曳到另一台機器即可建立關聯；點選連線可設定方向、協定與連接埠。</span></div>
-        <div className={styles.topologyCanvas}><ReactFlow nodes={graphNodes} edges={graphEdges} onConnect={connect} onEdgeClick={(_, edge) => setSelectedEdgeId(edge.id)} nodesDraggable={false} nodesConnectable={!locked} elementsSelectable fitView><Background gap={20} size={1} /><Controls showInteractive={false} /></ReactFlow></div>
-        {selectedEdge && <div className={styles.edgeEditor}><strong>連線設定</strong><label>方向<select disabled={locked} value={selectedEdge.direction} onChange={(event) => patchEdge({ direction: event.target.value })}><option value="bidirectional">雙向</option><option value="one_way">單向（來源 → 目標）</option></select></label><label>協定<select disabled={locked} value={selectedEdge.protocol} onChange={(event) => patchEdge({ protocol: event.target.value, port: null })}><option value="any">全部</option><option value="tcp">TCP</option><option value="udp">UDP</option><option value="icmp">ICMP</option></select></label>{["tcp", "udp"].includes(selectedEdge.protocol) && <label>連接埠<input disabled={locked} type="number" min="1" max="65535" value={selectedEdge.port ?? ""} onChange={(event) => patchEdge({ port: event.target.value })} /></label>}{!locked && <button type="button" onClick={() => { onEdgesChange(edges.filter((edge) => edge.id !== selectedEdge.id)); setSelectedEdgeId(""); }}><MIcon name="delete_outline" size={16} />刪除連線</button>}</div>}
-        <div className={styles.blueprintCanvas}>{value.map((node, index) => <div className={styles.blueprintItem} key={node.id}>
-        <article className={styles.machineBlock}>
-          <div className={styles.machineTitle}><span><MIcon name={node.icon ?? "dns"} size={20} /></span><div><input disabled={locked} aria-label={`機器 ${index + 1} 名稱`} value={node.name} onChange={(event) => patchNode(node.id, { name: event.target.value })} /><small>{node.sourceType === "custom" ? `自訂 · ${node.image}` : `既有範本 · ${node.image}`}</small></div><em>{node.type}</em></div>
-          <div className={styles.machineFields}><label>角色<input disabled={locked} value={node.role} onChange={(event) => patchNode(node.id, { role: event.target.value })} /></label><label>CPU<input disabled={locked || node.sourceType !== "custom"} type="number" min="1" max="32" value={node.cpu} onChange={(event) => patchNode(node.id, { cpu: Number(event.target.value) })} /></label><label>RAM (GB)<input disabled={locked || node.sourceType !== "custom"} type="number" min="1" max="64" value={node.memory} onChange={(event) => patchNode(node.id, { memory: Number(event.target.value) })} /></label><label>Disk (GB)<input disabled={locked || node.sourceType !== "custom"} type="number" min="1" max="1000" value={node.disk} onChange={(event) => patchNode(node.id, { disk: Number(event.target.value) })} /></label>{node.sourceType === "custom" && <label>儲存區<input disabled={locked} value={node.customStorage} onChange={(event) => patchNode(node.id, { customStorage: event.target.value })} /></label>}</div>
-          <div className={styles.machineSpecs}><span>{node.cpu} CPU</span><span>{node.memory} GB RAM</span><span>{node.disk} GB Disk</span>{!locked && <button type="button" onClick={() => removeMachine(node.id)}><MIcon name="delete_outline" size={16} />移除</button>}</div>
-        </article>
-      </div>)}</div></> : <div className={styles.emptyState}><MIcon name="dns" size={32} /><p>請從既有範本或自訂 VM/LXC 規格加入第一個節點。</p></div>}
+        <div className={styles.topologyHelp}><MIcon name="account_tree" size={17} /><span>拖曳節點圓點建立連線；點節點或連線進行設定。</span></div>
+        <div className={styles.topologyWorkspace}>
+          <div className={styles.topologyCanvas}><ReactFlow
+            nodes={graphNodes}
+            edges={graphEdges}
+            onConnect={connect}
+            onNodeClick={(_, node) => { setSelectedNodeId(node.id); setSelectedEdgeId(""); }}
+            onEdgeClick={(_, edge) => { setSelectedEdgeId(edge.id); setSelectedNodeId(""); }}
+            nodesDraggable={false}
+            nodesConnectable={!locked}
+            elementsSelectable
+            minZoom={0.7}
+            maxZoom={1.4}
+            fitView
+            fitViewOptions={{ padding: 0.22, maxZoom: 1.1 }}
+            proOptions={{ hideAttribution: true }}
+          ><Background gap={20} size={1} /></ReactFlow></div>
+          <aside className={styles.topologyInspector}>
+            {selectedEdge ? <>
+              <div className={styles.inspectorTitle}><MIcon name="link" size={18} /><div><strong>連線規則</strong><small>{value.find((node) => node.id === selectedEdge.source)?.name} → {value.find((node) => node.id === selectedEdge.target)?.name}</small></div></div>
+              <label>方向<select disabled={locked} value={selectedEdge.direction} onChange={(event) => patchEdge({ direction: event.target.value })}><option value="one_way">單向</option><option value="bidirectional">雙向</option></select></label>
+              <div className={styles.inspectorSplit}>
+                <label>協定<select disabled={locked} value={selectedEdge.protocol} onChange={(event) => patchEdge({ protocol: event.target.value })}>{selectedEdge.protocol === "any" && <option value="any">全部（舊設定）</option>}{FIREWALL_PROTOCOLS.map((protocol) => <option key={protocol} value={protocol}>{protocol.toUpperCase()}</option>)}</select></label>
+                <label>Port<input disabled={locked || selectedEdge.protocol === "any"} type="number" min="1" max="65535" value={selectedEdge.port ?? ""} onChange={(event) => patchEdge({ port: event.target.value })} /></label>
+              </div>
+              <p className={styles.inspectorHint}>單向會建立來源 OUT 與目標 IN 規則；雙向會再建立反向規則。</p>
+              {!locked && <button type="button" className={styles.inspectorDanger} onClick={() => { onEdgesChange(edges.filter((edge) => edge.id !== selectedEdge.id)); setSelectedEdgeId(""); }}><MIcon name="delete_outline" size={16} />刪除連線</button>}
+            </> : selectedNode ? <>
+              <div className={styles.inspectorTitle}><MIcon name="dns" size={18} /><div><strong>{selectedNode.name}</strong><small>{selectedNode.sourceType === "custom" ? "自訂規格" : "既有範本"} · {String(selectedNode.type).toUpperCase()}</small></div></div>
+              <label>名稱<input disabled={locked} value={selectedNode.name} onChange={(event) => patchNode(selectedNode.id, { name: event.target.value })} /></label>
+              <label>角色<input disabled={locked} value={selectedNode.role} onChange={(event) => patchNode(selectedNode.id, { role: event.target.value })} /></label>
+              <div className={styles.inspectorSplit}>
+                <label>CPU<input disabled={locked || selectedNode.sourceType !== "custom"} type="number" min="1" max="32" value={selectedNode.cpu} onChange={(event) => patchNode(selectedNode.id, { cpu: Number(event.target.value) })} /></label>
+                <label>RAM (GB)<input disabled={locked || selectedNode.sourceType !== "custom"} type="number" min="1" max="64" value={selectedNode.memory} onChange={(event) => patchNode(selectedNode.id, { memory: Number(event.target.value) })} /></label>
+              </div>
+              <label>Disk (GB)<input disabled={locked || selectedNode.sourceType !== "custom"} type="number" min={selectedNode.type === "lxc" ? 1 : 10} max="1000" value={selectedNode.disk} onChange={(event) => patchNode(selectedNode.id, { disk: Number(event.target.value) })} /></label>
+              {selectedNode.sourceType === "custom" && <label>儲存區<input disabled={locked} value={selectedNode.customStorage} onChange={(event) => patchNode(selectedNode.id, { customStorage: event.target.value })} /></label>}
+              {!locked && <button type="button" className={styles.inspectorDanger} onClick={() => removeMachine(selectedNode.id)}><MIcon name="delete_outline" size={16} />移除節點</button>}
+            </> : null}
+          </aside>
+        </div>
+      </> : <div className={styles.emptyState}><MIcon name="dns" size={32} /><p>先加入一個節點，再設定機器之間的連線。</p></div>}
   </section>;
 }
 
@@ -131,6 +189,10 @@ export default function CourseTemplateEditorPage() {
   const [message, setMessage] = useState("");
   const isNew = !templateId;
   const locked = template.status !== "draft";
+  const invalidTopology = (template.edges ?? []).some((edge) => (
+    edge.protocol !== "any"
+    && (!Number.isInteger(Number(edge.port)) || Number(edge.port) < 1 || Number(edge.port) > 65535)
+  ));
   useEffect(() => {
     if (!templateId) { setTemplate(structuredClone(emptyTemplate)); setLoading(false); return undefined; }
     let active = true;
@@ -186,7 +248,7 @@ export default function CourseTemplateEditorPage() {
   if (loading) return <div className={styles.emptyState}><p>正在讀取環境模板…</p></div>;
   return <div className={styles.page}>
     <button type="button" className={styles.backLink} onClick={() => navigate(returnTo ?? "/course-template-management")}><MIcon name="arrow_back" size={18} />{returnTo ? "返回班級上課環境" : "返回環境模板"}</button>
-    <div className={styles.pageHeader}><div className={styles.pageHeading}><div className={styles.titleLine}><h1 className={styles.pageTitle}>{isNew ? "建立環境模板" : template.name}</h1></div><p className={styles.pageSubtitle}>{isNew ? "定義可重複套用到班級的學生機器組合。" : `${template.code} · v${template.version} · ${template.updatedAt}`}</p></div><div className={styles.pageActions}><button type="button" className={styles.btnSecondary} onClick={() => navigate(returnTo ?? "/course-template-management")}>返回</button>{locked ? <button type="button" className={styles.btnPrimary} disabled={saving} onClick={newVersion}><MIcon name="content_copy" size={16} />建立新版本</button> : <><button type="button" className={styles.btnSecondary} disabled={isNew || saving || template.nodes.length === 0} onClick={publish}><MIcon name="lock" size={16} />發布並鎖定</button><button type="button" className={styles.btnPrimary} disabled={saving || !template.name.trim() || !template.code.trim() || template.nodes.length === 0 || template.nodes.length > 3} onClick={save}><MIcon name="save" size={16} />{saving ? "儲存中…" : "儲存草稿"}</button></>}</div></div>
+    <div className={styles.pageHeader}><div className={styles.pageHeading}><div className={styles.titleLine}><h1 className={styles.pageTitle}>{isNew ? "建立環境模板" : template.name}</h1></div><p className={styles.pageSubtitle}>{isNew ? "定義可重複套用到班級的學生機器組合。" : `${template.code} · v${template.version} · ${template.updatedAt}`}</p></div><div className={styles.pageActions}><button type="button" className={styles.btnSecondary} onClick={() => navigate(returnTo ?? "/course-template-management")}>返回</button>{locked ? <button type="button" className={styles.btnPrimary} disabled={saving} onClick={newVersion}><MIcon name="content_copy" size={16} />建立新版本</button> : <><button type="button" className={styles.btnSecondary} disabled={isNew || saving || template.nodes.length === 0 || invalidTopology} onClick={publish}><MIcon name="lock" size={16} />發布並鎖定</button><button type="button" className={styles.btnPrimary} disabled={saving || !template.name.trim() || !template.code.trim() || template.nodes.length === 0 || template.nodes.length > 3 || invalidTopology} onClick={save}><MIcon name="save" size={16} />{saving ? "儲存中…" : "儲存草稿"}</button></>}</div></div>
     {message && <p className={styles.persistentFeedback}><MIcon name="info" size={17} />{message}</p>}
     <div className={styles.stepTabs}>{TABS.map(([key, label], index) => <button type="button" key={key} className={tab === key ? styles.stepActive : ""} onClick={() => changeTab(key)}><span>{index + 1}</span>{label}</button>)}</div>
     {tab === "basic" && <section className={styles.card}><div className={styles.cardHeader}><div><h2>基本資料</h2><p>{locked ? "這個版本已發布並鎖定；需要調整時請建立新版本。" : "環境模板只定義機器組合，不包含班級名單、每週任務或進度。"}</p></div></div><div className={styles.formGrid}><label className={styles.field}><span>模板名稱</span><input disabled={locked} value={template.name} onChange={(event) => update({ name: event.target.value })} placeholder="例如：Linux 三層式上課環境" /></label><label className={styles.field}><span>模板代碼</span><input disabled={locked} value={template.code} onChange={(event) => update({ code: event.target.value })} placeholder="LINUX-3TIER" /></label><label className={`${styles.field} ${styles.fieldFull}`}><span>環境用途</span><textarea disabled={locked} rows={5} value={template.description ?? ""} onChange={(event) => update({ description: event.target.value })} /></label></div><div className={styles.actionFooter}><button type="button" className={styles.btnPrimary} onClick={() => changeTab("machines")}>查看機器配置<MIcon name="arrow_forward" size={16} /></button></div></section>}

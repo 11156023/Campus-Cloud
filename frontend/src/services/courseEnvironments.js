@@ -32,6 +32,9 @@ export function normalizeCourseEnvironment(item) {
       id: String(edge.id ?? `${edge.source_node_key}-${edge.target_node_key}`),
       source: edge.source_node_key,
       target: edge.target_node_key,
+      direction: edge.direction ?? "one_way",
+      protocol: edge.protocol ?? "tcp",
+      port: edge.protocol === "any" ? null : Number(edge.port ?? 22),
     })),
   };
 }
@@ -60,9 +63,9 @@ export function environmentPayload(item) {
     edges: (item.edges ?? []).map((edge) => ({
       source_node_key: String(edge.source ?? edge.source_node_key),
       target_node_key: String(edge.target ?? edge.target_node_key),
-      direction: edge.direction ?? "bidirectional",
-      protocol: edge.protocol ?? "any",
-      port: ["tcp", "udp"].includes(edge.protocol) && edge.port ? Number(edge.port) : null,
+      direction: edge.direction ?? "one_way",
+      protocol: edge.protocol ?? "tcp",
+      port: edge.protocol === "any" ? null : Number(edge.port ?? 22),
     })),
   };
 }

@@ -212,3 +212,24 @@ def test_custom_vm_requires_numeric_base_template_vmid():
             memory_mb=2048,
             disk_gb=20,
         )
+
+
+def test_course_edge_defaults_match_firewall_connection_dialog():
+    edge = EnvironmentEdgeIn(
+        source_node_key="client",
+        target_node_key="server",
+    )
+
+    assert edge.direction == "one_way"
+    assert edge.protocol == "tcp"
+    assert edge.port == 22
+
+
+def test_course_edge_rejects_portless_firewall_service():
+    with pytest.raises(ValueError, match="Port"):
+        EnvironmentEdgeIn(
+            source_node_key="client",
+            target_node_key="server",
+            protocol="tcp",
+            port=None,
+        )
