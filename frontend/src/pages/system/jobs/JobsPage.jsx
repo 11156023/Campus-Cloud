@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import styles from "./JobsPage.module.scss";
 import MIcon from "../../../components/MIcon";
 import { JobsService } from "../../../services/jobs";
+import JobDetailDialog from "../../../components/Jobs/JobDetailDialog";
 import { useToast } from "../../../hooks/useToast";
 import useAutoRefresh from "../../../hooks/useAutoRefresh";
 
@@ -81,6 +82,7 @@ export default function JobsPage() {
   const [kind, setKind] = useState("all");
   const [status, setStatus] = useState("all");
   const [loading, setLoading] = useState(true);
+  const [focusJobId, setFocusJobId] = useState(null);
 
   /** silent = true 時不觸發 loading 與錯誤提示，供背景自動刷新使用 */
   const load = useCallback(async (silent = false) => {
@@ -192,7 +194,12 @@ export default function JobsPage() {
               </thead>
               <tbody>
                 {visible.map((j) => (
-                  <tr key={j.id} className={styles.tr}>
+                  <tr
+                    key={j.id}
+                    className={styles.tr}
+                    onClick={() => setFocusJobId(j.id)}
+                    style={{ cursor: "pointer" }}
+                  >
                     <td className={styles.td}>
                       <div className={styles.nameCell}>
                         <div className={styles.nameIcon}>
@@ -221,6 +228,8 @@ export default function JobsPage() {
           </div>
         )}
       </div>
+
+      <JobDetailDialog jobId={focusJobId} onClose={() => setFocusJobId(null)} />
     </div>
   );
 }

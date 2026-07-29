@@ -315,6 +315,22 @@
     background: var(--color-primary);
     color: var(--color-text-on-primary);
   }
+
+  &.appearanceOptionDisabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+
+    &:hover {
+      background: none;
+      color: var(--color-text-secondary);
+    }
+  }
+}
+
+.optionHint {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--color-text-muted);
 }
 
 /* ===== Bottom ===== */

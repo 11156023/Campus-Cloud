@@ -38,6 +38,48 @@
   color: var(--color-text-secondary);
 }
 
+/* ── Quick actions（非管理員的申請入口）── */
+.quickActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $spacing-8;
+}
+
+%quick-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 38px;
+  padding: 0 $spacing-16;
+  border-radius: $radius-8;
+  font-size: $font-size-14;
+  font-weight: $font-weight-500;
+  cursor: pointer;
+  transition: background $transition-base;
+}
+
+.quickPrimary {
+  @extend %quick-btn;
+  border: 1px solid var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+  color: var(--color-primary);
+
+  &:hover {
+    background: color-mix(in srgb, var(--color-primary) 20%, transparent);
+  }
+}
+
+.quickSecondary {
+  @extend %quick-btn;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+
+  &:hover {
+    background: var(--color-hover);
+  }
+}
+
 /* ── Section ── */
 .section {
   @include flex-column;

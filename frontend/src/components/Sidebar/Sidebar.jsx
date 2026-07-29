@@ -200,7 +200,8 @@ function SelectPopup({ options, value, onSelect, onClose, triggerRef, closing })
         <button
           key={opt.key}
           type="button"
-          className={`${styles.appearanceOption} ${value === opt.key ? styles.appearanceOptionActive : ""}`}
+          className={`${styles.appearanceOption} ${value === opt.key ? styles.appearanceOptionActive : ""} ${opt.disabled ? styles.appearanceOptionDisabled : ""}`}
+          disabled={opt.disabled}
           onClick={() => { onSelect(opt.key); onClose(); }}
         >
           {opt.flag
@@ -208,6 +209,7 @@ function SelectPopup({ options, value, onSelect, onClose, triggerRef, closing })
             : <MIcon name={opt.icon} size={18} />
           }
           <span>{opt.label}</span>
+          {opt.hint && <span className={styles.optionHint}>{opt.hint}</span>}
         </button>
       ))}
     </div>
@@ -253,10 +255,11 @@ function UserPopup({ user, onLogout, onSettings, onClose, triggerRef, closing })
   );
 }
 
+// 介面尚未接 i18n，僅繁體中文可用；其餘語言待字串抽取完成後開放
 const LANG_OPTIONS = [
   { key: "zh-TW", label: "繁體中文", flag: "🇹🇼" },
-  { key: "en",    label: "English",  flag: "🇬🇧" },
-  { key: "ja",    label: "日本語",   flag: "🇯🇵" },
+  { key: "en",    label: "English",  flag: "🇬🇧", disabled: true, hint: "即將推出" },
+  { key: "ja",    label: "日本語",   flag: "🇯🇵", disabled: true, hint: "即將推出" },
 ];
 
 export default function Sidebar({ collapsed, mobileOpen, onToggle, onClose }) {
