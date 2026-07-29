@@ -665,9 +665,7 @@ def _submit_node_job(
     retry: bool = False,
 ) -> uuid.UUID:
     rule, duration = _recurrence(item)
-    retry_suffix = (
-        f"-r{get_datetime_utc().strftime('%H%M%S')}" if retry else ""
-    )
+    retry_suffix = f"-r{uuid.uuid4().hex[:8]}" if retry else ""
     return batch_provision_service.submit_batch_job_for_users(
         session=session,
         member_user_ids=member_user_ids,
