@@ -4,6 +4,7 @@ import { useAuth } from "../../../contexts/AuthContext";
 import { useDragScroll } from "../../../hooks/useDragScroll";
 import { TemplatesService } from "../../../services/templates";
 import MIcon from "../../../components/MIcon";
+import JobsButton from "../../../components/Jobs/JobsButton";
 import styles from "./DashboardPage.module.scss";
 import { COURSES } from "./dashboard.data";
 
@@ -116,6 +117,7 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const firstName = user?.full_name?.split(" ")[0] ?? user?.email?.split("@")[0] ?? "同學";
+  const isAdmin = Boolean(user?.is_superuser || user?.role === "admin");
 
   const scrollRef = useRef(null);
 
@@ -173,7 +175,29 @@ export default function DashboardPage() {
           <h1 className={styles.pageTitle}>嗨，{firstName} 👋</h1>
           <p className={styles.pageSubtitle}>歡迎回來，很高興再次見到你！</p>
         </div>
+        <JobsButton />
       </div>
+
+      {/* ── 快速操作（非管理員）── */}
+      {!isAdmin && (
+        <nav aria-label="快速操作" className={styles.quickActions}>
+          <button
+            type="button"
+            className={styles.quickPrimary}
+            onClick={() => navigate("/my-requests", { state: { create: true } })}
+          >
+            <MIcon name="add" size={18} />
+            申請新資源
+          </button>
+          <button
+            type="button"
+            className={styles.quickSecondary}
+            onClick={() => navigate("/my-requests")}
+          >
+            查看我的申請
+          </button>
+        </nav>
+      )}
 
       {/* ── 課程推薦 ── */}
       <section className={styles.section}>

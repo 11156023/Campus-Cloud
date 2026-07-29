@@ -56,6 +56,16 @@ export const ResourcesService = {
     return apiPost("/api/v1/resources/batch", { vmids, action });
   },
 
+  /** 練習階段狀態（自動關機／到期警告用）→ { should_warn, warn_reason, ... } */
+  sessionStatus(vmid) {
+    return apiGet(`/api/v1/resources/${vmid}/session-status`);
+  },
+
+  /** 延長練習階段 → { vmid, auto_stop_at, extended_minutes } */
+  extendSession(vmid) {
+    return apiPost(`/api/v1/resources/${vmid}/extend-session`, {});
+  },
+
   /** 取得 VNC 控制台資訊（QEMU VM） */
   getConsole(vmid) {
     return apiGet(`/api/v1/vm/${vmid}/console`);

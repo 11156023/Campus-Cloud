@@ -5,6 +5,10 @@ import MIcon from "../components/MIcon";
 import Sidebar from "../components/Sidebar/Sidebar";
 import AiFloatingChat from "../components/AiFloatingChat/AiFloatingChat";
 import ClassroomStudentLayer from "../components/Classroom/ClassroomStudentLayer";
+import JobsProvider from "../components/Jobs/JobsProvider";
+import SubnetBanner from "../components/SubnetBanner/SubnetBanner";
+import SessionWarningDialog from "../components/SessionWarning/SessionWarningDialog";
+import useSessionWarning from "../hooks/useSessionWarning";
 import ErrorBoundary from "../components/ErrorBoundary/ErrorBoundary";
 import styles from "./DashboardLayout.module.scss";
 
@@ -17,6 +21,7 @@ export default function DashboardLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [compactFooter, setCompactFooter] = useState(false);
   const [assistantOpen, setAssistantOpen] = useState(false);
+  const { active: sessionWarning, dismiss, dismissPermanent } = useSessionWarning();
 
   useEffect(() => {
     function handleResize() {
@@ -32,6 +37,8 @@ export default function DashboardLayout() {
 
   return (
     <LayoutContext.Provider value={{ setCompactFooter }}>
+    {/* 任務狀態全站常駐（WS + toast + 詳情 dialog）；顯示按鈕放在首頁 pageHeader */}
+    <JobsProvider>
     <div className={`${styles.layout} ${collapsed ? styles.collapsed : ""}`}>
       {mobileOpen && (
         <div
@@ -62,6 +69,7 @@ export default function DashboardLayout() {
                   <MIcon name="segment" size={22} />
                 </button>
               </div>
+              <SubnetBanner />
               <ErrorBoundary>
                 <Suspense fallback={<div className={styles.routeLoading}>載入頁面中…</div>}>
                   <Outlet />
@@ -74,9 +82,15 @@ export default function DashboardLayout() {
               onOpenChange={setAssistantOpen}
             />
           </div>
+          <SessionWarningDialog
+            status={sessionWarning}
+            onClose={dismiss}
+            onDismissPermanent={dismissPermanent}
+          />
         </ClassroomStudentLayer>
       </main>
     </div>
+    </JobsProvider>
     </LayoutContext.Provider>
   );
 }
