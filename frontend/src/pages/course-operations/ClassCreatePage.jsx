@@ -3,19 +3,20 @@ import MIcon from "../../components/MIcon";
 import { TeachingClassesService } from "../../services/teachingClasses";
 import styles from "./CourseOperations.module.scss";
 
-export default function ClassCreateDialog({ onClose, onCreated }) {
-  const [form, setForm] = useState({
-    name: "",
-    code: "",
-    term: "114-1",
-    startDate: "2026-09-01",
-    endDate: "2027-01-31",
-    weekday: 1,
-    startTime: "13:10",
-    endTime: "16:00",
-    timezone: "Asia/Taipei",
-    bootLeadMinutes: 10,
-  });
+export default function ClassCreateDialog({ item = null, onClose, onCreated, onUpdated }) {
+  const isEdit = Boolean(item);
+  const [form, setForm] = useState(() => ({
+    name: item?.name ?? "",
+    code: item?.code ?? "",
+    term: item?.term ?? "114-1",
+    startDate: item?.startDate ?? item?.start_date ?? "2026-09-01",
+    endDate: item?.endDate ?? item?.end_date ?? "2027-01-31",
+    weekday: item?.weekday ?? 1,
+    startTime: item?.startTime ?? String(item?.start_time ?? "13:10").slice(0, 5),
+    endTime: item?.endTime ?? String(item?.end_time ?? "16:00").slice(0, 5),
+    timezone: item?.timezone ?? "Asia/Taipei",
+    bootLeadMinutes: item?.bootLeadMinutes ?? item?.boot_lead_minutes ?? 10,
+  }));
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -37,7 +38,7 @@ export default function ClassCreateDialog({ onClose, onCreated }) {
     setSubmitting(true);
     setError("");
     try {
-      const created = await TeachingClassesService.create({
+      const payload = {
         name: form.name.trim(),
         code: form.code.trim() || `CLASS-${Date.now().toString().slice(-8)}`,
         term: form.term,
@@ -48,10 +49,13 @@ export default function ClassCreateDialog({ onClose, onCreated }) {
         end_time: form.endTime,
         timezone: form.timezone,
         boot_lead_minutes: Number(form.bootLeadMinutes),
-      });
-      onCreated(created);
+      };
+      const saved = isEdit
+        ? await TeachingClassesService.update(item.id, payload)
+        : await TeachingClassesService.create(payload);
+      (isEdit ? onUpdated : onCreated)?.(saved);
     } catch (reason) {
-      setError(reason?.message ?? "建立班級失敗，請稍後再試。");
+      setError(reason?.message ?? (isEdit ? "儲存班級失敗，請稍後再試。" : "建立班級失敗，請稍後再試。"));
     } finally {
       setSubmitting(false);
     }
@@ -60,7 +64,7 @@ export default function ClassCreateDialog({ onClose, onCreated }) {
   return <div className={styles.createDialogOverlay} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !submitting) onClose(); }}>
     <section className={styles.createDialog} role="dialog" aria-modal="true" aria-labelledby="create-class-title">
       <header className={styles.createDialogHeader}>
-        <h2 id="create-class-title">建立班級</h2>
+        <h2 id="create-class-title">{isEdit ? "編輯班級與課表" : "建立班級"}</h2>
         <button type="button" className={styles.iconBtn} aria-label="關閉" disabled={submitting} onClick={onClose}><MIcon name="close" size={19} /></button>
       </header>
 
@@ -92,7 +96,7 @@ export default function ClassCreateDialog({ onClose, onCreated }) {
 
         <footer className={styles.createDialogFooter}>
           <button type="button" className={styles.btnSecondary} disabled={submitting} onClick={onClose}>取消</button>
-          <button type="submit" className={styles.btnPrimary} disabled={!form.name.trim() || submitting}>{submitting ? "建立中…" : "建立班級"}</button>
+          <button type="submit" className={styles.btnPrimary} disabled={!form.name.trim() || submitting}>{submitting ? "儲存中…" : isEdit ? "儲存變更" : "建立班級"}</button>
         </footer>
       </form>
     </section>

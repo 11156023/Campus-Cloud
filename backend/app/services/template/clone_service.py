@@ -240,6 +240,7 @@ def run_clone_task(task_id: uuid.UUID, payload: dict[str, Any]) -> dict[str, Any
     batch_job_id = uuid.UUID(str(raw_batch)) if raw_batch else None
     environment_type = payload.get("environment_type")
     expiry_date = _parse_expiry(payload.get("expiry_date"))
+    ip_reservation_key = payload.get("ip_reservation_key")
 
     with Session(engine) as session:
         template = session.get(VMTemplate, template_id)
@@ -258,7 +259,12 @@ def run_clone_task(task_id: uuid.UUID, payload: dict[str, Any]) -> dict[str, Any
         new_vmid = proxmox_ops.next_vmid()
         net_cfg = ip_management_service.get_network_config_for_vm(session)
         purpose = "lxc" if resource_type == "lxc" else "vm"
-        allocated_ip = ip_management_service.allocate_ip(session, new_vmid, purpose)
+        allocated_ip = ip_management_service.allocate_ip(
+            session,
+            new_vmid,
+            purpose,
+            reservation_key=ip_reservation_key,
+        )
         # 先提交 IP 分配，避免克隆期間（可能數分鐘）併發任務撞 IP
         session.commit()
 
@@ -326,7 +332,11 @@ def run_clone_task(task_id: uuid.UUID, payload: dict[str, Any]) -> dict[str, Any
         # 失敗清理：釋放 IP → 撤防火牆規則 → 刪除半成品
         try:
             with Session(engine) as cleanup_session:
-                ip_management_service.release_ip(cleanup_session, new_vmid)
+                ip_management_service.release_ip(
+                    cleanup_session,
+                    new_vmid,
+                    restore_reservation=bool(ip_reservation_key),
+                )
                 cleanup_session.commit()
         except Exception:
             logger.warning("Failed to release IP for VMID %d", new_vmid)

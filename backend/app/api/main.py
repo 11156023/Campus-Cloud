@@ -7,6 +7,7 @@ from app.api.routes import (
     classroom,
     cloudflare,
     course_admin,
+    course_environments,
     courses,
     deletion_requests,
     desktop_client,
@@ -62,6 +63,7 @@ api_router.include_router(teaching.router)
 api_router.include_router(teaching_classes.router)
 api_router.include_router(courses.router)
 api_router.include_router(course_admin.router)
+api_router.include_router(course_environments.router)
 api_router.include_router(ldap_config.router)
 api_router.include_router(mining_incidents.router)
 api_router.include_router(ai.router)

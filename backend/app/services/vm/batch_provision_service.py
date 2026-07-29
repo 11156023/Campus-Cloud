@@ -3,6 +3,7 @@
 import json
 import logging
 import re
+import secrets
 import threading
 import uuid
 from datetime import date
@@ -12,7 +13,11 @@ from sqlmodel import Session
 from app.core.db import engine
 from app.exceptions import BadRequestError
 from app.models import VMTemplateStatus
-from app.models.batch_provision import BatchProvisionJobStatus, BatchProvisionTask
+from app.models.batch_provision import (
+    BatchProvisionJob,
+    BatchProvisionJobStatus,
+    BatchProvisionTask,
+)
 from app.repositories import batch_provision as bp_repo
 from app.repositories import group as group_repo
 from app.repositories import vm_template as vm_template_repo
@@ -79,6 +84,7 @@ def submit_batch_job_for_users(
     recurrence_rule: str | None = None,
     recurrence_duration_minutes: int | None = None,
     schedule_timezone: str | None = None,
+    capacity_reserved: bool = False,
 ) -> uuid.UUID:
     """Create a reviewed batch for an explicit class-student roster."""
     if not member_user_ids:
@@ -98,7 +104,7 @@ def submit_batch_job_for_users(
 
     # 檢查可用 IP 是否足夠
     stats = ip_management_service.get_ip_stats(session)
-    if stats["available"] < len(member_user_ids):
+    if not capacity_reserved and stats["available"] < len(member_user_ids):
         raise BadRequestError(
             f"可用 IP 不足：需要 {len(member_user_ids)} 個，"
             f"但僅剩 {stats['available']} 個可用"
@@ -203,6 +209,46 @@ def reject_batch_job(
             "processed by another reviewer)."
         )
     logger.info("Batch provision job %s rejected by %s", job_id, reviewer_id)
+
+
+def review_batch_jobs(
+    *,
+    session: Session,
+    job_ids: list[uuid.UUID],
+    reviewer_id: uuid.UUID,
+    decision: BatchProvisionJobStatus,
+    review_comment: str | None = None,
+) -> list[BatchProvisionJob]:
+    """Review all current jobs of a class as one atomic decision."""
+    if not job_ids:
+        raise BadRequestError("Teaching class has no pending batch jobs")
+    jobs = bp_repo.transition_pending_reviews(
+        session=session,
+        job_ids=job_ids,
+        reviewer_id=reviewer_id,
+        decision=decision,
+        review_comment=review_comment,
+    )
+    if len(jobs) != len(set(job_ids)):
+        raise BadRequestError(
+            "Teaching class jobs are no longer all pending review."
+        )
+    if decision == BatchProvisionJobStatus.approved:
+        for job in jobs:
+            thread = threading.Thread(
+                target=_run_queue,
+                args=(job.id,),
+                daemon=True,
+                name=f"batch-provision-{job.id}",
+            )
+            thread.start()
+    logger.info(
+        "Teaching class batch jobs %s reviewed as %s by %s",
+        ",".join(str(job.id) for job in jobs),
+        decision.value,
+        reviewer_id,
+    )
+    return jobs
 
 
 # Backwards-compat shim — older callers still pass through ``start_batch_job``.
@@ -356,6 +402,11 @@ def _provision_one(
             "batch_job_id": str(batch_job_id) if batch_job_id else None,
             "environment_type": params.get("environment_type", "批量建立"),
             "expiry_date": params.get("expiry_date"),
+            "ip_reservation_key": (
+                f"{params['ip_reservation_prefix']}:{user_id}"
+                if params.get("ip_reservation_prefix")
+                else None
+            ),
         }
         # 同步執行（batch 已在背景執行緒）；task_id 無對應 TaskRecord，
         # report_progress 會自動 no-op
@@ -363,29 +414,43 @@ def _provision_one(
         return int(clone_result["vmid"])
 
     if resource_type == "lxc":
+        reservation_key = (
+            f"{params['ip_reservation_prefix']}:{user_id}"
+            if params.get("ip_reservation_prefix")
+            else None
+        )
         req = LXCCreateRequest(
             hostname=hostname,
             ostemplate=params["ostemplate"],
             cores=params["cores"],
             memory=params["memory"],
             rootfs_size=params.get("rootfs_size", 8),
-            password=params["password"],
+            password=params.get("password") or secrets.token_urlsafe(18),
             storage=params.get("storage", "local-lvm"),
             environment_type=params.get("environment_type", "批量建立"),
             os_info=params.get("os_info"),
             expiry_date=_parse_date(params.get("expiry_date")),
             start=start,
-            unprivileged=True,
+            unprivileged=bool(params.get("unprivileged", True)),
         )
         result = provisioning_service.create_lxc(
-            session=session, lxc_data=req, user_id=user_id, batch_job_id=batch_job_id
+            session=session,
+            lxc_data=req,
+            user_id=user_id,
+            batch_job_id=batch_job_id,
+            ip_reservation_key=reservation_key,
         )
     else:
+        reservation_key = (
+            f"{params['ip_reservation_prefix']}:{user_id}"
+            if params.get("ip_reservation_prefix")
+            else None
+        )
         req = VMCreateRequest(
             hostname=hostname,
             template_id=params["template_id"],
-            username=params["username"],
-            password=params["password"],
+            username=params.get("username") or "student",
+            password=params.get("password") or secrets.token_urlsafe(18),
             cores=params["cores"],
             memory=params["memory"],
             disk_size=params.get("disk_size", 20),
@@ -396,7 +461,11 @@ def _provision_one(
             start=start,
         )
         result = provisioning_service.create_vm(
-            session=session, vm_data=req, user_id=user_id, batch_job_id=batch_job_id
+            session=session,
+            vm_data=req,
+            user_id=user_id,
+            batch_job_id=batch_job_id,
+            ip_reservation_key=reservation_key,
         )
 
     if result.vmid is None:

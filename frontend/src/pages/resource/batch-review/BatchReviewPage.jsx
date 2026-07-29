@@ -67,6 +67,36 @@ function ProgressInline({ done, failed, total }) {
 
 const COLUMNS = ["批次名稱", "申請人", "課程", "VM 數量", "進度", "狀態", "提交時間", "動作"];
 
+function groupClassReviews(batches) {
+  const rows = [];
+  const classGroups = new Map();
+  for (const batch of batches) {
+    if (!batch.teaching_class_id) {
+      rows.push({ ...batch, jobs: [batch] });
+      continue;
+    }
+    const group = classGroups.get(batch.teaching_class_id) ?? [];
+    group.push(batch);
+    classGroups.set(batch.teaching_class_id, group);
+  }
+  for (const [classId, jobs] of classGroups) {
+    const first = jobs[0];
+    rows.push({
+      ...first,
+      id: `class-${classId}`,
+      jobs,
+      teaching_class_id: classId,
+      hostname_prefix: `${first.teaching_class_name ?? "班級"} · ${jobs.length} 個節點`,
+      resource_type: [...new Set(jobs.map((job) => job.resource_type?.toUpperCase()))].join(" / "),
+      total: jobs.reduce((sum, job) => sum + (job.total ?? 0), 0),
+      done: jobs.reduce((sum, job) => sum + (job.done ?? 0), 0),
+      failed_count: jobs.reduce((sum, job) => sum + (job.failed_count ?? 0), 0),
+      created_at: jobs.map((job) => job.created_at).sort()[0],
+    });
+  }
+  return rows.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+}
+
 export default function BatchReviewPage() {
   const toast = useToast();
   const [batches, setBatches] = useState([]);
@@ -107,10 +137,17 @@ export default function BatchReviewPage() {
   useEffect(() => { load(); }, [load]);
   useAutoRefresh(() => load(true));
 
-  const review = async (jobId, decision) => {
-    if (!window.confirm(decision === "approved" ? "確定核准此批次?" : "確定駁回此批次?")) return;
+  const review = async (row, decision) => {
+    const target = row.teaching_class_id
+      ? `「${row.teaching_class_name}」的 ${row.jobs.length} 個機器節點`
+      : "此批次";
+    if (!window.confirm(decision === "approved" ? `確定核准${target}？` : `確定駁回${target}？`)) return;
     try {
-      await BatchProvisionService.review(jobId, { decision });
+      if (row.teaching_class_id) {
+        await BatchProvisionService.reviewClass(row.teaching_class_id, { decision });
+      } else {
+        await BatchProvisionService.review(row.id, { decision });
+      }
       toast.success(decision === "approved" ? "已核准" : "已駁回");
       load();
     } catch (e) {
@@ -118,18 +155,20 @@ export default function BatchReviewPage() {
     }
   };
 
+  const reviewRows = useMemo(() => groupClassReviews(batches), [batches]);
+
   const stats = useMemo(() => {
-    const pending = batches.filter((b) => b.status === "pending_review").length;
-    const inProgress = batches.filter((b) =>
+    const pending = reviewRows.filter((b) => b.status === "pending_review").length;
+    const inProgress = reviewRows.filter((b) =>
       ["approved", "pending", "running"].includes(b.status),
     ).length;
-    const totalVms = batches.reduce((s, b) => s + (b.total ?? 0), 0);
+    const totalVms = reviewRows.reduce((s, b) => s + (b.total ?? 0), 0);
     return { pending, inProgress, totalVms };
-  }, [batches]);
+  }, [reviewRows]);
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return batches.filter((b) => {
+    return reviewRows.filter((b) => {
       if (status !== "all" && b.status !== status) return false;
       if (!q) return true;
       return (
@@ -139,7 +178,7 @@ export default function BatchReviewPage() {
         (b.group_name ?? b.teaching_class_name ?? "").toLowerCase().includes(q)
       );
     });
-  }, [batches, status, query]);
+  }, [reviewRows, status, query]);
 
   return (
     <div className={styles.page}>
@@ -237,20 +276,20 @@ export default function BatchReviewPage() {
                                   type="button"
                                   className={styles.recurChip}
                                   title="點擊查看未來開機時段"
-                                  onClick={() => togglePreview(b.id)}
+                                  onClick={() => togglePreview(b.jobs?.[0]?.id ?? b.id)}
                                 >
                                   <MIcon name="update" size={12} />
                                   週期排程
                                 </button>
-                                {Array.isArray(previews[b.id]) && (
+                                {Array.isArray(previews[b.jobs?.[0]?.id ?? b.id]) && (
                                   <ul className={styles.recurWindows}>
-                                    {previews[b.id].length === 0 && <li>沒有排定的時段</li>}
-                                    {previews[b.id].map(([start, end]) => (
+                                    {previews[b.jobs?.[0]?.id ?? b.id].length === 0 && <li>沒有排定的時段</li>}
+                                    {previews[b.jobs?.[0]?.id ?? b.id].map(([start, end]) => (
                                       <li key={start}>{fmtTime(start)} ～ {fmtTime(end)}</li>
                                     ))}
                                   </ul>
                                 )}
-                                {previews[b.id] === "loading" && (
+                                {previews[b.jobs?.[0]?.id ?? b.id] === "loading" && (
                                   <span className={styles.recurLoading}>載入中…</span>
                                 )}
                               </>
@@ -279,7 +318,7 @@ export default function BatchReviewPage() {
                             className={`${styles.actionBtn} ${styles.actionBtnOk}`}
                             title="核准"
                             disabled={!canReview}
-                            onClick={() => review(b.id, "approved")}
+                            onClick={() => review(b, "approved")}
                           >
                             <MIcon name="check" size={16} />
                           </button>
@@ -288,7 +327,7 @@ export default function BatchReviewPage() {
                             className={`${styles.actionBtn} ${styles.actionBtnDanger}`}
                             title="駁回"
                             disabled={!canReview}
-                            onClick={() => review(b.id, "rejected")}
+                            onClick={() => review(b, "rejected")}
                           >
                             <MIcon name="close" size={16} />
                           </button>

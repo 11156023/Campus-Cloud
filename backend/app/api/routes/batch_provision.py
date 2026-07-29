@@ -12,9 +12,17 @@ from sqlmodel import select
 from app.api.deps import AdminUser, InstructorUser, SessionDep, rate_limit_by_user
 from app.core.authorizers import require_group_access
 from app.exceptions import BadRequestError, NotFoundError
-from app.models import TeachingClass, User
+from app.models import (
+    BatchProvisionJobStatus,
+    TeachingClass,
+    TeachingClassMachineNode,
+    TeachingClassStatus,
+    User,
+)
+from app.models.base import get_datetime_utc
 from app.repositories import batch_provision as bp_repo
 from app.repositories import group as group_repo
+from app.services.teaching import class_capacity_service
 from app.services.vm import batch_provision_service
 
 logger = logging.getLogger(__name__)
@@ -419,3 +427,67 @@ def review_batch_job(
     if not job:
         raise NotFoundError("Batch provision job not found")
     return _build_job_public(session, job)
+
+
+@router.post(
+    "/class/{class_id}/review",
+    response_model=list[BatchProvisionJobPublic],
+)
+def review_teaching_class_jobs(
+    class_id: uuid.UUID,
+    body: BatchProvisionReviewRequest,
+    session: SessionDep,
+    current_user: AdminUser,
+) -> list[BatchProvisionJobPublic]:
+    teaching_class = session.get(TeachingClass, class_id)
+    if teaching_class is None:
+        raise NotFoundError("Teaching class not found")
+    nodes = list(
+        session.exec(
+            select(TeachingClassMachineNode).where(
+                TeachingClassMachineNode.class_id == class_id
+            )
+        ).all()
+    )
+    job_ids = [node.batch_job_id for node in nodes if node.batch_job_id]
+    jobs = [
+        job
+        for job_id in job_ids
+        if (job := bp_repo.get_job(session=session, job_id=job_id)) is not None
+    ]
+    pending_ids = [
+        job.id
+        for job in jobs
+        if job.status == BatchProvisionJobStatus.pending_review
+    ]
+    if not pending_ids:
+        raise BadRequestError("Teaching class has no pending jobs to review")
+    decision = BatchProvisionJobStatus(body.decision)
+    reviewed = batch_provision_service.review_batch_jobs(
+        session=session,
+        job_ids=pending_ids,
+        reviewer_id=current_user.id,
+        decision=decision,
+        review_comment=body.review_comment,
+    )
+    if decision == BatchProvisionJobStatus.approved:
+        teaching_class.status = TeachingClassStatus.provisioning
+    else:
+        all_tasks = [
+            task
+            for job in jobs
+            for task in bp_repo.get_job_tasks(session=session, job_id=job.id)
+        ]
+        if any(task.vmid is not None for task in all_tasks):
+            teaching_class.status = TeachingClassStatus.partial_failed
+        else:
+            for node in nodes:
+                node.batch_job_id = None
+                session.add(node)
+            class_capacity_service.release(session, class_id=class_id)
+            teaching_class.status = TeachingClassStatus.planning
+            teaching_class.locked_at = None
+    teaching_class.updated_at = get_datetime_utc()
+    session.add(teaching_class)
+    session.commit()
+    return [_build_job_public(session, job) for job in reviewed]

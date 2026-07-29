@@ -25,7 +25,7 @@ const navGroups = [
     items: [
       { key: "my-resources",  label: "我的資源",    icon: "inventory_2" },
       { key: "resource-mgmt", label: "資源管理",    icon: "storage" },
-      { key: "templates",     label: "模板管理",    icon: "library_books" },
+      { key: "templates",     label: "機器範本",    icon: "library_books" },
       { key: "gpu-mgmt",      label: "GPU 管理",    icon: "memory" },
     ],
   },
@@ -67,9 +67,9 @@ const navGroups = [
     icon: "school",
     items: [
       { key: "class-management", label: "班級管理", icon: "groups_2" },
-      { key: "course-template-management", label: "環境模板", icon: "view_quilt" },
-      { key: "teaching",   label: "教學面板", icon: "grid_view" },
-      { key: "courses",    label: "課程學習", icon: "flag" },
+      { key: "course-template-management", label: "課程環境", icon: "view_quilt" },
+      { key: "teaching",   label: "教學面板（非正式）", icon: "grid_view" },
+      { key: "courses",    label: "課程學習（非正式）", icon: "flag" },
     ],
   },
   {

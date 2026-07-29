@@ -11,12 +11,12 @@ import TemplateTasksCard from "./TemplateTasksCard";
 
 function visibilityLabel(template) {
   return template.visibility === "global"
-    ? "全域"
-    : `${template.group_ids?.length ?? 0} 個群組`;
+    ? "全部可見"
+    : "私人";
 }
 
 /** 單列的「⋯」操作選單 */
-function RowMenu({ template, cycleBusy, onClone, onEdit, onCycle, onDelete, onClose, anchorRef }) {
+function RowMenu({ template, cycleBusy, onClone, onEdit, onRetry, onCycle, onDelete, onClose, anchorRef }) {
   const ref = useRef(null);
 
   useEffect(() => {
@@ -47,6 +47,17 @@ function RowMenu({ template, cycleBusy, onClone, onEdit, onCycle, onDelete, onCl
         編輯 / 可見範圍
       </button>
       <div className={styles.rowMenuDivider} />
+      {template.status === "failed" && (
+        <button
+          type="button"
+          className={styles.rowMenuItem}
+          disabled={cycleBusy}
+          onClick={() => { onClose(); onRetry(template.id); }}
+        >
+          <MIcon name="restart_alt" size={15} />
+          重新轉換
+        </button>
+      )}
       {template.status === "ready" && (
         <button
           type="button"
@@ -92,7 +103,7 @@ function RowMenu({ template, cycleBusy, onClone, onEdit, onCycle, onDelete, onCl
   );
 }
 
-function ManagementRow({ template, cycleBusy, onClone, onEdit, onCycle, onDelete }) {
+function ManagementRow({ template, cycleBusy, onClone, onEdit, onRetry, onCycle, onDelete }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuBtnRef = useRef(null);
 
@@ -101,7 +112,7 @@ function ManagementRow({ template, cycleBusy, onClone, onEdit, onCycle, onDelete
       <td className={styles.td}>
         <div className={styles.nameCell}>
           <span className={styles.namePrimary}>{template.name}</span>
-          {template.pve_exists === false && (
+          {template.pve_exists === false && template.status === "ready" && (
             <span className={styles.pveMissing} title="PVE 端找不到這個範本，可能已被手動刪除">
               <MIcon name="warning" size={13} />
               PVE 不存在
@@ -132,6 +143,7 @@ function ManagementRow({ template, cycleBusy, onClone, onEdit, onCycle, onDelete
               cycleBusy={cycleBusy}
               onClone={onClone}
               onEdit={onEdit}
+              onRetry={onRetry}
               onCycle={onCycle}
               onDelete={onDelete}
               onClose={() => setMenuOpen(false)}
@@ -278,6 +290,20 @@ export default function TemplatesPage() {
     }
   };
 
+  const handleRetry = async (templateId) => {
+    setCycleBusy(true);
+    try {
+      await TemplatesService.retry(templateId);
+      toast.success("已重新送出轉換；母機會先安全關機，再轉為唯讀範本");
+      await load();
+      setTasksKey((k) => k + 1);
+    } catch (e) {
+      toast.error(e?.message ?? "重新轉換失敗");
+    } finally {
+      setCycleBusy(false);
+    }
+  };
+
   const handleDelete = async () => {
     setDeleting(true);
     try {
@@ -301,7 +327,7 @@ export default function TemplatesPage() {
     <div className={styles.page}>
       <div className={styles.pageHeader}>
         <div className={styles.pageHeading}>
-          <h1 className={styles.pageTitle}>模板管理</h1>
+          <h1 className={styles.pageTitle}>機器範本</h1>
           <p className={styles.pageSubtitle}>
             {canManage
               ? "把設定好的母機轉為範本，學生即可一鍵克隆出自己的環境"
@@ -364,6 +390,7 @@ export default function TemplatesPage() {
                     cycleBusy={cycleBusy}
                     onClone={setCloneTarget}
                     onEdit={setEditTarget}
+                    onRetry={handleRetry}
                     onCycle={handleCycle}
                     onDelete={setDeleteTarget}
                   />
