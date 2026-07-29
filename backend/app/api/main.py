@@ -35,6 +35,7 @@ from app.api.routes import (
     teacher_judge_files,
     teacher_judge_scripts,
     teaching,
+    teaching_classes,
     templates,
     tunnel,
     users,
@@ -58,6 +59,7 @@ api_router.include_router(monitoring.router)
 api_router.include_router(governance.router)
 api_router.include_router(quotas.router)
 api_router.include_router(teaching.router)
+api_router.include_router(teaching_classes.router)
 api_router.include_router(courses.router)
 api_router.include_router(course_admin.router)
 api_router.include_router(ldap_config.router)

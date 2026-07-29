@@ -1,13 +1,24 @@
 """classroom_service 權限與 GET /live 過濾測試（in-memory sqlite）。"""
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, time
 
 import pytest
 from sqlmodel import Session, SQLModel, create_engine
 
 from app.exceptions import NotFoundError, PermissionDeniedError
-from app.models import Group, GroupMember, Resource, User, UserRole
+from app.models import (
+    Group,
+    GroupMember,
+    Resource,
+    TeachingClass,
+    TeachingClassMachineNode,
+    TeachingClassStatus,
+    TeachingClassStudent,
+    TeachingClassStudentMachine,
+    User,
+    UserRole,
+)
 from app.services.classroom import classroom_service
 from app.services.classroom.vnc_session_manager import ClassroomSession, SessionMode
 
@@ -28,9 +39,26 @@ def db():
         yield session
 
 
+@pytest.fixture
+def class_db():
+    engine = create_engine("sqlite://")
+    SQLModel.metadata.create_all(
+        engine,
+        tables=[
+            User.__table__,  # type: ignore[arg-type]
+            TeachingClass.__table__,  # type: ignore[arg-type]
+            TeachingClassStudent.__table__,  # type: ignore[arg-type]
+            TeachingClassMachineNode.__table__,  # type: ignore[arg-type]
+            TeachingClassStudentMachine.__table__,  # type: ignore[arg-type]
+        ],
+    )
+    with Session(engine) as session:
+        yield session
+
+
 def _user(db: Session, role: UserRole, *, superuser: bool = False) -> User:
     user = User(
-        email=f"{uuid.uuid4().hex[:12]}@test.local",
+        email=f"{uuid.uuid4().hex[:12]}@example.com",
         hashed_password="x",
         role=role,
         is_superuser=superuser,
@@ -164,6 +192,69 @@ class TestGroupIdsOfUser:
         }
         assert classroom_service.get_group_ids_of_user(db, student.id) == {g_owned.id}
         assert classroom_service.get_group_ids_of_user(db, _user(db, UserRole.student).id) == set()
+
+
+class TestTeachingClassClassroom:
+    def test_lists_fixed_multi_machine_students(self, class_db: Session) -> None:
+        teacher = _user(class_db, UserRole.teacher)
+        student = _user(class_db, UserRole.student)
+        teaching_class = TeachingClass(
+            owner_id=teacher.id,
+            name="Linux",
+            code="CS-LINUX",
+            term="115-1",
+            start_date=date(2026, 9, 1),
+            end_date=date(2027, 1, 31),
+            weekday=1,
+            start_time=time(13, 10),
+            end_time=time(16, 0),
+            status=TeachingClassStatus.active,
+        )
+        class_db.add(teaching_class)
+        class_db.commit()
+        enrollment = TeachingClassStudent(
+            class_id=teaching_class.id, user_id=student.id
+        )
+        node = TeachingClassMachineNode(
+            class_id=teaching_class.id,
+            node_key="client",
+            source_template_id=uuid.uuid4(),
+            name="Client",
+            role="學生端",
+            resource_type="qemu",
+            cpu=2,
+            memory_mb=2048,
+            disk_gb=20,
+        )
+        class_db.add(enrollment)
+        class_db.add(node)
+        class_db.commit()
+        machine = TeachingClassStudentMachine(
+            class_student_id=enrollment.id,
+            machine_node_id=node.id,
+            vmid=501,
+            status="completed",
+        )
+        class_db.add(machine)
+        class_db.commit()
+
+        rows = classroom_service.list_class_students(
+            class_db,
+            teaching_class.id,
+            teacher,
+            cluster_resources=[
+                {"vmid": 501, "name": "student-client", "status": "running", "type": "qemu"}
+            ],
+        )
+
+        assert len(rows) == 1
+        assert rows[0].email == student.email
+        assert [(vm.vmid, vm.name, vm.status) for vm in rows[0].vms] == [
+            (501, "Client", "running")
+        ]
+        classroom_service.require_can_watch_class(
+            class_db, teacher, teaching_class.id, 501
+        )
 
 
 class _StubManager:

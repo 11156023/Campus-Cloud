@@ -1,0 +1,203 @@
+"""Persistent teaching-class orchestration models."""
+
+import enum
+import uuid
+from datetime import date, datetime, time
+
+import sqlalchemy as sa
+from sqlmodel import Column, DateTime, Field, SQLModel, UniqueConstraint
+
+from .base import get_datetime_utc
+
+
+class TeachingClassStatus(str, enum.Enum):
+    planning = "planning"
+    pending_review = "pending_review"
+    provisioning = "provisioning"
+    partial_failed = "partial_failed"
+    active = "active"
+    archived = "archived"
+
+
+class TeachingClass(SQLModel, table=True):
+    __tablename__ = "teaching_classes"
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    owner_id: uuid.UUID = Field(
+        sa_column=Column(
+            sa.ForeignKey("user.id", ondelete="CASCADE"),
+            nullable=False,
+            index=True,
+        )
+    )
+    name: str = Field(max_length=255)
+    code: str = Field(max_length=80)
+    term: str = Field(max_length=80)
+    start_date: date
+    end_date: date
+    weekday: int = Field(ge=0, le=6, description="Monday=0")
+    start_time: time
+    end_time: time
+    timezone: str = Field(default="Asia/Taipei", max_length=64)
+    boot_lead_minutes: int = Field(default=10, ge=0, le=120)
+    shutdown_grace_minutes: int = Field(default=30, ge=0, le=240)
+    status: TeachingClassStatus = Field(
+        default=TeachingClassStatus.planning,
+        sa_column=Column(sa.Enum(TeachingClassStatus), nullable=False, index=True),
+    )
+    created_at: datetime = Field(
+        default_factory=get_datetime_utc,
+        sa_column=Column(DateTime(timezone=True), nullable=False),
+    )
+    updated_at: datetime = Field(
+        default_factory=get_datetime_utc,
+        sa_column=Column(DateTime(timezone=True), nullable=False),
+    )
+
+
+class TeachingClassMachineNode(SQLModel, table=True):
+    __tablename__ = "teaching_class_machine_nodes"
+    __table_args__ = (
+        UniqueConstraint("class_id", "node_key", name="uq_teaching_class_machine_node"),
+    )
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    class_id: uuid.UUID = Field(
+        sa_column=Column(
+            sa.ForeignKey("teaching_classes.id", ondelete="CASCADE"),
+            nullable=False,
+            index=True,
+        )
+    )
+    node_key: str = Field(max_length=80)
+    source_template_id: uuid.UUID = Field(
+        sa_column=Column(
+            sa.ForeignKey("vm_templates.id", ondelete="RESTRICT"), nullable=False
+        )
+    )
+    name: str = Field(max_length=255)
+    role: str = Field(max_length=120)
+    resource_type: str = Field(max_length=10)
+    cpu: int = Field(ge=1, le=64)
+    memory_mb: int = Field(ge=128, le=131072)
+    disk_gb: int = Field(ge=1, le=2000)
+    network: str | None = Field(default=None, max_length=255)
+    sort_order: int = Field(default=0)
+    batch_job_id: uuid.UUID | None = Field(
+        default=None,
+        sa_column=Column(
+            sa.ForeignKey("batch_provision_jobs.id", ondelete="SET NULL"),
+            nullable=True,
+            index=True,
+        ),
+    )
+
+
+class TeachingClassWeek(SQLModel, table=True):
+    __tablename__ = "teaching_class_weeks"
+    __table_args__ = (
+        UniqueConstraint("class_id", "week_number", name="uq_teaching_class_week"),
+    )
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    class_id: uuid.UUID = Field(
+        sa_column=Column(
+            sa.ForeignKey("teaching_classes.id", ondelete="CASCADE"),
+            nullable=False,
+            index=True,
+        )
+    )
+    week_number: int = Field(ge=1)
+    session_date: date
+    title: str = Field(default="", max_length=255)
+    target_node_key: str | None = Field(default=None, max_length=80)
+    status: str = Field(default="draft", max_length=24)
+
+
+class TeachingClassTaskFile(SQLModel, table=True):
+    __tablename__ = "teaching_class_task_files"
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    week_id: uuid.UUID = Field(
+        sa_column=Column(
+            sa.ForeignKey("teaching_class_weeks.id", ondelete="CASCADE"),
+            nullable=False,
+            index=True,
+        )
+    )
+    filename: str = Field(max_length=255)
+    storage_key: str | None = Field(default=None, max_length=500)
+    target_path: str | None = Field(default=None, max_length=500)
+
+
+class TeachingClassStudent(SQLModel, table=True):
+    __tablename__ = "teaching_class_students"
+    __table_args__ = (
+        UniqueConstraint("class_id", "user_id", name="uq_teaching_class_student"),
+    )
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    class_id: uuid.UUID = Field(
+        sa_column=Column(
+            sa.ForeignKey("teaching_classes.id", ondelete="CASCADE"),
+            nullable=False,
+            index=True,
+        )
+    )
+    user_id: uuid.UUID = Field(
+        sa_column=Column(
+            sa.ForeignKey("user.id", ondelete="CASCADE"), nullable=False, index=True
+        )
+    )
+    status: str = Field(default="active", max_length=24)
+    joined_at: datetime = Field(
+        default_factory=get_datetime_utc,
+        sa_column=Column(DateTime(timezone=True), nullable=False),
+    )
+
+
+class TeachingClassStudentMachine(SQLModel, table=True):
+    __tablename__ = "teaching_class_student_machines"
+    __table_args__ = (
+        UniqueConstraint(
+            "class_student_id",
+            "machine_node_id",
+            name="uq_teaching_class_student_machine",
+        ),
+    )
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    class_student_id: uuid.UUID = Field(
+        sa_column=Column(
+            sa.ForeignKey("teaching_class_students.id", ondelete="CASCADE"),
+            nullable=False,
+            index=True,
+        )
+    )
+    machine_node_id: uuid.UUID = Field(
+        sa_column=Column(
+            sa.ForeignKey("teaching_class_machine_nodes.id", ondelete="CASCADE"),
+            nullable=False,
+        )
+    )
+    batch_task_id: uuid.UUID | None = Field(
+        default=None,
+        sa_column=Column(
+            sa.ForeignKey("batch_provision_tasks.id", ondelete="SET NULL"),
+            nullable=True,
+        ),
+    )
+    vmid: int | None = Field(default=None)
+    status: str = Field(default="pending", max_length=32)
+    error: str | None = Field(default=None, max_length=500)
+
+
+__all__ = [
+    "TeachingClass",
+    "TeachingClassStatus",
+    "TeachingClassMachineNode",
+    "TeachingClassWeek",
+    "TeachingClassTaskFile",
+    "TeachingClassStudent",
+    "TeachingClassStudentMachine",
+]

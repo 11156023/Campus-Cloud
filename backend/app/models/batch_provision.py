@@ -32,12 +32,21 @@ class BatchProvisionJob(SQLModel, table=True):
     __tablename__ = "batch_provision_jobs"
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    group_id: uuid.UUID = Field(
+    group_id: uuid.UUID | None = Field(
+        default=None,
         sa_column=Column(
             sa.ForeignKey("group.id", ondelete="CASCADE"),
-            nullable=False,
+            nullable=True,
             index=True,
-        )
+        ),
+    )
+    teaching_class_id: uuid.UUID | None = Field(
+        default=None,
+        sa_column=Column(
+            sa.ForeignKey("teaching_classes.id", ondelete="CASCADE"),
+            nullable=True,
+            index=True,
+        ),
     )
     initiated_by: uuid.UUID = Field(
         sa_column=Column(

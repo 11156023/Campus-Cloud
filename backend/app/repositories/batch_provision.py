@@ -17,7 +17,8 @@ from app.models.resource import Resource
 def create_job(
     *,
     session: Session,
-    group_id: uuid.UUID,
+    group_id: uuid.UUID | None,
+    teaching_class_id: uuid.UUID | None = None,
     initiated_by: uuid.UUID,
     resource_type: str,
     hostname_prefix: str,
@@ -31,6 +32,7 @@ def create_job(
     now = datetime.now(UTC)
     job = BatchProvisionJob(
         group_id=group_id,
+        teaching_class_id=teaching_class_id,
         initiated_by=initiated_by,
         resource_type=resource_type,
         hostname_prefix=hostname_prefix,
@@ -150,7 +152,9 @@ def get_job_tasks(*, session: Session, job_id: uuid.UUID) -> list[BatchProvision
     return list(session.exec(stmt).all())
 
 
-def get_pending_tasks(*, session: Session, job_id: uuid.UUID) -> list[BatchProvisionTask]:
+def get_pending_tasks(
+    *, session: Session, job_id: uuid.UUID
+) -> list[BatchProvisionTask]:
     stmt = (
         select(BatchProvisionTask)
         .where(
@@ -171,9 +175,7 @@ def update_task_running(*, session: Session, task_id: uuid.UUID) -> None:
         session.commit()
 
 
-def update_task_done(
-    *, session: Session, task_id: uuid.UUID, vmid: int
-) -> None:
+def update_task_done(*, session: Session, task_id: uuid.UUID, vmid: int) -> None:
     task = session.get(BatchProvisionTask, task_id)
     if task:
         task.status = BatchProvisionTaskStatus.completed
@@ -184,9 +186,7 @@ def update_task_done(
         session.commit()
 
 
-def update_task_failed(
-    *, session: Session, task_id: uuid.UUID, error: str
-) -> None:
+def update_task_failed(*, session: Session, task_id: uuid.UUID, error: str) -> None:
     task = session.get(BatchProvisionTask, task_id)
     if task:
         task.status = BatchProvisionTaskStatus.failed
@@ -221,7 +221,10 @@ def update_job_status(
     job = session.get(BatchProvisionJob, job_id)
     if job:
         job.status = status
-        if status in (BatchProvisionJobStatus.completed, BatchProvisionJobStatus.failed):
+        if status in (
+            BatchProvisionJobStatus.completed,
+            BatchProvisionJobStatus.failed,
+        ):
             job.finished_at = datetime.now(UTC)
         session.add(job)
         session.commit()
