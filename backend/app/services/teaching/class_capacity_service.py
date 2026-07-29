@@ -50,23 +50,35 @@ def preview(
     *,
     nodes: list[TeachingClassMachineNode],
     students: list[TeachingClassStudent],
+    check_cluster: bool = False,
 ) -> dict[str, object]:
     totals = calculate(nodes=nodes, students=students)
     ip_stats = ip_management_service.get_ip_stats(session)
+    issues = (
+        []
+        if ip_stats["available"] >= totals["ip_count"]
+        else [
+            f"IP 不足：需要 {totals['ip_count']} 個，"
+            f"目前只剩 {ip_stats['available']} 個"
+        ]
+    )
+    placement_plan: dict[str, dict[str, int]] = {}
+    if check_cluster and nodes and students:
+        try:
+            placement_plan = _check_cluster_capacity(
+                session,
+                nodes=nodes,
+                student_count=len(students),
+            )
+        except BadRequestError as exc:
+            issues.append(str(exc))
     return {
         **totals,
         "available_ips": ip_stats["available"],
-        "ready": bool(nodes)
-        and bool(students)
-        and ip_stats["available"] >= totals["ip_count"],
-        "issues": (
-            []
-            if ip_stats["available"] >= totals["ip_count"]
-            else [
-                f"IP 不足：需要 {totals['ip_count']} 個，"
-                f"目前只剩 {ip_stats['available']} 個"
-            ]
-        ),
+        "ready": bool(nodes) and bool(students) and not issues,
+        "issues": issues,
+        "cluster_checked": check_cluster,
+        "placement_plan": placement_plan,
     }
 
 
@@ -86,7 +98,10 @@ def reserve(
     if existing:
         if existing.course_version_id != course_version_id:
             raise BadRequestError("班級已使用其他課程版本完成容量預留")
-        return existing
+        if existing.status != "released":
+            return existing
+        session.delete(existing)
+        session.flush()
 
     totals = calculate(nodes=nodes, students=students)
     if not nodes or not students:
@@ -121,6 +136,31 @@ def reserve(
     session.add(reservation)
     session.flush()
     return reservation
+
+
+def release(
+    session: Session,
+    *,
+    class_id: uuid.UUID,
+    delete_snapshot: bool = True,
+) -> int:
+    """Release unused class IPs and its capacity snapshot."""
+    released_ips = ip_management_service.release_class_reservations(
+        session, class_id
+    )
+    reservation = session.exec(
+        select(ClassCapacityReservation).where(
+            ClassCapacityReservation.class_id == class_id
+        )
+    ).first()
+    if reservation:
+        if delete_snapshot:
+            session.delete(reservation)
+        else:
+            reservation.status = "released"
+            session.add(reservation)
+    session.flush()
+    return released_ips
 
 
 def _check_cluster_capacity(

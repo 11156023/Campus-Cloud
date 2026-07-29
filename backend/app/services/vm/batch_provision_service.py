@@ -13,7 +13,11 @@ from sqlmodel import Session
 from app.core.db import engine
 from app.exceptions import BadRequestError
 from app.models import VMTemplateStatus
-from app.models.batch_provision import BatchProvisionJobStatus, BatchProvisionTask
+from app.models.batch_provision import (
+    BatchProvisionJob,
+    BatchProvisionJobStatus,
+    BatchProvisionTask,
+)
 from app.repositories import batch_provision as bp_repo
 from app.repositories import group as group_repo
 from app.repositories import vm_template as vm_template_repo
@@ -205,6 +209,46 @@ def reject_batch_job(
             "processed by another reviewer)."
         )
     logger.info("Batch provision job %s rejected by %s", job_id, reviewer_id)
+
+
+def review_batch_jobs(
+    *,
+    session: Session,
+    job_ids: list[uuid.UUID],
+    reviewer_id: uuid.UUID,
+    decision: BatchProvisionJobStatus,
+    review_comment: str | None = None,
+) -> list[BatchProvisionJob]:
+    """Review all current jobs of a class as one atomic decision."""
+    if not job_ids:
+        raise BadRequestError("Teaching class has no pending batch jobs")
+    jobs = bp_repo.transition_pending_reviews(
+        session=session,
+        job_ids=job_ids,
+        reviewer_id=reviewer_id,
+        decision=decision,
+        review_comment=review_comment,
+    )
+    if len(jobs) != len(set(job_ids)):
+        raise BadRequestError(
+            "Teaching class jobs are no longer all pending review."
+        )
+    if decision == BatchProvisionJobStatus.approved:
+        for job in jobs:
+            thread = threading.Thread(
+                target=_run_queue,
+                args=(job.id,),
+                daemon=True,
+                name=f"batch-provision-{job.id}",
+            )
+            thread.start()
+    logger.info(
+        "Teaching class batch jobs %s reviewed as %s by %s",
+        ",".join(str(job.id) for job in jobs),
+        decision.value,
+        reviewer_id,
+    )
+    return jobs
 
 
 # Backwards-compat shim — older callers still pass through ``start_batch_job``.

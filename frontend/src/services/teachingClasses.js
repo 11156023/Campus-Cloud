@@ -5,6 +5,7 @@ export const TeachingClassesService = {
   create(body) { return apiPost("/api/v1/teaching-classes", body); },
   get(classId) { return apiGet(`/api/v1/teaching-classes/${classId}`); },
   update(classId, body) { return apiPatch(`/api/v1/teaching-classes/${classId}`, body); },
+  capacityPreview(classId) { return apiGet(`/api/v1/teaching-classes/${classId}/capacity-preview`); },
   addStudents(classId, emails) { return apiPost(`/api/v1/teaching-classes/${classId}/students`, { emails }); },
   removeStudent(classId, studentId) { return apiDelete(`/api/v1/teaching-classes/${classId}/students/${studentId}`); },
   importStudents(classId, file) {
@@ -23,5 +24,7 @@ export const TeachingClassesService = {
   },
   deleteWeekFile(classId, weekId, fileId) { return apiDelete(`/api/v1/teaching-classes/${classId}/weeks/${weekId}/files/${fileId}`); },
   provision(classId) { return apiPost(`/api/v1/teaching-classes/${classId}/provision`, {}); },
+  retryFailed(classId) { return apiPost(`/api/v1/teaching-classes/${classId}/retry-failed`, {}); },
+  resetFailed(classId) { return apiPost(`/api/v1/teaching-classes/${classId}/reset-failed`, {}); },
   provisionStatus(classId) { return apiGet(`/api/v1/teaching-classes/${classId}/provision-status`); },
 };

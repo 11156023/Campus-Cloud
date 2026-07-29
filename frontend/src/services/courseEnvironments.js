@@ -1,5 +1,11 @@
 import { apiGet, apiPost, apiPut } from "./api";
 
+export function courseNodeHasUsableSource(node) {
+  return node?.sourceType === "custom"
+    ? Boolean(node.customImageRef)
+    : Boolean(node?.sourceTemplateId);
+}
+
 function normalizeNode(node) {
   return {
     ...node,

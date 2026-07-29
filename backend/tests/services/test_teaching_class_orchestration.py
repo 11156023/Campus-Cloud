@@ -11,6 +11,7 @@ from app.api.routes.course_environments import (
 )
 from app.api.routes.teaching_classes import _recurrence
 from app.exceptions import BadRequestError
+from app.models import BatchProvisionJobStatus
 from app.services.teaching import class_capacity_service, class_network_service
 from app.services.vm import batch_provision_service
 
@@ -112,6 +113,83 @@ def test_class_capacity_is_calculated_for_the_complete_roster():
     }
 
 
+def test_full_capacity_preview_checks_cluster_and_ip(monkeypatch):
+    nodes = [
+        SimpleNamespace(
+            cpu=2,
+            memory_mb=2048,
+            disk_gb=20,
+            network="lab-net",
+        )
+    ]
+    students = [SimpleNamespace(user_id=uuid.uuid4()) for _ in range(3)]
+    monkeypatch.setattr(
+        class_capacity_service.ip_management_service,
+        "get_ip_stats",
+        lambda _session: {"available": 20},
+    )
+    monkeypatch.setattr(
+        class_capacity_service,
+        "_check_cluster_capacity",
+        lambda _session, **_kwargs: {
+            "pve1": {
+                "cpu_cores": 6,
+                "memory_bytes": 6 * 1024**3,
+                "disk_bytes": 60 * 1024**3,
+                "machines": 3,
+            }
+        },
+    )
+
+    result = class_capacity_service.preview(
+        object(),
+        nodes=nodes,
+        students=students,
+        check_cluster=True,
+    )
+
+    assert result["ready"] is True
+    assert result["cluster_checked"] is True
+    assert result["issues"] == []
+    assert result["placement_plan"]["pve1"]["machines"] == 3
+
+
+def test_full_capacity_preview_reports_cluster_issue(monkeypatch):
+    nodes = [
+        SimpleNamespace(
+            cpu=2,
+            memory_mb=2048,
+            disk_gb=20,
+            network="lab-net",
+        )
+    ]
+    students = [SimpleNamespace(user_id=uuid.uuid4())]
+    monkeypatch.setattr(
+        class_capacity_service.ip_management_service,
+        "get_ip_stats",
+        lambda _session: {"available": 20},
+    )
+
+    def reject_capacity(*_args, **_kwargs):
+        raise BadRequestError("pve1 RAM 不足")
+
+    monkeypatch.setattr(
+        class_capacity_service,
+        "_check_cluster_capacity",
+        reject_capacity,
+    )
+
+    result = class_capacity_service.preview(
+        object(),
+        nodes=nodes,
+        students=students,
+        check_cluster=True,
+    )
+
+    assert result["ready"] is False
+    assert result["issues"] == ["pve1 RAM 不足"]
+
+
 def test_reserved_class_batch_does_not_repeat_per_node_ip_check(monkeypatch):
     created_id = uuid.uuid4()
     monkeypatch.setattr(
@@ -143,6 +221,37 @@ def test_reserved_class_batch_does_not_repeat_per_node_ip_check(monkeypatch):
         )
         == created_id
     )
+
+
+def test_class_jobs_are_approved_as_one_decision(monkeypatch):
+    job_ids = [uuid.uuid4(), uuid.uuid4(), uuid.uuid4()]
+    jobs = [SimpleNamespace(id=job_id) for job_id in job_ids]
+    started = []
+
+    monkeypatch.setattr(
+        batch_provision_service.bp_repo,
+        "transition_pending_reviews",
+        lambda **_kwargs: jobs,
+    )
+
+    class FakeThread:
+        def __init__(self, *, args, **_kwargs):
+            self.job_id = args[0]
+
+        def start(self):
+            started.append(self.job_id)
+
+    monkeypatch.setattr(batch_provision_service.threading, "Thread", FakeThread)
+
+    reviewed = batch_provision_service.review_batch_jobs(
+        session=object(),
+        job_ids=job_ids,
+        reviewer_id=uuid.uuid4(),
+        decision=BatchProvisionJobStatus.approved,
+    )
+
+    assert reviewed == jobs
+    assert started == job_ids
 
 
 def test_network_labels_accept_ui_slash_or_comma_notation():

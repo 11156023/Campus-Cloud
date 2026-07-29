@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
-import { CourseEnvironmentsService, environmentPayload } from "./courseEnvironments";
+import {
+  courseNodeHasUsableSource,
+  CourseEnvironmentsService,
+  environmentPayload,
+} from "./courseEnvironments";
 
 const jsonRes = (body) => ({
   ok: true,
@@ -82,5 +86,21 @@ describe("CourseEnvironmentsService", () => {
       protocol: "tcp",
       port: 443,
     });
+  });
+
+  test("classroom selection accepts both machine templates and custom images", () => {
+    expect(courseNodeHasUsableSource({
+      sourceType: "template",
+      sourceTemplateId: "tpl-id",
+    })).toBe(true);
+    expect(courseNodeHasUsableSource({
+      sourceType: "custom",
+      customImageRef: "local:vztmpl/debian.tar.zst",
+    })).toBe(true);
+    expect(courseNodeHasUsableSource({
+      sourceType: "custom",
+      sourceTemplateId: null,
+      customImageRef: "",
+    })).toBe(false);
   });
 });

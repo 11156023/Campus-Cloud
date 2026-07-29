@@ -301,7 +301,7 @@ export default function TemplatesPage() {
     <div className={styles.page}>
       <div className={styles.pageHeader}>
         <div className={styles.pageHeading}>
-          <h1 className={styles.pageTitle}>模板管理</h1>
+          <h1 className={styles.pageTitle}>機器範本</h1>
           <p className={styles.pageSubtitle}>
             {canManage
               ? "把設定好的母機轉為範本，學生即可一鍵克隆出自己的環境"

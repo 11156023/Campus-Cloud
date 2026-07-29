@@ -1,16 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Background, MarkerType, ReactFlow } from "@xyflow/react";
+import "@xyflow/react/dist/style.css";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import MIcon from "../../components/MIcon";
 import ClassroomWatchDialog from "../../components/Classroom/ClassroomWatchDialog";
 import { ClassroomService } from "../../services/classroom";
-import { CourseEnvironmentsService } from "../../services/courseEnvironments";
+import { courseNodeHasUsableSource, CourseEnvironmentsService } from "../../services/courseEnvironments";
 import { TeachingClassesService } from "../../services/teachingClasses";
+import ClassCreateDialog from "./ClassCreatePage";
 import styles from "./CourseOperations.module.scss";
 
 const TABS = [
   ["overview", "dashboard", "班級總覽", "確認開課條件"],
   ["students", "groups", "加入學生", "建立正式名單"],
-  ["machines", "account_tree", "上課環境", "套用環境模板"],
+  ["machines", "account_tree", "上課環境", "套用課程環境"],
   ["weekly", "calendar_view_week", "每週內容", "可隨時補充"],
   ["classroom", "cast_for_education", "上課監看", "觀看與直播"],
   ["progress", "checklist", "學生機器", "逐人多機狀態"],
@@ -52,44 +55,83 @@ function normalizeClass(item) {
     })),
     students: (item.students ?? []).map((student) => ({ ...student, id: String(student.id), machines: student.machines ?? [] })),
     jobs: item.provision_jobs ?? [],
+    topologyEdges: item.topology_edges ?? [],
     readyMachines: item.ready_machines ?? 0,
     totalMachines: item.total_machines ?? 0,
   };
 }
 
-function Overview({ item, template, onProvision, onNavigate, provisioning, message }) {
+function Overview({
+  item,
+  template,
+  onProvision,
+  onNavigate,
+  onEditSchedule,
+  onRetry,
+  onReset,
+  provisioning,
+  recovering,
+  message,
+}) {
   const studentsReady = item.students.length > 0;
   const machinesReady = Boolean(item.course_environment) && item.nodes.length > 0;
   const completed = [studentsReady, machinesReady].filter(Boolean).length;
   const canProvision = completed === 2 && item.status === "planning";
+  const [capacity, setCapacity] = useState(null);
+  const [capacityLoading, setCapacityLoading] = useState(false);
+  useEffect(() => {
+    let active = true;
+    if (!canProvision) {
+      setCapacity(null);
+      return undefined;
+    }
+    setCapacityLoading(true);
+    TeachingClassesService.capacityPreview(item.id)
+      .then((result) => active && setCapacity(result))
+      .catch((error) => active && setCapacity({
+        ready: false,
+        issues: [error?.message ?? "無法完成容量預檢"],
+      }))
+      .finally(() => active && setCapacityLoading(false));
+    return () => { active = false; };
+  }, [canProvision, item.id, item.students.length, item.nodes.length, item.course_version_id]);
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: item.timezone, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
   const currentWeek = [...item.weeks].reverse().find((week) => week.date <= today) ?? item.weeks.find((week) => week.date > today);
   const weekLabel = currentWeek?.date === today ? "本週課程" : currentWeek?.date > today ? "下一次課程" : currentWeek === item.weeks.at(-1) && today > currentWeek.date ? "最後一週" : "目前週次";
   const weekday = ["星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日"][item.weekday];
   const setupItems = [
     [studentsReady, "學生名單", studentsReady ? `${item.students.length} 位學生` : "尚未加入學生"],
-    [machinesReady, "上課環境", machinesReady ? `${template?.name ?? "已套用環境模板"} · 每位學生 ${item.nodes.length} 台` : "尚未選擇環境模板"],
+    [machinesReady, "上課環境", machinesReady ? `${template?.name ?? "已套用課程環境"} · 每位學生 ${item.nodes.length} 台` : "尚未選擇課程環境"],
   ];
   let title = `還差 ${2 - completed} 項設定`;
   let description = "完成學生名單與上課環境後，即可送出建機。";
-  let actionLabel = studentsReady ? "選擇環境模板" : "加入學生";
+  let actionLabel = studentsReady ? "選擇課程環境" : "加入學生";
   let actionIcon = studentsReady ? "account_tree" : "person_add";
   let action = () => onNavigate(studentsReady ? "machines" : "students");
+  let actionDisabled = false;
+  let secondaryAction = null;
   if (canProvision) {
-    const capacity = item.capacity_preview;
-    title = "可以送出建機";
+    title = capacityLoading ? "正在執行完整容量預檢" : capacity?.ready ? "容量足夠，可以送出建機" : "容量預檢尚未通過";
     description = capacity
       ? `${capacity.machine_count} 台、${capacity.cpu_cores} CPU、${Math.round(capacity.memory_mb / 1024)} GB RAM、${capacity.disk_gb} GB Disk、${capacity.ip_count} 個 IP。送出後設定將鎖定。`
       : `${item.students.length} 位學生，每位 ${item.nodes.length} 台機器。送出後設定將鎖定並等待審核。`;
+    if (capacity?.issues?.length) description = capacity.issues.join("；");
     actionLabel = provisioning ? "正在送出…" : "確認並送出建機";
     actionIcon = "rocket_launch";
     action = onProvision;
+    actionDisabled = capacityLoading || !capacity?.ready;
   } else if (item.status === "pending_review") {
     title = "等待建機審核"; description = "設定已鎖定，審核通過後會開始建立全班環境。"; actionLabel = "";
   } else if (item.status === "provisioning") {
     title = "正在建立全班環境"; description = "系統正在處理每位學生的機器，結果會自動更新。"; actionLabel = "";
   } else if (item.status === "partial_failed") {
-    title = "部分機器建立失敗"; description = "請查看下方失敗節點，處理完成後才能正式上課。"; actionLabel = "";
+    title = "部分機器或網路設定失敗";
+    description = "可以只重新送出失敗學生；若尚未建立任何機器，也可以解除鎖定返回編輯。";
+    actionLabel = recovering ? "處理中…" : "重試失敗項目";
+    actionIcon = "refresh";
+    action = onRetry;
+    actionDisabled = recovering;
+    secondaryAction = item.readyMachines === 0 ? onReset : null;
   } else if (item.status === "active") {
     title = "班級已就緒"; description = `${item.readyMachines}/${item.totalMachines} 台機器已完成，可以查看學生環境。`; actionLabel = "查看學生機器"; actionIcon = "checklist"; action = () => onNavigate("progress");
   } else if (item.status === "archived") {
@@ -100,7 +142,7 @@ function Overview({ item, template, onProvision, onNavigate, provisioning, messa
       <div className={styles.setupSummary}>
         <span className={styles.setupSummaryIcon}><MIcon name={item.status === "active" ? "check" : item.status === "partial_failed" ? "error_outline" : "assignment"} size={22} /></span>
         <div><span>建機準備 · {completed}/2</span><h2>{title}</h2><p>{description}</p></div>
-        {actionLabel && <button type="button" className={styles.btnPrimary} disabled={provisioning} onClick={action}><MIcon name={actionIcon} size={17} />{actionLabel}</button>}
+        {actionLabel && <div className={styles.setupActions}>{secondaryAction && <button type="button" className={styles.btnSecondary} disabled={recovering} onClick={secondaryAction}>解除鎖定並返回編輯</button>}<button type="button" className={styles.btnPrimary} disabled={provisioning || actionDisabled} onClick={action}><MIcon name={actionIcon} size={17} />{actionLabel}</button></div>}
       </div>
       <div className={styles.setupChecklist}>{setupItems.map(([done, label, note]) => <div key={label} className={done ? styles.setupItemDone : styles.setupItemTodo}><span><MIcon name={done ? "check" : "radio_button_unchecked"} size={17} /></span><div><strong>{label}</strong><small>{note}</small></div><em>{done ? "完成" : "待設定"}</em></div>)}</div>
       {item.jobs.length > 0 && <div className={styles.jobGrid}>{item.jobs.map((job, index) => <article key={job.id}><span>節點 {index + 1}</span><strong>{JOB_STATUS[job.status] ?? job.status}</strong><small>{job.done}/{job.total} 成功 · {job.failed_count} 失敗</small></article>)}</div>}
@@ -108,7 +150,7 @@ function Overview({ item, template, onProvision, onNavigate, provisioning, messa
     </section>
     <div className={styles.overviewDetailGrid}>
       <section className={styles.overviewInfoCard}>
-        <div className={styles.overviewCardHeader}><h2>班級資訊</h2></div>
+        <div className={styles.overviewCardHeader}><h2>班級資訊</h2>{item.status === "planning" && <button type="button" onClick={onEditSchedule}>編輯班級與課表<MIcon name="edit" size={15} /></button>}</div>
         <div className={styles.classFacts}>
           <div><span>班級代碼</span><strong>{item.code}</strong></div><div><span>學期</span><strong>{item.term}</strong></div>
           <div><span>固定上課</span><strong>{weekday} {item.startTime}–{item.endTime}</strong></div><div><span>提前開機</span><strong>{item.bootLeadMinutes} 分鐘</strong></div>
@@ -234,18 +276,77 @@ function WeeklyContent({ item, onRefresh }) {
   </div>;
 }
 
+function TopologyPreview({ item }) {
+  const nodes = item.nodes.map((node, index) => ({
+    id: String(node.node_key),
+    position: { x: 70 + index * 250, y: 95 + (index % 2) * 35 },
+    data: {
+      label: <div className={styles.readonlyTopologyNode}><strong>{node.name}</strong><span>{node.source_type === "custom" ? "自訂規格" : "機器範本"} · {String(node.resource_type).toUpperCase()}</span><small>{node.cpu} CPU · {Math.round(node.memory_mb / 1024)} GB RAM · {node.disk_gb} GB</small></div>,
+    },
+    style: { width: 205, padding: 0, borderRadius: 10, borderColor: "var(--color-border)", background: "var(--color-surface)" },
+  }));
+  const edges = item.topologyEdges.map((edge, index) => {
+    const bidirectional = edge.direction === "bidirectional";
+    return {
+      id: String(edge.id ?? `topology-${index}`),
+      source: edge.source_node_key,
+      target: edge.target_node_key,
+      type: "smoothstep",
+      animated: true,
+      label: `${bidirectional ? "雙向" : "單向"} · ${String(edge.protocol).toUpperCase()}${edge.port ? `/${edge.port}` : ""}`,
+      markerEnd: { type: MarkerType.ArrowClosed, color: "#5d78cf" },
+      markerStart: bidirectional ? { type: MarkerType.ArrowClosed, color: "#5d78cf" } : undefined,
+      style: { stroke: "#5d78cf", strokeWidth: 2 },
+      labelStyle: { fill: "var(--color-text-secondary)", fontSize: 10, fontWeight: 600 },
+      labelBgStyle: { fill: "var(--color-surface)", fillOpacity: 0.95 },
+    };
+  });
+  return <div className={styles.readonlyTopology}>
+    <ReactFlow
+      nodes={nodes}
+      edges={edges}
+      nodesDraggable={false}
+      nodesConnectable={false}
+      elementsSelectable={false}
+      fitView
+      fitViewOptions={{ padding: 0.25, maxZoom: 1.1 }}
+      minZoom={0.65}
+      maxZoom={1.2}
+      proOptions={{ hideAttribution: true }}
+    >
+      <Background gap={20} size={1} />
+    </ReactFlow>
+  </div>;
+}
+
 function Machines({ item, templates, template, onRefresh, onTemplate, createdTemplateId }) {
   const navigate = useNavigate();
-  const [message, setMessage] = useState(createdTemplateId ? "環境模板已建立，請選擇套用到這個班級。" : "");
+  const [message, setMessage] = useState(createdTemplateId ? "課程環境已建立，請選擇套用到這個班級。" : "");
   const locked = item.status !== "planning";
   async function choose(candidate) {
-    if (candidate.nodes.some((node) => !node.sourceTemplateId)) { setMessage("此課程模板仍有節點未綁定可用的 PVE 範本。"); return; }
+    const invalidNode = candidate.nodes.find((node) => !courseNodeHasUsableSource(node));
+    if (invalidNode) {
+      setMessage(`「${invalidNode.name}」尚未綁定可用的${invalidNode.sourceType === "custom" ? "基礎映像" : "機器範本"}。`);
+      return;
+    }
     try {
       const result = await TeachingClassesService.selectCourse(item.id, candidate.versionId);
       onTemplate(candidate.id); onRefresh(result); setMessage(`已選擇「${candidate.name} v${candidate.version}」。機器設定由課程版本鎖定。`);
-    } catch (error) { setMessage(error?.message ?? "套用模板失敗"); }
+    } catch (error) { setMessage(error?.message ?? "套用課程環境失敗"); }
   }
-  return <div className={styles.stack}><section className={styles.card}><div className={styles.cardHeader}><div><h2>選擇已發布課程</h2><p>班級只能選擇已發布的固定版本；每位學生會取得相同的一組機器。</p></div><div className={styles.pageActions}>{!locked && <button type="button" className={styles.btnSecondary} onClick={() => navigate(`/course-template-management/new?returnTo=${encodeURIComponent(`/class-management/${item.id}/machines`)}`)}><MIcon name="add" size={16} />建立新課程環境</button>}{locked && <span className={styles.lockBadge}><MIcon name="lock" size={14} />設定已鎖定</span>}</div></div><div className={styles.templateChoices}>{templates.map((candidate) => <button type="button" key={candidate.versionId} disabled={locked} className={`${template?.id === candidate.id ? styles.templateSelected : ""} ${String(candidate.id) === String(createdTemplateId) ? styles.templateSuggested : ""}`} onClick={() => choose(candidate)}><span><MIcon name="account_tree" size={21} /></span><div><strong>{candidate.name} · v{candidate.version}</strong><p>{candidate.description}</p><small>每位學生 {candidate.nodes.length} 台 · 已發布鎖定</small></div></button>)}</div>{!templates.length && <div className={styles.emptyState}><p>目前沒有已發布的課程環境，請先到課程管理建立並發布。</p></div>}{message && <p className={styles.inlineMessage}>{message}</p>}</section>{item.nodes.length > 0 && <section className={styles.card}><div className={styles.cardHeader}><div><h2>已選擇的固定課程環境</h2><p>{item.course_environment ? `${item.course_environment.name} v${item.course_environment.version} · ` : ""}每位學生 {item.nodes.length} 台，全班共需要 {item.students.length * item.nodes.length} 台機器。</p></div></div><div className={styles.blueprintCanvas}>{item.nodes.map((node, index) => <div className={styles.blueprintItem} key={node.id}><article className={styles.machineBlock}><div className={styles.machineTitle}><span><MIcon name="dns" size={20} /></span><div><strong>{node.name}</strong><small>{node.role}</small></div><em>{node.resource_type}</em></div><div className={styles.machineSpecs}><span>{node.cpu} CPU</span><span>{Math.round(node.memory_mb / 1024)} GB RAM</span><span>{node.disk_gb} GB Disk</span></div></article>{index < item.nodes.length - 1 && <div className={styles.connection}><span>{node.network}</span><i /><MIcon name="arrow_forward" size={18} /></div>}</div>)}</div></section>}</div>;
+  return <div className={styles.stack}>
+    <section className={styles.card}>
+      <div className={styles.cardHeader}><div><h2>選擇已發布課程環境</h2><p>班級只能選擇已發布的固定版本；每位學生會取得相同的一組機器。</p></div><div className={styles.pageActions}>{!locked && <button type="button" className={styles.btnSecondary} onClick={() => navigate(`/course-template-management/new?returnTo=${encodeURIComponent(`/class-management/${item.id}/machines`)}`)}><MIcon name="add" size={16} />建立新課程環境</button>}{locked && <span className={styles.lockBadge}><MIcon name="lock" size={14} />設定已鎖定</span>}</div></div>
+      <div className={styles.templateChoices}>{templates.map((candidate) => <button type="button" key={candidate.versionId} disabled={locked} className={`${template?.id === candidate.id ? styles.templateSelected : ""} ${String(candidate.id) === String(createdTemplateId) ? styles.templateSuggested : ""}`} onClick={() => choose(candidate)}><span><MIcon name="account_tree" size={21} /></span><div><strong>{candidate.name} · v{candidate.version}</strong><p>{candidate.description}</p><small>每位學生 {candidate.nodes.length} 台 · 已發布鎖定</small></div></button>)}</div>
+      {!templates.length && <div className={styles.emptyState}><p>目前沒有已發布的課程環境，請先到「課程環境」建立並發布。</p></div>}
+      {message && <p className={styles.inlineMessage}>{message}</p>}
+    </section>
+    {item.nodes.length > 0 && <section className={styles.card}>
+      <div className={styles.cardHeader}><div><h2>鎖定前確認：機器與真實網路拓撲</h2><p>{item.course_environment ? `${item.course_environment.name} v${item.course_environment.version} · ` : ""}每位學生 {item.nodes.length} 台，全班共需要 {item.students.length * item.nodes.length} 台機器。線條標示實際防火牆方向、協定與 Port。</p></div></div>
+      <TopologyPreview item={item} />
+      {!item.topologyEdges.length && <p className={styles.topologyEmptyNote}>目前沒有跨節點防火牆連線；各機器仍會依自己的網路設定建立。</p>}
+    </section>}
+  </div>;
 }
 
 function ClassMonitor({ item }) {
@@ -333,6 +434,8 @@ export default function ClassWorkspacePage() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [provisioning, setProvisioning] = useState(false);
+  const [recovering, setRecovering] = useState(false);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
   const [templateId, setTemplateId] = useState("");
   const [templates, setTemplates] = useState([]);
   const template = templates.find((row) => row.id === templateId);
@@ -361,10 +464,31 @@ export default function ClassWorkspacePage() {
   }, [item?.id, item?.status]);
 
   async function provision() {
+    if (!window.confirm("送出後學生名單、課程環境與課表將鎖定並交由管理員審核，確定送出嗎？")) return;
     setProvisioning(true); setMessage("");
     try { refresh(await TeachingClassesService.provision(classId)); setMessage("所有節點批次工作已送出，正在等待審核；頁面會自動更新結果。"); }
     catch (reason) { setMessage(reason?.message ?? "送出建機失敗"); }
     finally { setProvisioning(false); }
+  }
+
+  async function retryFailed() {
+    setRecovering(true); setMessage("");
+    try {
+      const result = await TeachingClassesService.retryFailed(classId);
+      refresh(result);
+      setMessage(result.status === "active" ? "網路拓撲已重新套用，班級現在可以上課。" : "失敗項目已重新送審，只會建立尚未完成的學生機器。");
+    } catch (reason) { setMessage(reason?.message ?? "重試失敗"); }
+    finally { setRecovering(false); }
+  }
+
+  async function resetFailed() {
+    if (!window.confirm("確定釋放已預留的容量與 IP，解除鎖定並返回編輯嗎？")) return;
+    setRecovering(true); setMessage("");
+    try {
+      refresh(await TeachingClassesService.resetFailed(classId));
+      setMessage("已釋放容量與 IP，現在可以修改學生、課程環境或課表後重新送出。");
+    } catch (reason) { setMessage(reason?.message ?? "無法返回編輯"); }
+    finally { setRecovering(false); }
   }
 
   if (loading) return <div className={styles.emptyState}><p>正在讀取班級…</p></div>;
@@ -385,7 +509,7 @@ export default function ClassWorkspacePage() {
       <div className={styles.workflowProgress}><span>準備進度</span><strong>{item.status === "active" ? "全部就緒" : `${completed}/2 已完成`}</strong></div>
     </section>
     <main className={styles.workspaceContent}>
-      {tab === "overview" && <Overview item={item} template={template} onProvision={provision} onNavigate={(target) => navigate(`/class-management/${classId}/${target}`)} provisioning={provisioning} message={message} />}
+      {tab === "overview" && <Overview item={item} template={template} onProvision={provision} onNavigate={(target) => navigate(`/class-management/${classId}/${target}`)} onEditSchedule={() => setScheduleOpen(true)} onRetry={retryFailed} onReset={resetFailed} provisioning={provisioning} recovering={recovering} message={message} />}
       {tab === "students" && <Students item={item} onRefresh={refresh} />}
       {tab === "weekly" && <WeeklyContent item={item} onRefresh={refresh} />}
       {tab === "machines" && <Machines item={item} templates={templates} template={template} onRefresh={refresh} onTemplate={setTemplateId} createdTemplateId={location.state?.createdTemplateId} />}
@@ -395,5 +519,6 @@ export default function ClassWorkspacePage() {
       {tab === "ai" && !postUnavailable && <StudentMachines item={item} ai />}
       {!TABS.some(([key]) => key === tab) && <LockedFeature section={tab} />}
     </main>
+    {scheduleOpen && <ClassCreateDialog item={item} onClose={() => setScheduleOpen(false)} onUpdated={(result) => { refresh(result); setScheduleOpen(false); setMessage("班級與固定課表已更新。"); }} />}
   </div>;
 }

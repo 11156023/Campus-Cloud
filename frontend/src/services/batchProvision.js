@@ -21,6 +21,11 @@ export const BatchProvisionService = {
     return apiPost(`/api/v1/batch-provision/${jobId}/review`, body);
   },
 
+  /** Admin: 對同一班級目前的所有節點做一次一致審核 */
+  reviewClass(classId, body) {
+    return apiPost(`/api/v1/batch-provision/class/${classId}/review`, body);
+  },
+
   /** 週期排程批次：預覽未來 count 個開機時段（回傳 { windows: [start, end][] }） */
   getRecurrencePreview(jobId, count = 5) {
     return apiGet(`/api/v1/batch-provision/${jobId}/recurrence-preview?count=${count}`);
