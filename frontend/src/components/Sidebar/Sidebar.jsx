@@ -1,4 +1,4 @@
-﻿import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth }  from "../../contexts/AuthContext";
 import styles from "./Sidebar.module.scss";
@@ -77,7 +77,7 @@ const navGroups = [
     label: "系統管理",
     icon: "tune",
     items: [
-      { key: "groups",        label: "群組",       icon: "groups" },
+      { key: "groups",        label: "群組（非正式）", icon: "groups" },
       { key: "admin",         label: "使用者管理", icon: "admin_panel_settings" },
       { key: "quotas",        label: "配額管理",   icon: "data_usage" },
       { key: "settings",      label: "系統設定",   icon: "settings" },

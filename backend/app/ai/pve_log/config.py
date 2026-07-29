@@ -19,12 +19,6 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    proxmox_host: str = Field(default="localhost")
-    proxmox_user: str = Field(default="")
-    proxmox_password: str = Field(default="")
-    proxmox_verify_ssl: bool = Field(default=False)
-    proxmox_api_timeout: int = Field(default=30, ge=3, le=300)
-
     collector_max_workers: int = Field(default=8, ge=1, le=32)
     collector_fetch_config: bool = Field(default=True)
     collector_fetch_lxc_interfaces: bool = Field(default=True)
