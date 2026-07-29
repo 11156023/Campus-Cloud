@@ -318,7 +318,7 @@ def _validate_lxc_template_clone(
     if template.status != VMTemplateStatus.ready:
         raise BadRequestError("Selected LXC template is not ready")
     if not is_admin(user) and not vm_template_repo.is_template_visible_to_user(
-        session=session, template=template, user_id=user.id
+        template=template, user_id=user.id
     ):
         raise BadRequestError("Selected LXC template is not accessible")
 

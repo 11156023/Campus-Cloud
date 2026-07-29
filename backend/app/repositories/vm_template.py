@@ -6,10 +6,7 @@ from datetime import datetime, timezone
 from sqlmodel import Session, col, or_, select
 
 from app.models import (
-    Group,
-    GroupMember,
     VMTemplate,
-    VMTemplateGroupLink,
     VMTemplateStatus,
     VMTemplateVisibility,
 )
@@ -85,17 +82,7 @@ def list_visible_templates(
     user_id: uuid.UUID,
     only_ready: bool = False,
 ) -> list[VMTemplate]:
-    """非 admin 的可見範圍：自己擁有的、全域的、或所屬/擁有群組綁定的範本。"""
-    member_group_ids = select(GroupMember.group_id).where(
-        GroupMember.user_id == user_id
-    )
-    owned_group_ids = select(Group.id).where(Group.owner_id == user_id)
-    linked_template_ids = select(VMTemplateGroupLink.template_id).where(
-        or_(
-            col(VMTemplateGroupLink.group_id).in_(member_group_ids),
-            col(VMTemplateGroupLink.group_id).in_(owned_group_ids),
-        )
-    )
+    """非 admin 只看自己擁有的範本，或所有人可見的範本。"""
     stmt = (
         select(VMTemplate)
         .where(VMTemplate.status != VMTemplateStatus.deleted)
@@ -103,7 +90,6 @@ def list_visible_templates(
             or_(
                 VMTemplate.owner_id == user_id,
                 VMTemplate.visibility == VMTemplateVisibility.global_,
-                col(VMTemplate.id).in_(linked_template_ids),
             )
         )
     )
@@ -112,42 +98,6 @@ def list_visible_templates(
     stmt = stmt.order_by(col(VMTemplate.created_at).desc())
     return list(session.exec(stmt).all())
 
-
-def get_group_ids(
-    *, session: Session, template_id: uuid.UUID
-) -> list[uuid.UUID]:
-    stmt = select(VMTemplateGroupLink.group_id).where(
-        VMTemplateGroupLink.template_id == template_id
-    )
-    return list(session.exec(stmt).all())
-
-
-def set_group_links(
-    *,
-    session: Session,
-    template_id: uuid.UUID,
-    group_ids: list[uuid.UUID],
-    commit: bool = True,
-) -> None:
-    existing = session.exec(
-        select(VMTemplateGroupLink).where(
-            VMTemplateGroupLink.template_id == template_id
-        )
-    ).all()
-    wanted = set(group_ids)
-    for link in existing:
-        if link.group_id not in wanted:
-            session.delete(link)
-        else:
-            wanted.discard(link.group_id)
-    for group_id in wanted:
-        session.add(
-            VMTemplateGroupLink(template_id=template_id, group_id=group_id)
-        )
-    if commit:
-        session.commit()
-
-
 def touch(*, session: Session, template: VMTemplate, commit: bool = True) -> None:
     template.updated_at = datetime.now(timezone.utc)
     session.add(template)
@@ -155,34 +105,10 @@ def touch(*, session: Session, template: VMTemplate, commit: bool = True) -> Non
         session.commit()
         session.refresh(template)
 
-
-def get_groups_by_ids(
-    *, session: Session, group_ids: list[uuid.UUID]
-) -> list[Group]:
-    if not group_ids:
-        return []
-    stmt = select(Group).where(col(Group.id).in_(group_ids))
-    return list(session.exec(stmt).all())
-
-
 def is_template_visible_to_user(
-    *, session: Session, template: VMTemplate, user_id: uuid.UUID
+    *, template: VMTemplate, user_id: uuid.UUID
 ) -> bool:
-    if template.owner_id == user_id:
-        return True
-    if template.visibility == VMTemplateVisibility.global_:
-        return True
-    linked_groups = get_group_ids(session=session, template_id=template.id)
-    if not linked_groups:
-        return False
-    member_stmt = select(GroupMember.group_id).where(
-        GroupMember.user_id == user_id,
-        col(GroupMember.group_id).in_(linked_groups),
+    return (
+        template.owner_id == user_id
+        or template.visibility == VMTemplateVisibility.global_
     )
-    if session.exec(member_stmt).first() is not None:
-        return True
-    owner_stmt = select(Group.id).where(
-        Group.owner_id == user_id,
-        col(Group.id).in_(linked_groups),
-    )
-    return session.exec(owner_stmt).first() is not None

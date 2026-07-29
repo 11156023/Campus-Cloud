@@ -11,8 +11,8 @@ import TemplateTasksCard from "./TemplateTasksCard";
 
 function visibilityLabel(template) {
   return template.visibility === "global"
-    ? "全域"
-    : `${template.group_ids?.length ?? 0} 個群組`;
+    ? "全部可見"
+    : "私人";
 }
 
 /** 單列的「⋯」操作選單 */

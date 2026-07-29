@@ -50,15 +50,11 @@ TASK_UPDATE_CANCEL = "template.update_cancel"
 # ---------------------------------------------------------------------------
 
 def _to_public(
-    session: Session,
     template: VMTemplate,
     *,
     pve_vmids: set[int] | None = None,
 ) -> VMTemplatePublic:
     public = VMTemplatePublic.model_validate(template)
-    public.group_ids = template_repo.get_group_ids(
-        session=session, template_id=template.id
-    )
     if pve_vmids is not None:
         public.pve_exists = template.pve_vmid in pve_vmids
     return public
@@ -84,7 +80,7 @@ def list_templates(*, session: Session, user: User) -> list[VMTemplatePublic]:
         )
     pve_vmids = _pve_template_vmids()
     return [
-        _to_public(session, t, pve_vmids=pve_vmids) for t in templates
+        _to_public(t, pve_vmids=pve_vmids) for t in templates
     ]
 
 
@@ -93,7 +89,7 @@ def get_template_for_user(
 ) -> VMTemplatePublic:
     template = _get_or_404(session, template_id)
     _require_view(session, user, template)
-    return _to_public(session, template, pve_vmids=_pve_template_vmids())
+    return _to_public(template, pve_vmids=_pve_template_vmids())
 
 
 def _get_or_404(session: Session, template_id: uuid.UUID) -> VMTemplate:
@@ -116,10 +112,11 @@ def _can_manage(user: User) -> bool:
 
 
 def _require_view(session: Session, user: User, template: VMTemplate) -> None:
+    _ = session  # 保留服務層既有呼叫介面；私人/公開判斷已不需查詢群組。
     if is_admin(user):
         return
     if not template_repo.is_template_visible_to_user(
-        session=session, template=template, user_id=user.id
+        template=template, user_id=user.id
     ):
         raise NotFoundError("Template not found")
 
@@ -134,26 +131,6 @@ def _require_owner(user: User, template: VMTemplate) -> None:
 # 建立（VM → 範本）
 # ---------------------------------------------------------------------------
 
-def _validate_group_ids(
-    session: Session, user: User, group_ids: list[uuid.UUID]
-) -> None:
-    if not group_ids:
-        return
-    groups = template_repo.get_groups_by_ids(
-        session=session, group_ids=group_ids
-    )
-    found = {g.id for g in groups}
-    missing = [str(gid) for gid in group_ids if gid not in found]
-    if missing:
-        raise BadRequestError(f"Group(s) not found: {', '.join(missing)}")
-    if not is_admin(user):
-        not_owned = [g.name for g in groups if g.owner_id != user.id]
-        if not_owned:
-            raise PermissionDeniedError(
-                f"You can only bind templates to your own groups: {', '.join(not_owned)}"
-            )
-
-
 async def create_template(
     *, session: Session, user: User, data: VMTemplateCreate
 ) -> tuple[VMTemplatePublic, TaskRecord]:
@@ -161,7 +138,6 @@ async def create_template(
     from app.core.authorizers import require_template_manage
 
     require_template_manage(user)
-    _validate_group_ids(session, user, data.group_ids)
 
     if (
         template_repo.get_template_by_pve_vmid(
@@ -207,10 +183,6 @@ async def create_template(
         default_disk=data.default_disk,
         source_vmid=data.source_vmid,
     )
-    template_repo.set_group_links(
-        session=session, template_id=template.id, group_ids=data.group_ids
-    )
-
     record = await enqueue_task(
         session=session,
         task_type=TASK_CONVERT,
@@ -223,7 +195,7 @@ async def create_template(
             "node": node,
         },
     )
-    return _to_public(session, template), record
+    return _to_public(template), record
 
 
 # ---------------------------------------------------------------------------
@@ -240,22 +212,11 @@ def update_template(
     template = _get_or_404(session, template_id)
     _require_owner(user, template)
 
-    if data.group_ids is not None:
-        _validate_group_ids(session, user, data.group_ids)
-        template_repo.set_group_links(
-            session=session,
-            template_id=template.id,
-            group_ids=data.group_ids,
-            commit=False,
-        )
-
-    updates: dict[str, Any] = data.model_dump(
-        exclude_unset=True, exclude={"group_ids"}
-    )
+    updates: dict[str, Any] = data.model_dump(exclude_unset=True)
     for field, value in updates.items():
         setattr(template, field, value)
     template_repo.touch(session=session, template=template)
-    return _to_public(session, template)
+    return _to_public(template)
 
 
 # ---------------------------------------------------------------------------
