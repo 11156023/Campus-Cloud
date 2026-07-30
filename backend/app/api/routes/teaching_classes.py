@@ -37,6 +37,7 @@ from app.models.base import get_datetime_utc
 from app.repositories.user import get_user_by_email
 from app.schemas.teaching_class_machine import TeachingClassMachineStatusResponse
 from app.services.teaching import class_capacity_service, class_network_service
+from app.services.teaching_class_access import get_authorized_teaching_class
 from app.services.teaching_class_machine_status import (
     get_teaching_class_machine_status,
 )
@@ -116,11 +117,11 @@ class WeekIn(BaseModel):
 
 
 def _get_class(session: SessionDep, current_user, class_id: uuid.UUID) -> TeachingClass:
-    item = session.get(TeachingClass, class_id)
-    if not item:
-        raise NotFoundError("Teaching class not found")
-    require_group_access(current_user, item.owner_id)
-    return item
+    return get_authorized_teaching_class(
+        session=session,
+        current_user=current_user,
+        class_id=class_id,
+    )
 
 
 def _students(session: SessionDep, class_id: uuid.UUID) -> list[TeachingClassStudent]:

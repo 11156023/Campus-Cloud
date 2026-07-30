@@ -28,7 +28,7 @@ from app.ai.teacher_judge.template_command_service import (
     get_enabled_template_commands,
 )
 from app.api.deps import InstructorUser, SessionDep
-from app.models import TeachingClass
+from app.services.teaching_class_access import get_authorized_teaching_class
 
 router = APIRouter(
     prefix="/teaching-classes/{class_id}/judge/files",
@@ -39,15 +39,11 @@ router = APIRouter(
 def _ensure_access(
     session: SessionDep, class_id: uuid.UUID, current_user: InstructorUser
 ) -> None:
-    teaching_class = session.get(TeachingClass, class_id)
-    if teaching_class is None:
-        raise HTTPException(status_code=404, detail="Teaching class not found")
-    if (
-        teaching_class.owner_id != current_user.id
-        and not current_user.is_superuser
-        and current_user.role != "admin"
-    ):
-        raise HTTPException(status_code=403, detail="Not enough permissions")
+    get_authorized_teaching_class(
+        session=session,
+        current_user=current_user,
+        class_id=class_id,
+    )
 
 
 def _template_key(value: str) -> str:

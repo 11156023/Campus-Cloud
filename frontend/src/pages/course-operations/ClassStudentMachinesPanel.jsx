@@ -1,31 +1,12 @@
-import { useCallback, useEffect, useState } from "react";
 import MIcon from "../../components/MIcon";
-import { TeachingClassesService } from "../../services/teachingClasses";
 import styles from "./CourseOperations.module.scss";
 
 function metric(value) {
   return value == null ? "—" : `${value.toFixed(1)}%`;
 }
 
-export default function ClassStudentMachinesPanel({ classId, onData }) {
-  const [data, setData] = useState(null);
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(true);
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const result = await TeachingClassesService.studentMachines(classId);
-      setData(result);
-      onData?.(result);
-    } catch (reason) {
-      setError(reason?.message ?? "無法讀取學生機器狀態");
-    } finally {
-      setLoading(false);
-    }
-  }, [classId, onData]);
-
-  useEffect(() => { refresh(); }, [refresh]);
+export default function ClassStudentMachinesPanel({ machineState }) {
+  const { data, error, loading, refresh } = machineState;
   if (!data && loading) return <div className={styles.emptyState}>正在讀取學生機器…</div>;
 
   return <div className={styles.stack}>
@@ -38,9 +19,12 @@ export default function ClassStudentMachinesPanel({ classId, onData }) {
       {data && <div className={styles.statsGrid}>
         {[
           ["學生", data.summary.students], ["機器", data.summary.machines],
-          ["執行中", data.summary.running], ["停止", data.summary.stopped],
-          ["配置中", data.summary.provisioning], ["失敗", data.summary.failed],
-          ["未知", data.summary.unknown],
+          ["配置完成", data.summary.provision.ready],
+          ["配置中", data.summary.provision.provisioning],
+          ["配置失敗", data.summary.provision.failed],
+          ["執行中", data.summary.runtime.running],
+          ["停止", data.summary.runtime.stopped],
+          ["狀態未知", data.summary.runtime.unknown],
         ].map(([label, value]) => <div className={styles.statCard} key={label}><span>{label}</span><strong>{value}</strong></div>)}
       </div>}
     </section>

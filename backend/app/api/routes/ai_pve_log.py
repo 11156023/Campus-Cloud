@@ -201,7 +201,26 @@ async def post_ssh_confirm(
 
     try:
         if request.group_id is None:
-            return await _confirm_exec(request, session=session)
+            from app.ai.pve_log.ssh_exec import peek_pending_scope
+
+            scope_type, scope_id = peek_pending_scope(
+                request.token or request.confirm_token or ""
+            )
+            if scope_type != "group" or scope_id is None:
+                return await _confirm_exec(request, session=session)
+            allowed_vmids = _resolve_group_vmids(
+                session=session,
+                current_user=_current_user,
+                group_id=scope_id,
+            )
+            return await _confirm_exec(
+                request,
+                session=session,
+                requester_id=_current_user.id,
+                scope_type="group",
+                scope_id=scope_id,
+                allowed_vmids=allowed_vmids,
+            )
         allowed_vmids = _resolve_group_vmids(
             session=session,
             current_user=_current_user,

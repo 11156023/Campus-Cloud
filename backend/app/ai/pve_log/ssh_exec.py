@@ -77,6 +77,15 @@ def _pop_pending(token: str) -> dict[str, Any] | None:
     return _pending_store.pop(token, None)
 
 
+def peek_pending_scope(token: str) -> tuple[str | None, uuid.UUID | None]:
+    """Read token scope without consuming it so a legacy confirm body can be authorized."""
+    _cleanup_expired()
+    entry = _pending_store.get(token)
+    if entry is None:
+        return None, None
+    return entry.get("scope_type"), entry.get("scope_id")
+
+
 def _cleanup_expired() -> None:
     now = time.monotonic()
     expired = [k for k, v in _pending_store.items() if now - v["created_at"] > _PENDING_TTL]

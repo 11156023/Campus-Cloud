@@ -6,14 +6,27 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 
+class TeachingClassProvisionSummary(BaseModel):
+    ready: int = 0
+    provisioning: int = 0
+    failed: int = 0
+
+
+class TeachingClassRuntimeSummary(BaseModel):
+    running: int = 0
+    stopped: int = 0
+    unknown: int = 0
+
+
 class TeachingClassMachineSummary(BaseModel):
     students: int = 0
     machines: int = 0
-    running: int = 0
-    stopped: int = 0
-    provisioning: int = 0
-    failed: int = 0
-    unknown: int = 0
+    provision: TeachingClassProvisionSummary = Field(
+        default_factory=TeachingClassProvisionSummary
+    )
+    runtime: TeachingClassRuntimeSummary = Field(
+        default_factory=TeachingClassRuntimeSummary
+    )
 
 
 class TeachingClassStudentMachinePublic(BaseModel):

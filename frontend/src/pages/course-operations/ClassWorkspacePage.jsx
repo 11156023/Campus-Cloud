@@ -4,6 +4,7 @@ import "@xyflow/react/dist/style.css";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import MIcon from "../../components/MIcon";
 import ClassroomWatchDialog from "../../components/Classroom/ClassroomWatchDialog";
+import { useTeachingClassMachines } from "../../features/teaching-class-machines/useTeachingClassMachines";
 import { ClassroomService } from "../../services/classroom";
 import { courseNodeHasUsableSource, CourseEnvironmentsService } from "../../services/courseEnvironments";
 import { TeachingClassesService } from "../../services/teachingClasses";
@@ -434,8 +435,10 @@ export default function ClassWorkspacePage() {
   const [recovering, setRecovering] = useState(false);
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [templateId, setTemplateId] = useState("");
-  const [machineData, setMachineData] = useState(null);
   const [templates, setTemplates] = useState([]);
+  const machineState = useTeachingClassMachines(classId, {
+    enabled: ["progress", "ai"].includes(tab),
+  });
   const template = templates.find((row) => row.id === templateId);
 
   function refresh(result) {
@@ -460,13 +463,6 @@ export default function ClassWorkspacePage() {
     const timer = window.setInterval(() => TeachingClassesService.provisionStatus(item.id).then(refresh).catch(() => {}), 3000);
     return () => window.clearInterval(timer);
   }, [item?.id, item?.status]);
-  useEffect(() => {
-    if (!["progress", "ai"].includes(tab)) return;
-    TeachingClassesService.studentMachines(classId)
-      .then(setMachineData)
-      .catch(() => {});
-  }, [classId, tab]);
-
   async function provision() {
     if (!window.confirm("送出後學生名單、課程環境與課表將鎖定並交由管理員審核，確定送出嗎？")) return;
     setProvisioning(true); setMessage("");
@@ -523,8 +519,8 @@ export default function ClassWorkspacePage() {
       {tab === "machines" && <Machines item={item} templates={templates} template={template} onRefresh={refresh} onTemplate={setTemplateId} createdTemplateId={location.state?.createdTemplateId} />}
       {postUnavailable && <LockedFeature section={tab} />}
       {tab === "classroom" && !postUnavailable && <ClassMonitor item={item} />}
-      {tab === "progress" && !postUnavailable && <ClassStudentMachinesPanel classId={classId} onData={setMachineData} />}
-      {tab === "ai" && <ClassAiCheckPanel classId={classId} machineData={machineData} />}
+      {tab === "progress" && !postUnavailable && <ClassStudentMachinesPanel machineState={machineState} />}
+      {tab === "ai" && <ClassAiCheckPanel classId={classId} machineState={machineState} />}
       {!TABS.some(([key]) => key === tab) && <LockedFeature section={tab} />}
     </main>
     {scheduleOpen && <ClassCreateDialog item={item} onClose={() => setScheduleOpen(false)} onUpdated={(result) => { refresh(result); setScheduleOpen(false); setMessage("班級與固定課表已更新。"); }} />}

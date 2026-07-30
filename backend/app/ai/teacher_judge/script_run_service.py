@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from typing import Any, cast
 
 from fastapi import HTTPException
-from sqlmodel import Session, col, select
+from sqlmodel import Session
 
 from app.ai.teacher_judge.schemas import TeacherJudgeScriptRunPublic
 from app.ai.teacher_judge.script_artifact_service import get_artifact
@@ -20,12 +20,11 @@ from app.models.teacher_judge_script_run import (
     TeacherJudgeScriptRunStatus,
     TeacherJudgeScriptRunTargetScope,
 )
-from app.models.teaching_class import (
-    TeachingClassStudent,
-    TeachingClassStudentMachine,
-)
 from app.repositories import group as group_repo
 from app.repositories import resource as resource_repo
+from app.services.teaching_class_machine_scope import (
+    resolve_teaching_class_machine_targets,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -125,32 +124,17 @@ def _class_student_by_vmid(
     session: Session,
     class_id: uuid.UUID,
 ) -> dict[int, dict[str, Any]]:
-    enrollments = session.exec(
-        select(TeachingClassStudent).where(
-            TeachingClassStudent.class_id == class_id,
-            TeachingClassStudent.status == "active",
-        )
-    ).all()
-    enrollment_by_id = {row.id: row for row in enrollments}
-    if not enrollment_by_id:
-        return {}
-    mappings = session.exec(
-        select(TeachingClassStudentMachine).where(
-            col(TeachingClassStudentMachine.class_student_id).in_(enrollment_by_id),
-            col(TeachingClassStudentMachine.vmid).is_not(None),
-        )
-    ).all()
-    result: dict[int, dict[str, Any]] = {}
-    for mapping in mappings:
-        enrollment = enrollment_by_id.get(mapping.class_student_id)
-        if enrollment is None or mapping.vmid is None:
-            continue
-        result[int(mapping.vmid)] = {
-            "user_id": str(enrollment.user_id),
-            "mapping_id": str(mapping.id),
-            "machine_node_id": str(mapping.machine_node_id),
+    return {
+        target.vmid: {
+            "user_id": str(target.user_id),
+            "mapping_id": str(target.mapping_id),
+            "machine_node_id": str(target.machine_node_id),
         }
-    return result
+        for target in resolve_teaching_class_machine_targets(
+            session=session,
+            class_id=class_id,
+        )
+    }
 
 
 def _resolve_running_targets(

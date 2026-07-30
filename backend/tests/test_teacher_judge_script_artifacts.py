@@ -1472,6 +1472,69 @@ async def test_execute_script_run_records_executor_level_failure(
     assert stored_run.result_summary_json["executor_error"] == "proxmox unavailable"
 
 
+@pytest.mark.asyncio
+async def test_execute_script_run_rejects_artifact_scope_mismatch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session = _session()
+    artifact = models.TeacherJudgeScriptArtifact(
+        group_id=uuid.uuid4(),
+        name="rubric.pdf",
+        template_key="linux",
+        rubric_snapshot_json={},
+        script_content=SAFE_SCRIPT,
+        status=TeacherJudgeScriptStatus.approved,
+        policy_check_result_json={"approved": True},
+        ai_review_result_json={"approved": True},
+    )
+    session.add(artifact)
+    session.commit()
+    session.refresh(artifact)
+    run = models.TeacherJudgeScriptRun(
+        group_id=uuid.uuid4(),
+        artifact_id=artifact.id,
+        target_scope=TeacherJudgeScriptRunTargetScope.manual,
+        target_snapshot_json={"targets": []},
+        status=TeacherJudgeScriptRunStatus.pending,
+    )
+    session.add(run)
+    session.commit()
+    session.refresh(run)
+    monkeypatch.setattr(script_executor_service, "engine", session.get_bind())
+
+    await script_executor_service.execute_script_run(run.id)
+
+    session.expire_all()
+    stored_run = session.get(models.TeacherJudgeScriptRun, run.id)
+    assert stored_run is not None
+    assert stored_run.status == TeacherJudgeScriptRunStatus.failed
+    assert stored_run.result_summary_json["reason_code"] == "scope_mismatch"
+
+
+def test_executor_rejects_class_target_missing_from_current_scope() -> None:
+    vmid = 101
+    run = SimpleNamespace(id=uuid.uuid4(), class_id=uuid.uuid4())
+    target = {
+        "vmid": vmid,
+        "mapping_id": str(uuid.uuid4()),
+        "machine_node_id": str(uuid.uuid4()),
+        "user": {"id": str(uuid.uuid4())},
+    }
+
+    with pytest.raises(script_executor_service.TargetExecutionError) as exc_info:
+        script_executor_service._resolve_runtime_target(
+            session=SimpleNamespace(),
+            run=run,
+            target=target,
+            live_by_vmid={
+                vmid: {"vmid": vmid, "type": "qemu", "status": "running"}
+            },
+            class_targets_by_vmid={},
+        )
+
+    assert exc_info.value.reason_code == "class_scope_changed"
+
+
 def test_execute_target_script_uploads_runs_and_collects_result(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

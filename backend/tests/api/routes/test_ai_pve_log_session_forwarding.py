@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -111,3 +112,46 @@ async def test_post_ssh_confirm_forwards_session(
     result = await route.post_ssh_confirm(req, object(), fake_session)
     assert result.vmid == 157
     assert captured["session"] is fake_session
+
+
+@pytest.mark.asyncio
+async def test_post_ssh_confirm_accepts_legacy_body_for_scoped_group_token(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, object] = {}
+    group_id = uuid4()
+    user = SimpleNamespace(id=uuid4())
+    token = "legacy-group-token"
+    ssh_exec_module._pending_store[token] = {
+        "request": SSHExecRequest(vmid=157, command="python3 --version"),
+        "created_at": time.monotonic(),
+        "allowed_vmids": {157},
+        "requester_id": user.id,
+        "scope_type": "group",
+        "scope_id": group_id,
+    }
+
+    async def _fake_confirm_exec(req: SSHConfirmRequest, **kwargs) -> SSHExecResult:
+        captured.update(kwargs)
+        return SSHExecResult(vmid=157, command="python3 --version")
+
+    monkeypatch.setattr(ssh_exec_module, "confirm_exec", _fake_confirm_exec)
+    monkeypatch.setattr(
+        route,
+        "_resolve_group_vmids",
+        lambda **_kwargs: {157},
+    )
+    try:
+        result = await route.post_ssh_confirm(
+            SSHConfirmRequest(token=token, approved=True),
+            user,
+            object(),
+        )
+    finally:
+        ssh_exec_module._pending_store.pop(token, None)
+
+    assert result.vmid == 157
+    assert captured["requester_id"] == user.id
+    assert captured["scope_type"] == "group"
+    assert captured["scope_id"] == group_id
+    assert captured["allowed_vmids"] == {157}

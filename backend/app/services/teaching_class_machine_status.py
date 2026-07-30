@@ -11,13 +11,12 @@ from typing import Any
 from sqlmodel import Session, col, select
 
 from app.infrastructure.proxmox import operations as proxmox_ops
-from app.models import User
+from app.models import Resource, ResourceNetwork, User
 from app.models.teaching_class import (
     TeachingClassMachineNode,
     TeachingClassStudent,
     TeachingClassStudentMachine,
 )
-from app.repositories import resource as resource_repo
 from app.schemas.teaching_class_machine import (
     TeachingClassMachineStatusResponse,
     TeachingClassMachineSummary,
@@ -90,6 +89,23 @@ def get_teaching_class_machine_status(
         if user_ids
         else {}
     )
+    vmids = {mapping.vmid for mapping in mappings if mapping.vmid is not None}
+    resources = (
+        session.exec(select(Resource).where(col(Resource.vmid).in_(vmids))).all()
+        if vmids
+        else []
+    )
+    resources_by_vmid = {resource.vmid: resource for resource in resources}
+    networks = (
+        session.exec(
+            select(ResourceNetwork).where(
+                col(ResourceNetwork.resource_vmid).in_(vmids)
+            )
+        ).all()
+        if vmids
+        else []
+    )
+    networks_by_vmid = {network.resource_vmid: network for network in networks}
     summary = TeachingClassMachineSummary(students=len(enrollments))
     students: list[TeachingClassStudentMachinesPublic] = []
 
@@ -107,13 +123,11 @@ def get_teaching_class_machine_status(
             node = nodes_by_id.get(mapping.machine_node_id)
             if node is None:
                 continue
-            live = live_by_vmid.get(mapping.vmid) if mapping.vmid is not None else None
+            vmid = mapping.vmid
+            live = live_by_vmid.get(vmid) if vmid is not None else None
             runtime_status = str(live.get("status") or "unknown") if live else "unknown"
-            resource = (
-                resource_repo.get_resource_by_vmid(session=session, vmid=mapping.vmid)
-                if mapping.vmid is not None
-                else None
-            )
+            resource = resources_by_vmid.get(vmid) if vmid is not None else None
+            network = networks_by_vmid.get(vmid) if vmid is not None else None
             machine_rows.append(
                 TeachingClassStudentMachinePublic(
                     mapping_id=mapping.id,
@@ -137,10 +151,10 @@ def get_teaching_class_machine_status(
                     if live
                     else None,
                     ip_address=(
-                        resource_repo.get_cached_ip_address(
-                            session=session, vmid=mapping.vmid
-                        )
-                        if mapping.vmid is not None
+                        network.ip_address
+                        if network and network.ip_address
+                        else resource.ip_address
+                        if resource
                         else None
                     ),
                     has_ssh_key=bool(resource and resource.ssh_private_key_encrypted),
@@ -148,15 +162,17 @@ def get_teaching_class_machine_status(
             )
             summary.machines += 1
             if mapping.status == "failed":
-                summary.failed += 1
+                summary.provision.failed += 1
             elif mapping.vmid is None or mapping.status not in {"completed", "ready"}:
-                summary.provisioning += 1
-            if runtime_status == "running":
-                summary.running += 1
-            elif runtime_status == "stopped":
-                summary.stopped += 1
+                summary.provision.provisioning += 1
             else:
-                summary.unknown += 1
+                summary.provision.ready += 1
+            if runtime_status == "running":
+                summary.runtime.running += 1
+            elif runtime_status == "stopped":
+                summary.runtime.stopped += 1
+            else:
+                summary.runtime.unknown += 1
 
         students.append(
             TeachingClassStudentMachinesPublic(

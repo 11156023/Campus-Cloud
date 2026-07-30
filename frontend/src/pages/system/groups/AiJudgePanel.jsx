@@ -986,7 +986,7 @@ function ScriptsTab({ groupId, onScriptApproved }) {
       <div className={styles.sectionHead}>
         <div>
           <h3 className={styles.sectionTitle}>收集腳本</h3>
-          <p className={styles.sectionDesc}>管理群組內由評分表產生的受管 Python 收集腳本。</p>
+          <p className={styles.sectionDesc}>管理目前範圍內由評分表產生的受管 Python 收集腳本。</p>
         </div>
       </div>
 
@@ -1292,7 +1292,7 @@ function ExecutionTab({ groupId, members }) {
         <div>
           <h3 className={styles.sectionTitle}>腳本執行</h3>
           <p className={styles.sectionDesc}>
-            選擇群組內運行中的 VM/LXC，套用已核准的 AI 收集腳本。
+            選擇目前範圍內運行中的 VM/LXC，套用已核准的 AI 收集腳本。
           </p>
         </div>
         <button
@@ -1486,7 +1486,7 @@ function ExecutionTab({ groupId, members }) {
             <div className={styles.modalHeader}>
               <div>
                 <h2>確認執行腳本</h2>
-                <p>後端會在送出時再次確認這些 VM/LXC 仍屬於此群組且正在運行。</p>
+                <p>後端會在送出與執行前再次確認這些 VM/LXC 仍屬於目前範圍且正在運行。</p>
               </div>
               <button
                 type="button"
@@ -1581,7 +1581,7 @@ export default function AiJudgePanel({ groupId, members, scope, visibleTab = nul
           <MIcon name="checklist" size={20} />
           AI 評分管理
         </h2>
-        <p className={styles.panelDesc}>管理群組評分表、收集腳本與腳本執行。</p>
+        <p className={styles.panelDesc}>管理評分表、收集腳本與腳本執行。</p>
       </div>
 
       {!visibleTab && <div className={styles.subTabs}>

@@ -75,7 +75,19 @@ def test_student_machine_status_keeps_all_mappings_and_collects_snapshot_once(
         full_name="Student",
         email="student@example.com",
     )
-    session = _Session([[enrollment], nodes, mappings, [user]])
+    resources = [
+        SimpleNamespace(
+            vmid=101,
+            ip_address="192.0.2.10",
+            ssh_private_key_encrypted="encrypted",
+        ),
+        SimpleNamespace(
+            vmid=102,
+            ip_address="192.0.2.11",
+            ssh_private_key_encrypted="encrypted",
+        ),
+    ]
+    session = _Session([[enrollment], nodes, mappings, [user], resources, []])
     calls = 0
 
     def _resources():
@@ -87,17 +99,6 @@ def test_student_machine_status_keeps_all_mappings_and_collects_snapshot_once(
         ]
 
     monkeypatch.setattr(service.proxmox_ops, "list_all_resources", _resources)
-    monkeypatch.setattr(
-        service.resource_repo,
-        "get_resource_by_vmid",
-        lambda **_kwargs: SimpleNamespace(ssh_private_key_encrypted="encrypted"),
-    )
-    monkeypatch.setattr(
-        service.resource_repo,
-        "get_cached_ip_address",
-        lambda **_kwargs: "192.0.2.10",
-    )
-
     result = service.get_teaching_class_machine_status(
         session=session,
         class_id=class_id,
@@ -106,8 +107,9 @@ def test_student_machine_status_keeps_all_mappings_and_collects_snapshot_once(
     assert calls == 1
     assert [machine.vmid for machine in result.students[0].machines] == [101, 102]
     assert result.summary.machines == 2
-    assert result.summary.running == 1
-    assert result.summary.stopped == 1
+    assert result.summary.provision.ready == 2
+    assert result.summary.runtime.running == 1
+    assert result.summary.runtime.stopped == 1
 
 
 def test_student_machine_status_survives_snapshot_failure(
@@ -157,4 +159,5 @@ def test_student_machine_status_survives_snapshot_failure(
     machine = result.students[0].machines[0]
     assert machine.provision_error == "provision failed"
     assert machine.runtime_status == "unknown"
-    assert result.summary.failed == 1
+    assert result.summary.provision.failed == 1
+    assert result.summary.runtime.unknown == 1

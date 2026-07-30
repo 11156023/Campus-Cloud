@@ -28,8 +28,8 @@ from app.ai.teacher_judge.script_run_service import (
 from app.ai.teacher_judge.template_command_service import SUPPORTED_TEMPLATE_KEYS
 from app.api.deps import InstructorUser, SessionDep
 from app.infrastructure.worker import submit
-from app.models import TeachingClass
 from app.models.teacher_judge_script_run import TeacherJudgeScriptRunTargetScope
+from app.services.teaching_class_access import get_authorized_teaching_class
 
 router = APIRouter(
     prefix="/teaching-classes/{class_id}/judge/scripts",
@@ -40,15 +40,11 @@ router = APIRouter(
 def _ensure_access(
     session: SessionDep, class_id: uuid.UUID, current_user: InstructorUser
 ) -> None:
-    teaching_class = session.get(TeachingClass, class_id)
-    if teaching_class is None:
-        raise HTTPException(status_code=404, detail="Teaching class not found")
-    if (
-        teaching_class.owner_id != current_user.id
-        and not current_user.is_superuser
-        and current_user.role != "admin"
-    ):
-        raise HTTPException(status_code=403, detail="Not enough permissions")
+    get_authorized_teaching_class(
+        session=session,
+        current_user=current_user,
+        class_id=class_id,
+    )
 
 
 def _template_key(value: str) -> str:

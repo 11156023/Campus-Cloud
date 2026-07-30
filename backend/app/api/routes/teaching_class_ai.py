@@ -4,7 +4,6 @@ import logging
 import uuid
 
 from fastapi import APIRouter, HTTPException
-from sqlmodel import col, select
 
 from app.ai.pve_log.chat import chat as pve_chat
 from app.ai.pve_log.schemas import (
@@ -14,7 +13,10 @@ from app.ai.pve_log.schemas import (
     SSHExecResult,
 )
 from app.api.deps import InstructorUser, SessionDep
-from app.models import TeachingClass, TeachingClassStudent, TeachingClassStudentMachine
+from app.services.teaching_class_access import get_authorized_teaching_class
+from app.services.teaching_class_machine_scope import (
+    resolve_teaching_class_machine_targets,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(
@@ -29,29 +31,18 @@ def _resolve_class_vmids(
     current_user: InstructorUser,
     class_id: uuid.UUID,
 ) -> set[int]:
-    teaching_class = session.get(TeachingClass, class_id)
-    if teaching_class is None:
-        raise HTTPException(status_code=404, detail="Teaching class not found")
-    if (
-        teaching_class.owner_id != current_user.id
-        and not current_user.is_superuser
-        and current_user.role != "admin"
-    ):
-        raise HTTPException(status_code=403, detail="Not enough permissions")
-    enrollment_ids = session.exec(
-        select(TeachingClassStudent.id).where(
-            TeachingClassStudent.class_id == class_id
+    get_authorized_teaching_class(
+        session=session,
+        current_user=current_user,
+        class_id=class_id,
+    )
+    return {
+        target.vmid
+        for target in resolve_teaching_class_machine_targets(
+            session=session,
+            class_id=class_id,
         )
-    ).all()
-    if not enrollment_ids:
-        return set()
-    vmids = session.exec(
-        select(TeachingClassStudentMachine.vmid).where(
-            col(TeachingClassStudentMachine.class_student_id).in_(enrollment_ids),
-            col(TeachingClassStudentMachine.vmid).is_not(None),
-        )
-    ).all()
-    return {int(vmid) for vmid in vmids if vmid is not None}
+    }
 
 
 @router.post("/chat", response_model=ChatResponse)
