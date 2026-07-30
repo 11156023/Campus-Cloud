@@ -11,6 +11,7 @@ from .ai_api_credential import AIAPICredential
 from .ai_api_rate_limit import AIAPIRateLimit
 from .ai_api_request import AIAPIRequest, AIAPIRequestStatus
 from .ai_api_usage import AIAPIUsage
+from .ai_pve_template import AIPVETemplate
 from .ai_template_call_log import AITemplateCallLog
 from .alert_event import AlertEvent, AlertMetric, AlertScope
 from .audit_log import AuditAction, AuditLog
@@ -121,6 +122,7 @@ __all__ = [
     "AIAPIRequestStatus",
     "AIAPIUsage",
     "AIAPIRateLimit",
+    "AIPVETemplate",
     "AITemplateCallLog",
     # Resource
     "Resource",
