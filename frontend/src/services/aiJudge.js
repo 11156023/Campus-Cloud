@@ -35,39 +35,39 @@ export function rubricToContext(analysis) {
 export const AiJudgeService = {
   /* ── 評分表文件 ── */
 
-  /** 列出群組已保存的評分表 */
-  listFiles(groupId) {
-    return apiGet(`/api/v1/groups/${groupId}/judge/files/`);
+  /** 列出班級已保存的評分表 */
+  listFiles(classId) {
+    return apiGet(`/api/v1/teaching-classes/${classId}/judge/files/`);
   },
 
   /**
    * 上傳評分表文件並觸發 AI 分析。
    * 同名檔案已存在時後端回 409，可帶 conflictStrategy（"overwrite" | "copy"）重送。
    */
-  uploadFile(groupId, file, templateKey, conflictStrategy) {
+  uploadFile(classId, file, templateKey, conflictStrategy) {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("template_key", templateKey);
     if (conflictStrategy) formData.append("conflict_strategy", conflictStrategy);
-    return apiPostMultipart(`/api/v1/groups/${groupId}/judge/files/`, formData);
+    return apiPostMultipart(`/api/v1/teaching-classes/${classId}/judge/files/`, formData);
   },
 
   /** 更新已保存評分表的分析結果（項目編輯後持久化） */
-  updateFileAnalysis(groupId, fileId, analysis) {
+  updateFileAnalysis(classId, fileId, analysis) {
     return apiPatch(
-      `/api/v1/groups/${groupId}/judge/files/${fileId}/analysis`,
+      `/api/v1/teaching-classes/${classId}/judge/files/${fileId}/analysis`,
       { analysis },
     );
   },
 
   /** 下載評分表原始檔 */
-  downloadFile(groupId, fileId) {
-    return apiGetBlob(`/api/v1/groups/${groupId}/judge/files/${fileId}/download`);
+  downloadFile(classId, fileId) {
+    return apiGetBlob(`/api/v1/teaching-classes/${classId}/judge/files/${fileId}/download`);
   },
 
   /** 刪除評分表（原始檔＋分析結果） */
-  deleteFile(groupId, fileId) {
-    return apiDelete(`/api/v1/groups/${groupId}/judge/files/${fileId}`);
+  deleteFile(classId, fileId) {
+    return apiDelete(`/api/v1/teaching-classes/${classId}/judge/files/${fileId}`);
   },
 
   /* ── AI 對話與匯出 ── */
@@ -89,14 +89,14 @@ export const AiJudgeService = {
 
   /* ── 收集腳本 ── */
 
-  /** 列出群組收集腳本 */
-  listScripts(groupId) {
-    return apiGet(`/api/v1/groups/${groupId}/judge/scripts/`);
+  /** 列出班級收集腳本 */
+  listScripts(classId) {
+    return apiGet(`/api/v1/teaching-classes/${classId}/judge/scripts/`);
   },
 
   /** 由評分表快照產生受管收集腳本（後端會接著跑 policy 與 AI 審查） */
-  createScript(groupId, { name, templateKey, rubricSnapshot, sourceFileId = null }) {
-    return apiPost(`/api/v1/groups/${groupId}/judge/scripts/`, {
+  createScript(classId, { name, templateKey, rubricSnapshot, sourceFileId = null }) {
+    return apiPost(`/api/v1/teaching-classes/${classId}/judge/scripts/`, {
       name,
       template_key: templateKey,
       rubric_snapshot: rubricSnapshot,
@@ -105,37 +105,37 @@ export const AiJudgeService = {
   },
 
   /** 重新生成腳本（可帶新的 rubric 快照） */
-  regenerateScript(groupId, scriptId, rubricSnapshot = null) {
+  regenerateScript(classId, scriptId, rubricSnapshot = null) {
     return apiPost(
-      `/api/v1/groups/${groupId}/judge/scripts/${scriptId}/regenerate`,
+      `/api/v1/teaching-classes/${classId}/judge/scripts/${scriptId}/regenerate`,
       { rubric_snapshot: rubricSnapshot },
     );
   },
 
   /** 核准腳本（status: reviewed → approved） */
-  approveScript(groupId, scriptId) {
-    return apiPost(`/api/v1/groups/${groupId}/judge/scripts/${scriptId}/approve`, {});
+  approveScript(classId, scriptId) {
+    return apiPost(`/api/v1/teaching-classes/${classId}/judge/scripts/${scriptId}/approve`, {});
   },
 
   /** 刪除腳本 */
-  deleteScript(groupId, scriptId) {
-    return apiDelete(`/api/v1/groups/${groupId}/judge/scripts/${scriptId}`);
+  deleteScript(classId, scriptId) {
+    return apiDelete(`/api/v1/teaching-classes/${classId}/judge/scripts/${scriptId}`);
   },
 
   /* ── 腳本執行 ── */
 
   /** 對指定 VMID 建立腳本執行任務 */
-  createScriptRun(groupId, scriptId, targetVmids) {
-    return apiPost(`/api/v1/groups/${groupId}/judge/scripts/${scriptId}/runs`, {
+  createScriptRun(classId, scriptId, targetVmids) {
+    return apiPost(`/api/v1/teaching-classes/${classId}/judge/scripts/${scriptId}/runs`, {
       target_scope: "manual",
       target_vmids: targetVmids,
     });
   },
 
   /** 查詢執行任務進度與結果（前端輪詢用） */
-  getScriptRun(groupId, scriptId, runId) {
+  getScriptRun(classId, scriptId, runId) {
     return apiGet(
-      `/api/v1/groups/${groupId}/judge/scripts/${scriptId}/runs/${runId}`,
+      `/api/v1/teaching-classes/${classId}/judge/scripts/${scriptId}/runs/${runId}`,
     );
   },
 };

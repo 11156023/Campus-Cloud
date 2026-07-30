@@ -1,4 +1,4 @@
-﻿"""AI 對話服務 — vLLM Tool Calling（支援 Gemma-4 / Qwen3 等模型）
+"""AI 對話服務 — vLLM Tool Calling（支援 Gemma-4 / Qwen3 等模型）
 
 流程：
   1. 帶著工具定義向 vLLM 發出第一次請求
@@ -11,7 +11,7 @@
 設計重點：
   - 一次 chat 請求只收集一次 PVE 快照（lazy），多個 tool_calls 共用同一份快照。
   - ssh_exec 在 AI Tool 呼叫時直接執行（不走 pending 確認），黑名單仍有效。
-  - 若對話帶有群組範圍，工具輸出與 SSH 執行都只允許該群組可見的 VMID。
+  - 若呼叫端提供 VMID 範圍，工具輸出與 SSH 執行都只允許該範圍。
   - Gemma-4/Qwen3 的 <think> 與 tool call 標記會在第二次請求前清除，
     避免 message history 污染導致 LLM 無法正確總結。
 """
@@ -407,19 +407,22 @@ async def chat(
     #   <|tool_call>call:ssh_exec{command:<|"|>python3 -V<|"|>,vmid:157}<tool_call|>
     import re as _re
     import uuid as _uuid
+
     raw_content = assistant_msg.get("content") or ""
 
     if not assistant_msg.get("tool_calls") and "call:" in raw_content:
         # 使用貪婪匹配：從 call:funcName{ 到結束標記 <tool_call|> 或 <|/tool_call|>
         match = _re.search(
             r"<\|?tool_call\|?>\s*call:([a-zA-Z0-9_]+)\s*(\{.+?\})\s*<\|?/?tool_call\|?>",
-            raw_content, flags=_re.DOTALL,
+            raw_content,
+            flags=_re.DOTALL,
         )
         if not match:
             # 備用：沒有結束標記的情況（模型截斷）
             match = _re.search(
                 r"<\|?tool_call\|?>\s*call:([a-zA-Z0-9_]+)\s*(\{.+\})",
-                raw_content, flags=_re.DOTALL,
+                raw_content,
+                flags=_re.DOTALL,
             )
         if match:
             func_name = match.group(1)
@@ -428,8 +431,9 @@ async def chat(
             args_fixed = args_raw.replace('<|"|>', '"')
             # 2. 幫未加引號的 key 加上雙引號（例如 command:"..." → "command":"..."）
             args_fixed = _re.sub(
-                r'([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)(\s*:)',
-                r'\1"\2"\3', args_fixed,
+                r"([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)(\s*:)",
+                r'\1"\2"\3',
+                args_fixed,
             )
             try:
                 parsed_args = json.loads(args_fixed)
@@ -443,9 +447,13 @@ async def chat(
                         },
                     }
                 ]
-                logger.info("成功手動解析 Qwen tool call: %s(%s)", func_name, parsed_args)
+                logger.info(
+                    "成功手動解析 Qwen tool call: %s(%s)", func_name, parsed_args
+                )
             except Exception as e:
-                logger.error("手動解析 Qwen tool call 失敗: %s, 修正後: %s", e, args_fixed)
+                logger.error(
+                    "手動解析 Qwen tool call 失敗: %s, 修正後: %s", e, args_fixed
+                )
 
     if assistant_msg.get("tool_calls"):
         # 移除 Qwen3 內部 think 區塊（<think>...</think>）
@@ -453,19 +461,29 @@ async def chat(
         # 移除所有 tool call 標記（涵蓋 <|"|> 引號格式）
         cleaned = _re.sub(
             r"<\|?tool_call\|?>\s*call:[a-zA-Z0-9_]+\s*\{.+?\}\s*<\|?/?tool_call\|?>",
-            "", cleaned, flags=_re.DOTALL,
+            "",
+            cleaned,
+            flags=_re.DOTALL,
         )
         # 備用：無結束標記
         cleaned = _re.sub(
             r"<\|?tool_call\|?>\s*call:[a-zA-Z0-9_]+\s*\{.+\}",
-            "", cleaned, flags=_re.DOTALL,
+            "",
+            cleaned,
+            flags=_re.DOTALL,
         )
-        cleaned = _re.sub(r"<\|tool_call\|>.*?<\|/tool_call\|>", "", cleaned, flags=_re.DOTALL)
-        cleaned = _re.sub(r"<\|tool_call>.*?<tool_call\|>", "", cleaned, flags=_re.DOTALL)
-        cleaned = _re.sub(r'```json\s*\{\s*"tool_call".*?```', "", cleaned, flags=_re.DOTALL)
+        cleaned = _re.sub(
+            r"<\|tool_call\|>.*?<\|/tool_call\|>", "", cleaned, flags=_re.DOTALL
+        )
+        cleaned = _re.sub(
+            r"<\|tool_call>.*?<tool_call\|>", "", cleaned, flags=_re.DOTALL
+        )
+        cleaned = _re.sub(
+            r'```json\s*\{\s*"tool_call".*?```', "", cleaned, flags=_re.DOTALL
+        )
         cleaned = _re.sub(r"<tool_call>.*?</tool_call>", "", cleaned, flags=_re.DOTALL)
         # 清除殘留的特殊 token
-        cleaned = _re.sub(r'<\|[^>]*\|>', "", cleaned)
+        cleaned = _re.sub(r"<\|[^>]*\|>", "", cleaned)
         assistant_msg = {**assistant_msg, "content": cleaned.strip() or None}
 
     messages.append(assistant_msg)
@@ -500,12 +518,17 @@ async def chat(
                         args_str = args_str.replace('<|"|>', '"')
                         args_str = args_str.replace("'", '"')
                         # 嘗試修正未加引號的 key (排除已經有引號的情況)
-                        args_str = _re.sub(r'([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)(\s*:)', r'\1"\2"\3', args_str)
+                        args_str = _re.sub(
+                            r"([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)(\s*:)",
+                            r'\1"\2"\3',
+                            args_str,
+                        )
                         try:
                             func_args = json.loads(args_str)
                         except json.JSONDecodeError:
                             # 如果還是失敗，嘗試用 eval (僅限安全的 dict literal)
                             import ast
+
                             try:
                                 func_args = ast.literal_eval(args_str)
                                 if not isinstance(func_args, dict):
@@ -515,7 +538,11 @@ async def chat(
                 else:
                     func_args = {}
             except Exception as e:
-                logger.warning("Tool arguments 解析失敗: %s, 原始值: %s", e, tc["function"].get("arguments"))
+                logger.warning(
+                    "Tool arguments 解析失敗: %s, 原始值: %s",
+                    e,
+                    tc["function"].get("arguments"),
+                )
                 func_args = {}
 
             logger.info("執行工具 %s，參數：%s", func_name, func_args)
@@ -541,11 +568,17 @@ async def chat(
                     needs_confirmation = True
 
                 tool_content = json.dumps(result, ensure_ascii=False, default=str)
-                tools_called.append(ToolCallRecord(name=func_name, args=func_args, result=result_dict))
+                tools_called.append(
+                    ToolCallRecord(name=func_name, args=func_args, result=result_dict)
+                )
             except Exception as exc:
                 logger.error("工具 %s 執行失敗：%s", func_name, exc)
                 tool_content = json.dumps({"error": str(exc)}, ensure_ascii=False)
-                tools_called.append(ToolCallRecord(name=func_name, args=func_args, result={"error": str(exc)}))
+                tools_called.append(
+                    ToolCallRecord(
+                        name=func_name, args=func_args, result={"error": str(exc)}
+                    )
+                )
 
             messages.append(
                 {
@@ -578,16 +611,16 @@ async def chat(
 
         choices2 = data2.get("choices") or []
         reply = (
-            (choices2[0].get("message") or {}).get("content") or ""
-            if choices2
-            else ""
+            (choices2[0].get("message") or {}).get("content") or "" if choices2 else ""
         )
         if not choices2:
             logger.error("vLLM 第二次回應 choices 為空：%s", data2)
 
         # 將最終回覆也加入 messages
         if reply:
-            messages.append(choices2[0].get("message") or {"role": "assistant", "content": reply})
+            messages.append(
+                choices2[0].get("message") or {"role": "assistant", "content": reply}
+            )
 
     elif needs_confirmation:
         reply = "有指令需要您的確認，請允許後繼續。"
@@ -598,5 +631,5 @@ async def chat(
         reply=reply,
         tools_called=tools_called,
         needs_confirmation=needs_confirmation,
-        messages=messages
+        messages=messages,
     )

@@ -14,21 +14,21 @@ USER_ID = uuid.uuid4()
 
 
 @pytest.fixture()
-def stub_rows(monkeypatch: pytest.MonkeyPatch):
+def stub_quota(monkeypatch: pytest.MonkeyPatch):
     """樁掉 DB 查詢：回傳 (user_quota, group_quotas)。"""
 
-    def _set(user_quota=None, group_quotas=None):
+    def _set(user_quota=None):
         monkeypatch.setattr(
             quota_service,
-            "_quota_rows_for_user",
-            lambda session, user_id: (user_quota, group_quotas or []),
+            "_quota_for_user",
+            lambda session, user_id: user_quota,
         )
 
     return _set
 
 
-def test_get_effective_quota_defaults(stub_rows) -> None:
-    stub_rows()
+def test_get_effective_quota_defaults(stub_quota) -> None:
+    stub_quota()
     assert quota_service.get_effective_quota(None, USER_ID) == DEFAULT_QUOTA
 
 
@@ -45,8 +45,10 @@ def test_get_usage_sums_cluster_specs(monkeypatch: pytest.MonkeyPatch) -> None:
     assert usage == QuotaUsage(cpu_cores=6, memory_mb=6144, disk_gb=50, instances=2)
 
 
-def test_check_quota_raises_conflict(monkeypatch: pytest.MonkeyPatch, stub_rows) -> None:
-    stub_rows(user_quota=None, group_quotas=[])
+def test_check_quota_raises_conflict(
+    monkeypatch: pytest.MonkeyPatch, stub_quota
+) -> None:
+    stub_quota(user_quota=None)
     monkeypatch.setattr(
         quota_service,
         "get_usage",
@@ -59,9 +61,9 @@ def test_check_quota_raises_conflict(monkeypatch: pytest.MonkeyPatch, stub_rows)
 
 
 def test_check_quota_fail_open_on_pve_error(
-    monkeypatch: pytest.MonkeyPatch, stub_rows
+    monkeypatch: pytest.MonkeyPatch, stub_quota
 ) -> None:
-    stub_rows()
+    stub_quota()
 
     def _boom(session, user_id, cluster_resources=None):
         raise RuntimeError("PVE down")

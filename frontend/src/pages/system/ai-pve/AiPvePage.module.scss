@@ -1,6 +1,7 @@
 @use "../../../assets/styles/variables" as *;
 @use "../../../assets/styles/mixins" as *;
 
+/* Standalone administrator PVE operations assistant. */
 .panel {
   @include flex-column;
   gap: $spacing-24;

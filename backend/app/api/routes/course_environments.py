@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field, model_validator
 from sqlmodel import col, delete, func, select
 
 from app.api.deps import InstructorUser, SessionDep
-from app.core.authorizers import require_group_access
+from app.core.authorizers import require_teaching_access
 from app.exceptions import BadRequestError, NotFoundError
 from app.models import (
     CourseEnvironment,
@@ -100,7 +100,7 @@ def _get_environment(
     item = session.get(CourseEnvironment, environment_id)
     if item is None:
         raise NotFoundError("Course environment not found")
-    require_group_access(current_user, item.owner_id)
+    require_teaching_access(current_user, item.owner_id)
     return item
 
 

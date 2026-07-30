@@ -115,13 +115,15 @@ SkyLab 的 AI 功能定位不是單一聊天機器人，而是「嵌入校園雲
 
 功能定位：
 
-這是給老師在群組課程內使用的 AI 評分輔助。它不直接任意操作學生機器，而是先把評分表變成結構化項目，再產生受管的只讀收集腳本，最後根據腳本結果產生老師可讀的評分建議。
+這是給老師在正式班級內使用的 AI 評分輔助。它不直接任意操作學生機器，而是先把評分表變成結構化項目，再產生受管的只讀收集腳本，最後根據腳本結果產生老師可讀的評分建議。
+
+AI PVE 維運助手則是獨立的管理員工具，查詢全站 PVE 節點與 VM/LXC 狀態，不綁定群組或正式班級，也不出現在教學工作區。涉及 SSH 指令時仍須由管理員明確確認。
 
 前端操作分頁：
 
 - 評分表：上傳 `.docx` / `.pdf`，AI 解析成評分項目，可聊天修正並匯出 Excel。
 - 收集腳本：由目前評分表產生 Python 收集腳本，經政策與 AI reviewer 檢查後才能核准。
-- 腳本執行：選擇群組 VM/LXC，執行已核准腳本，顯示執行狀態與 AI 分析分數。
+- 腳本執行：選擇正式班級學生機器，執行已核准腳本，顯示執行狀態與 AI 分析分數。
 
 後端流程：
 
@@ -138,9 +140,9 @@ SkyLab 的 AI 功能定位不是單一聊天機器人，而是「嵌入校園雲
 - `/api/v1/rubric/upload`
 - `/api/v1/rubric/chat`
 - `/api/v1/rubric/download-excel`
-- `/api/v1/groups/{group_id}/judge/files/`
-- `/api/v1/groups/{group_id}/judge/scripts/`
-- `/api/v1/groups/{group_id}/judge/scripts/{script_id}/runs`
+- `/api/v1/teaching-classes/{teaching_class_id}/judge/files/`
+- `/api/v1/teaching-classes/{teaching_class_id}/judge/scripts/`
+- `/api/v1/teaching-classes/{teaching_class_id}/judge/scripts/{script_id}/runs`
 
 主要檔案：
 

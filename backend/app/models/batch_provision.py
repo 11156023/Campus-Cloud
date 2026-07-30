@@ -27,24 +27,15 @@ class BatchProvisionTaskStatus(str, enum.Enum):
 
 
 class BatchProvisionJob(SQLModel, table=True):
-    """批量建立工作（一個群組一次操作）"""
+    """正式班級的批量建立工作。"""
 
     __tablename__ = "batch_provision_jobs"
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    group_id: uuid.UUID | None = Field(
-        default=None,
-        sa_column=Column(
-            sa.ForeignKey("group.id", ondelete="CASCADE"),
-            nullable=True,
-            index=True,
-        ),
-    )
-    teaching_class_id: uuid.UUID | None = Field(
-        default=None,
+    teaching_class_id: uuid.UUID = Field(
         sa_column=Column(
             sa.ForeignKey("teaching_classes.id", ondelete="CASCADE"),
-            nullable=True,
+            nullable=False,
             index=True,
         ),
     )

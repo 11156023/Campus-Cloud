@@ -53,10 +53,6 @@ ACTION_CATEGORY: dict[AuditAction, str] = {
     AuditAction.user_create: "user",
     AuditAction.user_update: "user",
     AuditAction.user_delete: "user",
-    AuditAction.group_create: "user",
-    AuditAction.group_delete: "user",
-    AuditAction.group_member_add: "user",
-    AuditAction.group_member_remove: "user",
     AuditAction.batch_provision_vm: "user",
     AuditAction.batch_provision_lxc: "user",
     # 防火牆
@@ -100,7 +96,6 @@ DANGER_ACTIONS: set[AuditAction] = {
     AuditAction.snapshot_delete,
     AuditAction.snapshot_rollback,
     AuditAction.user_delete,
-    AuditAction.group_delete,
     AuditAction.firewall_rule_delete,
     AuditAction.firewall_connection_delete,
     AuditAction.nat_rule_delete,

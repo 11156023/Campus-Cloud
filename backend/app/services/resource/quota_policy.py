@@ -30,22 +30,13 @@ DEFAULT_QUOTA = EffectiveQuota(
 )
 
 
-def resolve_effective_quota(
-    user_quota: Any | None, group_quotas: list[Any]
-) -> EffectiveQuota:
+def resolve_effective_quota(user_quota: Any | None) -> EffectiveQuota:
     if user_quota is not None:
         return EffectiveQuota(
             max_cpu_cores=int(user_quota.max_cpu_cores),
             max_memory_mb=int(user_quota.max_memory_mb),
             max_disk_gb=int(user_quota.max_disk_gb),
             max_instances=int(user_quota.max_instances),
-        )
-    if group_quotas:
-        return EffectiveQuota(
-            max_cpu_cores=max(int(q.max_cpu_cores) for q in group_quotas),
-            max_memory_mb=max(int(q.max_memory_mb) for q in group_quotas),
-            max_disk_gb=max(int(q.max_disk_gb) for q in group_quotas),
-            max_instances=max(int(q.max_instances) for q in group_quotas),
         )
     return DEFAULT_QUOTA
 

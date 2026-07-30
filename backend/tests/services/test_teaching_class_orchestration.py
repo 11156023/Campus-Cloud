@@ -30,7 +30,7 @@ def test_recurrence_uses_boot_day_when_lead_crosses_midnight():
     assert duration == 125
 
 
-def test_submit_batch_for_class_students_does_not_require_group(monkeypatch):
+def test_submit_batch_for_class_students_uses_formal_class(monkeypatch):
     class_id = uuid.uuid4()
     student_ids = [uuid.uuid4(), uuid.uuid4()]
     created_id = uuid.uuid4()
@@ -64,7 +64,6 @@ def test_submit_batch_for_class_students_does_not_require_group(monkeypatch):
     )
 
     assert job_id == created_id
-    assert captured["group_id"] is None
     assert captured["teaching_class_id"] == class_id
     assert captured["member_user_ids"] == student_ids
 

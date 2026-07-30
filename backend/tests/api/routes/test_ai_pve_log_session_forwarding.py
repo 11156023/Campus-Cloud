@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-from types import SimpleNamespace
-from uuid import uuid4
-
 import pytest
 
 from app.ai.pve_log import ssh_exec as ssh_exec_module
@@ -36,27 +33,15 @@ async def test_chat_forwards_session_to_service(
         return ChatResponse(reply="ok")
 
     monkeypatch.setattr(route, "pve_chat", _fake_chat)
-    monkeypatch.setattr(
-        route.group_repo,
-        "get_group_by_id",
-        lambda **_kwargs: SimpleNamespace(owner_id=uuid4()),
-    )
-    monkeypatch.setattr(
-        route.group_repo,
-        "get_member_vmids",
-        lambda **_kwargs: {uuid4(): 157},
-    )
-    monkeypatch.setattr(route, "require_group_access", lambda *_args, **_kwargs: None)
-
     fake_session = object()
     result = await route.chat(
-        ChatRequest(message="ping", group_id=uuid4()),
+        ChatRequest(message="ping"),
         object(),
         fake_session,
     )
     assert result.reply == "ok"
     assert captured["session"] is fake_session
-    assert captured["allowed_vmids"] == {157}
+    assert captured["allowed_vmids"] is None
 
 
 @pytest.mark.asyncio

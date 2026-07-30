@@ -279,7 +279,7 @@ def test_list_templates_student_sees_only_ready(
 def test_private_template_is_visible_only_to_owner() -> None:
     owner = make_user("teacher")
     template = make_template(owner_id=owner.id)
-    template.visibility = VMTemplateVisibility.groups
+    template.visibility = VMTemplateVisibility.private
 
     assert template_repo.is_template_visible_to_user(
         template=template, user_id=owner.id

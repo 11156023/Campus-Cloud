@@ -19,7 +19,7 @@ export default function TemplateFormDialog({ template, onClose, onSaved }) {
   const [sourceVmid, setSourceVmid] = useState("");
   const [name, setName] = useState(template?.name ?? "");
   const [description, setDescription] = useState(template?.description ?? "");
-  const [visibility, setVisibility] = useState(template?.visibility ?? "groups");
+  const [visibility, setVisibility] = useState(template?.visibility ?? "private");
   const [defaultCores, setDefaultCores] = useState(
     template?.default_cores ? String(template.default_cores) : "",
   );
@@ -149,9 +149,9 @@ export default function TemplateFormDialog({ template, onClose, onSaved }) {
               <input
                 type="radio"
                 name="template-visibility"
-                value="groups"
+                value="private"
                 checked={visibility !== "global"}
-                onChange={() => setVisibility("groups")}
+                onChange={() => setVisibility("private")}
               />
               <span>
                 <strong>私人</strong>

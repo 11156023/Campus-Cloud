@@ -31,8 +31,8 @@ class TeacherJudgeScriptRun(SQLModel, table=True):
     __tablename__ = "teacher_judge_script_runs"
     __table_args__ = (
         sa.Index(
-            "ix_teacher_judge_script_runs_group_status",
-            "group_id",
+            "ix_teacher_judge_script_runs_class_status",
+            "teaching_class_id",
             "status",
         ),
         sa.Index(
@@ -43,10 +43,10 @@ class TeacherJudgeScriptRun(SQLModel, table=True):
     )
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    group_id: uuid.UUID = Field(
+    teaching_class_id: uuid.UUID = Field(
         sa_column=Column(
             sa.Uuid,
-            sa.ForeignKey("group.id", ondelete="CASCADE"),
+            sa.ForeignKey("teaching_classes.id", ondelete="CASCADE"),
             nullable=False,
             index=True,
         )

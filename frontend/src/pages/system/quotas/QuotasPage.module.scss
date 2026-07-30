@@ -114,11 +114,6 @@
   white-space: nowrap;
 }
 
-.badge_group {
-  background: color-mix(in srgb, var(--color-info) 12%, transparent);
-  color: var(--color-info);
-}
-
 .badge_user {
   background: color-mix(in srgb, var(--color-warning) 12%, transparent);
   color: var(--color-warning);

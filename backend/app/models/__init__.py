@@ -45,8 +45,6 @@ from .deletion_request import DeletionRequest, DeletionRequestStatus
 from .firewall_layout import FirewallLayout
 from .gateway_config import GatewayConfig
 from .governance_config import GovernanceConfig
-from .group import Group
-from .group_member import GroupMember
 from .ip_allocation import IpAllocation
 from .ldap_config import LdapConfig
 from .mining_incident import MiningIncident, MiningIncidentStatus
@@ -105,7 +103,6 @@ from .vm_request import (
 )
 from .vm_template import (
     VMTemplate,
-    VMTemplateGroupLink,
     VMTemplateStatus,
     VMTemplateVisibility,
 )
@@ -153,9 +150,6 @@ __all__ = [
     "SpecChangeRequest",
     "SpecChangeRequestStatus",
     "SpecChangeType",
-    # Groups
-    "Group",
-    "GroupMember",
     # Proxmox Config
     "ProxmoxConfig",
     "ProxmoxConnectionConfig",
@@ -207,7 +201,6 @@ __all__ = [
     "DeletionRequestStatus",
     # VM Template (範本系統 2.0)
     "VMTemplate",
-    "VMTemplateGroupLink",
     "VMTemplateStatus",
     "VMTemplateVisibility",
     # Task Record (背景任務)

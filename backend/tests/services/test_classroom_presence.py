@@ -17,8 +17,8 @@ from app.services.classroom.presence import ClassroomPresenceHub
 
 U1 = uuid.uuid4()
 U2 = uuid.uuid4()
-G1 = uuid.uuid4()
-G2 = uuid.uuid4()
+C1 = uuid.uuid4()
+C2 = uuid.uuid4()
 
 KEY_EVENT = struct.pack(">BBxxI", 4, 1, 0x41)
 POINTER_EVENT = struct.pack(">BBHH", 5, 1, 10, 20)
@@ -114,39 +114,41 @@ class FakePresenceWs:
 async def _register(
     hub: ClassroomPresenceHub,
     user_id: uuid.UUID,
-    group_ids: set[uuid.UUID],
+    class_ids: set[uuid.UUID],
     *,
     broken_send: bool = False,
 ) -> tuple[FakePresenceWs, "asyncio.Task[None]"]:
     ws = FakePresenceWs(broken_send=broken_send)
     task = asyncio.create_task(
-        hub.register(user_id=user_id, group_ids=group_ids, websocket=ws)
+        hub.register(user_id=user_id, class_ids=class_ids, websocket=ws)
     )
-    await eventually(lambda: user_id in hub.online_user_ids(next(iter(group_ids))))
+    await eventually(
+        lambda: user_id in hub.online_user_ids_for_class(next(iter(class_ids)))
+    )
     return ws, task
 
 
 class TestClassroomPresenceHub:
     async def test_online_and_disconnect_cleanup(self) -> None:
         hub = ClassroomPresenceHub()
-        ws1, t1 = await _register(hub, U1, {G1})
-        ws2, t2 = await _register(hub, U2, {G1, G2})
-        assert hub.online_user_ids(G1) == {U1, U2}
-        assert hub.online_user_ids(G2) == {U2}
+        ws1, t1 = await _register(hub, U1, {C1})
+        ws2, t2 = await _register(hub, U2, {C1, C2})
+        assert hub.online_user_ids_for_class(C1) == {U1, U2}
+        assert hub.online_user_ids_for_class(C2) == {U2}
 
         ws1.disconnect()
-        await eventually(lambda: hub.online_user_ids(G1) == {U2})
+        await eventually(lambda: hub.online_user_ids_for_class(C1) == {U2})
         ws2.disconnect()
-        await eventually(lambda: hub.online_user_ids(G1) == set())
+        await eventually(lambda: hub.online_user_ids_for_class(C1) == set())
         await eventually(t1.done)
         await eventually(t2.done)
 
-    async def test_broadcast_only_to_group(self) -> None:
+    async def test_broadcast_only_to_class(self) -> None:
         hub = ClassroomPresenceHub()
-        ws1, t1 = await _register(hub, U1, {G1})
-        ws2, t2 = await _register(hub, U2, {G2})
+        ws1, t1 = await _register(hub, U1, {C1})
+        ws2, t2 = await _register(hub, U2, {C2})
         event = {"type": "live_started", "session_id": "s1"}
-        await hub.broadcast_to_group(G1, event)
+        await hub.broadcast_to_class(C1, event)
         assert ws1.events == [event]
         assert ws2.events == []
         ws1.disconnect()
@@ -156,9 +158,9 @@ class TestClassroomPresenceHub:
 
     async def test_send_to_user(self) -> None:
         hub = ClassroomPresenceHub()
-        ws1, t1 = await _register(hub, U1, {G1})
-        ws1b, t1b = await _register(hub, U1, {G1})  # 同一使用者兩個分頁
-        ws2, t2 = await _register(hub, U2, {G1})
+        ws1, t1 = await _register(hub, U1, {C1})
+        ws1b, t1b = await _register(hub, U1, {C1})  # 同一使用者兩個分頁
+        ws2, t2 = await _register(hub, U2, {C1})
         event = {"type": "takeover_started"}
         await hub.send_to_user(U1, event)
         assert ws1.events == [event]
@@ -171,11 +173,11 @@ class TestClassroomPresenceHub:
 
     async def test_dead_connection_cleaned_on_broadcast(self) -> None:
         hub = ClassroomPresenceHub()
-        ws1, t1 = await _register(hub, U1, {G1}, broken_send=True)
-        ws2, t2 = await _register(hub, U2, {G1})
-        await hub.broadcast_to_group(G1, {"type": "live_started"})
+        ws1, t1 = await _register(hub, U1, {C1}, broken_send=True)
+        ws2, t2 = await _register(hub, U2, {C1})
+        await hub.broadcast_to_class(C1, {"type": "live_started"})
         # 死連線送不出去 → 自動移出線上名單；健康連線照收
-        assert hub.online_user_ids(G1) == {U2}
+        assert hub.online_user_ids_for_class(C1) == {U2}
         assert ws2.events == [{"type": "live_started"}]
         ws1.disconnect()
         ws2.disconnect()

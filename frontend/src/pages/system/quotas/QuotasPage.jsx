@@ -2,11 +2,10 @@ import { useCallback, useEffect, useState } from "react";
 import styles from "./QuotasPage.module.scss";
 import MIcon from "../../../components/MIcon";
 import { QuotasService } from "../../../services/quotas";
-import { GroupsService } from "../../../services/groups";
 import { useToast } from "../../../hooks/useToast";
 
 const EMPTY_FORM = {
-  scope: "group", // "group" | "user"
+  scope: "user",
   target: "",
   max_cpu_cores: 8,
   max_memory_mb: 16384,
@@ -21,7 +20,7 @@ const NUMBER_FIELDS = [
   { key: "max_instances", label: "實例數" },
 ];
 
-function CreateQuotaDialog({ groups, onClose, onCreated }) {
+function CreateQuotaDialog({ onClose, onCreated }) {
   const toast = useToast();
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
@@ -32,9 +31,8 @@ function CreateQuotaDialog({ groups, onClose, onCreated }) {
     setSaving(true);
     try {
       await QuotasService.create({
-        scope: form.scope,
-        group_id: form.scope === "group" ? form.target : null,
-        user_id: form.scope === "user" ? form.target : null,
+        scope: "user",
+        user_id: form.target,
         max_cpu_cores: form.max_cpu_cores,
         max_memory_mb: form.max_memory_mb,
         max_disk_gb: form.max_disk_gb,
@@ -58,44 +56,14 @@ function CreateQuotaDialog({ groups, onClose, onCreated }) {
         </span>
 
         <div className={styles.field}>
-          <label htmlFor="quota-scope">範圍</label>
-          <select
-            id="quota-scope"
-            value={form.scope}
-            onChange={(e) => setForm({ ...form, scope: e.target.value, target: "" })}
-          >
-            <option value="group">群組預設</option>
-            <option value="user">個人覆寫</option>
-          </select>
+          <label htmlFor="quota-user">使用者 ID</label>
+          <input
+            id="quota-user"
+            value={form.target}
+            placeholder="使用者 UUID"
+            onChange={(e) => setField("target", e.target.value)}
+          />
         </div>
-
-        {form.scope === "group" ? (
-          <div className={styles.field}>
-            <label htmlFor="quota-group">群組</label>
-            <select
-              id="quota-group"
-              value={form.target}
-              onChange={(e) => setField("target", e.target.value)}
-            >
-              <option value="">選擇群組</option>
-              {groups.map((g) => (
-                <option key={g.id} value={g.id}>
-                  {g.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        ) : (
-          <div className={styles.field}>
-            <label htmlFor="quota-user">使用者 ID</label>
-            <input
-              id="quota-user"
-              value={form.target}
-              placeholder="使用者 UUID"
-              onChange={(e) => setField("target", e.target.value)}
-            />
-          </div>
-        )}
 
         <div className={styles.formGrid}>
           {NUMBER_FIELDS.map(({ key, label }) => (
@@ -133,7 +101,6 @@ function CreateQuotaDialog({ groups, onClose, onCreated }) {
 export default function QuotasPage() {
   const toast = useToast();
   const [quotas, setQuotas] = useState(null);
-  const [groups, setGroups] = useState([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleting, setDeleting] = useState(null);
 
@@ -148,13 +115,10 @@ export default function QuotasPage() {
 
   useEffect(() => {
     load();
-    GroupsService.list()
-      .then((res) => setGroups(res?.data ?? []))
-      .catch(() => setGroups([]));
   }, [load]);
 
   const handleDelete = async (quota) => {
-    const target = quota.group_name ?? quota.user_email ?? quota.id;
+    const target = quota.user_email ?? quota.id;
     if (!window.confirm(`確定要刪除「${target}」的配額？刪除後將套用內建預設。`)) return;
     setDeleting(quota.id);
     try {
@@ -173,7 +137,7 @@ export default function QuotasPage() {
       <div className={styles.pageHeader}>
         <div className={styles.pageHeading}>
           <h1 className={styles.pageTitle}>配額管理</h1>
-          <p className={styles.pageSubtitle}>群組預設與個人覆寫的資源上限</p>
+          <p className={styles.pageSubtitle}>個別使用者的資源上限覆寫</p>
         </div>
         <button type="button" className={styles.btnPrimary} onClick={() => setDialogOpen(true)}>
           <MIcon name="add" size={16} />
@@ -207,12 +171,12 @@ export default function QuotasPage() {
                 <tr key={q.id}>
                   <td>
                     <span
-                      className={`${styles.badge} ${q.scope === "group" ? styles.badge_group : styles.badge_user}`}
+                      className={`${styles.badge} ${styles.badge_user}`}
                     >
-                      {q.scope === "group" ? "群組" : "個人覆寫"}
+                      個人覆寫
                     </span>
                   </td>
-                  <td>{q.group_name ?? q.user_email ?? "—"}</td>
+                  <td>{q.user_email ?? "—"}</td>
                   <td>{q.max_cpu_cores}</td>
                   <td>{q.max_memory_mb}</td>
                   <td>{q.max_disk_gb}</td>
@@ -237,7 +201,6 @@ export default function QuotasPage() {
 
       {dialogOpen && (
         <CreateQuotaDialog
-          groups={groups}
           onClose={() => setDialogOpen(false)}
           onCreated={() => {
             setDialogOpen(false);

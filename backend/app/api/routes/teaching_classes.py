@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 from sqlmodel import delete, select
 
 from app.api.deps import InstructorUser, SessionDep
-from app.core.authorizers import require_group_access
+from app.core.authorizers import require_teaching_access
 from app.exceptions import BadRequestError, NotFoundError
 from app.models import (
     BatchProvisionJob,
@@ -115,7 +115,7 @@ def _get_class(session: SessionDep, current_user, class_id: uuid.UUID) -> Teachi
     item = session.get(TeachingClass, class_id)
     if not item:
         raise NotFoundError("Teaching class not found")
-    require_group_access(current_user, item.owner_id)
+    require_teaching_access(current_user, item.owner_id)
     return item
 
 
@@ -460,7 +460,7 @@ def select_course(
     environment = session.get(CourseEnvironment, version.environment_id)
     if environment is None:
         raise NotFoundError("Course environment not found")
-    require_group_access(current_user, environment.owner_id)
+    require_teaching_access(current_user, environment.owner_id)
     source_nodes = list(
         session.exec(
             select(CourseEnvironmentNode)
