@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import time
 import uuid
 from typing import Any
@@ -46,6 +47,16 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 _PENDING_TTL = 300  # 秒
+_MAX_OUTPUT_CHARS = 16 * 1024
+_SENSITIVE_OUTPUT_PATTERNS = (
+    re.compile(
+        r"(?i)(password|passwd|secret|token|api[_-]?key)\s*[:=]\s*([^\s,;]+)"
+    ),
+    re.compile(
+        r"-----BEGIN [A-Z ]*PRIVATE KEY-----.+?-----END [A-Z ]*PRIVATE KEY-----",
+        re.DOTALL,
+    ),
+)
 _pending_store: dict[str, dict[str, Any]] = {}  # token → {request, created_at}
 
 
@@ -53,6 +64,9 @@ def _store_pending(
     req: SSHExecRequest,
     *,
     allowed_vmids: set[int] | None = None,
+    requester_id: uuid.UUID | None = None,
+    scope_type: str | None = None,
+    scope_id: uuid.UUID | None = None,
 ) -> str:
     """儲存待確認請求，回傳 token。"""
     token = str(uuid.uuid4())
@@ -60,6 +74,9 @@ def _store_pending(
         "request": req,
         "created_at": time.monotonic(),
         "allowed_vmids": set(allowed_vmids) if allowed_vmids is not None else None,
+        "requester_id": requester_id,
+        "scope_type": scope_type,
+        "scope_id": scope_id,
     }
     _cleanup_expired()
     return token
@@ -69,6 +86,28 @@ def _pop_pending(token: str) -> dict[str, Any] | None:
     """取出待確認請求（同時從 store 移除）。"""
     _cleanup_expired()
     return _pending_store.pop(token, None)
+
+
+def _peek_pending(token: str) -> dict[str, Any] | None:
+    _cleanup_expired()
+    return _pending_store.get(token)
+
+
+def peek_pending_scope(token: str) -> tuple[str | None, uuid.UUID | None]:
+    """Read token scope without consuming it."""
+    entry = _peek_pending(token)
+    if entry is None:
+        return None, None
+    return entry.get("scope_type"), entry.get("scope_id")
+
+
+def peek_pending_request(token: str) -> SSHExecRequest | None:
+    """Read a pending request so the caller can re-authorize its VMID."""
+    entry = _peek_pending(token)
+    if entry is None:
+        return None
+    request = entry.get("request")
+    return request if isinstance(request, SSHExecRequest) else None
 
 
 def _cleanup_expired() -> None:
@@ -191,6 +230,21 @@ def _ssh_exec_sync(
         client.close()
 
 
+def _redact_and_truncate(value: str) -> tuple[str, bool]:
+    redacted = value
+    for pattern in _SENSITIVE_OUTPUT_PATTERNS:
+        if pattern.pattern.startswith("(?i)(password"):
+            redacted = pattern.sub(
+                lambda match: f"{match.group(1)}=[REDACTED]",
+                redacted,
+            )
+        else:
+            redacted = pattern.sub("[REDACTED PRIVATE KEY]", redacted)
+    if len(redacted) <= _MAX_OUTPUT_CHARS:
+        return redacted, False
+    return redacted[:_MAX_OUTPUT_CHARS] + "\n...[truncated]", True
+
+
 # ---------------------------------------------------------------------------
 # 內部 VM 資訊解析（主後端內嵌模組用，不經 HTTP 回呼）
 # ---------------------------------------------------------------------------
@@ -257,6 +311,9 @@ async def ssh_exec(
     *,
     session: Session | None = None,
     allowed_vmids: set[int] | None = None,
+    requester_id: uuid.UUID | None = None,
+    scope_type: str | None = None,
+    scope_id: uuid.UUID | None = None,
 ) -> SSHExecResult:
     """SSH 執行主入口。
 
@@ -284,12 +341,18 @@ async def ssh_exec(
             ssh_user=req.ssh_user,
             command=req.command,
             blocked=True,
-            block_reason="目前只允許存取所在群組內的 VM/LXC",
+            block_reason="目前只允許存取指定範圍內的 VM/LXC",
         )
 
     # ── 層二：執行前確認（AI 呼叫時） ────────────────────────────────────
     if req.require_confirm:
-        token = _store_pending(req, allowed_vmids=allowed_vmids)
+        token = _store_pending(
+            req,
+            allowed_vmids=allowed_vmids,
+            requester_id=requester_id,
+            scope_type=scope_type,
+            scope_id=scope_id,
+        )
         logger.info("SSH 待確認 vmid=%d cmd=%r token=%s", req.vmid, req.command, token)
         return SSHExecResult(
             vmid=req.vmid,
@@ -307,6 +370,10 @@ async def confirm_exec(
     confirm_req: SSHConfirmRequest,
     *,
     session: Session | None = None,
+    requester_id: uuid.UUID | None = None,
+    scope_type: str | None = None,
+    scope_id: uuid.UUID | None = None,
+    allowed_vmids: set[int] | None = None,
 ) -> SSHExecResult:
     """處理使用者確認（允許 or 拒絕）。"""
     token = confirm_req.token or confirm_req.confirm_token
@@ -318,7 +385,7 @@ async def confirm_exec(
             command="",
             error="缺少確認 token，請重新發起請求。",
         )
-    entry = _pop_pending(token)
+    entry = _peek_pending(token)
     if entry is None:
         return SSHExecResult(
             vmid=0,
@@ -328,7 +395,31 @@ async def confirm_exec(
             error="確認 token 無效或已過期（TTL 5 分鐘）。請重新發起請求。",
         )
     req = entry["request"]
-    allowed_vmids = entry.get("allowed_vmids")
+    stored_vmids = entry.get("allowed_vmids")
+    if (
+        entry.get("requester_id") != requester_id
+        or entry.get("scope_type") != scope_type
+        or entry.get("scope_id") != scope_id
+        or (
+            allowed_vmids is not None
+            and stored_vmids is not None
+            and set(allowed_vmids) != set(stored_vmids)
+        )
+    ):
+        return SSHExecResult(
+            vmid=req.vmid,
+            command=req.command,
+            error="確認 token 與目前使用者或資源範圍不符，請重新發起請求。",
+        )
+    # Only a successfully re-authorized caller may consume the one-time token.
+    entry = _pop_pending(token)
+    if entry is None:
+        return SSHExecResult(
+            vmid=req.vmid,
+            command=req.command,
+            error="確認 token 無效或已過期（TTL 5 分鐘）。請重新發起請求。",
+        )
+    allowed_vmids = stored_vmids
 
     if not confirm_req.approved:
         logger.info("使用者拒絕執行 vmid=%d cmd=%r", req.vmid, req.command)
@@ -385,7 +476,7 @@ async def _do_exec(
                 ssh_user=req.ssh_user,
                 command=req.command,
                 blocked=True,
-                block_reason="目前只允許存取所在群組內的 VM/LXC",
+                block_reason="目前只允許存取指定範圍內的 VM/LXC",
             )
 
         if session is not None:
@@ -422,6 +513,8 @@ async def _do_exec(
             timeout,
         )
 
+        stdout, stdout_truncated = _redact_and_truncate(stdout)
+        stderr, stderr_truncated = _redact_and_truncate(stderr)
         return SSHExecResult(
             vmid=req.vmid,
             host=host,
@@ -430,6 +523,8 @@ async def _do_exec(
             exit_code=exit_code,
             stdout=stdout,
             stderr=stderr,
+            stdout_truncated=stdout_truncated,
+            stderr_truncated=stderr_truncated,
         )
 
     except Exception as exc:

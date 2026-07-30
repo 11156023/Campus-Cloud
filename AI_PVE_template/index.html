@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AI PVE Template Test</title>
+    <style>
+      :root { color-scheme: dark; font-family: system-ui, sans-serif; }
+      body { max-width: 980px; margin: 0 auto; padding: 24px; background: #111827; color: #e5e7eb; }
+      h1 { margin-top: 0; }
+      label { display: block; margin: 12px 0 6px; color: #cbd5e1; }
+      input, select, textarea, button { box-sizing: border-box; width: 100%; padding: 9px 10px; border: 1px solid #475569; border-radius: 6px; background: #0f172a; color: inherit; }
+      textarea { min-height: 110px; resize: vertical; }
+      button { width: auto; margin-top: 12px; cursor: pointer; background: #1d4ed8; border-color: #2563eb; }
+      button.secondary { background: #334155; border-color: #64748b; }
+      button.danger { background: #991b1b; border-color: #dc2626; }
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+      .card { margin-top: 18px; padding: 16px; border: 1px solid #334155; border-radius: 8px; background: #1e293b; }
+      .muted { color: #94a3b8; }
+      pre { overflow: auto; max-height: 320px; padding: 12px; background: #020617; border-radius: 6px; white-space: pre-wrap; }
+      .tool { margin: 10px 0; padding: 10px; border-left: 3px solid #60a5fa; background: #0f172a; }
+      .pending { border-left-color: #f59e0b; }
+      .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+      @media (max-width: 700px) { .grid { grid-template-columns: 1fr; } }
+    </style>
+  </head>
+  <body>
+    <h1>AI PVE Template Test</h1>
+    <p class="muted">VMID 102 測試入口。所有授權、guard、SSH key 與 scope 驗證由 backend 負責。</p>
+
+    <div class="card">
+      <div class="grid">
+        <div>
+          <label for="apiBase">Backend API base</label>
+          <input id="apiBase" value="http://localhost:8000/api/v1" autocomplete="off" />
+        </div>
+        <div>
+          <label for="token">Access token（只保留在記憶體）</label>
+          <input id="token" type="password" autocomplete="off" />
+        </div>
+      </div>
+      <div class="grid">
+        <div>
+          <label for="template">機器模板</label>
+          <select id="template"><option value="">先載入模板</option></select>
+        </div>
+        <div>
+          <label for="vmid">測試 VMID</label>
+          <input id="vmid" value="102" readonly />
+        </div>
+      </div>
+      <div class="row">
+        <button id="loadTemplates" class="secondary">載入模板</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <label for="message">自然語言任務</label>
+      <textarea id="message" placeholder="例如：先確認 n8n 是否在 5678 連接埠提供 HTTP 回應。"></textarea>
+      <button id="send">送出任務</button>
+    </div>
+
+    <div id="confirmation" class="card" hidden>
+      <h2>等待確認</h2>
+      <p id="confirmationReason" class="muted"></p>
+      <pre id="confirmationCommand"></pre>
+      <button id="approve">允許執行</button>
+      <button id="reject" class="danger">拒絕</button>
+    </div>
+
+    <div id="result" class="card">
+      <h2>結果</h2>
+      <div id="reply" class="muted">尚未送出任務。</div>
+      <div id="tools"></div>
+    </div>
+
+    <script>
+      const state = { messages: [], pendingToken: null };
+      const $ = (id) => document.getElementById(id);
+      const base = () => $('apiBase').value.trim().replace(/\/$/, '');
+      const headers = () => ({
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${$('token').value.trim()}`,
+      });
+
+      function showError(error) { $('reply').textContent = `錯誤：${error}`; }
+
+      async function request(path, options = {}) {
+        const response = await fetch(`${base()}${path}`, { ...options, headers: headers() });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.detail || `HTTP ${response.status}`);
+        return data;
+      }
+
+      function renderTool(tool) {
+        const result = tool.result || {};
+        const node = document.createElement('div');
+        node.className = `tool${result.pending ? ' pending' : ''}`;
+        node.innerHTML = `<strong>${tool.name}</strong><pre>${escapeHtml(JSON.stringify({ args: tool.args, result }, null, 2))}</pre>`;
+        return node;
+      }
+
+      function escapeHtml(value) {
+        return String(value).replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]));
+      }
+
+      function render(data) {
+        state.messages = data.messages || state.messages;
+        $('reply').textContent = data.error ? `錯誤：${data.error}` : (data.reply || '');
+        $('tools').replaceChildren(...(data.tools_called || []).map(renderTool));
+        const pending = (data.tools_called || []).find((tool) => tool.result && tool.result.pending);
+        state.pendingToken = pending ? pending.result.confirm_token : null;
+        if (pending) {
+          $('confirmationReason').textContent = pending.result.reason || '這個指令不在 template 的唯讀 smoke command 清單，需要人工確認。';
+          $('confirmationCommand').textContent = pending.args.command || pending.result.command || '';
+          $('confirmation').hidden = false;
+        } else {
+          $('confirmation').hidden = true;
+        }
+        if (data.confirmation_result) {
+          const result = document.createElement('pre');
+          result.textContent = `confirmation result:\n${JSON.stringify(data.confirmation_result, null, 2)}`;
+          $('tools').appendChild(result);
+        }
+      }
+
+      $('loadTemplates').onclick = async () => {
+        try {
+          const templates = await request('/ai/pve-template/templates');
+          $('template').replaceChildren(...templates.map((item) => {
+            const option = document.createElement('option');
+            option.value = item.template_key;
+            option.textContent = `${item.display_name} — ${item.description}`;
+            return option;
+          }));
+        } catch (error) { showError(error.message); }
+      };
+
+      $('send').onclick = async () => {
+        try {
+          const data = await request('/ai/pve-template/chat', {
+            method: 'POST',
+            body: JSON.stringify({ template_key: $('template').value, vmid: 102, message: $('message').value, messages: state.messages.length ? state.messages : undefined }),
+          });
+          render(data);
+        } catch (error) { showError(error.message); }
+      };
+
+      $('approve').onclick = async () => {
+        if (!state.pendingToken) return;
+        try {
+          const data = await request('/ai/pve-template/ssh/confirm', { method: 'POST', body: JSON.stringify({ token: state.pendingToken, approved: true }) });
+          state.pendingToken = null;
+          render(data);
+        } catch (error) { showError(error.message); }
+      };
+
+      $('reject').onclick = async () => {
+        if (!state.pendingToken) return;
+        try {
+          const data = await request('/ai/pve-template/ssh/confirm', { method: 'POST', body: JSON.stringify({ token: state.pendingToken, approved: false }) });
+          state.pendingToken = null;
+          render(data);
+        } catch (error) { showError(error.message); }
+      };
+    </script>
+  </body>
+</html>
