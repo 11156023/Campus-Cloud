@@ -10,7 +10,8 @@
 
 設計重點：
   - 一次 chat 請求只收集一次 PVE 快照（lazy），多個 tool_calls 共用同一份快照。
-  - ssh_exec 在 AI Tool 呼叫時直接執行（不走 pending 確認），黑名單仍有效。
+  - ssh_exec 依呼叫情境執行；一般 PVE Log 路徑要求確認，template 測試路徑只對
+    伺服器列出的唯讀 smoke command 自動執行，其餘仍 pending。
   - 若對話帶有群組範圍，工具輸出與 SSH 執行都只允許該群組可見的 VMID。
   - Gemma-4/Qwen3 的 <think> 與 tool call 標記會在第二次請求前清除，
     避免 message history 污染導致 LLM 無法正確總結。
@@ -30,6 +31,7 @@ from sqlmodel import Session
 from app.ai.pve_log.collector import collect_snapshot
 from app.ai.pve_log.config import settings
 from app.ai.pve_log.schemas import ChatResponse, ToolCallRecord
+from app.ai.pve_template.command_policy import is_known_read_command
 from app.infrastructure.ai.pve_log import client as vllm_client
 
 logger = logging.getLogger(__name__)
@@ -281,14 +283,13 @@ async def _execute_ssh_tool(
     requester_id: uuid.UUID | None = None,
     scope_type: str | None = None,
     scope_id: uuid.UUID | None = None,
+    template_key: str | None = None,
+    auto_execute_known_ssh: bool = False,
 ) -> dict:
     """執行 ssh_exec 工具（async，需要等待 SSH 連線）。
 
-    重要設計：
-    - 在 AI Tool 呼叫時，不使用 require_confirm，直接執行取得真實資料
-    - LLM 必須拿到真實結果才能繼續總結，若回傳 pending=True 則 LLM 沒有資料可總結
-    - 黑名單依然產生作用（blocked=True 時回傳攔截說明）
-    - 安全性：黑名單（自動）+ 系統提示詞已告知 AI 描述指令目的
+    一般 PVE Log 呼叫會 pending；template 測試入口只讓伺服器列出的唯讀
+    smoke command 自動執行，未知或自訂指令仍需人工確認。黑名單永遠先執行。
     """
     from app.ai.pve_log.schemas import SSHExecRequest as _SSHExecRequest
     from app.ai.pve_log.ssh_exec import ssh_exec as _ssh_exec
@@ -310,12 +311,19 @@ async def _execute_ssh_tool(
             "pending": False,
         }
 
+    # The template test harness always uses the machine's highest supported
+    # account.  The model may suggest a username for diagnostics, but it must
+    # not downgrade or redirect the server-side credential selection.
+    effective_ssh_user = "root" if template_key else str(args.get("ssh_user", "root"))
     req = _SSHExecRequest(
         vmid=vmid,
         command=command,
-        ssh_user=str(args.get("ssh_user", "root")),
+        ssh_user=effective_ssh_user,
         ssh_port=int(args.get("ssh_port", 22)),
-        require_confirm=True,  # 支援中斷與接續確認，改為 True
+        require_confirm=not (
+            auto_execute_known_ssh
+            and is_known_read_command(template_key, command)
+        ),
     )
     result = await _ssh_exec(
         req,
@@ -345,6 +353,9 @@ async def chat(
     requester_id: uuid.UUID | None = None,
     scope_type: str | None = None,
     scope_id: uuid.UUID | None = None,
+    system_prompt: str | None = None,
+    template_key: str | None = None,
+    auto_execute_known_ssh: bool = False,
 ) -> ChatResponse:
     """單次 AI 對話，支援 Tool Calling 及其接續。
 
@@ -360,17 +371,41 @@ async def chat(
             error="vLLM 設定不完整，請確認 .env 中的 VLLM_* 設定",
         )
 
-    messages: list[dict] = history or []
-    if not messages:
-        messages = [
-            {"role": "system", "content": _SYSTEM_PROMPT},
-        ]
+    effective_system_prompt = system_prompt or _SYSTEM_PROMPT
+    if history:
+        if system_prompt is not None:
+            # Template history may contain stale or injected system messages.
+            # Keep conversational/tool turns, but always put the code-owned
+            # template prompt back at the front.
+            messages = [
+                dict(item)
+                for item in history
+                if isinstance(item, dict) and item.get("role") != "system"
+            ]
+            messages.insert(0, {"role": "system", "content": effective_system_prompt})
+            if allowed_vmids is not None:
+                messages.insert(
+                    1,
+                    {
+                        "role": "system",
+                        "content": (
+                            "本次對話僅可讀取與操作指定範圍內的 VM/LXC，"
+                            "不得查詢或操作範圍外的 VMID。"
+                        ),
+                    },
+                )
+            if message:
+                messages.append({"role": "user", "content": message})
+        else:
+            messages = [dict(item) for item in history]
+    else:
+        messages = [{"role": "system", "content": effective_system_prompt}]
         if allowed_vmids is not None:
             messages.append(
                 {
                     "role": "system",
                     "content": (
-                        "本次對話僅可讀取目前群組可見的 VM/LXC 資源，"
+                        "本次對話僅可讀取與操作指定範圍內的 VM/LXC，"
                         "不得查詢或操作範圍外的 VMID。"
                     ),
                 }
@@ -544,6 +579,8 @@ async def chat(
                         requester_id=requester_id,
                         scope_type=scope_type,
                         scope_id=scope_id,
+                        template_key=template_key,
+                        auto_execute_known_ssh=auto_execute_known_ssh,
                     )
                 else:
                     result = _execute_tool_sync(

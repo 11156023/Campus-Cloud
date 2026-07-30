@@ -170,6 +170,12 @@ class SSHExecResult(BaseModel):
     command: str = Field(default="")
     stdout: str = Field(default="")
     stderr: str = Field(default="")
+    stdout_truncated: bool = Field(
+        default=False, description="stdout 是否因輸出上限而截斷"
+    )
+    stderr_truncated: bool = Field(
+        default=False, description="stderr 是否因輸出上限而截斷"
+    )
     exit_code: int = Field(default=0)
     error: str | None = Field(default=None)
     blocked: bool = Field(
@@ -185,7 +191,7 @@ class SSHExecResult(BaseModel):
 
 
 class SSHConfirmRequest(BaseModel):
-    token: str = Field(description="執行時取得的 confirm_token")
+    token: str | None = Field(default=None, description="執行時取得的 confirm_token")
     confirm_token: str | None = Field(
         default=None, description="相容欄位：可改以 confirm_token 傳入"
     )

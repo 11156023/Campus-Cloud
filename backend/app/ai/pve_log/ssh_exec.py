@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import time
 import uuid
 from typing import Any
@@ -46,6 +47,16 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 _PENDING_TTL = 300  # 秒
+_MAX_OUTPUT_CHARS = 16 * 1024
+_SENSITIVE_OUTPUT_PATTERNS = (
+    re.compile(
+        r"(?i)(password|passwd|secret|token|api[_-]?key)\s*[:=]\s*([^\s,;]+)"
+    ),
+    re.compile(
+        r"-----BEGIN [A-Z ]*PRIVATE KEY-----.+?-----END [A-Z ]*PRIVATE KEY-----",
+        re.DOTALL,
+    ),
+)
 _pending_store: dict[str, dict[str, Any]] = {}  # token → {request, created_at}
 
 
@@ -77,13 +88,28 @@ def _pop_pending(token: str) -> dict[str, Any] | None:
     return _pending_store.pop(token, None)
 
 
+def _peek_pending(token: str) -> dict[str, Any] | None:
+    _cleanup_expired()
+    return _pending_store.get(token)
+
+
 def peek_pending_scope(token: str) -> tuple[str | None, uuid.UUID | None]:
     """Read token scope without consuming it so a legacy confirm body can be authorized."""
     _cleanup_expired()
-    entry = _pending_store.get(token)
+    entry = _peek_pending(token)
     if entry is None:
         return None, None
     return entry.get("scope_type"), entry.get("scope_id")
+
+
+def peek_pending_request(token: str) -> SSHExecRequest | None:
+    """Read a pending request for a fresh authorization check."""
+    _cleanup_expired()
+    entry = _peek_pending(token)
+    if entry is None:
+        return None
+    request = entry.get("request")
+    return request if isinstance(request, SSHExecRequest) else None
 
 
 def _cleanup_expired() -> None:
@@ -204,6 +230,18 @@ def _ssh_exec_sync(
         return exit_code, out_text, err_text
     finally:
         client.close()
+
+
+def _redact_and_truncate(value: str) -> tuple[str, bool]:
+    redacted = value
+    for pattern in _SENSITIVE_OUTPUT_PATTERNS:
+        if pattern.pattern.startswith("(?i)(password"):
+            redacted = pattern.sub(lambda match: f"{match.group(1)}=[REDACTED]", redacted)
+        else:
+            redacted = pattern.sub("[REDACTED PRIVATE KEY]", redacted)
+    if len(redacted) <= _MAX_OUTPUT_CHARS:
+        return redacted, False
+    return redacted[:_MAX_OUTPUT_CHARS] + "\n...[truncated]", True
 
 
 # ---------------------------------------------------------------------------
@@ -346,7 +384,7 @@ async def confirm_exec(
             command="",
             error="缺少確認 token，請重新發起請求。",
         )
-    entry = _pop_pending(token)
+    entry = _peek_pending(token)
     if entry is None:
         return SSHExecResult(
             vmid=0,
@@ -371,6 +409,15 @@ async def confirm_exec(
             vmid=req.vmid,
             command=req.command,
             error="確認 token 與目前使用者或資源範圍不符，請重新發起請求。",
+        )
+    # Consume only after the caller, scope, and VMID have been revalidated so
+    # a token cannot be burned by an unrelated user or stale scope.
+    entry = _pop_pending(token)
+    if entry is None:
+        return SSHExecResult(
+            vmid=req.vmid,
+            command=req.command,
+            error="確認 token 無效或已過期（TTL 5 分鐘）。請重新發起請求。",
         )
     allowed_vmids = stored_vmids
 
@@ -466,6 +513,8 @@ async def _do_exec(
             timeout,
         )
 
+        stdout, stdout_truncated = _redact_and_truncate(stdout)
+        stderr, stderr_truncated = _redact_and_truncate(stderr)
         return SSHExecResult(
             vmid=req.vmid,
             host=host,
@@ -474,6 +523,8 @@ async def _do_exec(
             exit_code=exit_code,
             stdout=stdout,
             stderr=stderr,
+            stdout_truncated=stdout_truncated,
+            stderr_truncated=stderr_truncated,
         )
 
     except Exception as exc:
