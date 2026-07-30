@@ -962,7 +962,7 @@ export default function GroupsPage() {
     <div className={styles.page}>
       <div className={styles.pageHeader}>
         <div className={styles.pageHeading}>
-          <h1 className={styles.pageTitle}>群組管理</h1>
+          <h1 className={styles.pageTitle}>群組管理（非正式）</h1>
           <p className={styles.pageSubtitle}>
             管理課程/班級群組，<span className={styles.accent}>批量分配虛擬機</span>
           </p>

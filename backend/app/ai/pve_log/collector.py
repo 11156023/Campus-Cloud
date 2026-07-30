@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
@@ -20,46 +19,9 @@ from app.ai.pve_log.schemas import (
     SystemSnapshot,
 )
 from app.ai.utils import safe_bool, safe_float, safe_int
+from app.infrastructure.proxmox import get_proxmox_api
 
 logger = logging.getLogger(__name__)
-
-class _ProxmoxClientState:
-    """共享的 PVE 連線快取狀態。"""
-
-    def __init__(self) -> None:
-        self.client: ProxmoxAPI | None = None
-        self.created_at = 0.0
-
-
-_state = _ProxmoxClientState()
-_proxmox_lock = threading.Lock()
-_TICKET_TTL = 7000
-
-
-def _get_proxmox() -> ProxmoxAPI:
-    if not settings.proxmox_user or not settings.proxmox_password:
-        raise RuntimeError("請在 .env 設定 PROXMOX_USER 與 PROXMOX_PASSWORD")
-
-    now = time.monotonic()
-    if _state.client is not None and (now - _state.created_at) < _TICKET_TTL:
-        return _state.client
-
-    with _proxmox_lock:
-        if _state.client is not None and (now - _state.created_at) < _TICKET_TTL:
-            return _state.client
-
-        logger.info("建立 PVE API 連線 -> %s", settings.proxmox_host)
-        _state.client = ProxmoxAPI(
-            settings.proxmox_host,
-            user=settings.proxmox_user,
-            password=settings.proxmox_password,
-            verify_ssl=settings.proxmox_verify_ssl,
-            timeout=settings.proxmox_api_timeout,
-        )
-        _state.created_at = now
-        return _state.client
-
-
 
 def _usage_pct(used: int, total: int) -> float:
     return round(used / total, 4) if total > 0 else 0.0
@@ -298,7 +260,7 @@ def _collect_lxc_interfaces(proxmox: ProxmoxAPI, node: str, vmid: int) -> list[N
 def collect_snapshot() -> SystemSnapshot:
     started = time.monotonic()
     errors: list[str] = []
-    proxmox = _get_proxmox()
+    proxmox = get_proxmox_api()
 
     logger.info("收集叢集資訊...")
     try:
