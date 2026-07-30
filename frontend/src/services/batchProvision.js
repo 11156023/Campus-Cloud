@@ -12,10 +12,6 @@ export const BatchProvisionService = {
   },
 
   /** 列出某 Group 的所有批次 */
-  listByGroup(groupId) {
-    return apiGet(`/api/v1/batch-provision/group/${groupId}`);
-  },
-
   /** Admin: 核准 / 駁回 */
   review(jobId, body) {
     return apiPost(`/api/v1/batch-provision/${jobId}/review`, body);
@@ -32,7 +28,4 @@ export const BatchProvisionService = {
   },
 
   /** 教師: 送出批次申請 */
-  submit(groupId, body) {
-    return apiPost(`/api/v1/batch-provision/${groupId}`, body);
-  },
 };

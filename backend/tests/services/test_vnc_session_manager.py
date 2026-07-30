@@ -24,7 +24,9 @@ from app.services.classroom.vnc_session_manager import (
     VncSessionManager,
 )
 
-INIT = ServerInitInfo(width=640, height=480, pixel_format=PIXEL_FORMAT_32BPP, name=b"vm")
+INIT = ServerInitInfo(
+    width=640, height=480, pixel_format=PIXEL_FORMAT_32BPP, name=b"vm"
+)
 
 FULL_FBUR = full_update_request(640, 480, incremental=False)
 INCREMENTAL_FBUR = full_update_request(640, 480, incremental=True)
@@ -44,9 +46,7 @@ EXPECTED_HANDSHAKE_PREFIX = (
 
 def _fb_update_raw_1x1(fill: bytes) -> bytes:
     return (
-        struct.pack(">BBH", 0, 0, 1)
-        + struct.pack(">HHHHi", 0, 0, 1, 1, 0)
-        + fill * 4
+        struct.pack(">BBH", 0, 0, 1) + struct.pack(">HHHHi", 0, 0, 1, 1, 0) + fill * 4
     )
 
 
@@ -163,7 +163,7 @@ def manager(
 USER_A = uuid.uuid4()
 USER_B = uuid.uuid4()
 TEACHER = uuid.uuid4()
-GROUP = uuid.uuid4()
+CLASS = uuid.uuid4()
 
 
 async def _start(
@@ -171,10 +171,10 @@ async def _start(
     *,
     mode: SessionMode = SessionMode.monitor,
     vmid: int = 100,
-    group_id: uuid.UUID | None = None,
+    class_id: uuid.UUID = CLASS,
 ) -> ClassroomSession:
     return await manager.start_session(
-        vmid=vmid, mode=mode, group_id=group_id, started_by=TEACHER
+        vmid=vmid, mode=mode, class_id=class_id, started_by=TEACHER
     )
 
 
@@ -204,13 +204,13 @@ class TestSessionLifecycle:
         await manager.stop_session(session.id)
 
     async def test_get_and_list_sessions(self, manager: VncSessionManager) -> None:
-        session = await _start(manager, mode=SessionMode.broadcast, group_id=GROUP)
+        session = await _start(manager, mode=SessionMode.broadcast, class_id=CLASS)
         assert manager.get_session(session.id) is not None
         assert manager.get_session("nope") is None
         assert [s.id for s in manager.list_sessions()] == [session.id]
-        found = manager.find_broadcast_for_groups({GROUP})
+        found = manager.find_broadcast_for_classes({CLASS})
         assert found is not None and found.id == session.id
-        assert manager.find_broadcast_for_groups({uuid.uuid4()}) is None
+        assert manager.find_broadcast_for_classes({uuid.uuid4()}) is None
         await manager.stop_session(session.id)
         assert manager.list_sessions() == []
 
@@ -306,7 +306,9 @@ class TestFanOut:
     ) -> None:
         from app.core.config import settings
 
-        monkeypatch.setattr(settings, "CLASSROOM_SUBSCRIBER_QUEUE_SIZE", 2, raising=False)
+        monkeypatch.setattr(
+            settings, "CLASSROOM_SUBSCRIBER_QUEUE_SIZE", 2, raising=False
+        )
         session = await _start(manager)
         ws, task = await _attach(manager, session.id, USER_A)
         ws.freeze_send()
@@ -332,9 +334,7 @@ class TestFanOut:
         ws1, t1 = await _attach(manager, session.id, USER_A)
         ws2 = FakeSubscriberWs(frames=list(HANDSHAKE_CLIENT_FRAMES))
         with pytest.raises(AppError):
-            await manager.attach_subscriber(
-                session.id, user_id=USER_B, websocket=ws2
-            )
+            await manager.attach_subscriber(session.id, user_id=USER_B, websocket=ws2)
         await manager.stop_session(session.id)
         await t1
 
@@ -399,7 +399,7 @@ class TestControl:
         self, manager: VncSessionManager
     ) -> None:
         session = await _start(
-            manager, mode=SessionMode.broadcast, vmid=200, group_id=GROUP
+            manager, mode=SessionMode.broadcast, vmid=200, class_id=CLASS
         )
         await manager.set_controller(session.id, TEACHER)
         assert manager.is_input_blocked(200) is False

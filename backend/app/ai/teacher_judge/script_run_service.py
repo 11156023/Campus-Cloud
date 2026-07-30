@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import HTTPException
-from sqlmodel import Session
+from sqlmodel import Session, col, select
 
 from app.ai.teacher_judge.schemas import TeacherJudgeScriptRunPublic
 from app.ai.teacher_judge.script_artifact_service import get_artifact
@@ -20,7 +20,11 @@ from app.models.teacher_judge_script_run import (
     TeacherJudgeScriptRunStatus,
     TeacherJudgeScriptRunTargetScope,
 )
-from app.repositories import group as group_repo
+from app.models.teaching_class import (
+    TeachingClassStudent,
+    TeachingClassStudentMachine,
+)
+from app.models.user import User
 from app.repositories import resource as resource_repo
 
 logger = logging.getLogger(__name__)
@@ -33,7 +37,7 @@ def _now() -> datetime:
 def _run_to_public(run: TeacherJudgeScriptRun) -> TeacherJudgeScriptRunPublic:
     return TeacherJudgeScriptRunPublic(
         id=str(run.id),
-        group_id=str(run.group_id),
+        teaching_class_id=str(run.teaching_class_id),
         artifact_id=str(run.artifact_id),
         target_scope=run.target_scope.value,
         target_snapshot_json=run.target_snapshot_json,
@@ -52,33 +56,62 @@ def _run_to_public(run: TeacherJudgeScriptRun) -> TeacherJudgeScriptRunPublic:
 def get_script_run_public(
     *,
     session: Session,
-    group_id: uuid.UUID,
+    teaching_class_id: uuid.UUID,
     artifact_id: uuid.UUID,
     run_id: uuid.UUID,
 ) -> TeacherJudgeScriptRunPublic:
     run = session.get(TeacherJudgeScriptRun, run_id)
-    if run is None or run.group_id != group_id or run.artifact_id != artifact_id:
+    if (
+        run is None
+        or run.teaching_class_id != teaching_class_id
+        or run.artifact_id != artifact_id
+    ):
         raise HTTPException(status_code=404, detail="Script run not found")
     return _run_to_public(run)
 
 
-def _group_member_by_vmid(
+def _class_member_by_vmid(
     *,
     session: Session,
-    group_id: uuid.UUID,
+    teaching_class_id: uuid.UUID,
 ) -> dict[int, dict[str, Any]]:
-    member_vmids = group_repo.get_member_vmids(session=session, group_id=group_id)
-    users = group_repo.get_group_members(session=session, group_id=group_id)
+    enrollments = list(
+        session.exec(
+            select(TeachingClassStudent).where(
+                TeachingClassStudent.class_id == teaching_class_id
+            )
+        ).all()
+    )
+    if not enrollments:
+        return {}
+
+    enrollments_by_id = {row.id: row for row in enrollments}
+    users = list(
+        session.exec(
+            select(User).where(col(User.id).in_([row.user_id for row in enrollments]))
+        ).all()
+    )
     users_by_id = {user.id: user for user in users}
+    machines = list(
+        session.exec(
+            select(TeachingClassStudentMachine).where(
+                col(TeachingClassStudentMachine.class_student_id).in_(
+                    list(enrollments_by_id)
+                ),
+                TeachingClassStudentMachine.vmid.is_not(None),
+            )
+        ).all()
+    )
 
     result: dict[int, dict[str, Any]] = {}
-    for user_id, vmid in member_vmids.items():
-        if vmid is None:
+    for machine in machines:
+        enrollment = enrollments_by_id.get(machine.class_student_id)
+        if enrollment is None or machine.vmid is None:
             continue
-        user = users_by_id.get(user_id)
+        user = users_by_id.get(enrollment.user_id)
         if user is None:
             continue
-        result[int(vmid)] = {
+        result[int(machine.vmid)] = {
             "user_id": str(user.id),
             "email": user.email,
             "full_name": user.full_name,
@@ -112,10 +145,13 @@ def _running_resources_by_vmid() -> dict[int, dict[str, Any]]:
 def _resolve_running_targets(
     *,
     session: Session,
-    group_id: uuid.UUID,
+    teaching_class_id: uuid.UUID,
     target_vmids: list[int],
 ) -> list[dict[str, Any]]:
-    member_by_vmid = _group_member_by_vmid(session=session, group_id=group_id)
+    member_by_vmid = _class_member_by_vmid(
+        session=session,
+        teaching_class_id=teaching_class_id,
+    )
     live_by_vmid = _running_resources_by_vmid()
 
     targets: list[dict[str, Any]] = []
@@ -124,7 +160,7 @@ def _resolve_running_targets(
         if member is None:
             raise HTTPException(
                 status_code=400,
-                detail=f"VMID {vmid} 不屬於此群組或尚未建立可用機器。",
+                detail=f"VMID {vmid} 不屬於此班級或尚未建立可用機器。",
             )
 
         live = live_by_vmid.get(vmid)
@@ -149,7 +185,7 @@ def _resolve_running_targets(
         if str(resource.user_id) != member["user_id"]:
             raise HTTPException(
                 status_code=400,
-                detail=f"VMID {vmid} 目前資源擁有者與群組成員不一致。",
+                detail=f"VMID {vmid} 目前資源擁有者與班級學生不一致。",
             )
         ip_address = resolve_target_ip_address(
             session=session,
@@ -187,7 +223,7 @@ def _resolve_running_targets(
 def create_script_run(
     *,
     session: Session,
-    group_id: uuid.UUID,
+    teaching_class_id: uuid.UUID,
     artifact_id: uuid.UUID,
     target_scope: TeacherJudgeScriptRunTargetScope,
     target_vmids: list[int],
@@ -198,7 +234,7 @@ def create_script_run(
 
     artifact = get_artifact(
         session=session,
-        group_id=group_id,
+        teaching_class_id=teaching_class_id,
         artifact_id=artifact_id,
     )
     if artifact.status != TeacherJudgeScriptStatus.approved:
@@ -206,7 +242,7 @@ def create_script_run(
 
     targets = _resolve_running_targets(
         session=session,
-        group_id=group_id,
+        teaching_class_id=teaching_class_id,
         target_vmids=target_vmids,
     )
     if not targets:
@@ -215,7 +251,7 @@ def create_script_run(
         raise HTTPException(status_code=400, detail="單次最多只能選擇 5 台 VM/LXC。")
 
     run = TeacherJudgeScriptRun(
-        group_id=group_id,
+        teaching_class_id=teaching_class_id,
         artifact_id=artifact.id,
         target_scope=target_scope,
         target_snapshot_json={

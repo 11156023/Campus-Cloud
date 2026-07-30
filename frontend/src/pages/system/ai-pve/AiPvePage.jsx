@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import styles from "./AiPvePanel.module.scss";
+import styles from "./AiPvePage.module.scss";
 import MIcon from "../../../components/MIcon";
 import { useToast } from "../../../hooks/useToast";
 import { AiPveLogService } from "../../../services/aiPveLog";
@@ -20,7 +20,7 @@ function sanitizeContent(text) {
   );
 }
 
-export default function AiPvePanel({ groupId }) {
+export default function AiPvePage() {
   const toast = useToast();
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
@@ -28,7 +28,7 @@ export default function AiPvePanel({ groupId }) {
     {
       role: "assistant",
       content:
-        "我是 AI-PVE 助手。你可以詢問節點資源、VM/LXC 狀態、儲存空間使用率等資訊。",
+        "我是 AI PVE 維運助手。你可以詢問全站節點資源、VM/LXC 狀態、儲存空間使用率等資訊。",
     },
   ]);
   const [chatHistory, setChatHistory] = useState([]);
@@ -88,8 +88,8 @@ export default function AiPvePanel({ groupId }) {
     try {
       const response = await AiPveLogService.chat(
         newHistory.length > 0
-          ? { messages: newHistory, group_id: groupId }
-          : { message, group_id: groupId },
+          ? { messages: newHistory }
+          : { message },
       );
       handleChatResponse(response);
     } catch (err) {
@@ -150,7 +150,6 @@ export default function AiPvePanel({ groupId }) {
 
       const chatRes = await AiPveLogService.chat({
         messages: updatedHistory,
-        group_id: groupId,
       });
       handleChatResponse(chatRes);
       setIsSending(false);
@@ -165,10 +164,10 @@ export default function AiPvePanel({ groupId }) {
       <div className={styles.panelHeading}>
         <h2 className={styles.panelTitle}>
           <MIcon name="smart_toy" size={20} />
-          AI-PVE 訊息
+          AI PVE 維運助手
         </h2>
         <p className={styles.panelDesc}>
-          針對當前 PVE 環境快速提問，取得 VM/LXC 與節點運行建議
+          管理員專用的全站 PVE 維運工具，可查詢 VM/LXC 與節點狀態，執行指令前會再次確認
         </p>
       </div>
 

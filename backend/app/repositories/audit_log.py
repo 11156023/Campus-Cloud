@@ -20,7 +20,9 @@ def create_audit_log(
 ) -> AuditLog:
     if isinstance(action, str):
         action = AuditAction(action)
-    resource_vmid = vmid if vmid is not None and session.get(Resource, vmid) is not None else None
+    resource_vmid = (
+        vmid if vmid is not None and session.get(Resource, vmid) is not None else None
+    )
     db_log = AuditLog(
         user_id=user_id,
         vmid=vmid,
@@ -167,13 +169,20 @@ def get_audit_stats(
         AuditAction.resource_reset,
         AuditAction.snapshot_delete,
         AuditAction.user_delete,
-        AuditAction.group_delete,
     ]
-    danger_stmt = select(func.count()).select_from(AuditLog).where(
-        AuditLog.action.in_(danger_actions)
+    danger_stmt = (
+        select(func.count())
+        .select_from(AuditLog)
+        .where(AuditLog.action.in_(danger_actions))
     )
-    login_failed_stmt = select(func.count()).select_from(AuditLog).where(
-        AuditLog.action.in_([AuditAction.login_failed, AuditAction.login_google_failed])
+    login_failed_stmt = (
+        select(func.count())
+        .select_from(AuditLog)
+        .where(
+            AuditLog.action.in_(
+                [AuditAction.login_failed, AuditAction.login_google_failed]
+            )
+        )
     )
     active_users_stmt = (
         select(func.count(func.distinct(AuditLog.user_id)))

@@ -11,10 +11,10 @@ import logging
 import uuid
 from typing import Any
 
-from sqlmodel import Session, col, select
+from sqlmodel import Session, select
 
 from app.exceptions import AppError, ConflictError
-from app.models import GroupMember, QuotaScope, Resource, ResourceQuota
+from app.models import QuotaScope, Resource, ResourceQuota
 from app.services.proxmox import proxmox_service
 from app.services.resource.quota_policy import (
     EffectiveQuota,
@@ -29,29 +29,13 @@ _MIB = 1024**2
 _GIB = 1024**3
 
 
-def _quota_rows_for_user(
-    session: Session, user_id: uuid.UUID
-) -> tuple[ResourceQuota | None, list[ResourceQuota]]:
-    user_quota = session.exec(
+def _quota_for_user(session: Session, user_id: uuid.UUID) -> ResourceQuota | None:
+    return session.exec(
         select(ResourceQuota).where(
             ResourceQuota.scope == QuotaScope.user,
             ResourceQuota.user_id == user_id,
         )
     ).first()
-    group_ids = session.exec(
-        select(GroupMember.group_id).where(GroupMember.user_id == user_id)
-    ).all()
-    group_quotas: list[ResourceQuota] = []
-    if group_ids:
-        group_quotas = list(
-            session.exec(
-                select(ResourceQuota).where(
-                    ResourceQuota.scope == QuotaScope.group,
-                    col(ResourceQuota.group_id).in_(list(group_ids)),
-                )
-            ).all()
-        )
-    return user_quota, group_quotas
 
 
 def _owned_vmids(session: Session, user_id: uuid.UUID) -> list[int]:
@@ -64,8 +48,7 @@ def _owned_vmids(session: Session, user_id: uuid.UUID) -> list[int]:
 
 
 def get_effective_quota(session: Session, user_id: uuid.UUID) -> EffectiveQuota:
-    user_quota, group_quotas = _quota_rows_for_user(session, user_id)
-    return resolve_effective_quota(user_quota, group_quotas)
+    return resolve_effective_quota(_quota_for_user(session, user_id))
 
 
 def get_usage(

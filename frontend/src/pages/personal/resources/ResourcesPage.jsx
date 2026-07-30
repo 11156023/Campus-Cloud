@@ -14,8 +14,6 @@ import useAutoRefresh from "../../../hooks/useAutoRefresh";
 import TerminalDialog from "./TerminalDialog";
 import VncDialog from "./VncDialog";
 import QuotaUsageBar from "../../../components/Teaching/QuotaUsageBar";
-import PairInvitesCard from "../../../components/Teaching/PairInvitesCard";
-import ClassroomWatchDialog from "../../../components/Classroom/ClassroomWatchDialog";
 
 /* ── Constants ── */
 const STATUS_MAP = {
@@ -507,7 +505,6 @@ export default function ResourcesPage() {
   const [pending, setPending]     = useState([]);
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState(false);
-  const [pairWatch, setPairWatch] = useState(null); // { sessionId, vmid }
   const pendingSigRef = useRef(null);
 
   /** silent = true 時不觸發 skeleton / error state，供背景同步使用 */
@@ -575,11 +572,6 @@ export default function ResourcesPage() {
       {/* 我的配額用量（模組 E） */}
       <QuotaUsageBar />
 
-      {/* 協作邀請（模組 E，有邀請才顯示） */}
-      <PairInvitesCard
-        onJoin={(sessionId, vmid) => setPairWatch({ sessionId, vmid })}
-      />
-
       <div className={styles.content}>
         {loading ? (
           <div className={styles.grid}>
@@ -610,14 +602,6 @@ export default function ResourcesPage() {
         )}
       </div>
 
-      {pairWatch && (
-        <ClassroomWatchDialog
-          sessionId={pairWatch.sessionId}
-          title={`協作 VM ${pairWatch.vmid}`}
-          pair
-          onClose={() => setPairWatch(null)}
-        />
-      )}
     </div>
   );
 }

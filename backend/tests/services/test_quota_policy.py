@@ -26,21 +26,13 @@ def _quota_row(**overrides: object) -> SimpleNamespace:
 
 class TestResolveEffectiveQuota:
     def test_no_rows_returns_default(self) -> None:
-        assert resolve_effective_quota(None, []) == DEFAULT_QUOTA
+        assert resolve_effective_quota(None) == DEFAULT_QUOTA
 
-    def test_user_override_wins_over_groups(self) -> None:
+    def test_user_override_wins(self) -> None:
         user_q = _quota_row(max_cpu_cores=2, max_instances=1)
-        group_q = _quota_row(max_cpu_cores=32)
-        result = resolve_effective_quota(user_q, [group_q])
+        result = resolve_effective_quota(user_q)
         assert result.max_cpu_cores == 2
         assert result.max_instances == 1
-
-    def test_group_quotas_take_per_field_max(self) -> None:
-        g1 = _quota_row(max_cpu_cores=4, max_memory_mb=8192)
-        g2 = _quota_row(max_cpu_cores=16, max_memory_mb=4096)
-        result = resolve_effective_quota(None, [g1, g2])
-        assert result.max_cpu_cores == 16
-        assert result.max_memory_mb == 8192
 
 
 class TestCheckQuotaDelta:

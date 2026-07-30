@@ -15,7 +15,6 @@ from app.api.routes import (
     gateway,
     governance,
     gpu,
-    groups,
     ip_management,
     jobs,
     ldap_config,
@@ -23,7 +22,6 @@ from app.api.routes import (
     lxc,
     mining_incidents,
     monitoring,
-    pair_sessions,
     private,
     proxmox_config,
     quotas,
@@ -35,7 +33,6 @@ from app.api.routes import (
     spec_change_requests,
     teacher_judge_files,
     teacher_judge_scripts,
-    teaching,
     teaching_classes,
     templates,
     tunnel,
@@ -59,7 +56,6 @@ api_router.include_router(deletion_requests.router)
 api_router.include_router(monitoring.router)
 api_router.include_router(governance.router)
 api_router.include_router(quotas.router)
-api_router.include_router(teaching.router)
 api_router.include_router(teaching_classes.router)
 api_router.include_router(courses.router)
 api_router.include_router(course_admin.router)
@@ -69,9 +65,7 @@ api_router.include_router(mining_incidents.router)
 api_router.include_router(ai.router)
 api_router.include_router(spec_change_requests.router)
 api_router.include_router(audit_logs.router)
-api_router.include_router(groups.router)
 api_router.include_router(classroom.router)
-api_router.include_router(pair_sessions.router)
 api_router.include_router(batch_provision.router)
 api_router.include_router(proxmox_config.router)
 api_router.include_router(cloudflare.router)

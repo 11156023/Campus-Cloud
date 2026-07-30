@@ -15,7 +15,7 @@ export const templateCatalog = [
     ],
   },
   {
-    id: "tpl-network-pair",
+    id: "tpl-network-dual",
     name: "Router + Client 上課環境",
     code: "NETWORK-PAIR",
     version: 2,
@@ -45,7 +45,7 @@ export const templateCatalog = [
 
 export const classCatalog = [
   { id: "class-linux-1141", name: "Linux 系統管理｜114-1", code: "CS-LINUX-1141", term: "114-1", teacher: "王老師", students: 32, templateId: "tpl-linux-three-tier", templateVersion: 3, machinesPerStudent: 3, status: "active", startDate: "2026/09/01", endDate: "2027/01/31", readyMachines: 94, totalMachines: 96 },
-  { id: "class-network-night", name: "企業網路實務｜夜間班", code: "NET-LAB-N1", term: "114-1", teacher: "王老師", students: 24, templateId: "tpl-network-pair", templateVersion: 2, machinesPerStudent: 2, status: "planning", startDate: "2026/09/08", endDate: "2027/01/20", readyMachines: 0, totalMachines: 48 },
+  { id: "class-network-night", name: "企業網路實務｜夜間班", code: "NET-LAB-N1", term: "114-1", teacher: "王老師", students: 24, templateId: "tpl-network-dual", templateVersion: 2, machinesPerStudent: 2, status: "planning", startDate: "2026/09/08", endDate: "2027/01/20", readyMachines: 0, totalMachines: 48 },
   { id: "class-docker-summer", name: "Docker 暑期密集班", code: "DOCKER-SUMMER", term: "2026 暑期", teacher: "林老師", students: 18, templateId: "tpl-docker-single", templateVersion: 3, machinesPerStudent: 1, status: "archived", startDate: "2026/07/01", endDate: "2026/08/15", readyMachines: 18, totalMachines: 18 },
 ];
 

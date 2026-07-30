@@ -1,17 +1,17 @@
 from __future__ import annotations
 
-import uuid
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ChatRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     message: str | None = Field(
         default=None, description="使用者輸入的自然語言問題", max_length=2000
     )
-    group_id: uuid.UUID = Field(description="目前所在群組 ID")
     messages: list[dict] | None = Field(
         default=None, description="完整的對話歷史（用於中斷與接續對話）"
     )
@@ -172,13 +172,9 @@ class SSHExecResult(BaseModel):
     stderr: str = Field(default="")
     exit_code: int = Field(default=0)
     error: str | None = Field(default=None)
-    blocked: bool = Field(
-        default=False, description="是否因安全黑名單被攔截"
-    )
+    blocked: bool = Field(default=False, description="是否因安全黑名單被攔截")
     block_reason: str | None = Field(default=None)
-    pending: bool = Field(
-        default=False, description="是否在等待使用者確認"
-    )
+    pending: bool = Field(default=False, description="是否在等待使用者確認")
     confirm_token: str | None = Field(
         default=None, description="等待確認時的 Token（TTL 5 分鐘）"
     )

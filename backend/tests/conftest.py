@@ -23,8 +23,6 @@ from app.models import (
     AIAPICredential,
     AIAPIRequest,
     FirewallLayout,
-    Group,
-    GroupMember,
     Resource,
     SpecChangeRequest,
     User,
@@ -138,7 +136,6 @@ def _cleanup_test_data(session: Session) -> None:
         FirewallLayout,   # user_id NOT NULL, FK → user.id
         AIAPICredential,  # user_id NOT NULL
         AIAPIRequest,     # user_id NOT NULL
-        GroupMember,      # user_id NOT NULL
         SpecChangeRequest,
         VMRequest,
         Resource,
@@ -149,19 +146,6 @@ def _cleanup_test_data(session: Session) -> None:
         ).all()
         for row in rows:
             session.delete(row)
-    session.flush()
-
-    # Groups are deleted only when owned by test users.
-    groups = session.exec(
-        select(Group).where(col(Group.owner_id).in_(test_user_ids))
-    ).all()
-    for group in groups:
-        memberships = session.exec(
-            select(GroupMember).where(GroupMember.group_id == group.id)
-        ).all()
-        for membership in memberships:
-            session.delete(membership)
-        session.delete(group)
     session.flush()
 
     # Delete the test users themselves (AuditLog.user_id becomes NULL via DB cascade)

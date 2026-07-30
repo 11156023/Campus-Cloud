@@ -9,9 +9,8 @@ from app.models import QuotaScope
 
 
 class ResourceQuotaCreate(BaseModel):
-    scope: QuotaScope
-    group_id: uuid.UUID | None = None
-    user_id: uuid.UUID | None = None
+    scope: QuotaScope = QuotaScope.user
+    user_id: uuid.UUID
     max_cpu_cores: int = Field(default=8, ge=1, le=256)
     max_memory_mb: int = Field(default=16384, ge=256, le=1048576)
     max_disk_gb: int = Field(default=100, ge=1, le=65536)
@@ -19,10 +18,8 @@ class ResourceQuotaCreate(BaseModel):
 
     @model_validator(mode="after")
     def _validate_target(self) -> "ResourceQuotaCreate":
-        if self.scope == QuotaScope.group and self.group_id is None:
-            raise ValueError("scope=group requires group_id")
-        if self.scope == QuotaScope.user and self.user_id is None:
-            raise ValueError("scope=user requires user_id")
+        if self.scope != QuotaScope.user:
+            raise ValueError("only user quota scope is supported")
         return self
 
 
@@ -36,9 +33,7 @@ class ResourceQuotaUpdate(BaseModel):
 class ResourceQuotaPublic(BaseModel):
     id: uuid.UUID
     scope: QuotaScope
-    group_id: uuid.UUID | None
-    user_id: uuid.UUID | None
-    group_name: str | None = None
+    user_id: uuid.UUID
     user_email: str | None = None
     max_cpu_cores: int
     max_memory_mb: int

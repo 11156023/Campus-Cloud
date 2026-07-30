@@ -22,7 +22,7 @@ def create_template(
     resource_type: str,
     description: str | None = None,
     storage: str | None = None,
-    visibility: VMTemplateVisibility = VMTemplateVisibility.groups,
+    visibility: VMTemplateVisibility = VMTemplateVisibility.private,
     default_cores: int | None = None,
     default_memory: int | None = None,
     default_disk: int | None = None,
