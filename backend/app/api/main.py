@@ -36,6 +36,9 @@ from app.api.routes import (
     teacher_judge_files,
     teacher_judge_scripts,
     teaching,
+    teaching_class_ai,
+    teaching_class_judge_files,
+    teaching_class_judge_scripts,
     teaching_classes,
     templates,
     tunnel,
@@ -61,6 +64,9 @@ api_router.include_router(governance.router)
 api_router.include_router(quotas.router)
 api_router.include_router(teaching.router)
 api_router.include_router(teaching_classes.router)
+api_router.include_router(teaching_class_ai.router)
+api_router.include_router(teaching_class_judge_files.router)
+api_router.include_router(teaching_class_judge_scripts.router)
 api_router.include_router(courses.router)
 api_router.include_router(course_admin.router)
 api_router.include_router(course_environments.router)

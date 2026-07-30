@@ -31,6 +31,7 @@ from app.schemas.group import (
     GroupsPublic,
 )
 from app.schemas.user import UserCreate
+from app.services.proxmox_usage import safe_usage_pct
 from app.services.user import audit_service
 from app.utils import generate_new_account_email, send_email
 
@@ -56,21 +57,6 @@ _group_resources_cache = _GroupResourcesCache()
 def _check_group_access(current_user, db_group) -> None:
     """確認使用者是群組擁有者或 admin，否則拋出例外"""
     require_group_access(current_user, db_group.owner_id)
-
-
-def _safe_usage_pct(used: object, total: object) -> float | None:
-    """將 used/total 轉成 0~100 的百分比，無法計算時回傳 None。"""
-    try:
-        used_value = float(used)
-        total_value = float(total)
-    except (TypeError, ValueError):
-        return None
-
-    if total_value <= 0:
-        return None
-
-    pct = max(0.0, min((used_value / total_value) * 100, 100.0))
-    return round(pct, 1)
 
 
 def _get_cached_group_resources() -> list[dict]:
@@ -185,11 +171,11 @@ def get_group(
 
                 vm_status_map[vmid] = r.get("status", "unknown")
                 vm_type_map[vmid] = r.get("type", "unknown")
-                vm_cpu_usage_map[vmid] = _safe_usage_pct(r.get("cpu"), 1)
-                vm_ram_usage_map[vmid] = _safe_usage_pct(
+                vm_cpu_usage_map[vmid] = safe_usage_pct(r.get("cpu"), 1)
+                vm_ram_usage_map[vmid] = safe_usage_pct(
                     r.get("mem"), r.get("maxmem")
                 )
-                vm_disk_usage_map[vmid] = _safe_usage_pct(
+                vm_disk_usage_map[vmid] = safe_usage_pct(
                     r.get("disk"), r.get("maxdisk")
                 )
         except Exception:

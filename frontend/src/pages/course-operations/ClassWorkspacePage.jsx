@@ -8,6 +8,8 @@ import { ClassroomService } from "../../services/classroom";
 import { courseNodeHasUsableSource, CourseEnvironmentsService } from "../../services/courseEnvironments";
 import { TeachingClassesService } from "../../services/teachingClasses";
 import ClassCreateDialog from "./ClassCreatePage";
+import ClassAiCheckPanel from "./ClassAiCheckPanel";
+import ClassStudentMachinesPanel from "./ClassStudentMachinesPanel";
 import styles from "./CourseOperations.module.scss";
 
 const TABS = [
@@ -414,11 +416,6 @@ function ClassMonitor({ item }) {
   </div>;
 }
 
-function StudentMachines({ item, ai = false }) {
-  const issues = item.students.flatMap((student) => student.machines.filter((machine) => machine.status === "failed").map((machine) => ({ student, machine })));
-  return <div className={styles.stack}>{ai && <div className={styles.integrationStrip}><MIcon name="auto_awesome" size={19} /><div><strong>AI 上課檢查</strong><span>集中查看機器異常與學生環境完整度，協助老師快速找到需要處理的學生。</span></div><span className={styles.devBadge}>判讀功能準備中</span></div>}<section className={styles.card}><div className={styles.cardHeader}><div><h2>{ai ? "需要注意的環境" : "學生機器狀態"}</h2><p>{ai ? (issues.length ? `有 ${issues.length} 個機器項目需要處理。` : "目前沒有發現建立失敗的機器。") : "逐一確認每位學生的上課環境。"}</p></div></div><div className={styles.tableWrap}><table className={styles.table}><thead><tr><th>學生</th>{item.nodes.map((node) => <th key={node.id}>{node.name}</th>)}<th>結果</th></tr></thead><tbody>{item.students.map((student) => { const byNode = Object.fromEntries(student.machines.map((machine) => [String(machine.machine_node_id), machine])); const ready = student.machines.filter((machine) => machine.status === "completed").length; return <tr key={student.id}><td><strong>{student.full_name || student.email}</strong><small>{student.email}</small></td>{item.nodes.map((node) => { const machine = byNode[String(node.id)]; return <td key={node.id}><strong>{machine?.vmid ?? "—"}</strong><small>{machine ? JOB_STATUS[machine.status] ?? machine.status : "尚未建立"}</small></td>; })}<td><span className={`${styles.statusBadge} ${ready === item.nodes.length ? styles.status_active : styles.status_partial_failed}`}>{ready}/{item.nodes.length} 就緒</span></td></tr>; })}</tbody></table></div></section></div>;
-}
-
 function LockedFeature({ section }) {
   const label = section === "ai" ? "AI 檢查" : section === "classroom" ? "上課監看" : "學生機器";
   return <section className={styles.lockedFeature}><span><MIcon name="lock" size={22} /></span><div><h2>{label}尚未開放</h2><p>班級必須通過審核，且每位學生的所有節點都建立成功後才會正式啟用。</p></div></section>;
@@ -437,6 +434,7 @@ export default function ClassWorkspacePage() {
   const [recovering, setRecovering] = useState(false);
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [templateId, setTemplateId] = useState("");
+  const [machineData, setMachineData] = useState(null);
   const [templates, setTemplates] = useState([]);
   const template = templates.find((row) => row.id === templateId);
 
@@ -462,6 +460,12 @@ export default function ClassWorkspacePage() {
     const timer = window.setInterval(() => TeachingClassesService.provisionStatus(item.id).then(refresh).catch(() => {}), 3000);
     return () => window.clearInterval(timer);
   }, [item?.id, item?.status]);
+  useEffect(() => {
+    if (!["progress", "ai"].includes(tab)) return;
+    TeachingClassesService.studentMachines(classId)
+      .then(setMachineData)
+      .catch(() => {});
+  }, [classId, tab]);
 
   async function provision() {
     if (!window.confirm("送出後學生名單、課程環境與課表將鎖定並交由管理員審核，確定送出嗎？")) return;
@@ -493,7 +497,9 @@ export default function ClassWorkspacePage() {
 
   if (loading) return <div className={styles.emptyState}><p>正在讀取班級…</p></div>;
   if (!item) return <div className={styles.page}><button type="button" className={styles.backLink} onClick={() => navigate("/class-management")}><MIcon name="arrow_back" size={18} />返回班級清單</button><p className={styles.errorMessage}>{error || "找不到班級"}</p></div>;
-  const postUnavailable = ["classroom", "progress", "ai"].includes(tab) && item.status !== "active";
+  const postUnavailable =
+    (tab === "classroom" && item.status !== "active") ||
+    (tab === "progress" && item.students.length === 0 && item.nodes.length === 0);
   const completed = [item.students.length > 0, Boolean(item.course_environment) && item.nodes.length > 0].filter(Boolean).length;
 
   return <div className={styles.page}>
@@ -502,7 +508,9 @@ export default function ClassWorkspacePage() {
     {error && <p className={styles.errorMessage}>{error}</p>}
     <section className={styles.workflowTabsBar} aria-label="班級管理流程">
       <nav className={styles.workspaceTabs}>{TABS.map(([key, icon, label]) => {
-        const unavailable = ["classroom", "progress", "ai"].includes(key) && item.status !== "active";
+        const unavailable =
+          (key === "classroom" && item.status !== "active") ||
+          (key === "progress" && item.students.length === 0 && item.nodes.length === 0);
         const done = key === "students" ? item.students.length > 0 : key === "weekly" ? item.weeks.some((week) => week.title.trim()) : key === "machines" ? Boolean(item.course_environment) && item.nodes.length > 0 : false;
         return <button type="button" key={key} disabled={unavailable} title={unavailable ? "全部機器成功後開放" : undefined} className={`${tab === key ? styles.workspaceTabActive : ""} ${unavailable ? styles.workspaceTabLocked : ""}`} onClick={() => navigate(key === "overview" ? `/class-management/${classId}` : `/class-management/${classId}/${key}`)}><MIcon name={unavailable ? "lock" : done ? "check" : icon} size={17} /><strong>{label}</strong></button>;
       })}</nav>
@@ -515,8 +523,8 @@ export default function ClassWorkspacePage() {
       {tab === "machines" && <Machines item={item} templates={templates} template={template} onRefresh={refresh} onTemplate={setTemplateId} createdTemplateId={location.state?.createdTemplateId} />}
       {postUnavailable && <LockedFeature section={tab} />}
       {tab === "classroom" && !postUnavailable && <ClassMonitor item={item} />}
-      {tab === "progress" && !postUnavailable && <StudentMachines item={item} />}
-      {tab === "ai" && !postUnavailable && <StudentMachines item={item} ai />}
+      {tab === "progress" && !postUnavailable && <ClassStudentMachinesPanel classId={classId} onData={setMachineData} />}
+      {tab === "ai" && <ClassAiCheckPanel classId={classId} machineData={machineData} />}
       {!TABS.some(([key]) => key === tab) && <LockedFeature section={tab} />}
     </main>
     {scheduleOpen && <ClassCreateDialog item={item} onClose={() => setScheduleOpen(false)} onUpdated={(result) => { refresh(result); setScheduleOpen(false); setMessage("班級與固定課表已更新。"); }} />}

@@ -193,3 +193,11 @@ class SSHConfirmRequest(BaseModel):
     command: str | None = Field(
         default=None, description="可選：允許前覆寫要執行的指令內容"
     )
+    group_id: uuid.UUID | None = Field(
+        default=None, description="群組入口的確認 scope"
+    )
+
+
+class ScopedChatRequest(BaseModel):
+    message: str | None = Field(default=None, max_length=2000)
+    messages: list[dict] | None = None

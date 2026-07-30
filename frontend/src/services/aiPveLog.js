@@ -15,3 +15,32 @@ export const AiPveLogService = {
     return apiPost("/api/v1/ai/pve-log/ssh/confirm", { token, approved, command });
   },
 };
+
+export function createAiPveLogService(scope) {
+  if (!scope || scope.type === "group") {
+    const groupId = scope?.id;
+    return {
+      chat(payload) {
+        return AiPveLogService.chat({ ...payload, group_id: groupId });
+      },
+      confirmSsh(payload) {
+        return apiPost("/api/v1/ai/pve-log/ssh/confirm", {
+          ...payload,
+          group_id: groupId,
+        });
+      },
+    };
+  }
+  if (scope.type === "teaching-class") {
+    const base = `/api/v1/teaching-classes/${scope.id}/ai/pve-log`;
+    return {
+      chat(payload) {
+        return apiPost(`${base}/chat`, payload);
+      },
+      confirmSsh(payload) {
+        return apiPost(`${base}/ssh/confirm`, payload);
+      },
+    };
+  }
+  throw new Error("Invalid AI PVE scope");
+}

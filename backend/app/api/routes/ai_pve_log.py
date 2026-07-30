@@ -156,11 +156,20 @@ async def chat(
         group_id=request.group_id,
     )
     try:
+        chat_kwargs = {
+            "message": request.message,
+            "history": request.messages,
+            "session": session,
+            "allowed_vmids": allowed_vmids,
+        }
+        if hasattr(_current_user, "id"):
+            chat_kwargs.update(
+                requester_id=_current_user.id,
+                scope_type="group",
+                scope_id=request.group_id,
+            )
         return await pve_chat(
-            message=request.message,
-            history=request.messages,
-            session=session,
-            allowed_vmids=allowed_vmids,
+            **chat_kwargs,
         )
     except Exception:
         logger.exception("AI-PVE 對話失敗")
@@ -191,7 +200,21 @@ async def post_ssh_confirm(
     from app.ai.pve_log.ssh_exec import confirm_exec as _confirm_exec
 
     try:
-        return await _confirm_exec(request, session=session)
+        if request.group_id is None:
+            return await _confirm_exec(request, session=session)
+        allowed_vmids = _resolve_group_vmids(
+            session=session,
+            current_user=_current_user,
+            group_id=request.group_id,
+        )
+        return await _confirm_exec(
+            request,
+            session=session,
+            requester_id=_current_user.id,
+            scope_type="group",
+            scope_id=request.group_id,
+            allowed_vmids=allowed_vmids,
+        )
     except Exception as exc:
         logger.exception("SSH 確認失敗")
         raise HTTPException(status_code=500, detail=str(exc))

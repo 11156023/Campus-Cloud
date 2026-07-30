@@ -21,6 +21,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import uuid
 from typing import Any
 
 import httpx
@@ -277,6 +278,9 @@ async def _execute_ssh_tool(
     *,
     session: Session | None = None,
     allowed_vmids: set[int] | None = None,
+    requester_id: uuid.UUID | None = None,
+    scope_type: str | None = None,
+    scope_id: uuid.UUID | None = None,
 ) -> dict:
     """執行 ssh_exec 工具（async，需要等待 SSH 連線）。
 
@@ -313,7 +317,14 @@ async def _execute_ssh_tool(
         ssh_port=int(args.get("ssh_port", 22)),
         require_confirm=True,  # 支援中斷與接續確認，改為 True
     )
-    result = await _ssh_exec(req, session=session, allowed_vmids=allowed_vmids)
+    result = await _ssh_exec(
+        req,
+        session=session,
+        allowed_vmids=allowed_vmids,
+        requester_id=requester_id,
+        scope_type=scope_type,
+        scope_id=scope_id,
+    )
     data = result.model_dump(mode="json")
     # 補充 reason 給前端顯示（AI 提供的說明）
     data["reason"] = str(args.get("reason", "未提供原因"))
@@ -331,6 +342,9 @@ async def chat(
     *,
     session: Session | None = None,
     allowed_vmids: set[int] | None = None,
+    requester_id: uuid.UUID | None = None,
+    scope_type: str | None = None,
+    scope_id: uuid.UUID | None = None,
 ) -> ChatResponse:
     """單次 AI 對話，支援 Tool Calling 及其接續。
 
@@ -527,6 +541,9 @@ async def chat(
                         func_args,
                         session=session,
                         allowed_vmids=allowed_vmids,
+                        requester_id=requester_id,
+                        scope_type=scope_type,
+                        scope_id=scope_id,
                     )
                 else:
                     result = _execute_tool_sync(

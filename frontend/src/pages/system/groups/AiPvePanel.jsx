@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import styles from "./AiPvePanel.module.scss";
 import MIcon from "../../../components/MIcon";
 import { useToast } from "../../../hooks/useToast";
-import { AiPveLogService } from "../../../services/aiPveLog";
+import { createAiPveLogService } from "../../../services/aiPveLog";
 
 /** 清除 Qwen3 殘留的 tool call 標記，避免原始標記顯示在對話框中 */
 function sanitizeContent(text) {
@@ -20,7 +20,10 @@ function sanitizeContent(text) {
   );
 }
 
-export default function AiPvePanel({ groupId }) {
+export default function AiPvePanel({ groupId, scope }) {
+  const aiPveService = createAiPveLogService(
+    scope ?? { type: "group", id: groupId },
+  );
   const toast = useToast();
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
@@ -86,10 +89,10 @@ export default function AiPvePanel({ groupId }) {
     }
 
     try {
-      const response = await AiPveLogService.chat(
+      const response = await aiPveService.chat(
         newHistory.length > 0
-          ? { messages: newHistory, group_id: groupId }
-          : { message, group_id: groupId },
+          ? { messages: newHistory }
+          : { message },
       );
       handleChatResponse(response);
     } catch (err) {
@@ -114,7 +117,7 @@ export default function AiPvePanel({ groupId }) {
     setIsSending(true);
 
     try {
-      const res = await AiPveLogService.confirmSsh({
+      const res = await aiPveService.confirmSsh({
         token: pendingTool.token,
         approved,
         command: approved ? command : undefined,
@@ -148,9 +151,8 @@ export default function AiPvePanel({ groupId }) {
         };
       }
 
-      const chatRes = await AiPveLogService.chat({
+      const chatRes = await aiPveService.chat({
         messages: updatedHistory,
-        group_id: groupId,
       });
       handleChatResponse(chatRes);
       setIsSending(false);

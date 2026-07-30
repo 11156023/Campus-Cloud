@@ -158,7 +158,8 @@ class TeacherJudgeScriptRegenerateRequest(BaseModel):
 
 class TeacherJudgeScriptArtifactPublic(BaseModel):
     id: str
-    group_id: str
+    group_id: str | None
+    class_id: str | None = None
     name: str
     template_key: str
     rubric_snapshot_json: dict[str, Any]
@@ -180,7 +181,8 @@ class TeacherJudgeScriptArtifactPublic(BaseModel):
 
 class TeacherJudgeFilePublic(BaseModel):
     id: str
-    group_id: str
+    group_id: str | None
+    class_id: str | None = None
     uploaded_by: str | None
     original_filename: str
     file_hash: str
@@ -219,7 +221,8 @@ class TeacherJudgeScriptRunCreateRequest(BaseModel):
 
 class TeacherJudgeScriptRunPublic(BaseModel):
     id: str
-    group_id: str
+    group_id: str | None
+    class_id: str | None = None
     artifact_id: str
     target_scope: TeacherJudgeScriptRunTargetScopeLiteral
     target_snapshot_json: dict[str, Any]

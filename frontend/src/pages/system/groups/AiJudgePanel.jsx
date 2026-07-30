@@ -1352,7 +1352,7 @@ function ExecutionTab({ groupId, members }) {
               </tr>
             ) : (
               runningMembers.map((member) => (
-                <tr key={member.user_id}>
+                <tr key={member.id ?? `${member.user_id}-${member.vmid}`}>
                   <td>
                     <input
                       type="checkbox"
@@ -1568,8 +1568,11 @@ const JUDGE_TABS = [
   { key: "execution", label: "腳本執行", icon: "play_circle_outline" },
 ];
 
-export default function AiJudgePanel({ groupId, members }) {
-  const [activeTab, setActiveTab] = useState("rubrics");
+export default function AiJudgePanel({ groupId, members, scope, visibleTab = null }) {
+  const judgeScope = scope ?? groupId;
+  const [internalTab, setInternalTab] = useState("rubrics");
+  const activeTab = visibleTab ?? internalTab;
+  const setActiveTab = visibleTab ? () => {} : setInternalTab;
 
   return (
     <div className={styles.panel}>
@@ -1581,7 +1584,7 @@ export default function AiJudgePanel({ groupId, members }) {
         <p className={styles.panelDesc}>管理群組評分表、收集腳本與腳本執行。</p>
       </div>
 
-      <div className={styles.subTabs}>
+      {!visibleTab && <div className={styles.subTabs}>
         {JUDGE_TABS.map((tab) => (
           <button
             key={tab.key}
@@ -1593,15 +1596,15 @@ export default function AiJudgePanel({ groupId, members }) {
             {tab.label}
           </button>
         ))}
-      </div>
+      </div>}
 
       {activeTab === "rubrics" && (
-        <RubricsTab groupId={groupId} onScriptCreated={() => setActiveTab("scripts")} />
+        <RubricsTab groupId={judgeScope} onScriptCreated={() => setActiveTab("scripts")} />
       )}
       {activeTab === "scripts" && (
-        <ScriptsTab groupId={groupId} onScriptApproved={() => setActiveTab("execution")} />
+        <ScriptsTab groupId={judgeScope} onScriptApproved={() => setActiveTab("execution")} />
       )}
-      {activeTab === "execution" && <ExecutionTab groupId={groupId} members={members} />}
+      {activeTab === "execution" && <ExecutionTab groupId={judgeScope} members={members} />}
     </div>
   );
 }

@@ -53,6 +53,9 @@ def _store_pending(
     req: SSHExecRequest,
     *,
     allowed_vmids: set[int] | None = None,
+    requester_id: uuid.UUID | None = None,
+    scope_type: str | None = None,
+    scope_id: uuid.UUID | None = None,
 ) -> str:
     """儲存待確認請求，回傳 token。"""
     token = str(uuid.uuid4())
@@ -60,6 +63,9 @@ def _store_pending(
         "request": req,
         "created_at": time.monotonic(),
         "allowed_vmids": set(allowed_vmids) if allowed_vmids is not None else None,
+        "requester_id": requester_id,
+        "scope_type": scope_type,
+        "scope_id": scope_id,
     }
     _cleanup_expired()
     return token
@@ -257,6 +263,9 @@ async def ssh_exec(
     *,
     session: Session | None = None,
     allowed_vmids: set[int] | None = None,
+    requester_id: uuid.UUID | None = None,
+    scope_type: str | None = None,
+    scope_id: uuid.UUID | None = None,
 ) -> SSHExecResult:
     """SSH 執行主入口。
 
@@ -289,7 +298,13 @@ async def ssh_exec(
 
     # ── 層二：執行前確認（AI 呼叫時） ────────────────────────────────────
     if req.require_confirm:
-        token = _store_pending(req, allowed_vmids=allowed_vmids)
+        token = _store_pending(
+            req,
+            allowed_vmids=allowed_vmids,
+            requester_id=requester_id,
+            scope_type=scope_type,
+            scope_id=scope_id,
+        )
         logger.info("SSH 待確認 vmid=%d cmd=%r token=%s", req.vmid, req.command, token)
         return SSHExecResult(
             vmid=req.vmid,
@@ -307,6 +322,10 @@ async def confirm_exec(
     confirm_req: SSHConfirmRequest,
     *,
     session: Session | None = None,
+    requester_id: uuid.UUID | None = None,
+    scope_type: str | None = None,
+    scope_id: uuid.UUID | None = None,
+    allowed_vmids: set[int] | None = None,
 ) -> SSHExecResult:
     """處理使用者確認（允許 or 拒絕）。"""
     token = confirm_req.token or confirm_req.confirm_token
@@ -328,7 +347,23 @@ async def confirm_exec(
             error="確認 token 無效或已過期（TTL 5 分鐘）。請重新發起請求。",
         )
     req = entry["request"]
-    allowed_vmids = entry.get("allowed_vmids")
+    stored_vmids = entry.get("allowed_vmids")
+    if (
+        entry.get("requester_id") != requester_id
+        or entry.get("scope_type") != scope_type
+        or entry.get("scope_id") != scope_id
+        or (
+            allowed_vmids is not None
+            and stored_vmids is not None
+            and set(allowed_vmids) != set(stored_vmids)
+        )
+    ):
+        return SSHExecResult(
+            vmid=req.vmid,
+            command=req.command,
+            error="確認 token 與目前使用者或資源範圍不符，請重新發起請求。",
+        )
+    allowed_vmids = stored_vmids
 
     if not confirm_req.approved:
         logger.info("使用者拒絕執行 vmid=%d cmd=%r", req.vmid, req.command)

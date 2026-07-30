@@ -17,6 +17,7 @@ from app.ai.teacher_judge.schemas import (
     TeacherJudgeFilePublic,
     TeacherJudgeRubricAnalysis,
 )
+from app.ai.teacher_judge.scope import JudgeScope
 from app.models.teacher_judge_file import TeacherJudgeFile, TeacherJudgeFileStatus
 from app.models.teacher_judge_script_artifact import TeacherJudgeScriptArtifact
 from app.services.rubric_parser import parse_document
@@ -83,7 +84,8 @@ def _raise_name_conflict(existing: TeacherJudgeFile | None = None) -> None:
 def _file_to_public(file: TeacherJudgeFile) -> TeacherJudgeFilePublic:
     return TeacherJudgeFilePublic(
         id=str(file.id),
-        group_id=str(file.group_id),
+        group_id=str(file.group_id) if file.group_id else None,
+        class_id=str(file.class_id) if file.class_id else None,
         uploaded_by=str(file.uploaded_by) if file.uploaded_by else None,
         original_filename=file.original_filename,
         file_hash=file.file_hash,
@@ -95,15 +97,30 @@ def _file_to_public(file: TeacherJudgeFile) -> TeacherJudgeFilePublic:
     )
 
 
+def _scope(
+    group_id: uuid.UUID | None,
+    class_id: uuid.UUID | None = None,
+) -> JudgeScope:
+    if (group_id is None) == (class_id is None):
+        raise ValueError("Exactly one Teacher Judge scope is required")
+    return (
+        JudgeScope.group(group_id)
+        if group_id is not None
+        else JudgeScope.teaching_class(cast("uuid.UUID", class_id))
+    )
+
+
 def _active_file_by_name(
     *,
     session: Session,
-    group_id: uuid.UUID,
+    group_id: uuid.UUID | None,
+    class_id: uuid.UUID | None = None,
     original_filename: str,
     for_update: bool = False,
 ) -> TeacherJudgeFile | None:
+    scope = _scope(group_id, class_id)
     statement = select(TeacherJudgeFile).where(
-        TeacherJudgeFile.group_id == group_id,
+        *scope.clause(TeacherJudgeFile),
         TeacherJudgeFile.original_filename == original_filename,
         TeacherJudgeFile.status == TeacherJudgeFileStatus.active,
     )
@@ -115,7 +132,8 @@ def _active_file_by_name(
 def raise_if_file_name_conflict(
     *,
     session: Session,
-    group_id: uuid.UUID,
+    group_id: uuid.UUID | None = None,
+    class_id: uuid.UUID | None = None,
     original_filename: str,
     conflict_strategy: ConflictStrategy | None,
 ) -> None:
@@ -124,6 +142,7 @@ def raise_if_file_name_conflict(
     existing = _active_file_by_name(
         session=session,
         group_id=group_id,
+        class_id=class_id,
         original_filename=original_filename,
     )
     if existing is None:
@@ -143,16 +162,18 @@ def _linked_script_count(*, session: Session, file_id: uuid.UUID) -> int:
 def _copy_filename(
     *,
     session: Session,
-    group_id: uuid.UUID,
+    group_id: uuid.UUID | None,
+    class_id: uuid.UUID | None = None,
     original_filename: str,
 ) -> str:
     path = Path(original_filename)
     stem = path.stem or "rubric"
     suffix = path.suffix
+    scope = _scope(group_id, class_id)
     existing = set(
         session.exec(
             select(TeacherJudgeFile.original_filename).where(
-                TeacherJudgeFile.group_id == group_id
+                *scope.clause(TeacherJudgeFile)
             )
         ).all()
     )
@@ -180,11 +201,13 @@ def _file_snapshot(file: TeacherJudgeFile | None) -> dict[str, Any]:
 def list_files(
     *,
     session: Session,
-    group_id: uuid.UUID,
+    group_id: uuid.UUID | None = None,
+    class_id: uuid.UUID | None = None,
 ) -> list[TeacherJudgeFilePublic]:
+    scope = _scope(group_id, class_id)
     files = session.exec(
         select(TeacherJudgeFile)
-        .where(TeacherJudgeFile.group_id == group_id)
+        .where(*scope.clause(TeacherJudgeFile))
         .order_by(desc(TeacherJudgeFile.created_at))
     ).all()
     return [_file_to_public(file) for file in files]
@@ -193,11 +216,13 @@ def list_files(
 def get_file(
     *,
     session: Session,
-    group_id: uuid.UUID,
+    group_id: uuid.UUID | None = None,
+    class_id: uuid.UUID | None = None,
     file_id: uuid.UUID,
 ) -> TeacherJudgeFile:
     file = session.get(TeacherJudgeFile, file_id)
-    if file is None or file.group_id != group_id:
+    scope = _scope(group_id, class_id)
+    if file is None or not scope.matches(file):
         raise HTTPException(status_code=404, detail="Teacher Judge file not found")
     return file
 
@@ -205,10 +230,13 @@ def get_file(
 def get_file_download(
     *,
     session: Session,
-    group_id: uuid.UUID,
+    group_id: uuid.UUID | None = None,
+    class_id: uuid.UUID | None = None,
     file_id: uuid.UUID,
 ) -> tuple[Path, str]:
-    file = get_file(session=session, group_id=group_id, file_id=file_id)
+    file = get_file(
+        session=session, group_id=group_id, class_id=class_id, file_id=file_id
+    )
     path = _stored_path(file.id, file.original_filename)
     if not path.is_file():
         raise HTTPException(status_code=404, detail="原始評分表檔案不存在。")
@@ -251,7 +279,8 @@ def prepare_file_payload(
 def save_analyzed_file(
     *,
     session: Session,
-    group_id: uuid.UUID,
+    group_id: uuid.UUID | None = None,
+    class_id: uuid.UUID | None = None,
     uploaded_by: uuid.UUID | None,
     original_filename: str,
     file_hash: str,
@@ -263,6 +292,7 @@ def save_analyzed_file(
     existing = _active_file_by_name(
         session=session,
         group_id=group_id,
+        class_id=class_id,
         original_filename=original_filename,
         for_update=conflict_strategy == "overwrite",
     )
@@ -274,6 +304,7 @@ def save_analyzed_file(
         raise_if_file_name_conflict(
             session=session,
             group_id=group_id,
+            class_id=class_id,
             original_filename=original_filename,
             conflict_strategy=conflict_strategy,
         )
@@ -282,6 +313,7 @@ def save_analyzed_file(
         target_filename = _copy_filename(
             session=session,
             group_id=group_id,
+            class_id=class_id,
             original_filename=original_filename,
         )
     elif existing is not None and conflict_strategy == "overwrite":
@@ -295,6 +327,7 @@ def save_analyzed_file(
     if target_file is None:
         target_file = TeacherJudgeFile(
             group_id=group_id,
+            class_id=class_id,
             uploaded_by=uploaded_by,
             original_filename=target_filename,
             file_hash=file_hash,
@@ -351,11 +384,14 @@ def save_analyzed_file(
 def update_file_analysis(
     *,
     session: Session,
-    group_id: uuid.UUID,
+    group_id: uuid.UUID | None = None,
+    class_id: uuid.UUID | None = None,
     file_id: uuid.UUID,
     analysis: TeacherJudgeRubricAnalysis,
 ) -> TeacherJudgeFilePublic:
-    file = get_file(session=session, group_id=group_id, file_id=file_id)
+    file = get_file(
+        session=session, group_id=group_id, class_id=class_id, file_id=file_id
+    )
     file.analysis_json = analysis.model_dump(mode="json")
     file.updated_at = _now()
     session.add(file)
@@ -367,10 +403,13 @@ def update_file_analysis(
 def delete_file(
     *,
     session: Session,
-    group_id: uuid.UUID,
+    group_id: uuid.UUID | None = None,
+    class_id: uuid.UUID | None = None,
     file_id: uuid.UUID,
 ) -> None:
-    file = get_file(session=session, group_id=group_id, file_id=file_id)
+    file = get_file(
+        session=session, group_id=group_id, class_id=class_id, file_id=file_id
+    )
     path = _stored_path(file.id, file.original_filename)
     deleted_path = _deleted_path(file.id, file.original_filename)
     if path.exists():
@@ -398,12 +437,15 @@ def delete_file(
 def source_file_snapshot(
     *,
     session: Session,
-    group_id: uuid.UUID,
+    group_id: uuid.UUID | None = None,
+    class_id: uuid.UUID | None = None,
     file_id: uuid.UUID | None,
 ) -> tuple[TeacherJudgeFile | None, dict[str, Any]]:
     if file_id is None:
         return None, {}
-    file = get_file(session=session, group_id=group_id, file_id=file_id)
+    file = get_file(
+        session=session, group_id=group_id, class_id=class_id, file_id=file_id
+    )
     return file, _file_snapshot(file)
 
 
