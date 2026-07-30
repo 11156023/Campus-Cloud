@@ -12,7 +12,7 @@ class Permission(str, enum.Enum):
     AI_API_VIEW_ALL = "ai_api_view_all"
     AUDIT_LOG_READ_ALL = "audit_log_read_all"
     CLASSROOM_MONITOR = "classroom_monitor"
-    GROUP_OWNERSHIP_BYPASS = "group_ownership_bypass"
+    TEACHING_OWNERSHIP_BYPASS = "teaching_ownership_bypass"
     NAT_RULES_SYNC = "nat_rules_sync"
     RESOURCE_OWNERSHIP_BYPASS = "resource_ownership_bypass"
     REVERSE_PROXY_RULES_SYNC = "reverse_proxy_rules_sync"

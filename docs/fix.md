@@ -1,10 +1,10 @@
-P1 — 中等問題
+﻿P1 — 中等問題
 #	問題	檔案:行號
 1	_to_bool vs safe_bool 行為分歧（處理 "True"/"on"/"checked" 不同）	service.py:44 vs utils.py:65
 2	RubricAnalysis 衍生欄位（total_items 等）可被獨立寫入，無驗證	schemas.py:47-59
 3	當 template_commands=None 時 check_steps 完全未驗證	service.py:58-97
-4	Artifact name 缺乏 UNIQUE(group_id, name, template_key) 約束	script_artifact_service.py:830 + model
-5	_ensure_group_access 在 3 個檔案中逐字重複（files.py + scripts.py + rubric.py）	3 個路由檔案
+4	Artifact name 缺乏 UNIQUE(teaching_class_id, name, template_key) 約束	script_artifact_service.py:830 + model
+5	_ensure_class_access 在 3 個檔案中逐字重複（files.py + scripts.py + rubric.py）	3 個路由檔案
 6	SessionDep 型別標註誤用於一般輔助函式（應為 Session）	teacher_judge_files.py:40
 7	服務層廣泛直接 raise HTTPException（應拋領域例外）	service.py, file_service.py, rubric_parser.py 等
 8	rubric_parser.py 在迴圈內做延遲匯入（每個 XML child 都 import）	rubric_parser.py:146,150

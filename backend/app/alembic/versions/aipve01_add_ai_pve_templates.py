@@ -1,7 +1,7 @@
 """Add AI PVE machine-role templates and default seed rows.
 
 Revision ID: aipve01_ai_pve_templates
-Revises: tjcs01
+Revises: tc03_retire_test_groups
 Create Date: 2026-07-30 00:00:00.000000
 """
 
@@ -14,7 +14,7 @@ from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision = "aipve01_ai_pve_templates"
-down_revision = "tjcs01"
+down_revision = "tc03_retire_test_groups"
 branch_labels = None
 depends_on = None
 

@@ -30,7 +30,7 @@ async def test_ssh_exec_blocks_out_of_scope_before_pending(
 
     assert result.blocked is True
     assert result.pending is False
-    assert result.block_reason == "目前只允許存取所在群組內的 VM/LXC"
+    assert result.block_reason == "目前只允許存取指定範圍內的 VM/LXC"
 
 
 @pytest.mark.asyncio

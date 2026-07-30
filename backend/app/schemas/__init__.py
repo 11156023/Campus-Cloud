@@ -79,14 +79,6 @@ from .gpu import (
     GPUSummary,
     GPUUsageInfo,
 )
-from .group import (
-    GroupCreate,
-    GroupDetailPublic,
-    GroupMemberAdd,
-    GroupMemberPublic,
-    GroupPublic,
-    GroupsPublic,
-)
 from .ldap import (
     LdapConfigPublic,
     LdapConfigUpdate,
@@ -105,10 +97,6 @@ from .monitoring import (
     MonitoringOverview,
     NodeMetrics,
     VMTopEntry,
-)
-from .pair_session import (
-    PairSessionCreate,
-    PairSessionPublic,
 )
 from .proxmox_config import (
     ProxmoxConfigPublic,
@@ -159,16 +147,6 @@ from .spec_change_request import (
     SpecChangeRequestPublic,
     SpecChangeRequestReview,
     SpecChangeRequestsPublic,
-)
-from .teaching import (
-    BatchSpecAccepted,
-    BatchSpecItemPublic,
-    BatchSpecRequest,
-    BatchSpecStatusPublic,
-    ConfigPushAccepted,
-    ConfigPushItemPublic,
-    ConfigPushStatusPublic,
-    HeatmapEntry,
 )
 from .user import (
     UpdatePassword,
@@ -311,13 +289,6 @@ __all__ = [
     "SpecChangeRequestReview",
     "SpecChangeRequestPublic",
     "SpecChangeRequestsPublic",
-    # Groups
-    "GroupCreate",
-    "GroupPublic",
-    "GroupsPublic",
-    "GroupDetailPublic",
-    "GroupMemberAdd",
-    "GroupMemberPublic",
     # Firewall
     "PortSpec",
     "ConnectionCreate",
@@ -351,9 +322,6 @@ __all__ = [
     "ProxmoxConfigPublic",
     "ProxmoxConfigUpdate",
     "ProxmoxConnectionTestResult",
-    # Pair Mode (module E)
-    "PairSessionCreate",
-    "PairSessionPublic",
     # Quota (module E)
     "EffectiveQuotaPublic",
     "QuotaUsagePublic",
@@ -364,13 +332,4 @@ __all__ = [
     "ScriptDeployRequest",
     "ScriptDeployResponse",
     "ScriptDeployStatus",
-    # Teaching (module E)
-    "ConfigPushAccepted",
-    "ConfigPushItemPublic",
-    "ConfigPushStatusPublic",
-    "HeatmapEntry",
-    "BatchSpecRequest",
-    "BatchSpecAccepted",
-    "BatchSpecItemPublic",
-    "BatchSpecStatusPublic",
 ]

@@ -94,8 +94,7 @@ def _peek_pending(token: str) -> dict[str, Any] | None:
 
 
 def peek_pending_scope(token: str) -> tuple[str | None, uuid.UUID | None]:
-    """Read token scope without consuming it so a legacy confirm body can be authorized."""
-    _cleanup_expired()
+    """Read token scope without consuming it."""
     entry = _peek_pending(token)
     if entry is None:
         return None, None
@@ -103,8 +102,7 @@ def peek_pending_scope(token: str) -> tuple[str | None, uuid.UUID | None]:
 
 
 def peek_pending_request(token: str) -> SSHExecRequest | None:
-    """Read a pending request for a fresh authorization check."""
-    _cleanup_expired()
+    """Read a pending request so the caller can re-authorize its VMID."""
     entry = _peek_pending(token)
     if entry is None:
         return None
@@ -236,7 +234,10 @@ def _redact_and_truncate(value: str) -> tuple[str, bool]:
     redacted = value
     for pattern in _SENSITIVE_OUTPUT_PATTERNS:
         if pattern.pattern.startswith("(?i)(password"):
-            redacted = pattern.sub(lambda match: f"{match.group(1)}=[REDACTED]", redacted)
+            redacted = pattern.sub(
+                lambda match: f"{match.group(1)}=[REDACTED]",
+                redacted,
+            )
         else:
             redacted = pattern.sub("[REDACTED PRIVATE KEY]", redacted)
     if len(redacted) <= _MAX_OUTPUT_CHARS:
@@ -340,7 +341,7 @@ async def ssh_exec(
             ssh_user=req.ssh_user,
             command=req.command,
             blocked=True,
-            block_reason="目前只允許存取所在群組內的 VM/LXC",
+            block_reason="目前只允許存取指定範圍內的 VM/LXC",
         )
 
     # ── 層二：執行前確認（AI 呼叫時） ────────────────────────────────────
@@ -410,8 +411,7 @@ async def confirm_exec(
             command=req.command,
             error="確認 token 與目前使用者或資源範圍不符，請重新發起請求。",
         )
-    # Consume only after the caller, scope, and VMID have been revalidated so
-    # a token cannot be burned by an unrelated user or stale scope.
+    # Only a successfully re-authorized caller may consume the one-time token.
     entry = _pop_pending(token)
     if entry is None:
         return SSHExecResult(
@@ -476,7 +476,7 @@ async def _do_exec(
                 ssh_user=req.ssh_user,
                 command=req.command,
                 blocked=True,
-                block_reason="目前只允許存取所在群組內的 VM/LXC",
+                block_reason="目前只允許存取指定範圍內的 VM/LXC",
             )
 
         if session is not None:

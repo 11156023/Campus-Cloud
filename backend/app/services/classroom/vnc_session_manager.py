@@ -65,7 +65,6 @@ class SubscriberSocket(DownstreamSocket, Protocol):
 class SessionMode(str, Enum):
     monitor = "monitor"
     broadcast = "broadcast"
-    pair = "pair"
 
 
 @dataclass(frozen=True)
@@ -73,11 +72,10 @@ class ClassroomSession:
     id: str
     vmid: int
     mode: SessionMode
-    group_id: uuid.UUID | None
+    class_id: uuid.UUID
     started_by: uuid.UUID
     controller_user_id: uuid.UUID | None
     subscriber_count: int
-    class_id: uuid.UUID | None = None
 
 
 @dataclass
@@ -94,8 +92,7 @@ class _SessionState:
         session_id: str,
         vmid: int,
         mode: SessionMode,
-        group_id: uuid.UUID | None,
-        class_id: uuid.UUID | None,
+        class_id: uuid.UUID,
         started_by: uuid.UUID,
         upstream: UpstreamConnection,
         init: ServerInitInfo,
@@ -103,7 +100,6 @@ class _SessionState:
         self.id = session_id
         self.vmid = vmid
         self.mode = mode
-        self.group_id = group_id
         self.class_id = class_id
         self.started_by = started_by
         self.upstream = upstream
@@ -125,11 +121,10 @@ class _SessionState:
             id=self.id,
             vmid=self.vmid,
             mode=self.mode,
-            group_id=self.group_id,
+            class_id=self.class_id,
             started_by=self.started_by,
             controller_user_id=self.controller_user_id,
             subscriber_count=len(self.subscribers),
-            class_id=self.class_id,
         )
 
 
@@ -153,9 +148,8 @@ class VncSessionManager:
         *,
         vmid: int,
         mode: SessionMode,
-        group_id: uuid.UUID | None,
+        class_id: uuid.UUID,
         started_by: uuid.UUID,
-        class_id: uuid.UUID | None = None,
     ) -> ClassroomSession:
         if vmid in self._vmid_index:
             raise ConflictError(f"VM {vmid} already has an active classroom session")
@@ -171,7 +165,6 @@ class VncSessionManager:
             session_id=session_id,
             vmid=vmid,
             mode=mode,
-            group_id=group_id,
             class_id=class_id,
             started_by=started_by,
             upstream=upstream,
@@ -196,14 +189,6 @@ class VncSessionManager:
 
     def list_sessions(self) -> list[ClassroomSession]:
         return [state.snapshot() for state in self._sessions.values()]
-
-    def find_broadcast_for_groups(
-        self, group_ids: set[uuid.UUID]
-    ) -> ClassroomSession | None:
-        for state in self._sessions.values():
-            if state.mode is SessionMode.broadcast and state.group_id in group_ids:
-                return state.snapshot()
-        return None
 
     def find_broadcast_for_classes(
         self, class_ids: set[uuid.UUID]
@@ -300,9 +285,7 @@ class VncSessionManager:
                     # FBUR / SetPixelFormat / SetEncodings 一律吞掉：
                     # 上游的像素格式與更新節奏由 pump 統一控制
                     continue
-                # pair session 的訂閱者已在 WS 層限定為 owner/受邀者/admin，
-                # 故放行全部成員輸入；其餘模式維持 controller 單一控制權。
-                allowed = state.mode is SessionMode.pair or (
+                allowed = (
                     state.controller_user_id is not None
                     and state.controller_user_id == subscriber.user_id
                 )

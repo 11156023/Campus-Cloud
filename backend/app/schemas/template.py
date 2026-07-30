@@ -23,7 +23,7 @@ class VMTemplateCreate(BaseModel):
     source_vmid: int = Field(gt=0, description="要轉換的母機 VMID")
     name: str = Field(min_length=1, max_length=255)
     description: str | None = Field(default=None, max_length=1000)
-    visibility: VMTemplateVisibility = VMTemplateVisibility.groups
+    visibility: VMTemplateVisibility = VMTemplateVisibility.private
     default_cores: int | None = Field(default=None, ge=1, le=64)
     default_memory: int | None = Field(default=None, ge=128, description="MB")
     default_disk: int | None = Field(default=None, ge=1, description="GB")

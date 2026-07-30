@@ -23,57 +23,34 @@ class TeacherJudgeFile(SQLModel, table=True):
 
     __tablename__ = "teacher_judge_files"
     __table_args__ = (
-        sa.CheckConstraint(
-            "(group_id IS NOT NULL AND class_id IS NULL) OR "
-            "(group_id IS NULL AND class_id IS NOT NULL)",
-            name="ck_teacher_judge_files_exactly_one_scope",
-        ),
         sa.Index(
-            "ix_teacher_judge_files_group_filename",
-            "group_id",
+            "ix_teacher_judge_files_class_filename",
+            "teaching_class_id",
             "original_filename",
         ),
         sa.Index(
-            "ix_teacher_judge_files_group_created",
-            "group_id",
+            "ix_teacher_judge_files_class_created",
+            "teaching_class_id",
             "created_at",
         ),
         sa.Index(
             "uq_teacher_judge_files_active_filename",
-            "group_id",
+            "teaching_class_id",
             "original_filename",
             unique=True,
             postgresql_where=sa.text("status = 'active'"),
             sqlite_where=sa.text("status = 'active'"),
         ),
-        sa.Index(
-            "uq_teacher_judge_files_class_active_filename",
-            "class_id",
-            "original_filename",
-            unique=True,
-            postgresql_where=sa.text("status = 'active' AND class_id IS NOT NULL"),
-            sqlite_where=sa.text("status = 'active' AND class_id IS NOT NULL"),
-        ),
     )
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    group_id: uuid.UUID | None = Field(
-        default=None,
-        sa_column=Column(
-            sa.Uuid,
-            sa.ForeignKey("group.id", ondelete="CASCADE"),
-            nullable=True,
-            index=True,
-        )
-    )
-    class_id: uuid.UUID | None = Field(
-        default=None,
+    teaching_class_id: uuid.UUID = Field(
         sa_column=Column(
             sa.Uuid,
             sa.ForeignKey("teaching_classes.id", ondelete="CASCADE"),
-            nullable=True,
+            nullable=False,
             index=True,
-        ),
+        )
     )
     uploaded_by: uuid.UUID | None = Field(
         default=None,

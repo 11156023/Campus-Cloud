@@ -37,7 +37,9 @@ SkyLab 是一個面向校園資源管理的全端 Proxmox VE（PVE）虛擬化�
 - 防火牆拓撲視覺化、NAT 規則、Reverse Proxy 規則管理
 - 閘道 VM 管理：HAProxy / Traefik / FRP（client/server）設定
 - 多重 Proxmox cluster 連線設定與 HA failover
-- 群組（班級）管理、CSV 大量匯入、自動寄發初始密碼信
+- 正式班級管理、固定課表、學生名單、多機環境與整班批次建置
+- 班級教室監看、教師廣播，以及班級內的 AI 評分檢查
+- 管理員專用的獨立 AI PVE 維運助手（不綁定班級）
 - AI API 憑證管理 + 申請審核 + Redis sliding-window 流量限制
 - OpenAI 相容 AI Proxy：使用者透過 Campus `/api/v1/ai-proxy/{models,chat/completions,completions,responses}` 呼叫；Backend 驗證 `ccai_*` 後轉發至受限 LiteLLM service key。內部 System AI 仍直接走 `{VLLM_BASE_URL}/chat/completions`
 - 規格變更申請（vCPU / RAM / Disk）審核流程

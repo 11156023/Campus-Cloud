@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import styles from "./AiJudgePanel.module.scss";
-import MIcon from "../../../components/MIcon";
-import { useToast } from "../../../hooks/useToast";
-import useAutoRefresh from "../../../hooks/useAutoRefresh";
-import { downloadBlob } from "../../../services/api";
+import MIcon from "../../components/MIcon";
+import { useToast } from "../../hooks/useToast";
+import useAutoRefresh from "../../hooks/useAutoRefresh";
+import { downloadBlob } from "../../services/api";
 import {
   AiJudgeService,
   TEMPLATE_OPTIONS,
   getTemplateLabel,
   rubricToContext,
-} from "../../../services/aiJudge";
+} from "../../services/aiJudge";
 
 /* ── 共用小元件 ─────────────────────────────────────────── */
 
@@ -397,7 +397,7 @@ function ConfirmModal({ title, description, actions, onClose }) {
 
 /* ── Tab 1：評分表 ──────────────────────────────────────── */
 
-function RubricsTab({ groupId, onScriptCreated }) {
+function RubricsTab({ classId, onScriptCreated }) {
   const toast = useToast();
 
   const [files, setFiles] = useState([]);
@@ -425,13 +425,13 @@ function RubricsTab({ groupId, onScriptCreated }) {
       setFilesError(false);
     }
     try {
-      setFiles(await AiJudgeService.listFiles(groupId));
+      setFiles(await AiJudgeService.listFiles(classId));
     } catch {
       if (!silent) setFilesError(true);
     } finally {
       if (!silent) setFilesLoading(false);
     }
-  }, [groupId]);
+  }, [classId]);
 
   useEffect(() => {
     fetchFiles();
@@ -453,7 +453,7 @@ function RubricsTab({ groupId, onScriptCreated }) {
     setAnalysis(nextAnalysis);
     if (persist && sourceFileId) {
       try {
-        const file = await AiJudgeService.updateFileAnalysis(groupId, sourceFileId, nextAnalysis);
+        const file = await AiJudgeService.updateFileAnalysis(classId, sourceFileId, nextAnalysis);
         setFiles((current) => current.map((item) => (item.id === file.id ? file : item)));
       } catch (err) {
         toast.error(err?.message ?? "更新評分表失敗");
@@ -465,7 +465,7 @@ function RubricsTab({ groupId, onScriptCreated }) {
     setIsUploading(true);
     try {
       const response = await AiJudgeService.uploadFile(
-        groupId,
+        classId,
         file,
         selectedTemplateKey,
         conflictStrategy,
@@ -513,7 +513,7 @@ function RubricsTab({ groupId, onScriptCreated }) {
 
   async function handleDownloadFile(file) {
     try {
-      const blob = await AiJudgeService.downloadFile(groupId, file.id);
+      const blob = await AiJudgeService.downloadFile(classId, file.id);
       downloadBlob(blob, file.original_filename);
     } catch (err) {
       toast.error(err?.message ?? "下載評分表失敗");
@@ -524,7 +524,7 @@ function RubricsTab({ groupId, onScriptCreated }) {
     if (!deleteTarget) return;
     setDeleting(true);
     try {
-      await AiJudgeService.deleteFile(groupId, deleteTarget.id);
+      await AiJudgeService.deleteFile(classId, deleteTarget.id);
       toast.success("評分表已刪除");
       setFiles((current) => current.filter((file) => file.id !== deleteTarget.id));
       if (sourceFileId === deleteTarget.id) setSourceFileId(null);
@@ -602,7 +602,7 @@ function RubricsTab({ groupId, onScriptCreated }) {
   async function handleCreateScript() {
     setIsCreatingScript(true);
     try {
-      const artifact = await AiJudgeService.createScript(groupId, {
+      const artifact = await AiJudgeService.createScript(classId, {
         name: uploadedFileName,
         templateKey: analysisTemplateKey,
         rubricSnapshot: analysis,
@@ -907,7 +907,7 @@ function ReviewPanel({ title, result }) {
   );
 }
 
-function ScriptsTab({ groupId, onScriptApproved }) {
+function ScriptsTab({ classId, onScriptApproved }) {
   const toast = useToast();
   const [scripts, setScripts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -920,13 +920,13 @@ function ScriptsTab({ groupId, onScriptApproved }) {
     setLoading(true);
     setError(false);
     try {
-      setScripts(await AiJudgeService.listScripts(groupId));
+      setScripts(await AiJudgeService.listScripts(classId));
     } catch {
       setError(true);
     } finally {
       setLoading(false);
     }
-  }, [groupId]);
+  }, [classId]);
 
   useEffect(() => {
     fetchScripts();
@@ -940,7 +940,7 @@ function ScriptsTab({ groupId, onScriptApproved }) {
   async function handleApprove() {
     setActionPending("approve");
     try {
-      await AiJudgeService.approveScript(groupId, selected.id);
+      await AiJudgeService.approveScript(classId, selected.id);
       toast.success("收集腳本已核准");
       fetchScripts();
       onScriptApproved?.();
@@ -954,7 +954,7 @@ function ScriptsTab({ groupId, onScriptApproved }) {
   async function handleRegenerate() {
     setActionPending("regenerate");
     try {
-      const script = await AiJudgeService.regenerateScript(groupId, selected.id);
+      const script = await AiJudgeService.regenerateScript(classId, selected.id);
       setSelectedId(script.id);
       toast.success("收集腳本已重新生成");
       fetchScripts();
@@ -969,7 +969,7 @@ function ScriptsTab({ groupId, onScriptApproved }) {
     if (!deleteTarget) return;
     setActionPending("delete");
     try {
-      await AiJudgeService.deleteScript(groupId, deleteTarget.id);
+      await AiJudgeService.deleteScript(classId, deleteTarget.id);
       toast.success("收集腳本已刪除");
       setSelectedId(null);
       setDeleteTarget(null);
@@ -986,7 +986,7 @@ function ScriptsTab({ groupId, onScriptApproved }) {
       <div className={styles.sectionHead}>
         <div>
           <h3 className={styles.sectionTitle}>收集腳本</h3>
-          <p className={styles.sectionDesc}>管理目前範圍內由評分表產生的受管 Python 收集腳本。</p>
+          <p className={styles.sectionDesc}>管理班級內由評分表產生的受管 Python 收集腳本。</p>
         </div>
       </div>
 
@@ -1198,7 +1198,7 @@ function formatUsage(value) {
   return `${Math.round(value)}%`;
 }
 
-function ExecutionTab({ groupId, members }) {
+function ExecutionTab({ classId, members }) {
   const toast = useToast();
   const [selectedVmids, setSelectedVmids] = useState([]);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -1209,10 +1209,10 @@ function ExecutionTab({ groupId, members }) {
   const [scripts, setScripts] = useState([]);
 
   useEffect(() => {
-    AiJudgeService.listScripts(groupId)
+    AiJudgeService.listScripts(classId)
       .then(setScripts)
       .catch(() => {});
-  }, [groupId]);
+  }, [classId]);
 
   /* 執行任務輪詢：每 2 秒直到終態；失敗放慢到 5 秒重試 */
   useEffect(() => {
@@ -1223,7 +1223,7 @@ function ExecutionTab({ groupId, members }) {
     async function poll() {
       try {
         const run = await AiJudgeService.getScriptRun(
-          groupId,
+          classId,
           activeRunRef.scriptId,
           activeRunRef.runId,
         );
@@ -1240,7 +1240,7 @@ function ExecutionTab({ groupId, members }) {
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-  }, [groupId, activeRunRef]);
+  }, [classId, activeRunRef]);
 
   const approvedScripts = useMemo(
     () => scripts.filter((script) => script.status === "approved"),
@@ -1270,7 +1270,7 @@ function ExecutionTab({ groupId, members }) {
   async function handleCreateRun() {
     setCreatingRun(true);
     try {
-      const run = await AiJudgeService.createScriptRun(groupId, effectiveScriptId, selectedVmids);
+      const run = await AiJudgeService.createScriptRun(classId, effectiveScriptId, selectedVmids);
       toast.success(
         `已建立腳本執行任務（${run.progress_json?.total ?? selectedVmids.length} 台）`,
       );
@@ -1292,7 +1292,7 @@ function ExecutionTab({ groupId, members }) {
         <div>
           <h3 className={styles.sectionTitle}>腳本執行</h3>
           <p className={styles.sectionDesc}>
-            選擇目前範圍內運行中的 VM/LXC，套用已核准的 AI 收集腳本。
+            選擇班級內運行中的 VM/LXC，套用已核准的 AI 收集腳本。
           </p>
         </div>
         <button
@@ -1352,7 +1352,7 @@ function ExecutionTab({ groupId, members }) {
               </tr>
             ) : (
               runningMembers.map((member) => (
-                <tr key={member.id ?? `${member.user_id}-${member.vmid}`}>
+                <tr key={member.user_id}>
                   <td>
                     <input
                       type="checkbox"
@@ -1486,7 +1486,7 @@ function ExecutionTab({ groupId, members }) {
             <div className={styles.modalHeader}>
               <div>
                 <h2>確認執行腳本</h2>
-                <p>後端會在送出與執行前再次確認這些 VM/LXC 仍屬於目前範圍且正在運行。</p>
+                <p>後端會在送出時再次確認這些 VM/LXC 仍屬於此班級且正在運行。</p>
               </div>
               <button
                 type="button"
@@ -1568,11 +1568,8 @@ const JUDGE_TABS = [
   { key: "execution", label: "腳本執行", icon: "play_circle_outline" },
 ];
 
-export default function AiJudgePanel({ groupId, members, scope, visibleTab = null }) {
-  const judgeScope = scope ?? groupId;
-  const [internalTab, setInternalTab] = useState("rubrics");
-  const activeTab = visibleTab ?? internalTab;
-  const setActiveTab = visibleTab ? () => {} : setInternalTab;
+export default function AiJudgePanel({ classId, members }) {
+  const [activeTab, setActiveTab] = useState("rubrics");
 
   return (
     <div className={styles.panel}>
@@ -1581,10 +1578,10 @@ export default function AiJudgePanel({ groupId, members, scope, visibleTab = nul
           <MIcon name="checklist" size={20} />
           AI 評分管理
         </h2>
-        <p className={styles.panelDesc}>管理評分表、收集腳本與腳本執行。</p>
+        <p className={styles.panelDesc}>管理班級評分表、收集腳本與腳本執行。</p>
       </div>
 
-      {!visibleTab && <div className={styles.subTabs}>
+      <div className={styles.subTabs}>
         {JUDGE_TABS.map((tab) => (
           <button
             key={tab.key}
@@ -1596,15 +1593,15 @@ export default function AiJudgePanel({ groupId, members, scope, visibleTab = nul
             {tab.label}
           </button>
         ))}
-      </div>}
+      </div>
 
       {activeTab === "rubrics" && (
-        <RubricsTab groupId={judgeScope} onScriptCreated={() => setActiveTab("scripts")} />
+        <RubricsTab classId={classId} onScriptCreated={() => setActiveTab("scripts")} />
       )}
       {activeTab === "scripts" && (
-        <ScriptsTab groupId={judgeScope} onScriptApproved={() => setActiveTab("execution")} />
+        <ScriptsTab classId={classId} onScriptApproved={() => setActiveTab("execution")} />
       )}
-      {activeTab === "execution" && <ExecutionTab groupId={judgeScope} members={members} />}
+      {activeTab === "execution" && <ExecutionTab classId={classId} members={members} />}
     </div>
   );
 }

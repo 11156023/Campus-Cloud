@@ -53,7 +53,10 @@ backend/
 | --- | --- |
 | `login.py` | 登入 / token 換發 / 刷新 |
 | `users.py` | 使用者 CRUD、密碼管理、個人資料 |
-| `groups.py` | 群組管理、CSV 匯入成員、寄發初始密碼 |
+| `teaching_classes.py` | 正式班級、課表、學生名單、機器配置與整班建置 |
+| `classroom.py` | 正式班級學生機器監看與教師廣播 |
+| `teacher_judge_*.py` | 班級 AI 評分表、受管檢查腳本與執行結果 |
+| `ai_pve_log.py` | 管理員專用的全站 AI PVE 維運助手 |
 | `vm.py` | VM 建立、VNC ticket、模板列舉 |
 | `lxc.py` | LXC 建立與終端機連線 |
 | `vm_requests.py` | VM 申請提交、可用性檢查、審核工作流 |

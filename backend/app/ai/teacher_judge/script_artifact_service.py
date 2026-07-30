@@ -31,7 +31,6 @@ from app.ai.teacher_judge.schemas import (
     TeacherJudgeRubricAnalysis,
     TeacherJudgeScriptArtifactPublic,
 )
-from app.ai.teacher_judge.scope import JudgeScope
 from app.ai.teacher_judge.script_generation_contract import (
     RESULT_SCHEMA_VERSION,
     SCRIPT_GENERATION_CONTRACT_PROMPT,
@@ -247,8 +246,7 @@ def _artifact_to_public(
 ) -> TeacherJudgeScriptArtifactPublic:
     return TeacherJudgeScriptArtifactPublic(
         id=str(artifact.id),
-        group_id=str(artifact.group_id) if artifact.group_id else None,
-        class_id=str(artifact.class_id) if artifact.class_id else None,
+        teaching_class_id=str(artifact.teaching_class_id),
         name=artifact.name,
         template_key=artifact.template_key,
         rubric_snapshot_json=artifact.rubric_snapshot_json,
@@ -268,19 +266,6 @@ def _artifact_to_public(
         created_at=artifact.created_at.isoformat(),
         updated_at=artifact.updated_at.isoformat(),
         approved_at=artifact.approved_at.isoformat() if artifact.approved_at else None,
-    )
-
-
-def _scope(
-    group_id: uuid.UUID | None,
-    class_id: uuid.UUID | None = None,
-) -> JudgeScope:
-    if (group_id is None) == (class_id is None):
-        raise ValueError("Exactly one Teacher Judge scope is required")
-    return (
-        JudgeScope.group(group_id)
-        if group_id is not None
-        else JudgeScope.teaching_class(cast("uuid.UUID", class_id))
     )
 
 
@@ -931,13 +916,11 @@ async def build_reviewed_script(
 def list_artifacts(
     *,
     session: Session,
-    group_id: uuid.UUID | None = None,
-    class_id: uuid.UUID | None = None,
+    teaching_class_id: uuid.UUID,
 ) -> list[TeacherJudgeScriptArtifactPublic]:
-    scope = _scope(group_id, class_id)
     artifacts = session.exec(
         select(TeacherJudgeScriptArtifact)
-        .where(*scope.clause(TeacherJudgeScriptArtifact))
+        .where(TeacherJudgeScriptArtifact.teaching_class_id == teaching_class_id)
         .order_by(desc(TeacherJudgeScriptArtifact.created_at))
     ).all()
     return [_artifact_to_public(artifact) for artifact in artifacts]
@@ -946,13 +929,11 @@ def list_artifacts(
 def get_artifact(
     *,
     session: Session,
-    group_id: uuid.UUID | None = None,
-    class_id: uuid.UUID | None = None,
+    teaching_class_id: uuid.UUID,
     artifact_id: uuid.UUID,
 ) -> TeacherJudgeScriptArtifact:
     artifact = session.get(TeacherJudgeScriptArtifact, artifact_id)
-    scope = _scope(group_id, class_id)
-    if artifact is None or not scope.matches(artifact):
+    if artifact is None or artifact.teaching_class_id != teaching_class_id:
         raise HTTPException(status_code=404, detail="Script artifact not found")
     return artifact
 
@@ -960,17 +941,11 @@ def get_artifact(
 def get_artifact_public(
     *,
     session: Session,
-    group_id: uuid.UUID | None = None,
-    class_id: uuid.UUID | None = None,
+    teaching_class_id: uuid.UUID,
     artifact_id: uuid.UUID,
 ) -> TeacherJudgeScriptArtifactPublic:
     return _artifact_to_public(
-        get_artifact(
-            session=session,
-            group_id=group_id,
-            class_id=class_id,
-            artifact_id=artifact_id,
-        )
+        get_artifact(session=session, teaching_class_id=teaching_class_id, artifact_id=artifact_id)
     )
 
 
@@ -979,10 +954,9 @@ def _next_artifact_version(
     session: Session,
     artifact: TeacherJudgeScriptArtifact,
 ) -> int:
-    scope = _scope(artifact.group_id, artifact.class_id)
     max_version = session.exec(
         select(func.max(TeacherJudgeScriptArtifact.version)).where(
-            *scope.clause(TeacherJudgeScriptArtifact),
+            TeacherJudgeScriptArtifact.teaching_class_id == artifact.teaching_class_id,
             TeacherJudgeScriptArtifact.name == artifact.name,
             TeacherJudgeScriptArtifact.template_key == artifact.template_key,
         )
@@ -1031,8 +1005,7 @@ async def _build_reviewed_script_for_artifact(
 async def create_artifact(
     *,
     session: Session,
-    group_id: uuid.UUID | None = None,
-    class_id: uuid.UUID | None = None,
+    teaching_class_id: uuid.UUID,
     name: str,
     template_key: str,
     rubric_analysis: TeacherJudgeRubricAnalysis,
@@ -1053,8 +1026,7 @@ async def create_artifact(
     )
     source_file, source_file_snapshot_json = source_file_snapshot(
         session=session,
-        group_id=group_id,
-        class_id=class_id,
+        teaching_class_id=teaching_class_id,
         file_id=source_file_id,
     )
     if source_file is not None:
@@ -1073,8 +1045,7 @@ async def create_artifact(
     )
 
     artifact = TeacherJudgeScriptArtifact(
-        group_id=group_id,
-        class_id=class_id,
+        teaching_class_id=teaching_class_id,
         name=artifact_name,
         template_key=template_key,
         rubric_snapshot_json=rubric_snapshot,
@@ -1105,8 +1076,7 @@ async def create_artifact(
 async def regenerate_artifact(
     *,
     session: Session,
-    group_id: uuid.UUID | None = None,
-    class_id: uuid.UUID | None = None,
+    teaching_class_id: uuid.UUID,
     artifact_id: uuid.UUID,
     rubric_analysis: TeacherJudgeRubricAnalysis | None,
     created_by: uuid.UUID | None,
@@ -1114,8 +1084,7 @@ async def regenerate_artifact(
 ) -> TeacherJudgeScriptArtifactPublic:
     artifact = get_artifact(
         session=session,
-        group_id=group_id,
-        class_id=class_id,
+        teaching_class_id=teaching_class_id,
         artifact_id=artifact_id,
     )
     if artifact.status == TeacherJudgeScriptStatus.archived:
@@ -1135,8 +1104,7 @@ async def regenerate_artifact(
     if source_file_id is not None and rubric_analysis is not None:
         source_file, source_file_snapshot_json = source_file_snapshot(
             session=session,
-            group_id=group_id,
-            class_id=class_id,
+            teaching_class_id=teaching_class_id,
             file_id=source_file_id,
         )
         if source_file is not None:
@@ -1161,8 +1129,7 @@ async def regenerate_artifact(
     if artifact.status == TeacherJudgeScriptStatus.approved:
         next_version = _next_artifact_version(session=session, artifact=artifact)
         next_artifact = TeacherJudgeScriptArtifact(
-            group_id=group_id,
-            class_id=class_id,
+            teaching_class_id=teaching_class_id,
             name=artifact.name,
             template_key=template_key,
             rubric_snapshot_json=rubric_snapshot,
@@ -1212,15 +1179,13 @@ async def regenerate_artifact(
 def approve_artifact(
     *,
     session: Session,
-    group_id: uuid.UUID | None = None,
-    class_id: uuid.UUID | None = None,
+    teaching_class_id: uuid.UUID,
     artifact_id: uuid.UUID,
     approved_by: uuid.UUID | None,
 ) -> TeacherJudgeScriptArtifactPublic:
     artifact = get_artifact(
         session=session,
-        group_id=group_id,
-        class_id=class_id,
+        teaching_class_id=teaching_class_id,
         artifact_id=artifact_id,
     )
     if artifact.status != TeacherJudgeScriptStatus.reviewed:
@@ -1243,14 +1208,12 @@ def approve_artifact(
 def archive_artifact(
     *,
     session: Session,
-    group_id: uuid.UUID | None = None,
-    class_id: uuid.UUID | None = None,
+    teaching_class_id: uuid.UUID,
     artifact_id: uuid.UUID,
 ) -> TeacherJudgeScriptArtifactPublic:
     artifact = get_artifact(
         session=session,
-        group_id=group_id,
-        class_id=class_id,
+        teaching_class_id=teaching_class_id,
         artifact_id=artifact_id,
     )
     artifact.status = TeacherJudgeScriptStatus.archived
@@ -1264,14 +1227,12 @@ def archive_artifact(
 def delete_artifact(
     *,
     session: Session,
-    group_id: uuid.UUID | None = None,
-    class_id: uuid.UUID | None = None,
+    teaching_class_id: uuid.UUID,
     artifact_id: uuid.UUID,
 ) -> None:
     artifact = get_artifact(
         session=session,
-        group_id=group_id,
-        class_id=class_id,
+        teaching_class_id=teaching_class_id,
         artifact_id=artifact_id,
     )
     session.delete(artifact)

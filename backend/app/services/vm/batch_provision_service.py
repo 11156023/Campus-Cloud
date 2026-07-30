@@ -19,7 +19,6 @@ from app.models.batch_provision import (
     BatchProvisionTask,
 )
 from app.repositories import batch_provision as bp_repo
-from app.repositories import group as group_repo
 from app.repositories import vm_template as vm_template_repo
 from app.schemas import LXCCreateRequest, VMCreateRequest
 from app.services.network import ip_management_service
@@ -33,44 +32,6 @@ logger = logging.getLogger(__name__)
 # ─── 公開 API ─────────────────────────────────────────────────────────────────
 
 
-def submit_batch_job(
-    *,
-    session: Session,
-    group_id: uuid.UUID,
-    initiated_by_id: uuid.UUID,
-    resource_type: str,
-    hostname_prefix: str,
-    params: dict,
-    recurrence_rule: str | None = None,
-    recurrence_duration_minutes: int | None = None,
-    schedule_timezone: str | None = None,
-) -> uuid.UUID:
-    """Create a BatchProvisionJob in ``pending_review`` state.
-
-    The job (and its per-member tasks) are persisted but no provisioning is
-    started — an admin must call :func:`approve_batch_job` first.
-
-    Validates that the IP subnet is configured and that there is enough free
-    capacity for every group member before persisting anything.
-    """
-    member_rows = group_repo.get_member_rows(session=session, group_id=group_id)
-    if not member_rows:
-        raise BadRequestError("群組沒有成員，無法執行批量建立")
-
-    return submit_batch_job_for_users(
-        session=session,
-        member_user_ids=[row.user_id for row in member_rows],
-        initiated_by_id=initiated_by_id,
-        resource_type=resource_type,
-        hostname_prefix=hostname_prefix,
-        params=params,
-        group_id=group_id,
-        recurrence_rule=recurrence_rule,
-        recurrence_duration_minutes=recurrence_duration_minutes,
-        schedule_timezone=schedule_timezone,
-    )
-
-
 def submit_batch_job_for_users(
     *,
     session: Session,
@@ -79,8 +40,7 @@ def submit_batch_job_for_users(
     resource_type: str,
     hostname_prefix: str,
     params: dict,
-    group_id: uuid.UUID | None = None,
-    teaching_class_id: uuid.UUID | None = None,
+    teaching_class_id: uuid.UUID,
     recurrence_rule: str | None = None,
     recurrence_duration_minutes: int | None = None,
     schedule_timezone: str | None = None,
@@ -117,7 +77,6 @@ def submit_batch_job_for_users(
 
     job = bp_repo.create_job(
         session=session,
-        group_id=group_id,
         teaching_class_id=teaching_class_id,
         initiated_by=initiated_by_id,
         resource_type=resource_type,
@@ -249,31 +208,6 @@ def review_batch_jobs(
         reviewer_id,
     )
     return jobs
-
-
-# Backwards-compat shim — older callers still pass through ``start_batch_job``.
-# The scheduling feature wraps batches in a review step; immediate provisioning
-# is no longer the default but can be opted into for non-recurring jobs that
-# bypass review (e.g. a future "instant batch" admin tool).
-def start_batch_job(
-    *,
-    session: Session,
-    group_id: uuid.UUID,
-    initiated_by_id: uuid.UUID,
-    resource_type: str,
-    hostname_prefix: str,
-    params: dict,
-    **schedule_kwargs,
-) -> uuid.UUID:
-    return submit_batch_job(
-        session=session,
-        group_id=group_id,
-        initiated_by_id=initiated_by_id,
-        resource_type=resource_type,
-        hostname_prefix=hostname_prefix,
-        params=params,
-        **schedule_kwargs,
-    )
 
 
 # ─── 背景排隊執行 ──────────────────────────────────────────────────────────────

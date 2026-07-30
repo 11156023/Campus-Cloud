@@ -11,9 +11,9 @@ from app.core.authorizers import (
     can_auto_approve_vm_request,
     can_manage_users,
     require_ai_api_access,
-    require_group_access,
     require_immediate_vm_request_access,
     require_resource_access,
+    require_teaching_access,
     require_user_manage,
     require_vm_request_access,
     require_vm_request_review,
@@ -108,26 +108,26 @@ def test_vm_request_authorizers_match_existing_role_rules() -> None:
         require_vm_request_review(teacher)
 
 
-def test_resource_group_vm_and_ai_access_authorizers() -> None:
+def test_resource_teaching_vm_and_ai_access_authorizers() -> None:
     owner_id = uuid.uuid4()
     owner = _user(role=UserRole.student, user_id=owner_id)
     admin = _user(role=UserRole.admin)
     stranger = _user(role=UserRole.student)
 
     require_resource_access(owner, owner_id)
-    require_group_access(owner, owner_id)
+    require_teaching_access(owner, owner_id)
     require_vm_request_access(owner, owner_id)
     require_ai_api_access(owner, owner_id)
 
     require_resource_access(admin, uuid.uuid4())
-    require_group_access(admin, uuid.uuid4())
+    require_teaching_access(admin, uuid.uuid4())
     require_vm_request_access(admin, uuid.uuid4())
     require_ai_api_access(admin, uuid.uuid4())
 
     with pytest.raises(PermissionDeniedError):
         require_resource_access(stranger, owner_id)
     with pytest.raises(PermissionDeniedError):
-        require_group_access(stranger, owner_id)
+        require_teaching_access(stranger, owner_id)
     with pytest.raises(PermissionDeniedError):
         require_vm_request_access(stranger, owner_id)
     with pytest.raises(PermissionDeniedError):

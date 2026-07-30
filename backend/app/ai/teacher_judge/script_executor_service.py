@@ -33,10 +33,6 @@ from app.models.teacher_judge_script_run import (
     TeacherJudgeScriptRunStatus,
 )
 from app.repositories import resource as resource_repo
-from app.services.teaching_class_machine_scope import (
-    TeachingClassMachineTarget,
-    resolve_teaching_class_machine_targets,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -62,10 +58,6 @@ class TargetExecutionError(RuntimeError):
     def __init__(self, message: str, reason_code: str) -> None:
         super().__init__(message)
         self.reason_code = reason_code
-
-
-class RunScopeMismatchError(RuntimeError):
-    """Run and artifact no longer share the same persisted scope."""
 
 
 def _now() -> datetime:
@@ -165,10 +157,6 @@ def _load_run_and_artifact(
     artifact = session.get(TeacherJudgeScriptArtifact, run.artifact_id)
     if artifact is None:
         raise RuntimeError(f"Teacher Judge script artifact {run.artifact_id} not found")
-    if run.group_id != artifact.group_id or run.class_id != artifact.class_id:
-        raise RunScopeMismatchError(
-            "Teacher Judge script run and artifact scope mismatch"
-        )
     return run, artifact
 
 
@@ -193,22 +181,8 @@ def _resolve_runtime_target(
     run: TeacherJudgeScriptRun,
     target: dict[str, Any],
     live_by_vmid: dict[int, dict[str, Any]],
-    class_targets_by_vmid: dict[int, TeachingClassMachineTarget] | None = None,
 ) -> dict[str, Any]:
     vmid = _target_vmid(target)
-    if run.class_id is not None:
-        class_target = (class_targets_by_vmid or {}).get(vmid)
-        if (
-            class_target is None
-            or str(class_target.mapping_id) != str(target.get("mapping_id"))
-            or str(class_target.machine_node_id)
-            != str(target.get("machine_node_id"))
-            or str(class_target.user_id) != str(_target_user(target).get("id"))
-        ):
-            raise TargetExecutionError(
-                f"VMID {vmid} 已不屬於此班級的有效學生機器。",
-                "class_scope_changed",
-            )
     resource = resource_repo.get_resource_by_vmid(session=session, vmid=vmid)
     if resource is None:
         raise TargetExecutionError(
@@ -446,12 +420,7 @@ def _with_pending_ai_judgement(results: list[dict[str, Any]]) -> list[dict[str, 
     return prepared
 
 
-def _mark_run_executor_failed(
-    run_id: uuid.UUID,
-    message: str,
-    *,
-    reason_code: str = "executor_error",
-) -> None:
+def _mark_run_executor_failed(run_id: uuid.UUID, message: str) -> None:
     with Session(engine) as session:
         run = session.get(TeacherJudgeScriptRun, run_id)
         if run is None:
@@ -465,10 +434,7 @@ def _mark_run_executor_failed(
             "done": 0,
             "targets": _target_progress(targets, statuses),
         }
-        run.result_summary_json = {
-            "executor_error": message,
-            "reason_code": reason_code,
-        }
+        run.result_summary_json = {"executor_error": message}
         run.finished_at = _now()
         run.updated_at = _now()
         session.add(run)
@@ -526,17 +492,6 @@ async def _execute_script_run(run_id: uuid.UUID) -> None:
             return
 
         live_by_vmid = _live_running_by_vmid()
-        class_targets_by_vmid = (
-            {
-                target.vmid: target
-                for target in resolve_teaching_class_machine_targets(
-                    session=session,
-                    class_id=run.class_id,
-                )
-            }
-            if run.class_id is not None
-            else None
-        )
         statuses = {_target_vmid(target): "queued" for target in targets}
         run.status = TeacherJudgeScriptRunStatus.running
         run.started_at = run.started_at or _now()
@@ -562,7 +517,6 @@ async def _execute_script_run(run_id: uuid.UUID) -> None:
                         run=run,
                         target=target,
                         live_by_vmid=live_by_vmid,
-                        class_targets_by_vmid=class_targets_by_vmid,
                     )
                 )
                 statuses[vmid] = "running"
@@ -679,12 +633,4 @@ async def execute_script_run(run_id: uuid.UUID) -> None:
         await _execute_script_run(run_id)
     except Exception as exc:
         logger.exception("Teacher Judge script run executor failed run=%s", run_id)
-        _mark_run_executor_failed(
-            run_id,
-            str(exc),
-            reason_code=(
-                "scope_mismatch"
-                if isinstance(exc, RunScopeMismatchError)
-                else "executor_error"
-            ),
-        )
+        _mark_run_executor_failed(run_id, str(exc))

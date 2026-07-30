@@ -30,14 +30,9 @@ class TeacherJudgeScriptRun(SQLModel, table=True):
 
     __tablename__ = "teacher_judge_script_runs"
     __table_args__ = (
-        sa.CheckConstraint(
-            "(group_id IS NOT NULL AND class_id IS NULL) OR "
-            "(group_id IS NULL AND class_id IS NOT NULL)",
-            name="ck_teacher_judge_script_runs_exactly_one_scope",
-        ),
         sa.Index(
-            "ix_teacher_judge_script_runs_group_status",
-            "group_id",
+            "ix_teacher_judge_script_runs_class_status",
+            "teaching_class_id",
             "status",
         ),
         sa.Index(
@@ -45,31 +40,16 @@ class TeacherJudgeScriptRun(SQLModel, table=True):
             "artifact_id",
             "created_at",
         ),
-        sa.Index(
-            "ix_teacher_judge_script_runs_class_status",
-            "class_id",
-            "status",
-        ),
     )
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    group_id: uuid.UUID | None = Field(
-        default=None,
-        sa_column=Column(
-            sa.Uuid,
-            sa.ForeignKey("group.id", ondelete="CASCADE"),
-            nullable=True,
-            index=True,
-        )
-    )
-    class_id: uuid.UUID | None = Field(
-        default=None,
+    teaching_class_id: uuid.UUID = Field(
         sa_column=Column(
             sa.Uuid,
             sa.ForeignKey("teaching_classes.id", ondelete="CASCADE"),
-            nullable=True,
+            nullable=False,
             index=True,
-        ),
+        )
     )
     artifact_id: uuid.UUID = Field(
         sa_column=Column(

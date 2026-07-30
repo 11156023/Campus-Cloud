@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 from sqlmodel import delete, select
 
 from app.api.deps import InstructorUser, SessionDep
-from app.core.authorizers import require_group_access
+from app.core.authorizers import require_teaching_access
 from app.exceptions import BadRequestError, NotFoundError
 from app.models import (
     BatchProvisionJob,
@@ -35,12 +35,7 @@ from app.models import (
 )
 from app.models.base import get_datetime_utc
 from app.repositories.user import get_user_by_email
-from app.schemas.teaching_class_machine import TeachingClassMachineStatusResponse
 from app.services.teaching import class_capacity_service, class_network_service
-from app.services.teaching_class_access import get_authorized_teaching_class
-from app.services.teaching_class_machine_status import (
-    get_teaching_class_machine_status,
-)
 from app.services.vm import batch_provision_service
 
 router = APIRouter(prefix="/teaching-classes", tags=["teaching-classes"])
@@ -117,11 +112,11 @@ class WeekIn(BaseModel):
 
 
 def _get_class(session: SessionDep, current_user, class_id: uuid.UUID) -> TeachingClass:
-    return get_authorized_teaching_class(
-        session=session,
-        current_user=current_user,
-        class_id=class_id,
-    )
+    item = session.get(TeachingClass, class_id)
+    if not item:
+        raise NotFoundError("Teaching class not found")
+    require_teaching_access(current_user, item.owner_id)
+    return item
 
 
 def _students(session: SessionDep, class_id: uuid.UUID) -> list[TeachingClassStudent]:
@@ -292,19 +287,6 @@ def list_classes(session: SessionDep, current_user: InstructorUser):
 @router.get("/{class_id}")
 def get_class(class_id: uuid.UUID, session: SessionDep, current_user: InstructorUser):
     return _serialize(session, _get_class(session, current_user, class_id))
-
-
-@router.get(
-    "/{class_id}/student-machines",
-    response_model=TeachingClassMachineStatusResponse,
-)
-def get_class_student_machines(
-    class_id: uuid.UUID,
-    session: SessionDep,
-    current_user: InstructorUser,
-) -> TeachingClassMachineStatusResponse:
-    _get_class(session, current_user, class_id)
-    return get_teaching_class_machine_status(session=session, class_id=class_id)
 
 
 @router.patch("/{class_id}")
@@ -478,7 +460,7 @@ def select_course(
     environment = session.get(CourseEnvironment, version.environment_id)
     if environment is None:
         raise NotFoundError("Course environment not found")
-    require_group_access(current_user, environment.owner_id)
+    require_teaching_access(current_user, environment.owner_id)
     source_nodes = list(
         session.exec(
             select(CourseEnvironmentNode)

@@ -89,7 +89,7 @@ class TestClassroomWatchDisconnect:
         session = SimpleNamespace(
             mode=classroom_ws.SessionMode.broadcast,
             started_by=user.id,
-            group_id=None,
+            class_id=uuid.uuid4(),
             vmid=100,
         )
 

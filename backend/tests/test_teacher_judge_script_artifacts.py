@@ -176,7 +176,7 @@ async def test_create_artifact_saves_reviewed_managed_script(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     session = _session()
-    group_id = uuid.uuid4()
+    teaching_class_id = uuid.uuid4()
     user_id = uuid.uuid4()
 
     async def fake_build_reviewed_script(*, rubric_snapshot, template_key):
@@ -197,7 +197,7 @@ async def test_create_artifact_saves_reviewed_managed_script(
 
     artifact = await script_artifact_service.create_artifact(
         session=session,
-        group_id=group_id,
+        teaching_class_id=teaching_class_id,
         name="rubric.pdf",
         template_key="n8n",
         rubric_analysis=_analysis(),
@@ -211,7 +211,7 @@ async def test_create_artifact_saves_reviewed_managed_script(
 
     approved = script_artifact_service.approve_artifact(
         session=session,
-        group_id=group_id,
+        teaching_class_id=teaching_class_id,
         artifact_id=uuid.UUID(artifact.id),
         approved_by=user_id,
     )
@@ -341,7 +341,7 @@ async def test_fix_script_content_applies_line_replacements(
                             "replacement": "\n".join(
                                 [
                                     "except Exception as exc:",
-                                    "    errors.append(f\"runtime.python_version: 未預期錯誤: {str(exc)[:200]}\")",
+                                    '    errors.append(f"runtime.python_version: 未預期錯誤: {str(exc)[:200]}")',
                                 ]
                             ),
                         }
@@ -515,7 +515,7 @@ async def test_create_artifact_includes_current_template_commands(
 
     artifact = await script_artifact_service.create_artifact(
         session=session,
-        group_id=uuid.uuid4(),
+        teaching_class_id=uuid.uuid4(),
         name="rubric.pdf",
         template_key="n8n",
         rubric_analysis=_analysis(),
@@ -532,7 +532,7 @@ async def test_regenerate_approved_artifact_creates_next_version(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     session = _session()
-    group_id = uuid.uuid4()
+    teaching_class_id = uuid.uuid4()
 
     async def fake_build_reviewed_script(*, rubric_snapshot, template_key):
         return (
@@ -549,7 +549,7 @@ async def test_regenerate_approved_artifact_creates_next_version(
     )
     first = await script_artifact_service.create_artifact(
         session=session,
-        group_id=group_id,
+        teaching_class_id=teaching_class_id,
         name="rubric.pdf",
         template_key="linux",
         rubric_analysis=_analysis(),
@@ -557,14 +557,14 @@ async def test_regenerate_approved_artifact_creates_next_version(
     )
     approved = script_artifact_service.approve_artifact(
         session=session,
-        group_id=group_id,
+        teaching_class_id=teaching_class_id,
         artifact_id=uuid.UUID(first.id),
         approved_by=None,
     )
 
     regenerated = await script_artifact_service.regenerate_artifact(
         session=session,
-        group_id=group_id,
+        teaching_class_id=teaching_class_id,
         artifact_id=uuid.UUID(approved.id),
         rubric_analysis=None,
         created_by=None,
@@ -577,7 +577,7 @@ async def test_regenerate_approved_artifact_creates_next_version(
 
     regenerated_again = await script_artifact_service.regenerate_artifact(
         session=session,
-        group_id=group_id,
+        teaching_class_id=teaching_class_id,
         artifact_id=uuid.UUID(approved.id),
         rubric_analysis=None,
         created_by=None,
@@ -591,9 +591,9 @@ async def test_regenerate_failed_artifact_passes_previous_review_feedback(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     session = _session()
-    group_id = uuid.uuid4()
+    teaching_class_id = uuid.uuid4()
     artifact = models.TeacherJudgeScriptArtifact(
-        group_id=group_id,
+        teaching_class_id=teaching_class_id,
         name="unsafe.pdf",
         template_key="linux",
         rubric_snapshot_json={"template_key": "linux", "items": []},
@@ -651,7 +651,7 @@ async def test_regenerate_failed_artifact_passes_previous_review_feedback(
 
     regenerated = await script_artifact_service.regenerate_artifact(
         session=session,
-        group_id=group_id,
+        teaching_class_id=teaching_class_id,
         artifact_id=artifact.id,
         rubric_analysis=None,
         created_by=None,
@@ -666,7 +666,7 @@ async def test_regenerate_rejects_archived_artifact(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     session = _session()
-    group_id = uuid.uuid4()
+    teaching_class_id = uuid.uuid4()
 
     async def fake_build_reviewed_script(*, rubric_snapshot, template_key):
         return (
@@ -683,7 +683,7 @@ async def test_regenerate_rejects_archived_artifact(
     )
     artifact = await script_artifact_service.create_artifact(
         session=session,
-        group_id=group_id,
+        teaching_class_id=teaching_class_id,
         name="rubric.pdf",
         template_key="linux",
         rubric_analysis=_analysis(),
@@ -691,14 +691,14 @@ async def test_regenerate_rejects_archived_artifact(
     )
     archived = script_artifact_service.archive_artifact(
         session=session,
-        group_id=group_id,
+        teaching_class_id=teaching_class_id,
         artifact_id=uuid.UUID(artifact.id),
     )
 
     with pytest.raises(HTTPException) as exc_info:
         await script_artifact_service.regenerate_artifact(
             session=session,
-            group_id=group_id,
+            teaching_class_id=teaching_class_id,
             artifact_id=uuid.UUID(archived.id),
             rubric_analysis=None,
             created_by=None,
@@ -709,9 +709,9 @@ async def test_regenerate_rejects_archived_artifact(
 
 def test_approve_rejects_failed_review_artifact() -> None:
     session = _session()
-    group_id = uuid.uuid4()
+    teaching_class_id = uuid.uuid4()
     artifact = models.TeacherJudgeScriptArtifact(
-        group_id=group_id,
+        teaching_class_id=teaching_class_id,
         name="unsafe.pdf",
         template_key="linux",
         rubric_snapshot_json={},
@@ -727,7 +727,7 @@ def test_approve_rejects_failed_review_artifact() -> None:
     with pytest.raises(HTTPException) as exc_info:
         script_artifact_service.approve_artifact(
             session=session,
-            group_id=group_id,
+            teaching_class_id=teaching_class_id,
             artifact_id=artifact.id,
             approved_by=None,
         )
@@ -737,9 +737,9 @@ def test_approve_rejects_failed_review_artifact() -> None:
 
 def test_delete_artifact_removes_script_even_when_archived() -> None:
     session = _session()
-    group_id = uuid.uuid4()
+    teaching_class_id = uuid.uuid4()
     artifact = models.TeacherJudgeScriptArtifact(
-        group_id=group_id,
+        teaching_class_id=teaching_class_id,
         name="old.pdf",
         template_key="linux",
         rubric_snapshot_json={},
@@ -754,34 +754,34 @@ def test_delete_artifact_removes_script_even_when_archived() -> None:
 
     script_artifact_service.delete_artifact(
         session=session,
-        group_id=group_id,
+        teaching_class_id=teaching_class_id,
         artifact_id=artifact.id,
     )
 
     assert (
         script_artifact_service.list_artifacts(
             session=session,
-            group_id=group_id,
+            teaching_class_id=teaching_class_id,
         )
         == []
     )
     with pytest.raises(HTTPException) as exc_info:
         script_artifact_service.get_artifact(
             session=session,
-            group_id=group_id,
+            teaching_class_id=teaching_class_id,
             artifact_id=artifact.id,
         )
     assert exc_info.value.status_code == 404
 
 
-def test_create_script_run_snapshots_only_running_group_targets(
+def test_create_script_run_snapshots_only_running_class_targets(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     session = _session()
-    group_id = uuid.uuid4()
+    teaching_class_id = uuid.uuid4()
     user_id = uuid.uuid4()
     artifact = models.TeacherJudgeScriptArtifact(
-        group_id=group_id,
+        teaching_class_id=teaching_class_id,
         name="rubric.pdf",
         template_key="linux",
         rubric_snapshot_json={},
@@ -797,8 +797,8 @@ def test_create_script_run_snapshots_only_running_group_targets(
 
     monkeypatch.setattr(
         script_run_service,
-        "_group_member_by_vmid",
-        lambda *, session, group_id: {
+        "_class_member_by_vmid",
+        lambda *, session, teaching_class_id: {
             101: {
                 "user_id": str(user_id),
                 "email": "student@example.com",
@@ -816,7 +816,7 @@ def test_create_script_run_snapshots_only_running_group_targets(
 
     run = script_run_service.create_script_run(
         session=session,
-        group_id=group_id,
+        teaching_class_id=teaching_class_id,
         artifact_id=artifact.id,
         target_scope=TeacherJudgeScriptRunTargetScope.manual,
         target_vmids=[101],
@@ -837,10 +837,10 @@ def test_create_script_run_falls_back_to_live_ip_when_cache_missing(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     session = _session()
-    group_id = uuid.uuid4()
+    teaching_class_id = uuid.uuid4()
     user_id = uuid.uuid4()
     artifact = models.TeacherJudgeScriptArtifact(
-        group_id=group_id,
+        teaching_class_id=teaching_class_id,
         name="rubric.pdf",
         template_key="linux",
         rubric_snapshot_json={},
@@ -858,8 +858,8 @@ def test_create_script_run_falls_back_to_live_ip_when_cache_missing(
 
     monkeypatch.setattr(
         script_run_service,
-        "_group_member_by_vmid",
-        lambda *, session, group_id: {
+        "_class_member_by_vmid",
+        lambda *, session, teaching_class_id: {
             131: {
                 "user_id": str(user_id),
                 "email": "student@example.com",
@@ -870,9 +870,7 @@ def test_create_script_run_falls_back_to_live_ip_when_cache_missing(
     monkeypatch.setattr(
         script_run_service,
         "_running_resources_by_vmid",
-        lambda: {
-            131: {"vmid": 131, "type": "lxc", "status": "running", "node": "pve"}
-        },
+        lambda: {131: {"vmid": 131, "type": "lxc", "status": "running", "node": "pve"}},
     )
     monkeypatch.setattr(
         target_ip_resolver.proxmox_ops,
@@ -882,7 +880,7 @@ def test_create_script_run_falls_back_to_live_ip_when_cache_missing(
 
     run = script_run_service.create_script_run(
         session=session,
-        group_id=group_id,
+        teaching_class_id=teaching_class_id,
         artifact_id=artifact.id,
         target_scope=TeacherJudgeScriptRunTargetScope.manual,
         target_vmids=[131],
@@ -891,8 +889,7 @@ def test_create_script_run_falls_back_to_live_ip_when_cache_missing(
 
     assert run.target_snapshot_json["targets"][0]["ip_address"] == "10.0.0.131"
     assert (
-        resource_repo.get_cached_ip_address(session=session, vmid=131)
-        == "10.0.0.131"
+        resource_repo.get_cached_ip_address(session=session, vmid=131) == "10.0.0.131"
     )
 
 
@@ -900,10 +897,10 @@ def test_create_script_run_rejects_stopped_target(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     session = _session()
-    group_id = uuid.uuid4()
+    teaching_class_id = uuid.uuid4()
     user_id = uuid.uuid4()
     artifact = models.TeacherJudgeScriptArtifact(
-        group_id=group_id,
+        teaching_class_id=teaching_class_id,
         name="rubric.pdf",
         template_key="linux",
         rubric_snapshot_json={},
@@ -919,8 +916,8 @@ def test_create_script_run_rejects_stopped_target(
 
     monkeypatch.setattr(
         script_run_service,
-        "_group_member_by_vmid",
-        lambda *, session, group_id: {
+        "_class_member_by_vmid",
+        lambda *, session, teaching_class_id: {
             101: {"user_id": str(user_id), "email": "s@example.com", "full_name": None}
         },
     )
@@ -933,7 +930,7 @@ def test_create_script_run_rejects_stopped_target(
     with pytest.raises(HTTPException) as exc_info:
         script_run_service.create_script_run(
             session=session,
-            group_id=group_id,
+            teaching_class_id=teaching_class_id,
             artifact_id=artifact.id,
             target_scope=TeacherJudgeScriptRunTargetScope.manual,
             target_vmids=[101],
@@ -948,10 +945,10 @@ def test_create_script_run_rejects_target_without_ssh_key(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     session = _session()
-    group_id = uuid.uuid4()
+    teaching_class_id = uuid.uuid4()
     user_id = uuid.uuid4()
     artifact = models.TeacherJudgeScriptArtifact(
-        group_id=group_id,
+        teaching_class_id=teaching_class_id,
         name="rubric.pdf",
         template_key="linux",
         rubric_snapshot_json={},
@@ -969,8 +966,8 @@ def test_create_script_run_rejects_target_without_ssh_key(
 
     monkeypatch.setattr(
         script_run_service,
-        "_group_member_by_vmid",
-        lambda *, session, group_id: {
+        "_class_member_by_vmid",
+        lambda *, session, teaching_class_id: {
             101: {"user_id": str(user_id), "email": "s@example.com", "full_name": None}
         },
     )
@@ -983,7 +980,7 @@ def test_create_script_run_rejects_target_without_ssh_key(
     with pytest.raises(HTTPException) as exc_info:
         script_run_service.create_script_run(
             session=session,
-            group_id=group_id,
+            teaching_class_id=teaching_class_id,
             artifact_id=artifact.id,
             target_scope=TeacherJudgeScriptRunTargetScope.manual,
             target_vmids=[101],
@@ -999,10 +996,10 @@ async def test_execute_script_run_saves_valid_target_result(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     session = _session()
-    group_id = uuid.uuid4()
+    teaching_class_id = uuid.uuid4()
     user_id = uuid.uuid4()
     artifact = models.TeacherJudgeScriptArtifact(
-        group_id=group_id,
+        teaching_class_id=teaching_class_id,
         name="rubric.pdf",
         template_key="linux",
         rubric_snapshot_json={},
@@ -1020,8 +1017,8 @@ async def test_execute_script_run_saves_valid_target_result(
     monkeypatch.setattr(script_executor_service, "decrypt_value", lambda _value: "KEY")
     monkeypatch.setattr(
         script_run_service,
-        "_group_member_by_vmid",
-        lambda *, session, group_id: {
+        "_class_member_by_vmid",
+        lambda *, session, teaching_class_id: {
             101: {"user_id": str(user_id), "email": "s@example.com", "full_name": "S"}
         },
     )
@@ -1086,7 +1083,7 @@ async def test_execute_script_run_saves_valid_target_result(
 
     run = script_run_service.create_script_run(
         session=session,
-        group_id=group_id,
+        teaching_class_id=teaching_class_id,
         artifact_id=artifact.id,
         target_scope=TeacherJudgeScriptRunTargetScope.manual,
         target_vmids=[101],
@@ -1112,9 +1109,7 @@ async def test_execute_script_run_saves_valid_target_result(
         stored_run.target_results_json["targets"][0]["parsed_result"]["schema_version"]
         == "teacher_judge_result.v1"
     )
-    assert (
-        stored_run.target_results_json["targets"][0]["ai_judgement"]["score"] == 5
-    )
+    assert stored_run.target_results_json["targets"][0]["ai_judgement"]["score"] == 5
     assert analysis_calls[0]["script_metadata"]["id"] == str(artifact.id)
     assert analysis_calls[0]["target_results"][0]["ai_judgement"]["status"] == "pending"
 
@@ -1124,10 +1119,10 @@ async def test_execute_script_run_does_not_commit_partial_results_before_analysi
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     session = _session()
-    group_id = uuid.uuid4()
+    teaching_class_id = uuid.uuid4()
     user_id = uuid.uuid4()
     artifact = models.TeacherJudgeScriptArtifact(
-        group_id=group_id,
+        teaching_class_id=teaching_class_id,
         name="rubric.pdf",
         template_key="linux",
         rubric_snapshot_json={},
@@ -1145,8 +1140,8 @@ async def test_execute_script_run_does_not_commit_partial_results_before_analysi
     monkeypatch.setattr(script_executor_service, "decrypt_value", lambda _value: "KEY")
     monkeypatch.setattr(
         script_run_service,
-        "_group_member_by_vmid",
-        lambda *, session, group_id: {
+        "_class_member_by_vmid",
+        lambda *, session, teaching_class_id: {
             101: {"user_id": str(user_id), "email": "s@example.com", "full_name": "S"}
         },
     )
@@ -1185,7 +1180,7 @@ async def test_execute_script_run_does_not_commit_partial_results_before_analysi
 
     run = script_run_service.create_script_run(
         session=session,
-        group_id=group_id,
+        teaching_class_id=teaching_class_id,
         artifact_id=artifact.id,
         target_scope=TeacherJudgeScriptRunTargetScope.manual,
         target_vmids=[101],
@@ -1206,7 +1201,7 @@ def test_executor_runtime_target_falls_back_to_live_ip_when_cache_missing(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     session = _session()
-    group_id = uuid.uuid4()
+    teaching_class_id = uuid.uuid4()
     user_id = uuid.uuid4()
     resource = _resource(vmid=131, user_id=user_id)
     resource.ip_address = None
@@ -1214,7 +1209,7 @@ def test_executor_runtime_target_falls_back_to_live_ip_when_cache_missing(
     session.commit()
 
     run = models.TeacherJudgeScriptRun(
-        group_id=group_id,
+        teaching_class_id=teaching_class_id,
         artifact_id=uuid.uuid4(),
         target_scope=TeacherJudgeScriptRunTargetScope.manual,
         status=TeacherJudgeScriptRunStatus.running,
@@ -1238,8 +1233,7 @@ def test_executor_runtime_target_falls_back_to_live_ip_when_cache_missing(
     assert target["host"] == "10.0.0.131"
     assert target["private_key_pem"] == "KEY"
     assert (
-        resource_repo.get_cached_ip_address(session=session, vmid=131)
-        == "10.0.0.131"
+        resource_repo.get_cached_ip_address(session=session, vmid=131) == "10.0.0.131"
     )
 
 
@@ -1248,10 +1242,10 @@ async def test_execute_script_run_saves_invalid_json_result(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     session = _session()
-    group_id = uuid.uuid4()
+    teaching_class_id = uuid.uuid4()
     user_id = uuid.uuid4()
     artifact = models.TeacherJudgeScriptArtifact(
-        group_id=group_id,
+        teaching_class_id=teaching_class_id,
         name="rubric.pdf",
         template_key="linux",
         rubric_snapshot_json={},
@@ -1269,8 +1263,8 @@ async def test_execute_script_run_saves_invalid_json_result(
     monkeypatch.setattr(script_executor_service, "decrypt_value", lambda _value: "KEY")
     monkeypatch.setattr(
         script_run_service,
-        "_group_member_by_vmid",
-        lambda *, session, group_id: {
+        "_class_member_by_vmid",
+        lambda *, session, teaching_class_id: {
             101: {"user_id": str(user_id), "email": "s@example.com", "full_name": "S"}
         },
     )
@@ -1300,7 +1294,7 @@ async def test_execute_script_run_saves_invalid_json_result(
 
     run = script_run_service.create_script_run(
         session=session,
-        group_id=group_id,
+        teaching_class_id=teaching_class_id,
         artifact_id=artifact.id,
         target_scope=TeacherJudgeScriptRunTargetScope.manual,
         target_vmids=[101],
@@ -1411,10 +1405,10 @@ async def test_execute_script_run_records_executor_level_failure(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     session = _session()
-    group_id = uuid.uuid4()
+    teaching_class_id = uuid.uuid4()
     user_id = uuid.uuid4()
     artifact = models.TeacherJudgeScriptArtifact(
-        group_id=group_id,
+        teaching_class_id=teaching_class_id,
         name="rubric.pdf",
         template_key="linux",
         rubric_snapshot_json={},
@@ -1431,8 +1425,8 @@ async def test_execute_script_run_records_executor_level_failure(
     monkeypatch.setattr(script_executor_service, "engine", session.get_bind())
     monkeypatch.setattr(
         script_run_service,
-        "_group_member_by_vmid",
-        lambda *, session, group_id: {
+        "_class_member_by_vmid",
+        lambda *, session, teaching_class_id: {
             101: {"user_id": str(user_id), "email": "s@example.com", "full_name": "S"}
         },
     )
@@ -1455,7 +1449,7 @@ async def test_execute_script_run_records_executor_level_failure(
 
     run = script_run_service.create_script_run(
         session=session,
-        group_id=group_id,
+        teaching_class_id=teaching_class_id,
         artifact_id=artifact.id,
         target_scope=TeacherJudgeScriptRunTargetScope.manual,
         target_vmids=[101],
@@ -1470,69 +1464,6 @@ async def test_execute_script_run_records_executor_level_failure(
     assert stored_run.status.value == "failed"
     assert stored_run.progress_json["stage"] == "failed"
     assert stored_run.result_summary_json["executor_error"] == "proxmox unavailable"
-
-
-@pytest.mark.asyncio
-async def test_execute_script_run_rejects_artifact_scope_mismatch(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    session = _session()
-    artifact = models.TeacherJudgeScriptArtifact(
-        group_id=uuid.uuid4(),
-        name="rubric.pdf",
-        template_key="linux",
-        rubric_snapshot_json={},
-        script_content=SAFE_SCRIPT,
-        status=TeacherJudgeScriptStatus.approved,
-        policy_check_result_json={"approved": True},
-        ai_review_result_json={"approved": True},
-    )
-    session.add(artifact)
-    session.commit()
-    session.refresh(artifact)
-    run = models.TeacherJudgeScriptRun(
-        group_id=uuid.uuid4(),
-        artifact_id=artifact.id,
-        target_scope=TeacherJudgeScriptRunTargetScope.manual,
-        target_snapshot_json={"targets": []},
-        status=TeacherJudgeScriptRunStatus.pending,
-    )
-    session.add(run)
-    session.commit()
-    session.refresh(run)
-    monkeypatch.setattr(script_executor_service, "engine", session.get_bind())
-
-    await script_executor_service.execute_script_run(run.id)
-
-    session.expire_all()
-    stored_run = session.get(models.TeacherJudgeScriptRun, run.id)
-    assert stored_run is not None
-    assert stored_run.status == TeacherJudgeScriptRunStatus.failed
-    assert stored_run.result_summary_json["reason_code"] == "scope_mismatch"
-
-
-def test_executor_rejects_class_target_missing_from_current_scope() -> None:
-    vmid = 101
-    run = SimpleNamespace(id=uuid.uuid4(), class_id=uuid.uuid4())
-    target = {
-        "vmid": vmid,
-        "mapping_id": str(uuid.uuid4()),
-        "machine_node_id": str(uuid.uuid4()),
-        "user": {"id": str(uuid.uuid4())},
-    }
-
-    with pytest.raises(script_executor_service.TargetExecutionError) as exc_info:
-        script_executor_service._resolve_runtime_target(
-            session=SimpleNamespace(),
-            run=run,
-            target=target,
-            live_by_vmid={
-                vmid: {"vmid": vmid, "type": "qemu", "status": "running"}
-            },
-            class_targets_by_vmid={},
-        )
-
-    assert exc_info.value.reason_code == "class_scope_changed"
 
 
 def test_execute_target_script_uploads_runs_and_collects_result(
@@ -1644,7 +1575,7 @@ async def test_create_artifact_rejects_blank_name(
     with pytest.raises(HTTPException) as exc_info:
         await script_artifact_service.create_artifact(
             session=session,
-            group_id=uuid.uuid4(),
+            teaching_class_id=uuid.uuid4(),
             name="   ",
             template_key="linux",
             rubric_analysis=_analysis(),

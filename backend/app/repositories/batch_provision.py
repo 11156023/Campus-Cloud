@@ -17,8 +17,7 @@ from app.models.resource import Resource
 def create_job(
     *,
     session: Session,
-    group_id: uuid.UUID | None,
-    teaching_class_id: uuid.UUID | None = None,
+    teaching_class_id: uuid.UUID,
     initiated_by: uuid.UUID,
     resource_type: str,
     hostname_prefix: str,
@@ -31,7 +30,6 @@ def create_job(
 ) -> BatchProvisionJob:
     now = datetime.now(UTC)
     job = BatchProvisionJob(
-        group_id=group_id,
         teaching_class_id=teaching_class_id,
         initiated_by=initiated_by,
         resource_type=resource_type,
@@ -270,17 +268,6 @@ def update_job_status(
             job.finished_at = datetime.now(UTC)
         session.add(job)
         session.commit()
-
-
-def list_jobs_by_group(
-    *, session: Session, group_id: uuid.UUID
-) -> list[BatchProvisionJob]:
-    stmt = (
-        select(BatchProvisionJob)
-        .where(BatchProvisionJob.group_id == group_id)
-        .order_by(BatchProvisionJob.created_at.desc())
-    )
-    return list(session.exec(stmt).all())
 
 
 def list_jobs_by_teaching_class(

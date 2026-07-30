@@ -68,10 +68,10 @@ _ROUTES: tuple[NavigationRoute, ...] = (
         allow_teacher=False,
     ),
     NavigationRoute(
-        path="/groups",
-        title="群組",
-        summary="管理課程或專案群組。",
-        keywords=("群組", "group", "班級", "團隊"),
+        path="/class-management",
+        title="班級管理",
+        summary="管理正式班級、學生、課程環境與上課監看。",
+        keywords=("班級", "課程", "學生", "教室", "上課"),
         allow_student=False,
     ),
     NavigationRoute(
@@ -103,6 +103,14 @@ _ROUTES: tuple[NavigationRoute, ...] = (
         title="AI API",
         summary="管理 AI API 金鑰與個人用量。",
         keywords=("ai api", "token 用量", "金鑰", "ai 用量"),
+    ),
+    NavigationRoute(
+        path="/ai-pve",
+        title="AI PVE 維運助手",
+        summary="查詢全站 PVE 狀態並協助執行維運操作。",
+        keywords=("ai pve", "pve 維運", "節點狀態", "vm 維運"),
+        allow_student=False,
+        allow_teacher=False,
     ),
     NavigationRoute(
         path="/admin",
@@ -196,10 +204,11 @@ def get_routes_for_user(user: User) -> tuple[NavigationRoute, ...]:
     return tuple(routes)
 
 
-def find_route_by_path(path: str, routes: Iterable[NavigationRoute]) -> NavigationRoute | None:
+def find_route_by_path(
+    path: str, routes: Iterable[NavigationRoute]
+) -> NavigationRoute | None:
     target = path.strip()
     for route in routes:
         if route.path == target:
             return route
     return None
-

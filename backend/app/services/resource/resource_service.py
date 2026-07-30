@@ -551,7 +551,7 @@ def delete(
         except Exception as exc:
             logger.warning("Failed to release IP for VM %s: %s", vmid, exc)
 
-        # Unlink deleted VMID from historical batch tasks so group status won't
+        # Unlink deleted VMID from historical batch tasks so class job status won't
         # accidentally match a future resource that reuses the same VMID.
         try:
             cleared_count = batch_provision_repo.clear_task_vmid_references(
@@ -848,7 +848,7 @@ def get_session_status(
 
     Reports whichever warning is more urgent:
     - ``warn_reason="auto_stop"``: VM has an ``auto_stop_at`` within the
-      configured warning window (group practice quota or course-window grace).
+      configured warning window (class practice quota or course-window grace).
     - ``warn_reason="expiry"``: VM's ``expiry_date`` is within
       ``policy.expiry_warning_hours`` (admin-configurable, defaults to 24 h).
 

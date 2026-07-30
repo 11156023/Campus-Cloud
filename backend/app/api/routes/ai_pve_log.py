@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import uuid
 
 from fastapi import APIRouter, HTTPException, Query
 
@@ -22,9 +21,7 @@ from app.ai.pve_log.schemas import (
     StorageInfo,
     SystemSnapshot,
 )
-from app.api.deps import InstructorUser, SessionDep
-from app.core.authorizers import require_group_access
-from app.repositories import group as group_repo
+from app.api.deps import AdminUser, SessionDep
 
 logger = logging.getLogger(__name__)
 
@@ -39,31 +36,16 @@ async def _snapshot_or_500() -> SystemSnapshot:
         raise HTTPException(status_code=500, detail="收集 PVE 資料失敗，請稍後再試")
 
 
-def _resolve_group_vmids(
-    *,
-    session: SessionDep,
-    current_user: InstructorUser,
-    group_id: uuid.UUID,
-) -> set[int]:
-    db_group = group_repo.get_group_by_id(session=session, group_id=group_id)
-    if not db_group:
-        raise HTTPException(status_code=404, detail="Group not found")
-
-    require_group_access(current_user, db_group.owner_id)
-    member_vmids = group_repo.get_member_vmids(session=session, group_id=group_id)
-    return {vmid for vmid in member_vmids.values() if vmid is not None}
-
-
 @router.get("/system-snapshot", response_model=SystemSnapshot)
 async def get_system_snapshot(
-    _current_user: InstructorUser,
+    _current_user: AdminUser,
 ) -> SystemSnapshot:
     return await _snapshot_or_500()
 
 
 @router.get("/nodes", response_model=list[NodeInfo])
 async def get_nodes(
-    _current_user: InstructorUser,
+    _current_user: AdminUser,
 ) -> list[NodeInfo]:
     snapshot = await _snapshot_or_500()
     return snapshot.nodes
@@ -71,7 +53,7 @@ async def get_nodes(
 
 @router.get("/storages", response_model=list[StorageInfo])
 async def get_storages(
-    _current_user: InstructorUser,
+    _current_user: AdminUser,
     node: str | None = Query(default=None),
 ) -> list[StorageInfo]:
     snapshot = await _snapshot_or_500()
@@ -82,7 +64,7 @@ async def get_storages(
 
 @router.get("/resources", response_model=list[ResourceSummary])
 async def get_resources(
-    _current_user: InstructorUser,
+    _current_user: AdminUser,
     node: str | None = Query(default=None),
     resource_type: str | None = Query(default=None, pattern="^(qemu|lxc)$"),
     status: str | None = Query(default=None, pattern="^(running|stopped)$"),
@@ -100,7 +82,7 @@ async def get_resources(
 
 @router.get("/resource-statuses", response_model=list[ResourceStatus])
 async def get_resource_statuses(
-    _current_user: InstructorUser,
+    _current_user: AdminUser,
     node: str | None = Query(default=None),
     vmid: int | None = Query(default=None),
 ) -> list[ResourceStatus]:
@@ -119,7 +101,7 @@ async def get_resource_statuses(
     response_model_exclude={"__all__": {"raw"}},
 )
 async def get_resource_configs(
-    _current_user: InstructorUser,
+    _current_user: AdminUser,
     node: str | None = Query(default=None),
     vmid: int | None = Query(default=None),
 ) -> list[ResourceConfig]:
@@ -134,7 +116,7 @@ async def get_resource_configs(
 
 @router.get("/network-interfaces", response_model=list[NetworkInterface])
 async def get_network_interfaces(
-    _current_user: InstructorUser,
+    _current_user: AdminUser,
     vmid: int | None = Query(default=None),
 ) -> list[NetworkInterface]:
     snapshot = await _snapshot_or_500()
@@ -147,29 +129,14 @@ async def get_network_interfaces(
 @router.post("/chat", response_model=ChatResponse)
 async def chat(
     request: ChatRequest,
-    _current_user: InstructorUser,
+    _current_user: AdminUser,
     session: SessionDep,
 ) -> ChatResponse:
-    allowed_vmids = _resolve_group_vmids(
-        session=session,
-        current_user=_current_user,
-        group_id=request.group_id,
-    )
     try:
-        chat_kwargs = {
-            "message": request.message,
-            "history": request.messages,
-            "session": session,
-            "allowed_vmids": allowed_vmids,
-        }
-        if hasattr(_current_user, "id"):
-            chat_kwargs.update(
-                requester_id=_current_user.id,
-                scope_type="group",
-                scope_id=request.group_id,
-            )
         return await pve_chat(
-            **chat_kwargs,
+            message=request.message,
+            history=request.messages,
+            session=session,
         )
     except Exception:
         logger.exception("AI-PVE 對話失敗")
@@ -179,7 +146,7 @@ async def chat(
 @router.post("/ssh/exec", response_model=SSHExecResult, tags=["ai-pve-log-ssh"])
 async def post_ssh_exec(
     request: SSHExecRequest,
-    _current_user: InstructorUser,
+    _current_user: AdminUser,
     session: SessionDep,
 ) -> SSHExecResult:
     from app.ai.pve_log.ssh_exec import ssh_exec as _ssh_exec
@@ -194,46 +161,13 @@ async def post_ssh_exec(
 @router.post("/ssh/confirm", response_model=SSHExecResult, tags=["ai-pve-log-ssh"])
 async def post_ssh_confirm(
     request: SSHConfirmRequest,
-    _current_user: InstructorUser,
+    _current_user: AdminUser,
     session: SessionDep,
 ) -> SSHExecResult:
     from app.ai.pve_log.ssh_exec import confirm_exec as _confirm_exec
 
     try:
-        if request.group_id is None:
-            from app.ai.pve_log.ssh_exec import peek_pending_scope
-
-            scope_type, scope_id = peek_pending_scope(
-                request.token or request.confirm_token or ""
-            )
-            if scope_type != "group" or scope_id is None:
-                return await _confirm_exec(request, session=session)
-            allowed_vmids = _resolve_group_vmids(
-                session=session,
-                current_user=_current_user,
-                group_id=scope_id,
-            )
-            return await _confirm_exec(
-                request,
-                session=session,
-                requester_id=_current_user.id,
-                scope_type="group",
-                scope_id=scope_id,
-                allowed_vmids=allowed_vmids,
-            )
-        allowed_vmids = _resolve_group_vmids(
-            session=session,
-            current_user=_current_user,
-            group_id=request.group_id,
-        )
-        return await _confirm_exec(
-            request,
-            session=session,
-            requester_id=_current_user.id,
-            scope_type="group",
-            scope_id=request.group_id,
-            allowed_vmids=allowed_vmids,
-        )
+        return await _confirm_exec(request, session=session)
     except Exception as exc:
         logger.exception("SSH 確認失敗")
         raise HTTPException(status_code=500, detail=str(exc))
