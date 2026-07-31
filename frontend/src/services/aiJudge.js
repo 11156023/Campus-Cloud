@@ -66,6 +66,12 @@ export const AiJudgeService = {
     );
   },
 
+  deleteSession(classId, sessionId) {
+    return apiDelete(
+      `/api/v1/teaching-classes/${classId}/judge/sessions/${sessionId}`,
+    );
+  },
+
   listSessionMessages(classId, sessionId, before = null) {
     const query = before ? `?before=${encodeURIComponent(before)}` : "";
     return apiGet(

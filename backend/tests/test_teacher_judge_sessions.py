@@ -2,13 +2,20 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
 
 import pytest
 from fastapi import HTTPException
-from sqlmodel import Session, SQLModel, create_engine
+from sqlmodel import Session, SQLModel, create_engine, select
 
 from app.ai.teacher_judge import session_service
+from app.ai.teacher_judge.schemas import (
+    TeacherJudgeSessionMessageCreateRequest,
+)
+from app.api.routes import teacher_judge_sessions
 from app.models.teacher_judge_file import TeacherJudgeFile
+from app.models.teacher_judge_script_artifact import TeacherJudgeScriptArtifact
+from app.models.teacher_judge_script_run import TeacherJudgeScriptRun
 from app.models.teacher_judge_session import (
     TeacherJudgeMessageRole,
     TeacherJudgeSession,
@@ -58,6 +65,100 @@ def test_archived_session_is_read_only() -> None:
         session_service.ensure_active(item)
 
     assert exc_info.value.status_code == 409
+
+
+def test_chat_can_start_without_selected_file() -> None:
+    db = _session()
+    item = TeacherJudgeSession(teaching_class_id=uuid.uuid4(), title="Chat first")
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+
+    assert session_service.selected_file_for_chat(db, item) is None
+
+
+def test_delete_session_data_removes_owned_records_but_keeps_shared_file() -> None:
+    db = _session()
+    class_id = uuid.uuid4()
+    rubric_file = _file(db, class_id)
+    item = TeacherJudgeSession(
+        teaching_class_id=class_id,
+        title="Delete me",
+        selected_file_id=rubric_file.id,
+    )
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+
+    artifact = TeacherJudgeScriptArtifact(
+        teaching_class_id=class_id,
+        session_id=item.id,
+        name="Delete script",
+        template_key="linux",
+        script_content="print('ok')",
+    )
+    db.add(artifact)
+    db.commit()
+    db.refresh(artifact)
+    db.add_all(
+        [
+            TeacherJudgeScriptRun(
+                teaching_class_id=class_id,
+                artifact_id=artifact.id,
+            ),
+            TeacherJudgeSessionMessage(
+                session_id=item.id,
+                role=TeacherJudgeMessageRole.user,
+                content="remove this",
+            ),
+        ]
+    )
+    db.commit()
+
+    session_service.delete_session_data(db, item)
+
+    assert db.get(TeacherJudgeSession, item.id) is None
+    assert db.get(TeacherJudgeScriptArtifact, artifact.id) is None
+    assert not db.exec(select(TeacherJudgeScriptRun)).all()
+    assert not db.exec(select(TeacherJudgeSessionMessage)).all()
+    assert db.get(TeacherJudgeFile, rubric_file.id) is not None
+
+
+@pytest.mark.asyncio
+async def test_message_without_rubric_is_saved_and_uses_general_chat(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    db = _session()
+    class_id = uuid.uuid4()
+    item = TeacherJudgeSession(teaching_class_id=class_id, title="Chat first")
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+
+    async def fake_chat(messages, rubric_context, **kwargs):
+        assert messages[-1].content == "先討論檢查需求"
+        assert rubric_context == "{}"
+        assert kwargs["template_key"] == "linux"
+        return "可以，先描述目標環境。", None, {}
+
+    monkeypatch.setattr(teacher_judge_sessions, "_access", lambda *args: None)
+    monkeypatch.setattr(teacher_judge_sessions, "chat_with_rubric", fake_chat)
+    monkeypatch.setattr(
+        teacher_judge_sessions, "get_enabled_template_commands", lambda *args: []
+    )
+
+    result = await teacher_judge_sessions.create_message(
+        class_id,
+        item.id,
+        TeacherJudgeSessionMessageCreateRequest(content="先討論檢查需求"),
+        db,
+        SimpleNamespace(id=uuid.uuid4()),
+    )
+
+    assert result.user_message.content == "先討論檢查需求"
+    assert result.assistant_message.content == "可以，先描述目標環境。"
+    assert result.rubric_proposal is None
+    assert len(db.exec(select(TeacherJudgeSessionMessage)).all()) == 2
 
 
 def test_message_content_redacts_common_secrets() -> None:

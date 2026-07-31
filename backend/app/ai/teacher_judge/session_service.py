@@ -66,6 +66,15 @@ def require_selected_file(db: Session, item: TeacherJudgeSession) -> TeacherJudg
     return file
 
 
+def selected_file_for_chat(
+    db: Session, item: TeacherJudgeSession
+) -> TeacherJudgeFile | None:
+    """Return the selected rubric when present; a chat can start without one."""
+    if not item.selected_file_id:
+        return None
+    return require_selected_file(db, item)
+
+
 def get_session(
     db: Session, class_id: uuid.UUID, session_id: uuid.UUID
 ) -> TeacherJudgeSession:
@@ -73,6 +82,46 @@ def get_session(
     if not item or item.teaching_class_id != class_id:
         raise HTTPException(status_code=404, detail="Teacher Judge session not found")
     return item
+
+
+def delete_session_data(db: Session, item: TeacherJudgeSession) -> None:
+    """Delete a session and all session-owned messages, scripts, and runs.
+
+    Rubric files are class-scoped library records and may be shared by multiple
+    sessions, so the selected file itself is intentionally preserved.
+    """
+    artifacts = list(
+        db.exec(
+            select(TeacherJudgeScriptArtifact).where(
+                TeacherJudgeScriptArtifact.session_id == item.id
+            )
+        )
+    )
+    for artifact in artifacts:
+        runs = list(
+            db.exec(
+                select(TeacherJudgeScriptRun).where(
+                    TeacherJudgeScriptRun.artifact_id == artifact.id
+                )
+            )
+        )
+        for run in runs:
+            db.delete(run)
+
+    messages = list(
+        db.exec(
+            select(TeacherJudgeSessionMessage).where(
+                TeacherJudgeSessionMessage.session_id == item.id
+            )
+        )
+    )
+    for message in messages:
+        db.delete(message)
+    for artifact in artifacts:
+        db.delete(artifact)
+
+    db.delete(item)
+    db.commit()
 
 
 def ensure_active(item: TeacherJudgeSession) -> None:
@@ -186,7 +235,7 @@ def bounded_history(
 
 
 async def maybe_summarize(
-    db: Session, item: TeacherJudgeSession, file: TeacherJudgeFile
+    db: Session, item: TeacherJudgeSession, file: TeacherJudgeFile | None
 ) -> None:
     assistant_count = db.exec(
         select(func.count())
@@ -209,12 +258,14 @@ async def maybe_summarize(
         )
     )
     try:
+        rubric_context = json.dumps(file.analysis_json, ensure_ascii=False) if file else "{}"
+        template_key = file.template_key if file else "linux"
         reply, _, _ = await chat_with_rubric(
             messages,
-            json.dumps(file.analysis_json, ensure_ascii=False),
+            rubric_context,
             is_refine=False,
-            template_key=file.template_key,
-            template_commands=get_enabled_template_commands(db, file.template_key),
+            template_key=template_key,
+            template_commands=get_enabled_template_commands(db, template_key),
         )
     except Exception:
         return

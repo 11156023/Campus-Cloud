@@ -265,7 +265,13 @@ function RubricUploader({ onUpload, isLoading }) {
 
 /* ── AI 對話面板 ────────────────────────────────────────── */
 
-function ChatPanel({ messages, onSendMessage, isLoading, disabled = false }) {
+function ChatPanel({
+  messages,
+  onSendMessage,
+  isLoading,
+  disabled = false,
+  hasRubric = false,
+}) {
   const [input, setInput] = useState("");
   const messagesEndRef = useRef(null);
 
@@ -286,8 +292,12 @@ function ChatPanel({ messages, onSendMessage, isLoading, disabled = false }) {
         {messages.length === 0 ? (
           <div className={styles.chatEmpty}>
             <MIcon name="smart_toy" size={32} />
-            <p>與 AI 對話來精煉你的情境評估表</p>
-            <p className={styles.chatEmptyMeta}>可以詢問修改建議，或直接下達調整指令</p>
+            <p>{hasRubric ? "與 AI 對話來精煉你的情境評估表" : "先和 AI 討論你的檢查需求"}</p>
+            <p className={styles.chatEmptyMeta}>
+              {hasRubric
+                ? "可以詢問修改建議，或直接下達調整指令"
+                : "不必先上傳文件；之後再上傳評分表即可接續這段對話"}
+            </p>
           </div>
         ) : (
           messages.map((msg, i) => (
@@ -335,7 +345,7 @@ function ChatPanel({ messages, onSendMessage, isLoading, disabled = false }) {
         <button
           type="button"
           className={styles.btnSecondary}
-          disabled={isLoading || disabled}
+          disabled={isLoading || disabled || !hasRubric}
           onClick={() => onSendMessage("請幫我審核並潤飾目前的情境評估表", true)}
         >
           <MIcon name="auto_fix_high" size={14} />
@@ -357,7 +367,11 @@ function ChatPanel({ messages, onSendMessage, isLoading, disabled = false }) {
                 send();
               }
             }}
-            placeholder="輸入訊息...（Shift+Enter 換行）"
+            placeholder={
+              hasRubric
+                ? "輸入訊息...（Shift+Enter 換行）"
+                : "描述想檢查的環境或問題...（Shift+Enter 換行）"
+            }
             rows={1}
             disabled={isLoading || disabled}
           />
@@ -371,7 +385,9 @@ function ChatPanel({ messages, onSendMessage, isLoading, disabled = false }) {
           </button>
         </form>
         <p className={styles.chatHint}>
-          提示：詢問問題不會修改評估表，需明確指令（如「幫我改」「新增」）才會執行變更
+          {hasRubric
+            ? "提示：詢問問題不會修改評估表，需明確指令（如「幫我改」「新增」）才會執行變更"
+            : "提示：這是一般 AI 對話；上傳評分表後，AI 才會提出可套用的評分項目修改"}
         </p>
       </div>
     </div>
@@ -508,7 +524,6 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated }
       setUploadedFileName(file.name || "rubric");
       setSourceFileId(uploadedFile.id);
       setAnalysisTemplateKey(response.template_key ?? selectedTemplateKey);
-      setMessages([]);
       setPendingConflictFile(null);
       setFiles((current) => [
         uploadedFile,
@@ -585,7 +600,7 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated }
   }
 
   async function handleSendMessage(content, isRefine = false) {
-    if (!analysis) return;
+    if (!judgeSession?.id && !analysis) return;
     if (judgeSession?.status === "archived") return;
     const newMessages = [...messages, { role: "user", content }];
     setMessages(newMessages);
@@ -797,110 +812,116 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated }
         )}
       </div>
 
-      {!analysis ? (
-        <div className={styles.card}>
-          <h4 className={styles.cardTitle}>
-            <MIcon name="upload" size={18} />
-            上傳情境評估表
-          </h4>
-          <div className={styles.templateRow}>
-            <span className={styles.fieldLabel}>評分環境</span>
-            <div className={styles.chipBtns}>
-              {TEMPLATE_OPTIONS.map((option) => (
-                <button
-                  key={option.key}
-                  type="button"
-                  className={
-                    selectedTemplateKey === option.key ? styles.chipBtnActive : styles.chipBtn
-                  }
-                  onClick={() => setSelectedTemplateKey(option.key)}
-                  disabled={isUploading}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <RubricUploader onUpload={handleUpload} isLoading={isUploading} />
-        </div>
-      ) : (
-        <div className={styles.analysisGrid}>
-          <div className={styles.analysisMain}>
-            <div className={styles.card}>
-              <RubricStats items={items} />
-              <p className={styles.mutedText}>
-                本次評分環境：{getTemplateLabel(analysisTemplateKey)}
-              </p>
-              {analysis.summary && <p className={styles.summaryBox}>{analysis.summary}</p>}
-            </div>
-
-            <div className={styles.card}>
-              <div className={styles.cardHead}>
-                <h4 className={styles.cardTitle}>評估項目（{items.length}）</h4>
-                <button
-                  type="button"
-                  className={styles.btnSecondary}
-                  onClick={handleAddItem}
-                  disabled={readOnly}
-                >
-                  <MIcon name="add" size={16} />
-                  新增項目
-                </button>
-              </div>
-              <div className={styles.itemsList}>
-                {items.map((item, index) => (
-                  <RubricCard
-                    key={item.id}
-                    item={item}
-                    index={index}
-                    onChange={(updated) => handleItemChange(index, updated)}
-                    onDelete={() => handleItemDelete(index)}
-                    disabled={isChatting || readOnly}
-                  />
+      <div className={styles.analysisGrid}>
+        <div className={styles.analysisMain}>
+          <div className={styles.card}>
+            <h4 className={styles.cardTitle}>
+              <MIcon name="upload" size={18} />
+              上傳情境評估表（可選）
+            </h4>
+            <p className={styles.mutedText}>
+              可以先聊天再上傳；上傳後會分析並自動綁定到目前 session。
+            </p>
+            <div className={styles.templateRow}>
+              <span className={styles.fieldLabel}>評分環境</span>
+              <div className={styles.chipBtns}>
+                {TEMPLATE_OPTIONS.map((option) => (
+                  <button
+                    key={option.key}
+                    type="button"
+                    className={
+                      selectedTemplateKey === option.key ? styles.chipBtnActive : styles.chipBtn
+                    }
+                    onClick={() => setSelectedTemplateKey(option.key)}
+                    disabled={isUploading || readOnly}
+                  >
+                    {option.label}
+                  </button>
                 ))}
               </div>
             </div>
+            <RubricUploader onUpload={handleUpload} isLoading={isUploading || readOnly} />
           </div>
 
-          <div className={`${styles.card} ${styles.chatCard}`}>
-            <h4 className={styles.cardTitle}>
-              <MIcon name="smart_toy" size={18} />
-              AI 對話助手
-            </h4>
-            <ChatPanel
-              messages={messages}
-              onSendMessage={handleSendMessage}
-              isLoading={isChatting}
-              disabled={readOnly}
-            />
-            {pendingProposal && (
-              <div className={styles.proposalCard}>
-                <div>
-                  <strong>AI 提出 {pendingProposal.length} 個評分項目</strong>
-                  <p>確認後才會寫回班級評分表。</p>
-                </div>
-                <div className={styles.sectionActions}>
+          {analysis && (
+            <>
+              <div className={styles.card}>
+                <RubricStats items={items} />
+                <p className={styles.mutedText}>
+                  本次評分環境：{getTemplateLabel(analysisTemplateKey)}
+                </p>
+                {analysis.summary && <p className={styles.summaryBox}>{analysis.summary}</p>}
+              </div>
+
+              <div className={styles.card}>
+                <div className={styles.cardHead}>
+                  <h4 className={styles.cardTitle}>評估項目（{items.length}）</h4>
                   <button
                     type="button"
                     className={styles.btnSecondary}
-                    onClick={() => setPendingProposal(null)}
-                  >
-                    略過
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.btnPrimary}
-                    onClick={applyPendingProposal}
+                    onClick={handleAddItem}
                     disabled={readOnly}
                   >
-                    套用提案
+                    <MIcon name="add" size={16} />
+                    新增項目
                   </button>
                 </div>
+                <div className={styles.itemsList}>
+                  {items.map((item, index) => (
+                    <RubricCard
+                      key={item.id}
+                      item={item}
+                      index={index}
+                      onChange={(updated) => handleItemChange(index, updated)}
+                      onDelete={() => handleItemDelete(index)}
+                      disabled={isChatting || readOnly}
+                    />
+                  ))}
+                </div>
               </div>
-            )}
-          </div>
+            </>
+          )}
         </div>
-      )}
+
+        <div className={`${styles.card} ${styles.chatCard}`}>
+          <h4 className={styles.cardTitle}>
+            <MIcon name="smart_toy" size={18} />
+            AI 聊天室
+          </h4>
+          <ChatPanel
+            messages={messages}
+            onSendMessage={handleSendMessage}
+            isLoading={isChatting}
+            disabled={readOnly}
+            hasRubric={Boolean(analysis)}
+          />
+          {pendingProposal && analysis && (
+            <div className={styles.proposalCard}>
+              <div>
+                <strong>AI 提出 {pendingProposal.length} 個評分項目</strong>
+                <p>確認後才會寫回班級評分表。</p>
+              </div>
+              <div className={styles.sectionActions}>
+                <button
+                  type="button"
+                  className={styles.btnSecondary}
+                  onClick={() => setPendingProposal(null)}
+                >
+                  略過
+                </button>
+                <button
+                  type="button"
+                  className={styles.btnPrimary}
+                  onClick={applyPendingProposal}
+                  disabled={readOnly}
+                >
+                  套用提案
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
 
       {pendingConflictFile && (
         <ConfirmModal
@@ -1763,6 +1784,8 @@ export default function AiJudgePanel({ classId, members }) {
   const [newSessionTitle, setNewSessionTitle] = useState("");
   const [sessionsLoading, setSessionsLoading] = useState(true);
   const [sessionAction, setSessionAction] = useState(false);
+  const [deleteSessionTarget, setDeleteSessionTarget] = useState(null);
+  const [deletingSession, setDeletingSession] = useState(false);
   const requestVersionRef = useRef(0);
   const toast = useToast();
 
@@ -1831,6 +1854,26 @@ export default function AiJudgePanel({ classId, members }) {
       toast.error(err?.message ?? "封存 session 失敗");
     } finally {
       setSessionAction(false);
+    }
+  }
+
+  async function deleteJudgeSession() {
+    if (!deleteSessionTarget) return;
+    setDeletingSession(true);
+    try {
+      await AiJudgeService.deleteSession(classId, deleteSessionTarget.id);
+      setSessions((current) =>
+        current.filter((item) => item.id !== deleteSessionTarget.id),
+      );
+      setActiveSessionId((current) =>
+        current === deleteSessionTarget.id ? null : current,
+      );
+      setDeleteSessionTarget(null);
+      toast.success("Session 與相關資料已刪除");
+    } catch (err) {
+      toast.error(err?.message ?? "刪除 session 失敗");
+    } finally {
+      setDeletingSession(false);
     }
   }
 
@@ -1926,17 +1969,28 @@ export default function AiJudgePanel({ classId, members }) {
                     {activeSession.run_count}
                   </p>
                 </div>
-                {activeSession.status === "active" && (
+                <div className={styles.sectionActions}>
+                  {activeSession.status === "active" && (
+                    <button
+                      type="button"
+                      className={styles.btnSecondary}
+                      disabled={sessionAction || deletingSession}
+                      onClick={archiveActiveSession}
+                    >
+                      <MIcon name="archive" size={16} />
+                      封存
+                    </button>
+                  )}
                   <button
                     type="button"
-                    className={styles.btnSecondary}
-                    disabled={sessionAction}
-                    onClick={archiveActiveSession}
+                    className={styles.btnDanger}
+                    disabled={sessionAction || deletingSession}
+                    onClick={() => setDeleteSessionTarget(activeSession)}
                   >
-                    <MIcon name="archive" size={16} />
-                    封存
+                    <MIcon name="delete" size={16} />
+                    刪除
                   </button>
-                )}
+                </div>
               </div>
 
               <div className={styles.subTabs}>
@@ -1985,6 +2039,36 @@ export default function AiJudgePanel({ classId, members }) {
           )}
         </section>
       </div>
+
+      {deleteSessionTarget && (
+        <ConfirmModal
+          title="確認刪除 Session？"
+          description={`「${deleteSessionTarget.title}」及其聊天紀錄、腳本與執行紀錄將直接從資料庫刪除，且無法復原。共用評分表檔案不會刪除。`}
+          onClose={() => {
+            if (!deletingSession) setDeleteSessionTarget(null);
+          }}
+          actions={
+            <>
+              <button
+                type="button"
+                className={styles.btnSecondary}
+                disabled={deletingSession}
+                onClick={() => setDeleteSessionTarget(null)}
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                className={styles.btnDanger}
+                disabled={deletingSession}
+                onClick={deleteJudgeSession}
+              >
+                {deletingSession ? "刪除中..." : "確認刪除"}
+              </button>
+            </>
+          }
+        />
+      )}
     </div>
   );
 }

@@ -476,3 +476,21 @@ production build。不得把沒有 isolated PostgreSQL/PVE/vLLM 證據的結果�
 規則實作。確認 session 邊界、
 權限與恢復正確後，再把既有 script artifact 與 run history 接入，避免第一次 migration
 就同時重寫整個 Teacher Judge 流程。
+
+## 14. 2026-07-31 實作狀態補充
+
+目前 checkout 已完成 session/message model、migration、class-scoped API、前端 session
+工作區與 script/run lineage。另已將聊天與評分表解耦：新 session 沒有 selected rubric 時，
+仍可直接送出一般訊息並將 user/assistant 訊息保存到資料庫；上傳或選擇評分表後，才啟用
+rubric proposal 與腳本產生。上傳新檔案不會清除同一 session 的既有聊天紀錄。
+
+本次變更未新增 schema，因此沿用既有 session migration；尚未宣稱 isolated PostgreSQL、
+vLLM 與 PVE 的完整 E2E 驗收。
+
+## 15. 2026-07-31 Session 刪除行為
+
+Session 詳情頁的封存按鈕旁提供刪除按鈕，必須經二次確認後呼叫
+`DELETE /teaching-classes/{class_id}/judge/sessions/{session_id}`。後端會在同一交易中
+刪除該 session 的訊息、腳本 artifact、腳本 runs 與 session；班級共用的
+`teacher_judge_files` 不刪除，避免影響其他 session 或 library。刪除成功後前端會移除列表項目
+並清空目前選取狀態。

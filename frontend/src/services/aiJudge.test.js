@@ -46,6 +46,18 @@ describe("AiJudgeService persistent sessions", () => {
     expect(JSON.parse(init.body)).toEqual({});
   });
 
+  test("刪除 session 使用 DELETE endpoint", async () => {
+    fetchMock.mockResolvedValue({ ok: true, status: 204 });
+
+    await AiJudgeService.deleteSession("class-1", "session-1");
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toContain(
+      "/api/v1/teaching-classes/class-1/judge/sessions/session-1",
+    );
+    expect(init.method).toBe("DELETE");
+  });
+
   test("session filter 會限制腳本 library", async () => {
     await AiJudgeService.listScripts("class-1", "session/1");
 

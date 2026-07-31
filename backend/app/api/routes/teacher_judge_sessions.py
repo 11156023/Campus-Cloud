@@ -27,12 +27,14 @@ from app.ai.teacher_judge.script_run_service import _run_to_public, create_scrip
 from app.ai.teacher_judge.service import chat_with_rubric
 from app.ai.teacher_judge.session_service import (
     bounded_history,
+    delete_session_data,
     ensure_active,
     get_session,
     maybe_summarize,
     message_public,
     redact_message_content,
     require_selected_file,
+    selected_file_for_chat,
     session_public,
     validate_selected_file,
 )
@@ -170,6 +172,18 @@ def archive_session(
     )
 
 
+@router.delete("/{session_id}", status_code=204)
+def delete_session(
+    teaching_class_id: uuid.UUID,
+    session_id: uuid.UUID,
+    session: SessionDep,
+    current_user: InstructorUser,
+) -> None:
+    _access(session, teaching_class_id, current_user)
+    item = get_session(session, teaching_class_id, session_id)
+    delete_session_data(session, item)
+
+
 @router.get(
     "/{session_id}/messages", response_model=list[TeacherJudgeSessionMessagePublic]
 )
@@ -220,7 +234,7 @@ async def create_message(
     _access(session, teaching_class_id, current_user)
     item = get_session(session, teaching_class_id, session_id)
     ensure_active(item)
-    file = require_selected_file(session, item)
+    file = selected_file_for_chat(session, item)
     user_message = TeacherJudgeSessionMessage(
         session_id=item.id,
         role=TeacherJudgeMessageRole.user,
@@ -233,11 +247,17 @@ async def create_message(
     try:
         reply, proposal, metrics = await chat_with_rubric(
             bounded_history(session, item.id),
-            json.dumps(file.analysis_json, ensure_ascii=False),
+            json.dumps(file.analysis_json, ensure_ascii=False) if file else "{}",
             is_refine=False,
-            template_key=file.template_key,
-            template_commands=get_enabled_template_commands(session, file.template_key),
+            template_key=file.template_key if file else "linux",
+            template_commands=get_enabled_template_commands(
+                session, file.template_key if file else "linux"
+            ),
         )
+        # Without a selected rubric the conversation is general assistance only;
+        # do not let an unconstrained model response create an unreviewed proposal.
+        if file is None:
+            proposal = None
         assistant = TeacherJudgeSessionMessage(
             session_id=item.id,
             role=TeacherJudgeMessageRole.assistant,
