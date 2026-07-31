@@ -46,6 +46,33 @@ describe("AiJudgeService persistent sessions", () => {
     expect(JSON.parse(init.body)).toEqual({});
   });
 
+  test("腳本產生 request 可超過一般 15 秒 timeout", async () => {
+    vi.useFakeTimers();
+    try {
+      fetchMock.mockImplementationOnce((_url, init) => new Promise((resolve, reject) => {
+        const timer = setTimeout(
+          () => resolve(jsonResponse({ status: "reviewed" })),
+          20_000,
+        );
+        init.signal.addEventListener(
+          "abort",
+          () => {
+            clearTimeout(timer);
+            reject(new DOMException("aborted", "AbortError"));
+          },
+          { once: true },
+        );
+      }));
+
+      const pending = AiJudgeService.createSessionScript("class-1", "session-1");
+      await vi.advanceTimersByTimeAsync(20_000);
+
+      await expect(pending).resolves.toEqual({ status: "reviewed" });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   test("刪除 session 使用 DELETE endpoint", async () => {
     fetchMock.mockResolvedValue({ ok: true, status: 204 });
 

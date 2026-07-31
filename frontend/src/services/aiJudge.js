@@ -8,6 +8,10 @@ import {
   apiPostMultipart,
 } from "./api";
 
+// 腳本產生會依序執行 generation、policy/quality 修正與 AI reviewer，
+// 不能沿用一般 API 的 15 秒 request budget。後端每次 vLLM 呼叫仍有自己的 timeout。
+const SCRIPT_GENERATION_TIMEOUT_MS = 7 * 60 * 1000;
+
 /** 評分環境模板選項 */
 export const TEMPLATE_OPTIONS = [
   { key: "linux", label: "一般 Linux/LXC" },
@@ -90,6 +94,7 @@ export const AiJudgeService = {
     return apiPost(
       `/api/v1/teaching-classes/${classId}/judge/sessions/${sessionId}/scripts`,
       {},
+      { timeoutMs: SCRIPT_GENERATION_TIMEOUT_MS },
     );
   },
 
@@ -176,12 +181,16 @@ export const AiJudgeService = {
 
   /** 由評分表快照產生受管收集腳本（後端會接著跑 policy 與 AI 審查） */
   createScript(classId, { name, templateKey, rubricSnapshot, sourceFileId = null }) {
-    return apiPost(`/api/v1/teaching-classes/${classId}/judge/scripts/`, {
-      name,
-      template_key: templateKey,
-      rubric_snapshot: rubricSnapshot,
-      source_file_id: sourceFileId,
-    });
+    return apiPost(
+      `/api/v1/teaching-classes/${classId}/judge/scripts/`,
+      {
+        name,
+        template_key: templateKey,
+        rubric_snapshot: rubricSnapshot,
+        source_file_id: sourceFileId,
+      },
+      { timeoutMs: SCRIPT_GENERATION_TIMEOUT_MS },
+    );
   },
 
   /** 重新生成腳本（可帶新的 rubric 快照） */
@@ -189,6 +198,7 @@ export const AiJudgeService = {
     return apiPost(
       `/api/v1/teaching-classes/${classId}/judge/scripts/${scriptId}/regenerate`,
       { rubric_snapshot: rubricSnapshot },
+      { timeoutMs: SCRIPT_GENERATION_TIMEOUT_MS },
     );
   },
 
