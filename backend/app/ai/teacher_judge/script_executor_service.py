@@ -32,6 +32,7 @@ from app.models.teacher_judge_script_run import (
     TeacherJudgeScriptRun,
     TeacherJudgeScriptRunStatus,
 )
+from app.models.teacher_judge_session import TeacherJudgeSession
 from app.repositories import resource as resource_repo
 
 logger = logging.getLogger(__name__)
@@ -273,8 +274,19 @@ def _execute_target_script(
         finally:
             sftp.close()
     finally:
-        # First version intentionally keeps the remote temp directory for
-        # troubleshooting; add cleanup / retention policy before production scale.
+        cleanup_command = (
+            f"rm -f -- {quoted_dir}/script.py {quoted_dir}/result.json "
+            f"{quoted_dir}/stderr.log && rmdir -- {quoted_dir} 2>/dev/null || true"
+        )
+        try:
+            exec_command(client, cleanup_command, timeout=SSH_TIMEOUT_SECONDS)
+        except Exception:
+            logger.warning(
+                "Teacher Judge remote cleanup failed run=%s vmid=%s",
+                target["run_id"],
+                vmid,
+                exc_info=True,
+            )
         client.close()
 
 
@@ -438,7 +450,24 @@ def _mark_run_executor_failed(run_id: uuid.UUID, message: str) -> None:
         run.finished_at = _now()
         run.updated_at = _now()
         session.add(run)
+        artifact = session.get(TeacherJudgeScriptArtifact, run.artifact_id)
+        if artifact is not None:
+            _touch_judge_session(session, artifact)
         session.commit()
+
+
+def _touch_judge_session(
+    session: Session,
+    artifact: TeacherJudgeScriptArtifact,
+) -> None:
+    if artifact.session_id is None:
+        return
+    judge_session = session.get(TeacherJudgeSession, artifact.session_id)
+    if judge_session is None:
+        return
+    judge_session.last_activity_at = _now()
+    judge_session.updated_at = judge_session.last_activity_at
+    session.add(judge_session)
 
 
 def _record_result_ai_usage(
@@ -478,6 +507,7 @@ async def _execute_script_run(run_id: uuid.UUID) -> None:
             run.finished_at = _now()
             run.updated_at = _now()
             session.add(run)
+            _touch_judge_session(session, artifact)
             session.commit()
             return
 
@@ -488,6 +518,7 @@ async def _execute_script_run(run_id: uuid.UUID) -> None:
             run.finished_at = _now()
             run.updated_at = _now()
             session.add(run)
+            _touch_judge_session(session, artifact)
             session.commit()
             return
 
@@ -618,6 +649,7 @@ async def _execute_script_run(run_id: uuid.UUID) -> None:
         run.finished_at = _now()
         run.updated_at = _now()
         session.add(run)
+        _touch_judge_session(session, artifact)
         session.commit()
         _record_result_ai_usage(
             session=session,

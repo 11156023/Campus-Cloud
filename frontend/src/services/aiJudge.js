@@ -33,6 +33,79 @@ export function rubricToContext(analysis) {
 }
 
 export const AiJudgeService = {
+  /* ── 持久化檢查 Session ── */
+
+  listSessions(classId, status = "active") {
+    return apiGet(
+      `/api/v1/teaching-classes/${classId}/judge/sessions/?status=${encodeURIComponent(status)}`,
+    );
+  },
+
+  createSession(classId, { title, selectedFileId = null }) {
+    return apiPost(`/api/v1/teaching-classes/${classId}/judge/sessions/`, {
+      title,
+      selected_file_id: selectedFileId,
+    });
+  },
+
+  getSession(classId, sessionId) {
+    return apiGet(`/api/v1/teaching-classes/${classId}/judge/sessions/${sessionId}`);
+  },
+
+  updateSession(classId, sessionId, changes) {
+    return apiPatch(
+      `/api/v1/teaching-classes/${classId}/judge/sessions/${sessionId}`,
+      changes,
+    );
+  },
+
+  archiveSession(classId, sessionId) {
+    return apiPost(
+      `/api/v1/teaching-classes/${classId}/judge/sessions/${sessionId}/archive`,
+      {},
+    );
+  },
+
+  listSessionMessages(classId, sessionId, before = null) {
+    const query = before ? `?before=${encodeURIComponent(before)}` : "";
+    return apiGet(
+      `/api/v1/teaching-classes/${classId}/judge/sessions/${sessionId}/messages${query}`,
+    );
+  },
+
+  sendSessionMessage(classId, sessionId, content) {
+    return apiPost(
+      `/api/v1/teaching-classes/${classId}/judge/sessions/${sessionId}/messages`,
+      { content },
+    );
+  },
+
+  createSessionScript(classId, sessionId) {
+    return apiPost(
+      `/api/v1/teaching-classes/${classId}/judge/sessions/${sessionId}/scripts`,
+      {},
+    );
+  },
+
+  listSessionRuns(classId, sessionId) {
+    return apiGet(
+      `/api/v1/teaching-classes/${classId}/judge/sessions/${sessionId}/runs`,
+    );
+  },
+
+  getSessionRun(classId, sessionId, runId) {
+    return apiGet(
+      `/api/v1/teaching-classes/${classId}/judge/sessions/${sessionId}/runs/${runId}`,
+    );
+  },
+
+  createSessionRun(classId, sessionId, scriptId, targetVmids) {
+    return apiPost(
+      `/api/v1/teaching-classes/${classId}/judge/sessions/${sessionId}/scripts/${scriptId}/runs`,
+      { target_scope: "manual", target_vmids: targetVmids },
+    );
+  },
+
   /* ── 評分表文件 ── */
 
   /** 列出班級已保存的評分表 */
@@ -90,8 +163,9 @@ export const AiJudgeService = {
   /* ── 收集腳本 ── */
 
   /** 列出班級收集腳本 */
-  listScripts(classId) {
-    return apiGet(`/api/v1/teaching-classes/${classId}/judge/scripts/`);
+  listScripts(classId, sessionId = null) {
+    const query = sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : "";
+    return apiGet(`/api/v1/teaching-classes/${classId}/judge/scripts/${query}`);
   },
 
   /** 由評分表快照產生受管收集腳本（後端會接著跑 policy 與 AI 審查） */

@@ -1544,6 +1544,10 @@ def test_execute_target_script_uploads_runs_and_collects_result(
     assert commands == [
         "mkdir -p /tmp/campus-cloud-judge/run-1/101",
         "cd /tmp/campus-cloud-judge/run-1/101 && python3 script.py > result.json 2> stderr.log",
+        "rm -f -- /tmp/campus-cloud-judge/run-1/101/script.py "
+        "/tmp/campus-cloud-judge/run-1/101/result.json "
+        "/tmp/campus-cloud-judge/run-1/101/stderr.log && "
+        "rmdir -- /tmp/campus-cloud-judge/run-1/101 2>/dev/null || true",
     ]
     assert fake_client.sftp.files[f"{remote_dir}/script.py"] == SAFE_SCRIPT.encode()
     assert result.exit_code == 0
