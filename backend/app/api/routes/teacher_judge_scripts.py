@@ -64,11 +64,14 @@ def list_class_teacher_judge_scripts(
     teaching_class_id: uuid.UUID,
     session: SessionDep,
     current_user: InstructorUser,
+    session_id: uuid.UUID | None = None,
 ) -> list[TeacherJudgeScriptArtifactPublic]:
     _ensure_class_access(
         session=session, teaching_class_id=teaching_class_id, current_user=current_user
     )
-    return list_artifacts(session=session, teaching_class_id=teaching_class_id)
+    return list_artifacts(
+        session=session, teaching_class_id=teaching_class_id, session_id=session_id
+    )
 
 
 @router.post("/", response_model=TeacherJudgeScriptArtifactPublic)

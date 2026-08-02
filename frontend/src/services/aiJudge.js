@@ -8,6 +8,10 @@ import {
   apiPostMultipart,
 } from "./api";
 
+// 腳本產生會依序執行 generation、policy/quality 修正與 AI reviewer，
+// 不能沿用一般 API 的 15 秒 request budget。後端每次 vLLM 呼叫仍有自己的 timeout。
+const SCRIPT_GENERATION_TIMEOUT_MS = 7 * 60 * 1000;
+
 /** 評分環境模板選項 */
 export const TEMPLATE_OPTIONS = [
   { key: "linux", label: "一般 Linux/LXC" },
@@ -33,6 +37,86 @@ export function rubricToContext(analysis) {
 }
 
 export const AiJudgeService = {
+  /* ── 持久化檢查 Session ── */
+
+  listSessions(classId, status = "active") {
+    return apiGet(
+      `/api/v1/teaching-classes/${classId}/judge/sessions/?status=${encodeURIComponent(status)}`,
+    );
+  },
+
+  createSession(classId, { title, selectedFileId = null }) {
+    return apiPost(`/api/v1/teaching-classes/${classId}/judge/sessions/`, {
+      title,
+      selected_file_id: selectedFileId,
+    });
+  },
+
+  getSession(classId, sessionId) {
+    return apiGet(`/api/v1/teaching-classes/${classId}/judge/sessions/${sessionId}`);
+  },
+
+  updateSession(classId, sessionId, changes) {
+    return apiPatch(
+      `/api/v1/teaching-classes/${classId}/judge/sessions/${sessionId}`,
+      changes,
+    );
+  },
+
+  archiveSession(classId, sessionId) {
+    return apiPost(
+      `/api/v1/teaching-classes/${classId}/judge/sessions/${sessionId}/archive`,
+      {},
+    );
+  },
+
+  deleteSession(classId, sessionId) {
+    return apiDelete(
+      `/api/v1/teaching-classes/${classId}/judge/sessions/${sessionId}`,
+    );
+  },
+
+  listSessionMessages(classId, sessionId, before = null) {
+    const query = before ? `?before=${encodeURIComponent(before)}` : "";
+    return apiGet(
+      `/api/v1/teaching-classes/${classId}/judge/sessions/${sessionId}/messages${query}`,
+    );
+  },
+
+  sendSessionMessage(classId, sessionId, content) {
+    return apiPost(
+      `/api/v1/teaching-classes/${classId}/judge/sessions/${sessionId}/messages`,
+      { content },
+    );
+  },
+
+  createSessionScript(classId, sessionId) {
+    return apiPost(
+      `/api/v1/teaching-classes/${classId}/judge/sessions/${sessionId}/scripts`,
+      {},
+      { timeoutMs: SCRIPT_GENERATION_TIMEOUT_MS },
+    );
+  },
+
+  listSessionRuns(classId, sessionId) {
+    return apiGet(
+      `/api/v1/teaching-classes/${classId}/judge/sessions/${sessionId}/runs`,
+    );
+  },
+
+  getSessionRun(classId, sessionId, runId) {
+    return apiGet(
+      `/api/v1/teaching-classes/${classId}/judge/sessions/${sessionId}/runs/${runId}`,
+    );
+  },
+
+  createSessionRun(classId, sessionId, scriptId, targetVmids) {
+    return apiPost(
+      `/api/v1/teaching-classes/${classId}/judge/sessions/${sessionId}/scripts/${scriptId}/runs`,
+      { target_scope: "manual", target_vmids: targetVmids },
+    );
+  },
+
   /* ── 評分表文件 ── */
 
   /** 列出班級已保存的評分表 */
@@ -90,18 +174,23 @@ export const AiJudgeService = {
   /* ── 收集腳本 ── */
 
   /** 列出班級收集腳本 */
-  listScripts(classId) {
-    return apiGet(`/api/v1/teaching-classes/${classId}/judge/scripts/`);
+  listScripts(classId, sessionId = null) {
+    const query = sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : "";
+    return apiGet(`/api/v1/teaching-classes/${classId}/judge/scripts/${query}`);
   },
 
   /** 由評分表快照產生受管收集腳本（後端會接著跑 policy 與 AI 審查） */
   createScript(classId, { name, templateKey, rubricSnapshot, sourceFileId = null }) {
-    return apiPost(`/api/v1/teaching-classes/${classId}/judge/scripts/`, {
-      name,
-      template_key: templateKey,
-      rubric_snapshot: rubricSnapshot,
-      source_file_id: sourceFileId,
-    });
+    return apiPost(
+      `/api/v1/teaching-classes/${classId}/judge/scripts/`,
+      {
+        name,
+        template_key: templateKey,
+        rubric_snapshot: rubricSnapshot,
+        source_file_id: sourceFileId,
+      },
+      { timeoutMs: SCRIPT_GENERATION_TIMEOUT_MS },
+    );
   },
 
   /** 重新生成腳本（可帶新的 rubric 快照） */
@@ -109,6 +198,7 @@ export const AiJudgeService = {
     return apiPost(
       `/api/v1/teaching-classes/${classId}/judge/scripts/${scriptId}/regenerate`,
       { rubric_snapshot: rubricSnapshot },
+      { timeoutMs: SCRIPT_GENERATION_TIMEOUT_MS },
     );
   },
 

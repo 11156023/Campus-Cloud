@@ -83,6 +83,13 @@ from .teacher_judge_script_run import (
     TeacherJudgeScriptRunStatus,
     TeacherJudgeScriptRunTargetScope,
 )
+from .teacher_judge_session import (
+    TeacherJudgeMessageRole,
+    TeacherJudgeMessageType,
+    TeacherJudgeSession,
+    TeacherJudgeSessionMessage,
+    TeacherJudgeSessionStatus,
+)
 from .teacher_judge_template_command import TeacherJudgeTemplateCommand
 from .teaching_class import (
     TeachingClass,
@@ -192,6 +199,11 @@ __all__ = [
     "ScriptDeployLog",
     "TeacherJudgeFile",
     "TeacherJudgeFileStatus",
+    "TeacherJudgeMessageRole",
+    "TeacherJudgeMessageType",
+    "TeacherJudgeSession",
+    "TeacherJudgeSessionMessage",
+    "TeacherJudgeSessionStatus",
     "TeacherJudgeScriptArtifact",
     "TeacherJudgeScriptLanguage",
     "TeacherJudgeScriptRun",

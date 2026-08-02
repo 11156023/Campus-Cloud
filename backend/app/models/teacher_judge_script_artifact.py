@@ -58,6 +58,15 @@ class TeacherJudgeScriptArtifact(SQLModel, table=True):
             index=True,
         )
     )
+    session_id: uuid.UUID | None = Field(
+        default=None,
+        sa_column=Column(
+            sa.Uuid,
+            sa.ForeignKey("teacher_judge_sessions.id", ondelete="SET NULL"),
+            nullable=True,
+            index=True,
+        ),
+    )
     name: str = Field(max_length=255)
     template_key: str = Field(max_length=50, index=True)
     rubric_snapshot_json: dict[str, Any] = Field(

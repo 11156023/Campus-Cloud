@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import time
 import uuid
 
@@ -41,6 +42,9 @@ def test_template_prompt_keeps_code_owned_safety_rules() -> None:
     assert "VMID=102" in prompt
     assert "模板角色提示" in prompt
     assert "以固定安全規則及後端授權結果為準" in prompt
+    assert "直接呼叫 ssh_exec" in prompt
+    assert "後端是唯一的確認攔截點" in prompt
+    assert "不要為此多呼叫 get_resource_detail" in prompt
 
 
 @pytest.mark.parametrize(
@@ -109,6 +113,228 @@ async def test_template_unknown_command_stays_pending(monkeypatch: pytest.Monkey
     assert result["pending"] is True
 
 
+@pytest.mark.asyncio
+async def test_agent_continues_from_resource_detail_to_n8n_check_and_summary(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    responses = [
+        {
+            "choices": [
+                {
+                    "message": {
+                        "role": "assistant",
+                        "content": None,
+                        "tool_calls": [
+                            {
+                                "id": "detail-call",
+                                "type": "function",
+                                "function": {
+                                    "name": "get_resource_detail",
+                                    "arguments": '{"vmid": 102}',
+                                },
+                            }
+                        ],
+                    }
+                }
+            ]
+        },
+        {
+            "choices": [
+                {
+                    "message": {
+                        "role": "assistant",
+                        "content": None,
+                        "tool_calls": [
+                            {
+                                "id": "n8n-call",
+                                "type": "function",
+                                "function": {
+                                    "name": "ssh_exec",
+                                    "arguments": (
+                                        '{"vmid": 102, '
+                                        '"command": "ss -lntp | grep \':5678\'", '
+                                        '"reason": "檢查 n8n 監聽狀態"}'
+                                    ),
+                                },
+                            }
+                        ],
+                    }
+                }
+            ]
+        },
+        {
+            "choices": [
+                {
+                    "message": {
+                        "role": "assistant",
+                        "content": "n8n 正在 5678 port 提供服務。",
+                    }
+                }
+            ]
+        },
+    ]
+    payloads: list[dict[str, object]] = []
+
+    async def fake_completion(payload, *, timeout):
+        del timeout
+        payloads.append(copy.deepcopy(payload))
+        return responses[len(payloads) - 1]
+
+    async def fake_ssh_tool(args, **_kwargs):
+        assert args["vmid"] == 102
+        return {
+            "vmid": 102,
+            "command": args["command"],
+            "exit_code": 0,
+            "stdout": "LISTEN 0 511 0.0.0.0:5678",
+            "pending": False,
+        }
+
+    monkeypatch.setattr(
+        pve_chat_module,
+        "settings",
+        type(
+            "SettingsStub",
+            (),
+            {
+                "VLLM_BASE_URL": "http://vllm/v1",
+                "VLLM_MODEL_NAME": "test-model",
+                "VLLM_TIMEOUT": 30,
+            },
+        )(),
+    )
+    monkeypatch.setattr(
+        pve_chat_module.vllm_client,
+        "create_chat_completion",
+        fake_completion,
+    )
+    monkeypatch.setattr(
+        pve_chat_module,
+        "collect_snapshot",
+        lambda: object(),
+    )
+    monkeypatch.setattr(
+        pve_chat_module,
+        "_execute_tool_sync",
+        lambda *_args, **_kwargs: {
+            "summary": {"vmid": 102, "status": "running"},
+            "status": {"status": "running"},
+        },
+    )
+    monkeypatch.setattr(pve_chat_module, "_execute_ssh_tool", fake_ssh_tool)
+
+    result = await pve_chat_module.chat(
+        message="檢查 N8n 服務",
+        allowed_vmids={102},
+        template_key="n8n",
+        auto_execute_known_ssh=True,
+    )
+
+    assert result.reply == "n8n 正在 5678 port 提供服務。"
+    assert [tool.name for tool in result.tools_called] == [
+        "get_resource_detail",
+        "ssh_exec",
+    ]
+    assert len(payloads) == 3
+    assert all(payload["tools"] == pve_chat_module._TOOLS for payload in payloads)
+    assert payloads[1]["messages"][-1]["role"] == "tool"
+    assert payloads[2]["messages"][-1]["role"] == "tool"
+
+
+@pytest.mark.asyncio
+async def test_template_prose_confirmation_is_intercepted_without_user_round_trip(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    prose = """\
+既然您確認 n8n 是使用 Node.js 啟動的，我需要進入 VMID 102 內部檢查程序。
+
+**請確認是否同意執行以下指令：**
+* **指令：** `ps aux | grep node`
+* **執行原因：** 檢查是否有 Node.js 相關的 n8n 程序正在運行。
+
+若您同意，我將立即執行並回報結果。
+"""
+    payloads: list[dict[str, object]] = []
+
+    async def fake_completion(payload, *, timeout):
+        del timeout
+        payloads.append(copy.deepcopy(payload))
+        return {
+            "choices": [
+                {
+                    "message": {
+                        "role": "assistant",
+                        "content": prose,
+                    }
+                }
+            ]
+        }
+
+    async def fake_ssh_tool(args, **_kwargs):
+        return {
+            "vmid": args["vmid"],
+            "command": args["command"],
+            "reason": args["reason"],
+            "pending": True,
+            "confirm_token": "confirm-once",
+        }
+
+    monkeypatch.setattr(
+        pve_chat_module,
+        "settings",
+        type(
+            "SettingsStub",
+            (),
+            {
+                "VLLM_BASE_URL": "http://vllm/v1",
+                "VLLM_MODEL_NAME": "test-model",
+                "VLLM_TIMEOUT": 30,
+            },
+        )(),
+    )
+    monkeypatch.setattr(
+        pve_chat_module.vllm_client,
+        "create_chat_completion",
+        fake_completion,
+    )
+    monkeypatch.setattr(pve_chat_module, "_execute_ssh_tool", fake_ssh_tool)
+
+    result = await pve_chat_module.chat(
+        message="檢查 N8n 服務",
+        allowed_vmids={102},
+        template_key="n8n",
+        auto_execute_known_ssh=True,
+    )
+
+    assert len(payloads) == 1
+    assert result.needs_confirmation is True
+    assert result.reply.startswith("有指令需要您的確認")
+    assert len(result.tools_called) == 1
+    assert result.tools_called[0].name == "ssh_exec"
+    assert result.tools_called[0].args == {
+        "vmid": 102,
+        "command": "ps aux | grep node",
+        "reason": "檢查是否有 Node.js 相關的 n8n 程序正在運行。",
+    }
+    assert result.messages[-2]["content"] is None
+    assert result.messages[-2]["tool_calls"][0]["function"]["name"] == "ssh_exec"
+
+
+def test_non_confirmation_prose_is_not_promoted_to_tool_call() -> None:
+    message = {
+        "role": "assistant",
+        "content": "例如可以執行 `ps aux | grep node`，但目前不需要執行。",
+    }
+
+    result = pve_chat_module._promote_confirmation_prose_to_tool_call(
+        message,
+        allowed_vmids={102},
+        template_key="n8n",
+    )
+
+    assert result == message
+
+
 def test_ssh_output_is_redacted_and_bounded() -> None:
     value = "password=top-secret " + "x" * 20000
     redacted, truncated = ssh_exec_module._redact_and_truncate(value)
@@ -153,9 +379,11 @@ async def test_wrong_confirmation_owner_does_not_consume_token() -> None:
         ssh_exec_module._pending_store.pop(token, None)
 
 
+@pytest.mark.parametrize("approved", [True, False])
 @pytest.mark.asyncio
 async def test_template_confirmation_resumes_ai_with_execution_result(
     monkeypatch: pytest.MonkeyPatch,
+    approved: bool,
 ) -> None:
     template = _template()
     resource = type("ResourceStub", (), {"user_id": uuid.uuid4()})()
@@ -189,6 +417,13 @@ async def test_template_confirmation_resumes_ai_with_execution_result(
         return first if len(calls) == 1 else resumed
 
     async def fake_confirm(*_args, **_kwargs):
+        ssh_exec_module._pending_store.pop(token, None)
+        if not approved:
+            return SSHExecResult(
+                vmid=102,
+                command="npm install n8n",
+                error="使用者已拒絕執行此指令。",
+            )
         return SSHExecResult(
             vmid=102,
             command="npm install n8n",
@@ -218,7 +453,10 @@ async def test_template_confirmation_resumes_ai_with_execution_result(
             request=request, current_user=user, session=object()
         )
         result = await template_service.confirm_ssh(
-            request=AIPVETemplateSSHConfirmRequest(token=token, approved=True),
+            request=AIPVETemplateSSHConfirmRequest(
+                token=token,
+                approved=approved,
+            ),
             current_user=user,
             session=object(),
         )
@@ -228,4 +466,12 @@ async def test_template_confirmation_resumes_ai_with_execution_result(
 
     assert result.reply == resumed.reply
     assert result.confirmation_result is not None
-    assert '"exit_code": 0' in calls[1]["history"][-1]["content"]
+    expected_decision = "approved" if approved else "rejected"
+    assert (
+        f'"confirmation_decision": "{expected_decision}"'
+        in calls[1]["history"][-1]["content"]
+    )
+    if approved:
+        assert '"exit_code": 0' in calls[1]["history"][-1]["content"]
+    else:
+        assert "使用者已拒絕執行此指令" in calls[1]["history"][-1]["content"]
