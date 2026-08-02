@@ -52,7 +52,9 @@ def test_write_file_qemu_base64_and_encode_flag(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     calls: dict = {}
-    monkeypatch.setattr(guest, "get_proxmox_api", lambda: _AgentApi(calls))
+    monkeypatch.setattr(
+        guest, "get_proxmox_api_for_node", lambda _node: _AgentApi(calls)
+    )
     guest.write_file_qemu("pve1", 101, "/etc/app.conf", b"hello")
     cmd, params = calls["posts"][-1]
     assert cmd == "file-write"
@@ -66,7 +68,9 @@ def test_write_file_qemu_agent_down_readable_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
-        guest, "get_proxmox_api", lambda: _AgentApi({}, ping_fails=True)
+        guest,
+        "get_proxmox_api_for_node",
+        lambda _node: _AgentApi({}, ping_fails=True),
     )
     with pytest.raises(AppError) as exc_info:
         guest.write_file_qemu("pve1", 101, "/etc/app.conf", b"hello")
@@ -104,7 +108,7 @@ def test_write_file_lxc_pushes_and_cleans_up(
         def close(self) -> None:
             written["closed"] = True
 
-    monkeypatch.setattr(guest, "_node_ssh_client", lambda: _Client())
+    monkeypatch.setattr(guest, "_node_ssh_client", lambda _node=None: _Client())
     monkeypatch.setattr(
         guest,
         "exec_command",
@@ -141,7 +145,7 @@ def test_write_file_lxc_nonzero_exit_raises(
 
         def close(self) -> None: ...
 
-    monkeypatch.setattr(guest, "_node_ssh_client", lambda: _Client())
+    monkeypatch.setattr(guest, "_node_ssh_client", lambda _node=None: _Client())
 
     def _exec(client, cmd, timeout=None):
         if "pct push" in cmd:

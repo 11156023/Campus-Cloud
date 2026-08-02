@@ -24,15 +24,25 @@ def get_storages_by_node(session: Session, node_name: str) -> list[ProxmoxStorag
     return list(session.exec(stmt).all())
 
 
-def upsert_storages(session: Session, storages: list[dict]) -> list[ProxmoxStorage]:
+def upsert_storages(
+    session: Session,
+    storages: list[dict],
+    scope_node_names: set[str] | None = None,
+) -> list[ProxmoxStorage]:
     """
     同步 Storage 清單到資料庫。
     以 (node_name, storage) 為 key：
     - 存在則只更新硬體資訊（total_gb/used_gb/avail_gb/type/flags/active）
     - 不存在則新建；保留既有的 enabled/speed_tier/user_priority 使用者設定。
     - 刪除本次同步中不再出現的舊 Storage。
+
+    ``scope_node_names`` 有值時，只在這些節點的範圍內比對與刪除
+    （單一連線同步時不可動到其他連線的 Storage）。
     """
-    existing_all = list(session.exec(select(ProxmoxStorage)).all())
+    stmt = select(ProxmoxStorage)
+    if scope_node_names is not None:
+        stmt = stmt.where(ProxmoxStorage.node_name.in_(scope_node_names))  # type: ignore[attr-defined]
+    existing_all = list(session.exec(stmt).all())
     existing_map: dict[tuple[str, str], ProxmoxStorage] = {
         (s.node_name, s.storage): s for s in existing_all
     }

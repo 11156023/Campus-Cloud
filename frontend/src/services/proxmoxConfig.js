@@ -1,6 +1,36 @@
-import { apiGet, apiPost, apiPut } from "./api";
+import { apiDelete, apiGet, apiPost, apiPut } from "./api";
 
 export const ProxmoxConfigService = {
+  /** 連線列表（多 PVE 入口） */
+  listConnections() {
+    return apiGet("/api/v1/proxmox-config/connections");
+  },
+
+  /** 新增連線（name / host / port / user / password / verify_ssl / ca_cert / api_timeout / enabled / is_default） */
+  createConnection(body) {
+    return apiPost("/api/v1/proxmox-config/connections", body);
+  },
+
+  /** 更新連線（password 為 null 表示不更新） */
+  updateConnection(connectionId, body) {
+    return apiPut(`/api/v1/proxmox-config/connections/${connectionId}`, body);
+  },
+
+  /** 刪除連線（其節點與 Storage 記錄一併移除） */
+  deleteConnection(connectionId) {
+    return apiDelete(`/api/v1/proxmox-config/connections/${connectionId}`);
+  },
+
+  /** 測試指定連線 */
+  testConnectionById(connectionId) {
+    return apiPost(`/api/v1/proxmox-config/connections/${connectionId}/test`);
+  },
+
+  /** 同步指定連線的節點與 Storage */
+  syncConnection(connectionId) {
+    return apiPost(`/api/v1/proxmox-config/connections/${connectionId}/sync`);
+  },
+
   /** 取得 PVE 連線與排程設定 */
   getConfig() {
     return apiGet("/api/v1/proxmox-config/");

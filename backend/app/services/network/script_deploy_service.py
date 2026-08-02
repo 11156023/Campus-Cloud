@@ -17,9 +17,13 @@ from sqlmodel import Session
 
 from app.infrastructure.proxmox import (
     get_active_host,
+    get_connection_id_for_node,
+    get_node_host,
     get_proxmox_api,
+    get_proxmox_api_for_node,
     get_proxmox_settings,
 )
+from app.infrastructure.proxmox.operations import iter_connection_clients
 from app.infrastructure.ssh import (
     create_password_client,
     exec_command,
@@ -204,19 +208,20 @@ def _store_task(task: DeploymentTask) -> None:
     _persist_task(task)
 
 
-def get_task(task_id: str) -> DeploymentTask | None:
-    return _TASK_STORE.get(task_id)
-
-
 # ---------------------------------------------------------------------------
 # SSH helpers
 # ---------------------------------------------------------------------------
 
 
-def _ssh_connect():
-    """建立到 Proxmox 節點的 SSH 連線。"""
-    cfg = get_proxmox_settings()
-    host = get_active_host()
+def _ssh_connect(node: str | None = None):
+    """建立到 Proxmox 節點的 SSH 連線。
+
+    ``node`` 有值時 SSH 到該節點本身（``pct`` 只能操作本機容器），
+    並使用節點所屬連線的帳密；否則連到預設連線的 active host。
+    """
+    connection_id = get_connection_id_for_node(node) if node else None
+    cfg = get_proxmox_settings(connection_id)
+    host = (get_node_host(node) if node else None) or get_active_host(connection_id)
     ssh_user = cfg.user.split("@")[0] if "@" in cfg.user else cfg.user
 
     return create_password_client(
@@ -295,11 +300,9 @@ def _ssh_exec_streaming(
 
 
 def _get_all_vmids() -> set[int]:
-    """取得目前所有 VM/CT 的 VMID 集合（不限 pool）。"""
+    """取得目前所有 VM/CT 的 VMID 集合（不限 pool，跨所有連線）。"""
     try:
-        proxmox = get_proxmox_api()
-        resources = proxmox.cluster.resources.get(type="vm")
-        return {r["vmid"] for r in resources}
+        return proxmox_service.list_all_vmids()
     except Exception as e:
         # 不可 silent fallback：PVE 查詢失敗時不能默默回空集，
         # 否則 _find_new_vmid 會認為沒有新 VM 而變成部署失敗難切
@@ -334,13 +337,12 @@ def _detect_new_vmid(before: set[int], hostname: str) -> int | None:
 
 
 def _find_vmid_by_hostname(hostname: str) -> int | None:
-    """透過 hostname 在所有叢集資源中尋找 VMID。"""
+    """透過 hostname 在所有連線的資源中尋找 VMID。"""
     try:
-        proxmox = get_proxmox_api()
-        all_resources = proxmox.cluster.resources.get(type="vm")
-        for r in all_resources:
-            if r.get("name") == hostname:
-                return r["vmid"]
+        for _key, proxmox in iter_connection_clients():
+            for r in proxmox.cluster.resources.get(type="vm"):
+                if r.get("name") == hostname:
+                    return r["vmid"]
     except Exception:
         logger.warning("透過 hostname 尋找 VMID 失敗: %s", hostname)
     return None
@@ -352,12 +354,12 @@ def _find_vmid_by_hostname(hostname: str) -> int | None:
 
 
 def _find_resource_any(vmid: int) -> dict | None:
-    """不限 pool 地查找資源，回傳含 node 和 type 的 dict。"""
+    """不限 pool 地查找資源（跨所有連線），回傳含 node 和 type 的 dict。"""
     try:
-        proxmox = get_proxmox_api()
-        for r in proxmox.cluster.resources.get(type="vm"):
-            if r["vmid"] == vmid:
-                return r
+        for _key, proxmox in iter_connection_clients():
+            for r in proxmox.cluster.resources.get(type="vm"):
+                if r["vmid"] == vmid:
+                    return r
     except Exception as e:
         logger.warning(
             "_find_resource_any(vmid=%s) 查詢 cluster resources 失敗: %s",
@@ -367,9 +369,13 @@ def _find_resource_any(vmid: int) -> dict | None:
 
 
 def _add_to_pool(vmid: int) -> None:
-    """將容器加入 SkyLab Pool。"""
+    """將容器加入 SkyLab Pool（在容器所屬連線上操作）。"""
     pool_name = get_proxmox_settings().pool_name
-    proxmox = get_proxmox_api()
+    resource = _find_resource_any(vmid)
+    if resource and resource.get("node"):
+        proxmox = get_proxmox_api_for_node(resource["node"])
+    else:
+        proxmox = get_proxmox_api()
     proxmox.pools(pool_name).put(vms=str(vmid))
     logger.info("已將 VMID=%s 加入 Pool %s", vmid, pool_name)
 
@@ -432,7 +438,7 @@ def _enforce_static_network(vmid: int, net_config: dict) -> None:
             f"pct exec {vmid} -- ip -4 -o addr show 2>/dev/null "
             "| awk '{print $4}' | cut -d/ -f1 || true"
         )
-        client = _ssh_connect()
+        client = _ssh_connect(node)
         try:
             _ec, out, _err = _ssh_exec(client, verify_cmd, timeout=20)
         finally:
@@ -543,7 +549,7 @@ pct exec "$CTID" -- hostname -I 2>/dev/null || true
 
     client = None
     try:
-        client = _ssh_connect()
+        client = _ssh_connect(node)
         exit_code, stdout, stderr = _ssh_exec(client, remote_script, timeout=180)
     finally:
         if client is not None:
@@ -583,9 +589,11 @@ pct exec "$CTID" -- chmod 700 /root/.ssh
 echo "$PUB_B64" | base64 -d | pct exec "$CTID" -- tee -a /root/.ssh/authorized_keys >/dev/null
 pct exec "$CTID" -- chmod 600 /root/.ssh/authorized_keys
 """
+    resource = _find_resource_any(vmid)
+    node = resource.get("node") if resource else None
     client = None
     try:
-        client = _ssh_connect()
+        client = _ssh_connect(node)
         exit_code, _stdout, stderr = _ssh_exec(client, script, timeout=60)
         if exit_code != 0:
             raise RuntimeError(f"注入 SSH 公鑰失敗 (exit={exit_code}): {stderr}")
@@ -755,7 +763,7 @@ def _run_deployment(task: DeploymentTask, request_data: dict, password: str) -> 
     new_vmid: int | None = None
 
     try:
-        # Ensure cancel event exists (idempotent — start_deployment already creates one)
+        # Ensure cancel event exists (idempotent — caller may have pre-created one)
         cancel_event = _make_cancel_event(task.task_id)
         if cancel_event.is_set():
             raise RuntimeError("部署在啟動前即被取消")
@@ -1005,65 +1013,6 @@ def _run_deployment(task: DeploymentTask, request_data: dict, password: str) -> 
             except Exception:
                 # SSH 連線關閉失敗可忽略
                 pass
-
-
-def cancel_task(task_id: str) -> bool:
-    """請求取消正在執行的部署任務。
-
-    觸發 streaming 迴圈中斷 → exception 走 rollback 流程，
-    自動 destroy 容器 + 釋放預分配 IP。
-    回傳 True 表示已標記取消（任務正在跑），False 表示任務已結束或不存在。
-    """
-    task = _TASK_STORE.get(task_id)
-    if task is None:
-        return False
-    if task.status != "running":
-        return False
-    with _CANCEL_LOCK:
-        ev = _CANCEL_EVENTS.get(task_id)
-    if ev is None:
-        # Task hasn't reached the streaming step yet — create a placeholder so
-        # the deploy thread will pick it up when it calls _make_cancel_event.
-        # In practice the streaming step is reached within seconds of start.
-        return False
-    ev.set()
-    task.progress = "正在取消…"
-    _store_task(task)
-    logger.info("已請求取消部署任務 %s", task_id)
-    return True
-
-
-def start_deployment(
-    request_data: dict,
-    user_id: str,
-) -> str:
-    """啟動背景部署任務，回傳 task_id。"""
-    # 把密碼從 request_data 抽出來單獨傳遞，
-    # 之後 request_data 的內容才能安全地出現在 log
-    password = request_data.pop("password", "")
-    task_id = str(uuid.uuid4())
-    task = DeploymentTask(
-        task_id=task_id,
-        user_id=user_id,
-        template_name=request_data.get("os_info") or request_data.get("template_slug", ""),
-        template_slug=request_data.get("template_slug", ""),
-        script_path=request_data.get("script_path"),
-        hostname=request_data.get("hostname"),
-    )
-    _store_task(task)
-    # Pre-create cancel event so cancel_task() works even before _run_deployment
-    # reaches the streaming step.
-    _make_cancel_event(task_id)
-
-    thread = threading.Thread(
-        target=_run_deployment,
-        args=(task, request_data, password),
-        daemon=True,
-        name=f"deploy-{task_id[:8]}",
-    )
-    thread.start()
-
-    return task_id
 
 
 def deploy_for_vm_request_sync(

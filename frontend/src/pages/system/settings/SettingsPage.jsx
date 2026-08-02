@@ -142,6 +142,278 @@ function OverviewTab() {
   );
 }
 
+/* ── PVE 多連線管理 ─────────────────────────────────── */
+const EMPTY_CONNECTION_FORM = {
+  name: "",
+  host: "",
+  port: 8006,
+  user: "root@pam",
+  password: "",
+  verify_ssl: false,
+  ca_cert: "",
+  api_timeout: 30,
+  enabled: true,
+  is_default: false,
+};
+
+function ConnectionForm({ initial, isEdit, saving, onSubmit, onCancel }) {
+  const [form, setForm] = useState(initial);
+  const set = (name, value) => setForm((prev) => ({ ...prev, [name]: value }));
+
+  function handleSubmit(e) {
+    e.preventDefault();
+    const payload = {
+      name: form.name.trim(),
+      host: form.host.trim(),
+      port: Number(form.port) || 8006,
+      user: form.user.trim(),
+      verify_ssl: Boolean(form.verify_ssl),
+      api_timeout: Number(form.api_timeout) || 30,
+      enabled: Boolean(form.enabled),
+      is_default: Boolean(form.is_default),
+    };
+    if (isEdit) {
+      payload.password = form.password ? form.password : null;
+      payload.ca_cert = form.ca_cert?.trim() ? form.ca_cert.trim() : null;
+    } else {
+      payload.password = form.password;
+      if (form.ca_cert?.trim()) payload.ca_cert = form.ca_cert.trim();
+    }
+    onSubmit(payload);
+  }
+
+  return (
+    <form className={styles.card} onSubmit={handleSubmit}>
+      <h2 className={styles.cardTitle}>{isEdit ? "編輯連線" : "新增連線"}</h2>
+      <div className={styles.formGrid}>
+        <label className={styles.field}>
+          <span>名稱 *</span>
+          <input value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="例：機房A" required />
+        </label>
+        <label className={styles.field}>
+          <span>Host *</span>
+          <input value={form.host} onChange={(e) => set("host", e.target.value)} placeholder="例：192.168.100.2" required />
+        </label>
+        <label className={styles.field}>
+          <span>Port</span>
+          <input type="number" min={1} max={65535} value={form.port} onChange={(e) => set("port", e.target.value)} />
+        </label>
+        <label className={styles.field}>
+          <span>API 使用者 *</span>
+          <input value={form.user} onChange={(e) => set("user", e.target.value)} placeholder="root@pam" required />
+        </label>
+        <label className={styles.field}>
+          <span>密碼{isEdit ? "（留空表示不變更）" : " *"}</span>
+          <input
+            type="password"
+            value={form.password}
+            onChange={(e) => set("password", e.target.value)}
+            placeholder={isEdit ? "已設定" : "PVE 密碼"}
+            required={!isEdit}
+          />
+        </label>
+        <label className={styles.field}>
+          <span>API Timeout（秒）</span>
+          <input type="number" min={1} max={300} value={form.api_timeout} onChange={(e) => set("api_timeout", e.target.value)} />
+        </label>
+      </div>
+      <label className={styles.checkRow}>
+        <input type="checkbox" checked={Boolean(form.verify_ssl)} onChange={(e) => set("verify_ssl", e.target.checked)} />
+        <span>驗證 SSL 憑證</span>
+      </label>
+      {form.verify_ssl && (
+        <label className={styles.field}>
+          <span>CA 憑證 PEM{isEdit ? "（留空表示不變更）" : ""}</span>
+          <textarea
+            rows={5}
+            value={form.ca_cert}
+            onChange={(e) => set("ca_cert", e.target.value)}
+            placeholder="-----BEGIN CERTIFICATE-----"
+            spellCheck={false}
+          />
+        </label>
+      )}
+      <label className={styles.checkRow}>
+        <input type="checkbox" checked={Boolean(form.enabled)} onChange={(e) => set("enabled", e.target.checked)} />
+        <span>啟用此連線</span>
+      </label>
+      <label className={styles.checkRow}>
+        <input type="checkbox" checked={Boolean(form.is_default)} onChange={(e) => set("is_default", e.target.checked)} />
+        <span>設為預設連線</span>
+      </label>
+      <div className={styles.cardActions}>
+        <button type="button" className={styles.btnSecondary} onClick={onCancel}>取消</button>
+        <button type="submit" className={styles.btnPrimary} disabled={saving}>
+          {saving ? "儲存中..." : "儲存連線"}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function ConnectionsSection() {
+  const toast = useToast();
+  const [connections, setConnections] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState(null); // null | "new" | connection 物件
+  const [saving, setSaving] = useState(false);
+  const [busyId, setBusyId] = useState(null);
+
+  const fetchConnections = useCallback(() => {
+    setLoading(true);
+    ProxmoxConfigService.listConnections()
+      .then(setConnections)
+      .catch((err) => toast.error(err?.message ?? "載入 PVE 連線清單失敗"))
+      .finally(() => setLoading(false));
+  }, [toast]);
+
+  useEffect(() => {
+    fetchConnections();
+  }, [fetchConnections]);
+
+  async function handleSubmit(payload) {
+    setSaving(true);
+    try {
+      if (editing === "new") {
+        await ProxmoxConfigService.createConnection(payload);
+        toast.success("連線已新增");
+      } else {
+        await ProxmoxConfigService.updateConnection(editing.id, payload);
+        toast.success("連線已更新");
+      }
+      setEditing(null);
+      fetchConnections();
+    } catch (err) {
+      toast.error(err?.message ?? "儲存連線失敗");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDelete(conn) {
+    if (!window.confirm(`確定刪除連線「${conn.name}」？其節點與 Storage 記錄將一併移除。`)) return;
+    setBusyId(conn.id);
+    try {
+      await ProxmoxConfigService.deleteConnection(conn.id);
+      toast.success("連線已刪除");
+      fetchConnections();
+    } catch (err) {
+      toast.error(err?.message ?? "刪除連線失敗");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function handleTest(conn) {
+    setBusyId(conn.id);
+    try {
+      const res = await ProxmoxConfigService.testConnectionById(conn.id);
+      if (res.success) toast.success(res.message || "連線成功");
+      else toast.error(res.message || "連線失敗");
+    } catch (err) {
+      toast.error(err?.message ?? "連線測試失敗");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function handleSync(conn) {
+    setBusyId(conn.id);
+    try {
+      const res = await ProxmoxConfigService.syncConnection(conn.id);
+      if (res.success) {
+        toast.success(`同步完成：${res.nodes?.length ?? 0} 節點、${res.storage_count ?? 0} storage`);
+        fetchConnections();
+      } else {
+        toast.error(res.error || "同步失敗");
+      }
+    } catch (err) {
+      toast.error(err?.message ?? "同步失敗");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  return (
+    <div className={styles.panelStack}>
+      <div className={styles.card}>
+        <div className={styles.cardHead}>
+          <h2 className={styles.cardTitle}>PVE 連線清單</h2>
+          <button type="button" className={styles.btnSecondary} onClick={() => setEditing("new")}>
+            <MIcon name="add" size={16} />
+            新增連線
+          </button>
+        </div>
+        {loading ? (
+          <div className={styles.loading}>載入連線清單...</div>
+        ) : connections.length === 0 ? (
+          <p className={styles.rowMeta}>
+            尚未建立連線。可在下方表單完成第一組連線設定（將自動成為預設連線），或點「新增連線」。
+          </p>
+        ) : (
+          <div className={styles.list}>
+            {connections.map((conn) => (
+              <div key={conn.id} className={styles.nodeRow}>
+                <div className={styles.rowMain}>
+                  <span className={styles.rowName}>
+                    {conn.name}
+                    {conn.is_default && <span className={`${styles.badge} ${styles.badge_info}`}>預設</span>}
+                    {!conn.enabled && <span className={`${styles.badge} ${styles.badge_danger}`}>停用</span>}
+                  </span>
+                  <span className={styles.rowMeta}>
+                    {conn.host}:{conn.port} · {conn.user} · {conn.node_count} 節點
+                  </span>
+                </div>
+                <button type="button" className={styles.btnSecondary} disabled={busyId === conn.id} onClick={() => handleTest(conn)}>
+                  <MIcon name="wifi_tethering" size={16} />
+                  測試
+                </button>
+                <button type="button" className={styles.btnSecondary} disabled={busyId === conn.id} onClick={() => handleSync(conn)}>
+                  <MIcon name="sync" size={16} />
+                  同步
+                </button>
+                <button type="button" className={styles.btnSecondary} disabled={busyId === conn.id} onClick={() => setEditing(conn)}>
+                  <MIcon name="edit" size={16} />
+                  編輯
+                </button>
+                <button type="button" className={styles.btnSecondary} disabled={busyId === conn.id} onClick={() => handleDelete(conn)}>
+                  <MIcon name="delete" size={16} />
+                  刪除
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {editing !== null && (
+        <ConnectionForm
+          key={editing === "new" ? "new" : editing.id}
+          isEdit={editing !== "new"}
+          saving={saving}
+          initial={
+            editing === "new"
+              ? EMPTY_CONNECTION_FORM
+              : {
+                  ...EMPTY_CONNECTION_FORM,
+                  name: editing.name,
+                  host: editing.host,
+                  port: editing.port,
+                  user: editing.user,
+                  verify_ssl: editing.verify_ssl,
+                  api_timeout: editing.api_timeout,
+                  enabled: editing.enabled,
+                  is_default: editing.is_default,
+                }
+          }
+          onSubmit={handleSubmit}
+          onCancel={() => setEditing(null)}
+        />
+      )}
+    </div>
+  );
+}
+
 /* ── PVE 連線 ──────────────────────────────────────── */
 function PveTab({ config, form, setField, onSave, saving }) {
   const toast = useToast();
@@ -175,9 +447,11 @@ function PveTab({ config, form, setField, onSave, saving }) {
   }
 
   return (
+    <>
+    <ConnectionsSection />
     <form className={styles.panelStack} onSubmit={onSave}>
       <div className={styles.card}>
-        <h2 className={styles.cardTitle}>PVE API 連線</h2>
+        <h2 className={styles.cardTitle}>預設連線與全域設定</h2>
         <div className={styles.formGrid}>
           <label className={styles.field}>
             <span>Host *</span>
@@ -261,6 +535,7 @@ function PveTab({ config, form, setField, onSave, saving }) {
         </button>
       </div>
     </form>
+    </>
   );
 }
 

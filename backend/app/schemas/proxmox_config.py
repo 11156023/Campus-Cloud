@@ -94,6 +94,53 @@ class ProxmoxConfigUpdate(BaseModel):
     practice_warning_minutes: int = Field(default=30, ge=1, le=120)
 
 
+class ProxmoxConnectionPublic(BaseModel):
+    """回傳給前端的 PVE 連線資訊（不含密碼與憑證原文）"""
+
+    id: int
+    name: str
+    host: str
+    port: int
+    user: str
+    verify_ssl: bool
+    api_timeout: int
+    enabled: bool
+    is_default: bool
+    has_ca_cert: bool
+    node_count: int = 0
+    updated_at: datetime | None = None
+
+
+class ProxmoxConnectionCreate(BaseModel):
+    """新增 PVE 連線的請求 schema"""
+
+    name: str = Field(min_length=1, max_length=255)
+    host: str = Field(min_length=1, max_length=255)
+    port: int = Field(default=8006, ge=1, le=65535)
+    user: str = Field(min_length=1, max_length=255)
+    password: str = Field(min_length=1)
+    verify_ssl: bool = False
+    ca_cert: str | None = None
+    api_timeout: int = Field(default=30, ge=1, le=300)
+    enabled: bool = True
+    is_default: bool = False
+
+
+class ProxmoxConnectionUpdateIn(BaseModel):
+    """更新 PVE 連線的請求 schema"""
+
+    name: str = Field(min_length=1, max_length=255)
+    host: str = Field(min_length=1, max_length=255)
+    port: int = Field(default=8006, ge=1, le=65535)
+    user: str = Field(min_length=1, max_length=255)
+    password: str | None = None  # None 表示不更新密碼
+    verify_ssl: bool = False
+    ca_cert: str | None = None  # None 表示不更新；空字串表示清除
+    api_timeout: int = Field(default=30, ge=1, le=300)
+    enabled: bool = True
+    is_default: bool = False
+
+
 class CertParseResult(BaseModel):
     """解析憑證 PEM 的結果"""
 
@@ -132,6 +179,16 @@ class ProxmoxNodeUpdate(BaseModel):
     host: str
     port: int = Field(default=8006, ge=1, le=65535)
     priority: int = Field(default=5, ge=1, le=10)
+
+
+class ConnectionSyncResult(BaseModel):
+    """單一連線同步節點與 Storage 的結果"""
+
+    success: bool
+    connection_id: int
+    nodes: list[ProxmoxNodePublic]
+    storage_count: int
+    error: str | None = None
 
 
 class ClusterPreviewResult(BaseModel):
@@ -211,9 +268,13 @@ class ClusterStatsPublic(BaseModel):
 
 
 __all__ = [
+    "ConnectionSyncResult",
     "ProxmoxConfigPublic",
     "ProxmoxConfigUpdate",
+    "ProxmoxConnectionCreate",
+    "ProxmoxConnectionPublic",
     "ProxmoxConnectionTestResult",
+    "ProxmoxConnectionUpdateIn",
     "CertParseResult",
     "ProxmoxNodePublic",
     "ClusterPreviewResult",

@@ -138,9 +138,9 @@ from .resource import (
     VNCInfoSchema,
 )
 from .script_deploy import (
-    ScriptDeployRequest,
-    ScriptDeployResponse,
-    ScriptDeployStatus,
+    ScriptDeployLogDetail,
+    ScriptDeployLogList,
+    ScriptDeployLogListItem,
 )
 from .spec_change_request import (
     SpecChangeRequestCreate,
@@ -329,7 +329,7 @@ __all__ = [
     "ResourceQuotaPublic",
     "ResourceQuotaUpdate",
     # Script Deploy
-    "ScriptDeployRequest",
-    "ScriptDeployResponse",
-    "ScriptDeployStatus",
+    "ScriptDeployLogDetail",
+    "ScriptDeployLogList",
+    "ScriptDeployLogListItem",
 ]

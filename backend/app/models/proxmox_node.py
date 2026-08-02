@@ -15,6 +15,11 @@ class ProxmoxNode(SQLModel, table=True):
     )
 
     id: int | None = Field(default=None, primary_key=True)
+    connection_id: int | None = Field(
+        default=None,
+        foreign_key="proxmox_connections.id",
+        index=True,
+    )  # 所屬連線；None 表示尚未歸屬（舊資料，視同預設連線）
     name: str = Field(max_length=255)           # PVE 節點名稱，例如 "pve", "pve2"
     host: str = Field(max_length=255)           # IP 或 hostname
     port: int = Field(default=8006)

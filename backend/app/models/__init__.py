@@ -56,6 +56,7 @@ from .proxmox_config import (
     ProxmoxPlacementConfig,
     ProxmoxSchedulerConfig,
 )
+from .proxmox_connection import ProxmoxConnection
 from .proxmox_node import ProxmoxNode
 from .proxmox_storage import ProxmoxStorage
 from .resource import Resource
@@ -154,6 +155,7 @@ __all__ = [
     "SpecChangeType",
     # Proxmox Config
     "ProxmoxConfig",
+    "ProxmoxConnection",
     "ProxmoxConnectionConfig",
     "ProxmoxPlacementConfig",
     "ProxmoxSchedulerConfig",

@@ -157,7 +157,9 @@ def test_gpu_node_counts_are_loaded_from_proxmox_mappings(
     proxmox = SimpleNamespace(
         cluster=SimpleNamespace(mapping=SimpleNamespace(pci=FakePciMappings()))
     )
-    monkeypatch.setattr(gpu_service, "get_proxmox_api", lambda: proxmox)
+    monkeypatch.setattr(
+        gpu_service, "iter_connection_clients", lambda: [(None, proxmox)]
+    )
 
     assert gpu_service.get_gpu_node_counts() == {"pve-a": 2, "pve-b": 1}
     assert gpu_service.get_gpu_node_counts(mapping_id="gpu-b") == {"pve-b": 1}
