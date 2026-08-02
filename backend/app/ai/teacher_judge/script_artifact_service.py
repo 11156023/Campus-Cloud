@@ -247,6 +247,7 @@ def _artifact_to_public(
     return TeacherJudgeScriptArtifactPublic(
         id=str(artifact.id),
         teaching_class_id=str(artifact.teaching_class_id),
+        session_id=str(artifact.session_id) if artifact.session_id else None,
         name=artifact.name,
         template_key=artifact.template_key,
         rubric_snapshot_json=artifact.rubric_snapshot_json,
@@ -315,9 +316,7 @@ def _previous_review_feedback(
     ai_review = artifact.ai_review_result_json or {}
     safety_issues = policy_check.get("safety_issues")
     policy_issues = (
-        safety_issues
-        if isinstance(safety_issues, list)
-        else policy_check.get("issues")
+        safety_issues if isinstance(safety_issues, list) else policy_check.get("issues")
     )
     quality_issues = policy_check.get("quality_issues")
     ai_issues = ai_review.get("issues")
@@ -376,8 +375,7 @@ def _merge_gate_results(
         ),
     ]
     approved = (
-        safety_check.get("approved") is True
-        and quality_check.get("approved") is True
+        safety_check.get("approved") is True and quality_check.get("approved") is True
     )
     return {
         "approved": approved,
@@ -454,7 +452,7 @@ def _fix_goal_for_hint(hint: FixHint) -> str:
     hint_type = hint.get("type")
     if hint_type == "add_errors_append_in_except":
         return (
-            "只替換指定 except 區塊；加入 errors.append(f\"<check_id>: ...\")，"
+            '只替換指定 except 區塊；加入 errors.append(f"<check_id>: ...")，'
             "並確保該錯誤路徑輸出的 record_check status 是 unknown 或 fail，不可為 pass。"
         )
     if hint_type == "ai_reviewer_feedback":
@@ -486,9 +484,7 @@ def _line_replacement_log_summary(raw_replacements: Any) -> list[dict[str, objec
             continue
         replacement = raw.get("replacement")
         replacement_lines = (
-            len(str(replacement).splitlines())
-            if isinstance(replacement, str)
-            else 0
+            len(str(replacement).splitlines()) if isinstance(replacement, str) else 0
         )
         summary.append(
             {
@@ -542,7 +538,9 @@ async def generate_script_content(
     try:
         parsed = json.loads(content)
     except json.JSONDecodeError as exc:
-        raise HTTPException(status_code=502, detail="AI 產生腳本格式不是 JSON。") from exc
+        raise HTTPException(
+            status_code=502, detail="AI 產生腳本格式不是 JSON。"
+        ) from exc
 
     script_content = str(parsed.get("script_content") or "").strip()
     if not script_content:
@@ -644,7 +642,7 @@ async def fix_script_content(
         raise HTTPException(status_code=503, detail="VLLM_MODEL_NAME 未設定。")
 
     lines = script_content.split("\n")
-    numbered = "\n".join(f"{i+1:04d}|{line}" for i, line in enumerate(lines))
+    numbered = "\n".join(f"{i + 1:04d}|{line}" for i, line in enumerate(lines))
     repair_instructions = _repair_instructions(fix_hints)
     logger.info(
         "Teacher Judge script patch requested: hints=%s",
@@ -680,7 +678,9 @@ async def fix_script_content(
     try:
         parsed = json.loads(content)
     except json.JSONDecodeError as exc:
-        raise HTTPException(status_code=502, detail="AI 修正腳本格式不是 JSON。") from exc
+        raise HTTPException(
+            status_code=502, detail="AI 修正腳本格式不是 JSON。"
+        ) from exc
 
     logger.info(
         "Teacher Judge script patch response: replacements=%s summary=%s",
@@ -701,18 +701,21 @@ async def build_reviewed_script(
     rubric_snapshot: dict[str, Any],
     template_key: str,
     include_usage: bool = False,
-) -> tuple[
-    str,
-    GateResult,
-    AIReviewResult,
-    TeacherJudgeScriptStatus,
-] | tuple[
-    str,
-    GateResult,
-    AIReviewResult,
-    TeacherJudgeScriptStatus,
-    list[ScriptUsageRecord],
-]:
+) -> (
+    tuple[
+        str,
+        GateResult,
+        AIReviewResult,
+        TeacherJudgeScriptStatus,
+    ]
+    | tuple[
+        str,
+        GateResult,
+        AIReviewResult,
+        TeacherJudgeScriptStatus,
+        list[ScriptUsageRecord],
+    ]
+):
     attempt_snapshot = dict(rubric_snapshot)
     usage_records: list[ScriptUsageRecord] = []
 
@@ -740,9 +743,8 @@ async def build_reviewed_script(
         if gate_result["approved"]:
             break
 
-        fix_hints = (
-            safety_check.get("fix_hints", [])
-            + quality_check.get("fix_hints", [])
+        fix_hints = safety_check.get("fix_hints", []) + quality_check.get(
+            "fix_hints", []
         )
         attempt_record = _gate_attempt_record(
             attempt=attempt,
@@ -866,11 +868,14 @@ async def build_reviewed_script(
     # if AI reviewer failed, try one fix with AI feedback
     if last_ai_review.get("approved") is not True and last_ai_review.get("issues"):
         ai_fix_hints: list[FixHint] = [
-            cast("FixHint", {
-                "type": "ai_reviewer_feedback",
-                "issues": last_ai_review.get("issues", []),
-                "suggested_fix": last_ai_review.get("suggested_fix"),
-            })
+            cast(
+                "FixHint",
+                {
+                    "type": "ai_reviewer_feedback",
+                    "issues": last_ai_review.get("issues", []),
+                    "suggested_fix": last_ai_review.get("suggested_fix"),
+                },
+            )
         ]
         try:
             script_content, metrics = _script_result(
@@ -917,11 +922,15 @@ def list_artifacts(
     *,
     session: Session,
     teaching_class_id: uuid.UUID,
+    session_id: uuid.UUID | None = None,
 ) -> list[TeacherJudgeScriptArtifactPublic]:
+    query = select(TeacherJudgeScriptArtifact).where(
+        TeacherJudgeScriptArtifact.teaching_class_id == teaching_class_id
+    )
+    if session_id is not None:
+        query = query.where(TeacherJudgeScriptArtifact.session_id == session_id)
     artifacts = session.exec(
-        select(TeacherJudgeScriptArtifact)
-        .where(TeacherJudgeScriptArtifact.teaching_class_id == teaching_class_id)
-        .order_by(desc(TeacherJudgeScriptArtifact.created_at))
+        query.order_by(desc(TeacherJudgeScriptArtifact.created_at))
     ).all()
     return [_artifact_to_public(artifact) for artifact in artifacts]
 
@@ -945,7 +954,11 @@ def get_artifact_public(
     artifact_id: uuid.UUID,
 ) -> TeacherJudgeScriptArtifactPublic:
     return _artifact_to_public(
-        get_artifact(session=session, teaching_class_id=teaching_class_id, artifact_id=artifact_id)
+        get_artifact(
+            session=session,
+            teaching_class_id=teaching_class_id,
+            artifact_id=artifact_id,
+        )
     )
 
 
@@ -1011,6 +1024,7 @@ async def create_artifact(
     rubric_analysis: TeacherJudgeRubricAnalysis,
     created_by: uuid.UUID | None,
     source_file_id: uuid.UUID | None = None,
+    session_id: uuid.UUID | None = None,
     template_commands: list[TeacherJudgeTemplateCommand] | None = None,
 ) -> TeacherJudgeScriptArtifactPublic:
     artifact_name = name.strip()
@@ -1046,6 +1060,7 @@ async def create_artifact(
 
     artifact = TeacherJudgeScriptArtifact(
         teaching_class_id=teaching_class_id,
+        session_id=session_id,
         name=artifact_name,
         template_key=template_key,
         rubric_snapshot_json=rubric_snapshot,

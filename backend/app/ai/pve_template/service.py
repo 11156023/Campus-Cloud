@@ -130,7 +130,10 @@ async def chat(
 
 
 def _replace_pending_tool_result(
-    messages: list[dict[str, Any]], result: SSHExecResult
+    messages: list[dict[str, Any]],
+    result: SSHExecResult,
+    *,
+    approved: bool,
 ) -> list[dict[str, Any]]:
     replaced = [dict(message) for message in messages]
     for message in reversed(replaced):
@@ -141,8 +144,13 @@ def _replace_pending_tool_result(
         except (TypeError, json.JSONDecodeError):
             continue
         if isinstance(content, dict) and content.get("pending"):
+            resumed_result = result.model_dump(mode="json")
+            resumed_result["confirmation_decision"] = (
+                "approved" if approved else "rejected"
+            )
             message["content"] = json.dumps(
-                result.model_dump(mode="json"), ensure_ascii=False
+                resumed_result,
+                ensure_ascii=False,
             )
             break
     return replaced
@@ -174,18 +182,33 @@ async def confirm_ssh(
         allowed_vmids={pending_request.vmid},
     )
     _cleanup_pending_context()
-    context = _pending_context.pop(token, None)
-    if context is None or result.error or result.blocked or result.pending:
+    # Token still exists means confirm_exec rejected the caller/scope before
+    # consuming it. Keep both stores intact so the legitimate owner can retry.
+    if peek_pending_request(token) is not None:
         return AIPVETemplateChatResponse(
             template_key=template.template_key,
             vmid=pending_request.vmid,
-            reply=("指令已拒絕或無法執行。" if result.error or result.blocked else ""),
+            reply="確認未生效，原指令仍在等待有效的使用者決策。",
             error=result.error or result.block_reason,
             confirmation_result=result,
         )
 
+    context = _pending_context.pop(token, None)
+    if context is None or result.pending:
+        return AIPVETemplateChatResponse(
+            template_key=template.template_key,
+            vmid=pending_request.vmid,
+            reply="找不到可恢復的 AI 對話內容，請重新發起任務。",
+            error=result.error or result.block_reason or "AI 對話接續內容已過期",
+            confirmation_result=result,
+        )
+
     resumed = await pve_chat(
-        history=_replace_pending_tool_result(context.messages, result),
+        history=_replace_pending_tool_result(
+            context.messages,
+            result,
+            approved=request.approved,
+        ),
         session=session,
         allowed_vmids={context.vmid},
         requester_id=current_user.id,

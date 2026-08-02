@@ -1133,6 +1133,155 @@
   @include flex-center;
 }
 
+/* ── Persistent session workspace ── */
+.sessionWorkspace {
+  display: grid;
+  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+  gap: $spacing-16;
+  align-items: start;
+}
+
+.sessionSidebar {
+  position: sticky;
+  top: $spacing-16;
+  @include flex-column;
+  gap: $spacing-16;
+  padding: $spacing-16;
+  border: 1px solid var(--color-border);
+  border-radius: $radius-12;
+  background: var(--color-surface);
+}
+
+.sessionCreate {
+  @include flex-column;
+  gap: $spacing-8;
+
+  input {
+    min-width: 0;
+    padding: 9px 10px;
+    border: 1px solid var(--color-border);
+    border-radius: $radius-8;
+    background: var(--color-surface);
+    color: var(--color-text-primary);
+  }
+}
+
+.sessionFilters {
+  display: flex;
+  gap: $spacing-8;
+}
+
+.sessionList {
+  @include flex-column;
+  gap: $spacing-8;
+  max-height: 62vh;
+  overflow-y: auto;
+}
+
+.sessionItem,
+.sessionItemActive {
+  @include flex-column;
+  align-items: flex-start;
+  gap: 3px;
+  width: 100%;
+  padding: 10px;
+  border: 1px solid transparent;
+  border-radius: $radius-8;
+  background: transparent;
+  color: var(--color-text-primary);
+  text-align: left;
+  cursor: pointer;
+
+  span,
+  small {
+    color: var(--color-text-muted);
+    font-size: $font-size-12;
+  }
+}
+
+.sessionItem:hover {
+  background: var(--color-hover);
+}
+
+.sessionItemActive {
+  border-color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 8%, transparent);
+}
+
+.sessionMain {
+  min-width: 0;
+}
+
+.sessionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: $spacing-16;
+  margin-bottom: $spacing-16;
+
+  h3,
+  p {
+    margin: 0;
+  }
+
+  p {
+    margin-top: 4px;
+    color: var(--color-text-muted);
+    font-size: $font-size-12;
+  }
+}
+
+.proposalCard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: $spacing-16;
+  margin-top: $spacing-16;
+  padding: $spacing-16;
+  border: 1px solid var(--color-primary);
+  border-radius: $radius-8;
+  background: color-mix(in srgb, var(--color-primary) 7%, transparent);
+
+  p {
+    margin: 3px 0 0;
+    color: var(--color-text-muted);
+    font-size: $font-size-12;
+  }
+}
+
+.runHistory {
+  display: grid;
+  gap: $spacing-8;
+  margin-top: $spacing-16;
+}
+
+.runHistoryItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: $spacing-16;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: $radius-8;
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  cursor: pointer;
+}
+
+@media (max-width: 960px) {
+  .sessionWorkspace {
+    grid-template-columns: 1fr;
+  }
+
+  .sessionSidebar {
+    position: static;
+  }
+
+  .sessionList {
+    max-height: 240px;
+  }
+}
+
 /* ── 表單欄位 ── */
 .field {
   @include flex-column;
