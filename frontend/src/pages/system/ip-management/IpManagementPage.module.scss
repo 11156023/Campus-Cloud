@@ -56,6 +56,11 @@
   cursor: pointer;
   white-space: nowrap;
   transition: background $transition-base, box-shadow $transition-base;
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
 }
 
 .btnPrimary {
@@ -63,7 +68,7 @@
   background: var(--color-primary);
   color: var(--color-text-on-primary);
 
-  &:hover {
+  &:hover:not(:disabled) {
     background: var(--color-primary-dark);
     box-shadow: var(--shadow-sm);
   }
@@ -76,8 +81,22 @@
   border: 1px solid var(--color-border);
   box-shadow: var(--shadow-sm);
 
-  &:hover {
+  &:hover:not(:disabled) {
     background: var(--color-hover);
+  }
+}
+
+.btnDanger {
+  @extend %btn-base;
+  /* 危險操作靠左，與右側的取消／儲存分開 */
+  margin-right: auto;
+  background: var(--color-danger);
+  color: var(--color-text-on-primary);
+  border: 1px solid var(--color-danger);
+
+  &:hover:not(:disabled) {
+    background: #b91c1c;
+    border-color: #b91c1c;
   }
 }
 
@@ -323,4 +342,85 @@
     color: var(--color-danger);
     &:hover { background: color-mix(in srgb, var(--color-danger) 10%, transparent); }
   }
+}
+
+/* ── 子網設定表單 ── */
+.card {
+  @include flex-column;
+  gap: $spacing-16;
+  padding: $spacing-24;
+  @include glass-surface($shadow: var(--shadow-sm));
+  border-radius: $radius-16;
+}
+
+.cardTitle {
+  font-size: $font-size-16;
+  font-weight: $font-weight-700;
+  color: var(--color-text-primary);
+}
+
+/* 標題下的說明文字（貼近標題） */
+.cardDesc {
+  margin-top: -$spacing-8;
+  font-size: $font-size-12;
+  color: var(--color-text-muted);
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: $spacing-16;
+
+  @include respond-to(md) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.field {
+  @include flex-column;
+  gap: 6px;
+  font-size: $font-size-12;
+  font-weight: $font-weight-500;
+  color: var(--color-text-secondary);
+
+  input,
+  textarea {
+    min-height: 38px;
+    padding: 8px $spacing-16;
+    border: 1px solid var(--color-border);
+    border-radius: $radius-8;
+    background: var(--color-surface);
+    color: var(--color-text-primary);
+    outline: none;
+    font-size: $font-size-14;
+
+    &:focus {
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 12%, transparent);
+    }
+
+    &:read-only {
+      background: var(--color-hover);
+      color: var(--color-text-muted);
+      cursor: not-allowed;
+    }
+  }
+
+  textarea {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    resize: vertical;
+  }
+}
+
+.fieldHint {
+  font-weight: $font-weight-400;
+  color: var(--color-text-muted);
+}
+
+.cardActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: $spacing-8;
 }

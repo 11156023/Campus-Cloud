@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import styles from "./IpManagementPage.module.scss";
 import MIcon from "../../../components/MIcon";
+import SubnetConfigForm from "./SubnetConfigForm";
+import { useAuth } from "../../../contexts/AuthContext";
 import { IpManagementService } from "../../../services/ipManagement";
 import { useToast } from "../../../hooks/useToast";
 import useAutoRefresh from "../../../hooks/useAutoRefresh";
@@ -15,15 +17,40 @@ const PURPOSE_LABELS = {
   reserved: "保留",
 };
 
-function EmptyState() {
+function EmptyState({ variant, canConfigure, onConfigure }) {
+  if (variant === "unconfigured") {
+    return (
+      <div className={styles.empty}>
+        <div className={styles.emptyIcon}>
+          <MIcon name="lan" size={40} />
+        </div>
+        <h2 className={styles.emptyTitle}>尚未設定子網</h2>
+        <p className={styles.emptyDesc}>
+          建立子網設定後，系統將自動為虛擬機與容器分配 IP 位址
+        </p>
+        {canConfigure && (
+          <button type="button" className={styles.btnPrimary} onClick={onConfigure}>
+            <MIcon name="add" size={18} />
+            建立子網設定
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  const isNoMatch = variant === "no-match";
   return (
     <div className={styles.empty}>
       <div className={styles.emptyIcon}>
-        <MIcon name="lan" size={40} />
+        <MIcon name={isNoMatch ? "search_off" : "inbox"} size={40} />
       </div>
-      <h2 className={styles.emptyTitle}>尚未設定子網</h2>
+      <h2 className={styles.emptyTitle}>
+        {isNoMatch ? "沒有符合條件的 IP" : "尚無 IP 分配記錄"}
+      </h2>
       <p className={styles.emptyDesc}>
-        建立子網設定後,系統將自動為虛擬機與容器分配 IP 位址
+        {isNoMatch
+          ? "換個 IP、VMID 或備註關鍵字再試一次"
+          : "建立虛擬機或容器後，分配的 IP 會顯示在這裡"}
       </p>
     </div>
   );
@@ -40,11 +67,17 @@ function PurposeBadge({ purpose }) {
 
 export default function IpManagementPage() {
   const toast = useToast();
+  const { user } = useAuth();
+  const isAdmin = Boolean(user?.is_superuser || user?.role === "admin");
+
   const [allocations, setAllocations] = useState([]);
   const [subnet, setSubnet] = useState(null);
   const [status, setStatus] = useState(null);
   const [filter, setFilter] = useState("");
   const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   /** silent = true 時不觸發 loading 與錯誤提示，供背景自動刷新使用 */
   const load = useCallback(async (silent = false) => {
@@ -66,7 +99,17 @@ export default function IpManagementPage() {
   }, [toast]);
 
   useEffect(() => { load(); }, [load]);
-  useAutoRefresh(() => load(true));
+  /* 編輯中不背景刷新，避免表單被重新掛載而清空輸入 */
+  useAutoRefresh(() => { if (!editing) load(true); });
+
+  /* getSubnet 需要管理員權限，非管理員只能靠 status 判斷是否已設定 */
+  const configured = Boolean(subnet) || Boolean(status?.configured);
+
+  /* 已有 VM/LXC 佔用網段時後端不允許改 CIDR，先在表單擋下來 */
+  const cidrLocked = useMemo(
+    () => allocations.some((a) => a.purpose === "vm" || a.purpose === "lxc"),
+    [allocations],
+  );
 
   const stats = useMemo(() => {
     const total = subnet?.total_ips ?? status?.total_ips ?? 0;
@@ -86,6 +129,44 @@ export default function IpManagementPage() {
     );
   }, [allocations, filter]);
 
+  const emptyVariant = !configured
+    ? "unconfigured"
+    : allocations.length === 0
+      ? "no-data"
+      : "no-match";
+
+  async function handleSave(payload) {
+    setSaving(true);
+    try {
+      await IpManagementService.upsertSubnet(payload);
+      toast.success("子網設定已儲存");
+      setEditing(false);
+      await load();
+    } catch (e) {
+      toast.error(e?.message ?? "儲存子網設定失敗");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDelete() {
+    const ok = window.confirm(
+      "確定刪除子網設定？刪除後全站 VM / LXC 建立功能將被停用，且需無任何 VM / LXC 仍佔用 IP 才能刪除。",
+    );
+    if (!ok) return;
+    setDeleting(true);
+    try {
+      await IpManagementService.deleteSubnet();
+      toast.success("子網設定已刪除");
+      setEditing(false);
+      await load();
+    } catch (e) {
+      toast.error(e?.message ?? "刪除子網設定失敗");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   return (
     <div className={styles.page}>
       <div className={styles.pageHeader}>
@@ -93,6 +174,18 @@ export default function IpManagementPage() {
           <h1 className={styles.pageTitle}>IP 管理</h1>
           <p className={styles.pageSubtitle}>管理子網設定與所有 IP 位址分配</p>
         </div>
+        {isAdmin && !editing && (
+          <div className={styles.pageActions}>
+            <button
+              type="button"
+              className={styles.btnPrimary}
+              onClick={() => setEditing(true)}
+            >
+              <MIcon name={configured ? "edit" : "add"} size={18} />
+              {configured ? "編輯子網設定" : "建立子網設定"}
+            </button>
+          </div>
+        )}
       </div>
 
       <div className={styles.statRow}>
@@ -125,6 +218,19 @@ export default function IpManagementPage() {
         </div>
       </div>
 
+      {editing && (
+        <SubnetConfigForm
+          key={subnet?.updated_at ?? "new"}
+          config={subnet}
+          cidrLocked={cidrLocked}
+          saving={saving}
+          deleting={deleting}
+          onSubmit={handleSave}
+          onCancel={() => setEditing(false)}
+          onDelete={handleDelete}
+        />
+      )}
+
       <div className={styles.toolbar}>
         <div className={styles.search}>
           <MIcon name="search" size={16} />
@@ -145,7 +251,11 @@ export default function IpManagementPage() {
 
       <div className={styles.content}>
         {visible.length === 0 ? (
-          <EmptyState />
+          <EmptyState
+            variant={emptyVariant}
+            canConfigure={isAdmin && !editing}
+            onConfigure={() => setEditing(true)}
+          />
         ) : (
           <div className={styles.tableWrap}>
             <table className={styles.table}>

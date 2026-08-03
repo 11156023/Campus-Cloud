@@ -46,7 +46,6 @@ const navGroups = [
       { key: "firewall",      label: "防火牆",     icon: "security" },
       { key: "reverse-proxy", label: "反向代理",   icon: "swap_horiz" },
       { key: "domain",        label: "網域管理",   icon: "domain" },
-      { key: "ip-management", label: "IP 管理",    icon: "lan" },
       { key: "gateway",       label: "閘道 VM",    icon: "dns" },
     ],
   },
@@ -79,6 +78,7 @@ const navGroups = [
     items: [
       { key: "admin",         label: "使用者管理", icon: "admin_panel_settings" },
       { key: "quotas",        label: "配額管理",   icon: "data_usage" },
+      { key: "ip-management", label: "IP 管理",    icon: "lan" },
       { key: "settings",      label: "系統設定",   icon: "settings" },
     ],
   },

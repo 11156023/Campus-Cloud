@@ -40,6 +40,7 @@ const AdminPage = lazy(() => import("./pages/system/admin/AdminPage"));
 const SettingsPage = lazy(() => import("./pages/system/settings/SettingsPage"));
 const MonitoringPage = lazy(() => import("./pages/system/monitoring/MonitoringPage"));
 const QuotasPage = lazy(() => import("./pages/system/quotas/QuotasPage"));
+const IpManagementPage = lazy(() => import("./pages/system/ip-management/IpManagementPage"));
 const AuditPage = lazy(() => import("./pages/system/audit/AuditPage"));
 const JobsPage = lazy(() => import("./pages/system/jobs/JobsPage"));
 const DeployLogsPage = lazy(() => import("./pages/system/deploy-logs/DeployLogsPage"));
@@ -49,7 +50,6 @@ const FirewallPage = lazy(() => import("./pages/network/firewall/FirewallPage"))
 const DomainPage = lazy(() => import("./pages/network/domain/DomainPage"));
 const GatewayPage = lazy(() => import("./pages/network/gateway/GatewayPage"));
 const ReverseProxyPage = lazy(() => import("./pages/network/reverse-proxy/ReverseProxyPage"));
-const IpManagementPage = lazy(() => import("./pages/network/ip-management/IpManagementPage"));
 
 function App() {
   const { user, loading } = useAuth();
@@ -117,6 +117,7 @@ function App() {
           <Route path="/admin"     element={<AdminPage />} />
           <Route path="/settings"  element={<SettingsPage />} />
           <Route path="/quotas"    element={<QuotasPage />} />
+          <Route path="/ip-management" element={<IpManagementPage />} />
           <Route path="/monitoring" element={<MonitoringPage />} />
           <Route path="/audit"     element={<AuditPage />} />
           <Route path="/jobs"      element={<JobsPage />} />
@@ -127,7 +128,6 @@ function App() {
           <Route path="/domain"         element={<DomainPage />} />
           <Route path="/gateway"        element={<GatewayPage />} />
           <Route path="/reverse-proxy"  element={<ReverseProxyPage />} />
-          <Route path="/ip-management"  element={<IpManagementPage />} />
 
           {/* fallback */}
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
