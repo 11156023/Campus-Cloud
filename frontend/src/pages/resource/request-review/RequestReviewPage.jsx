@@ -22,6 +22,7 @@ const STATUS_META = {
   approved: { label: "已通過", tone: "success" },
   rejected: { label: "已拒絕", tone: "danger" },
   cancelled: { label: "已取消", tone: "muted" },
+  expired: { label: "已過期", tone: "muted" },
   running: { label: "處理中", tone: "info" },
   completed: { label: "已完成", tone: "muted" },
   failed: { label: "失敗", tone: "danger" },
