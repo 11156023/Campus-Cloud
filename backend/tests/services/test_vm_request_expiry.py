@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
+from typing import Any
 
 import pytest
 from sqlmodel import Session, select
@@ -22,6 +24,7 @@ from app.models import (
 )
 from app.repositories import vm_request as vm_request_repo
 from app.services.user import audit_service
+from app.services.vm import vm_request_expiry_service
 
 
 def _db_fixture_available() -> bool:
@@ -142,3 +145,114 @@ def test_mark_vm_request_expired_leaves_review_fields_untouched(db: Session) -> 
         assert row.review_comment is None
     finally:
         db.rollback()
+
+
+class _FakeSession:
+    """站在 `with Session(engine) as session:` 位置的替身。"""
+
+    def __init__(self) -> None:
+        self.committed = False
+        self.rolled_back = False
+
+    def __enter__(self) -> _FakeSession:
+        return self
+
+    def __exit__(self, *exc: Any) -> bool:
+        return False
+
+    def commit(self) -> None:
+        self.committed = True
+
+    def rollback(self) -> None:
+        self.rolled_back = True
+
+
+def test_process_expired_requests_marks_and_audits_each_row(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    req_a = SimpleNamespace(id=uuid.uuid4(), end_at=NOW - timedelta(hours=1))
+    req_b = SimpleNamespace(id=uuid.uuid4(), end_at=NOW - timedelta(days=1))
+    fake_session = _FakeSession()
+    monkeypatch.setattr(
+        vm_request_expiry_service, "Session", lambda _engine: fake_session
+    )
+
+    marked: list[Any] = []
+    monkeypatch.setattr(
+        vm_request_expiry_service,
+        "vm_request_repo",
+        SimpleNamespace(
+            list_expired_pending_vm_requests=lambda **kw: [req_a, req_b],
+            mark_vm_request_expired=lambda **kw: marked.append(kw["db_request"]),
+        ),
+    )
+
+    audited: list[dict[str, Any]] = []
+    monkeypatch.setattr(
+        vm_request_expiry_service,
+        "audit_service",
+        SimpleNamespace(log_action=lambda **kw: audited.append(kw)),
+    )
+
+    count = vm_request_expiry_service.process_expired_requests()
+
+    assert count == 2
+    assert marked == [req_a, req_b]
+    assert [entry["action"] for entry in audited] == [
+        AuditAction.vm_request_expired,
+        AuditAction.vm_request_expired,
+    ]
+    # 系統動作，沒有操作者
+    assert all(entry["user_id"] is None for entry in audited)
+    # 整批一次 commit，避免中途釋放 FOR UPDATE 鎖
+    assert fake_session.committed
+    assert not fake_session.rolled_back
+
+
+def test_process_expired_requests_is_noop_when_nothing_due(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake_session = _FakeSession()
+    monkeypatch.setattr(
+        vm_request_expiry_service, "Session", lambda _engine: fake_session
+    )
+    monkeypatch.setattr(
+        vm_request_expiry_service,
+        "vm_request_repo",
+        SimpleNamespace(list_expired_pending_vm_requests=lambda **kw: []),
+    )
+
+    assert vm_request_expiry_service.process_expired_requests() == 0
+    assert not fake_session.committed
+
+
+def test_process_expired_requests_rolls_back_on_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    req = SimpleNamespace(id=uuid.uuid4(), end_at=NOW - timedelta(hours=1))
+    fake_session = _FakeSession()
+    monkeypatch.setattr(
+        vm_request_expiry_service, "Session", lambda _engine: fake_session
+    )
+
+    def _boom(**kw: Any) -> None:
+        raise RuntimeError("db is on fire")
+
+    monkeypatch.setattr(
+        vm_request_expiry_service,
+        "vm_request_repo",
+        SimpleNamespace(
+            list_expired_pending_vm_requests=lambda **kw: [req],
+            mark_vm_request_expired=_boom,
+        ),
+    )
+    monkeypatch.setattr(
+        vm_request_expiry_service,
+        "audit_service",
+        SimpleNamespace(log_action=lambda **kw: None),
+    )
+
+    # tick 不該把例外往上拋，否則整個 scheduler 迴圈會被打斷
+    assert vm_request_expiry_service.process_expired_requests() == 0
+    assert fake_session.rolled_back
+    assert not fake_session.committed

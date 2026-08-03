@@ -501,7 +501,7 @@ class _FakeSession:
         self.committed = False
         self.rolled_back = False
 
-    def __enter__(self) -> "_FakeSession":
+    def __enter__(self) -> _FakeSession:
         return self
 
     def __exit__(self, *exc: Any) -> bool:
