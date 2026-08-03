@@ -4,6 +4,8 @@
 - script_deploy:  服務模板部署 (script_deploy_logs)
 - vm_request:     VM/LXC 開機申請 (vm_requests)
 - spec_change:    規格變更申請 (spec_change_requests)
+- deletion:       VM/LXC 刪除 (deletion_requests)
+- template:       機器範本任務 (task_records：轉換／克隆／刪除／更新循環)
 
 所有來源被正規化到統一的 JobItem 結構，以便前端 Job 中心一致顯示。
 """
@@ -23,6 +25,7 @@ class JobKind(str, enum.Enum):
     vm_request = "vm_request"
     spec_change = "spec_change"
     deletion = "deletion"
+    template = "template"
 
 
 class JobStatus(str, enum.Enum):

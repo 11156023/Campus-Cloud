@@ -8,6 +8,7 @@ export const JOB_KIND_LABEL = {
   vm_request:    "開機申請",
   spec_change:   "規格變更",
   deletion:      "刪除",
+  template:      "範本",
 };
 
 /** 狀態顯示名稱 + MIcon 名稱 + 色調 class key */

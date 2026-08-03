@@ -13,6 +13,7 @@ const KIND_LABELS = {
   vm_request:    "VM 申請",
   spec_change:   "規格變更",
   deletion:      "刪除",
+  template:      "機器範本",
 };
 
 const STATUS_LABELS = {

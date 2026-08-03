@@ -7,7 +7,6 @@ import { useToast } from "../../../hooks/useToast";
 import { TemplateStatusBadge } from "./TemplateBadges";
 import TemplateCloneDialog from "./TemplateCloneDialog";
 import TemplateFormDialog from "./TemplateFormDialog";
-import TemplateTasksCard from "./TemplateTasksCard";
 
 function visibilityLabel(template) {
   return template.visibility === "global"
@@ -228,7 +227,6 @@ export default function TemplatesPage() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [cycleBusy, setCycleBusy] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [tasksKey, setTasksKey] = useState(0);
   const timerRef = useRef(null);
 
   const load = useCallback(async () => {
@@ -264,7 +262,6 @@ export default function TemplatesPage() {
   const refresh = async () => {
     setRefreshing(true);
     await load();
-    setTasksKey((k) => k + 1);
     setRefreshing(false);
   };
 
@@ -282,7 +279,6 @@ export default function TemplatesPage() {
             : "已取消更新循環，暫存母機將被回收",
       );
       await load();
-      setTasksKey((k) => k + 1);
     } catch (e) {
       toast.error(e?.message ?? "操作失敗");
     } finally {
@@ -296,7 +292,6 @@ export default function TemplatesPage() {
       await TemplatesService.retry(templateId);
       toast.success("已重新送出轉換；母機會先安全關機，再轉為唯讀範本");
       await load();
-      setTasksKey((k) => k + 1);
     } catch (e) {
       toast.error(e?.message ?? "重新轉換失敗");
     } finally {
@@ -308,10 +303,9 @@ export default function TemplatesPage() {
     setDeleting(true);
     try {
       await TemplatesService.remove(deleteTarget.id);
-      toast.success("刪除任務已送出");
+      toast.success("刪除任務已送出，進度請見側欄「背景任務」");
       setDeleteTarget(null);
       await load();
-      setTasksKey((k) => k + 1);
     } catch (e) {
       toast.error(e?.message ?? "刪除範本失敗");
       setDeleteTarget(null);
@@ -403,15 +397,10 @@ export default function TemplatesPage() {
         <StudentCatalog templates={readyTemplates} onClone={setCloneTarget} />
       )}
 
-      <TemplateTasksCard key={tasksKey} />
-
       {createOpen && (
         <TemplateFormDialog
           onClose={() => setCreateOpen(false)}
-          onSaved={() => {
-            load();
-            setTasksKey((k) => k + 1);
-          }}
+          onSaved={() => load()}
         />
       )}
       {editTarget && (
@@ -426,7 +415,6 @@ export default function TemplatesPage() {
           template={cloneTarget}
           canBatch={canManage}
           onClose={() => setCloneTarget(null)}
-          onCloned={() => setTasksKey((k) => k + 1)}
         />
       )}
 

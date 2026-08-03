@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 import uuid
@@ -23,10 +24,13 @@ from app.models import (
     ScriptDeployLog,
     SpecChangeRequest,
     SpecChangeRequestStatus,
+    TaskRecord,
+    TaskRecordStatus,
     User,
     VMProvisioningStatus,
     VMRequest,
     VMRequestStatus,
+    VMTemplate,
 )
 from app.schemas.jobs import (
     ACTIVE_JOB_STATUSES,
@@ -68,6 +72,23 @@ _SCRIPT_DEPLOY_STATUS_MAP: dict[str, JobStatus] = {
     "completed": JobStatus.completed,
     "failed": JobStatus.failed,
     "cancelled": JobStatus.cancelled,
+}
+
+_TEMPLATE_TASK_STATUS_MAP: dict[TaskRecordStatus, JobStatus] = {
+    TaskRecordStatus.queued: JobStatus.pending,
+    TaskRecordStatus.running: JobStatus.running,
+    TaskRecordStatus.succeeded: JobStatus.completed,
+    TaskRecordStatus.failed: JobStatus.failed,
+}
+
+# 與前端 TEMPLATE_TASK_LABEL 對齊
+_TEMPLATE_TASK_TYPE_LABEL: dict[str, str] = {
+    "template.convert": "轉換範本",
+    "template.delete": "刪除範本",
+    "template.update_clone": "更新循環：建立暫存母機",
+    "template.update_convert": "更新循環：轉換新版",
+    "template.update_cancel": "更新循環：取消",
+    "template.clone": "克隆開通",
 }
 
 _DELETION_STATUS_MAP: dict[DeletionRequestStatus, JobStatus] = {
@@ -364,11 +385,107 @@ def _fetch_deletions(
     ]
 
 
+def _parse_json(text: str | None) -> dict:
+    if not text:
+        return {}
+    try:
+        data = json.loads(text)
+        return data if isinstance(data, dict) else {}
+    except ValueError:
+        return {}
+
+
+def _template_task_to_job(
+    record: TaskRecord,
+    *,
+    user_email: str | None = None,
+    template_name: str | None = None,
+) -> JobItem:
+    payload = _parse_json(record.payload)
+    label = _TEMPLATE_TASK_TYPE_LABEL.get(record.task_type, record.task_type)
+    # 目標：克隆任務顯示新主機名，其餘顯示範本名（範本已刪除時退回 VMID）
+    target = (
+        payload.get("hostname")
+        if record.task_type == "template.clone"
+        else template_name
+    ) or (f"VMID {payload['pve_vmid']}" if payload.get("pve_vmid") else None)
+    title = f"{label}：{target}" if target else label
+
+    status = _TEMPLATE_TASK_STATUS_MAP.get(record.status, JobStatus.pending)
+    progress = 100 if status == JobStatus.completed else record.progress
+
+    updated = (
+        _coerce_aware(record.finished_at)
+        or _coerce_aware(record.started_at)
+        or _coerce_aware(record.created_at)
+        or _now()
+    )
+    return JobItem(
+        id=f"template:{record.id}",
+        kind=JobKind.template,
+        title=title,
+        status=status,
+        progress=progress,
+        message=record.error,
+        user_id=record.user_id,
+        user_email=user_email,
+        created_at=_coerce_aware(record.created_at) or _now(),
+        updated_at=updated,
+        completed_at=_coerce_aware(record.finished_at),
+        detail_url=f"/jobs?focus=template:{record.id}",
+        meta={
+            "task_type": record.task_type,
+            "template_id": str(record.template_id) if record.template_id else None,
+            "template_name": template_name,
+            "resource_vmid": record.resource_vmid,
+            "hostname": payload.get("hostname"),
+        },
+    )
+
+
+def _template_name_map(
+    session: Session, records: Iterable[TaskRecord]
+) -> dict[uuid.UUID, str]:
+    ids = {r.template_id for r in records if r.template_id is not None}
+    if not ids:
+        return {}
+    rows = session.exec(select(VMTemplate).where(VMTemplate.id.in_(ids))).all()
+    return {t.id: t.name for t in rows}
+
+
+def _fetch_template_tasks(
+    session: Session, *, user: User, since: datetime
+) -> list[JobItem]:
+    is_admin = bool(user.is_superuser or getattr(user, "role", None) == "admin")
+    stmt = select(TaskRecord).where(TaskRecord.created_at >= since)
+    if not is_admin:
+        stmt = stmt.where(TaskRecord.user_id == user.id)
+    stmt = stmt.order_by(TaskRecord.created_at.desc()).limit(_PER_SOURCE_FETCH_LIMIT)
+    rows = list(session.exec(stmt).all())
+
+    user_ids = {r.user_id for r in rows}
+    email_map: dict[uuid.UUID, str] = {}
+    if user_ids:
+        users = session.exec(select(User).where(User.id.in_(user_ids))).all()
+        email_map = {u.id: u.email for u in users}
+    name_map = _template_name_map(session, rows)
+
+    return [
+        _template_task_to_job(
+            r,
+            user_email=email_map.get(r.user_id),
+            template_name=name_map.get(r.template_id) if r.template_id else None,
+        )
+        for r in rows
+    ]
+
+
 _FETCHERS = {
     JobKind.script_deploy: _fetch_script_deploy,
     JobKind.vm_request: _fetch_vm_requests,
     JobKind.spec_change: _fetch_spec_changes,
     JobKind.deletion: _fetch_deletions,
+    JobKind.template: _fetch_template_tasks,
 }
 
 
@@ -594,11 +711,48 @@ def _detail_deletion(session: Session, raw_id: str, user: User) -> JobDetail:
     return JobDetail(item=item, error=req.error_message, extra=extra)
 
 
+def _detail_template_task(session: Session, raw_id: str, user: User) -> JobDetail:
+    try:
+        task_uuid = uuid.UUID(raw_id)
+    except ValueError as e:
+        raise JobNotFoundError(f"invalid template task id {raw_id}") from e
+    record = session.get(TaskRecord, task_uuid)
+    if record is None:
+        raise JobNotFoundError("template task not found")
+    _ensure_owner_or_admin(user, record.user_id)
+
+    owner = session.get(User, record.user_id)
+    template_name: str | None = None
+    if record.template_id is not None:
+        template = session.get(VMTemplate, record.template_id)
+        if template is not None:
+            template_name = template.name
+
+    item = _template_task_to_job(
+        record,
+        user_email=owner.email if owner else None,
+        template_name=template_name,
+    )
+    extra = {
+        "task_type": record.task_type,
+        "template_id": str(record.template_id) if record.template_id else None,
+        "template_name": template_name,
+        "raw_status": record.status.value,
+        "resource_vmid": record.resource_vmid,
+        "payload": _parse_json(record.payload),
+        "result": _parse_json(record.result),
+        "started_at": _isoformat(record.started_at),
+        "finished_at": _isoformat(record.finished_at),
+    }
+    return JobDetail(item=item, error=record.error, extra=extra)
+
+
 _DETAIL_FETCHERS = {
     JobKind.script_deploy: _detail_script_deploy,
     JobKind.vm_request: _detail_vm_request,
     JobKind.spec_change: _detail_spec_change,
     JobKind.deletion: _detail_deletion,
+    JobKind.template: _detail_template_task,
 }
 
 
