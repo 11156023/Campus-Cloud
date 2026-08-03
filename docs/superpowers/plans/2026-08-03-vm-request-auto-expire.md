@@ -504,8 +504,9 @@ class _FakeSession:
     def __enter__(self) -> _FakeSession:
         return self
 
-    def __exit__(self, *exc: Any) -> bool:
-        return False
+    def __exit__(self, *exc: Any) -> None:
+        # 回傳 None（falsy）＝ 不吞例外，讓它照常往外傳。
+        return None
 
     def commit(self) -> None:
         self.committed = True
@@ -779,10 +780,13 @@ def test_coordinator_task_delegates_to_expiry_service(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     calls: list[bool] = []
+
+    def _fake_process() -> int:
+        calls.append(True)
+        return 3
+
     monkeypatch.setattr(
-        vm_request_expiry_service,
-        "process_expired_requests",
-        lambda: calls.append(True) or 3,
+        vm_request_expiry_service, "process_expired_requests", _fake_process
     )
 
     assert coordinator.process_expired_requests_task() == 3

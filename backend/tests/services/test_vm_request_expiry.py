@@ -23,6 +23,8 @@ from app.models import (
     VMRequestStatus,
 )
 from app.repositories import vm_request as vm_request_repo
+from app.schemas.jobs import JobStatus
+from app.services.jobs import jobs_service
 from app.services.scheduling import coordinator
 from app.services.user import audit_service
 from app.services.vm import vm_request_expiry_service
@@ -158,8 +160,9 @@ class _FakeSession:
     def __enter__(self) -> _FakeSession:
         return self
 
-    def __exit__(self, *exc: Any) -> bool:
-        return False
+    def __exit__(self, *exc: Any) -> None:
+        # 回傳 None（falsy）＝ 不吞例外，讓它照常往外傳。
+        return None
 
     def commit(self) -> None:
         self.committed = True
@@ -263,11 +266,32 @@ def test_coordinator_task_delegates_to_expiry_service(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     calls: list[bool] = []
+
+    def _fake_process() -> int:
+        calls.append(True)
+        return 3
+
     monkeypatch.setattr(
-        vm_request_expiry_service,
-        "process_expired_requests",
-        lambda: calls.append(True) or 3,
+        vm_request_expiry_service, "process_expired_requests", _fake_process
     )
 
     assert coordinator.process_expired_requests_task() == 3
     assert calls == [True]
+
+
+def test_every_vm_request_status_maps_to_a_job_status() -> None:
+    """查表用 .get() 帶預設值，缺鍵會靜默顯示成「等待中」而不是報錯。"""
+    missing = [
+        status.value
+        for status in VMRequestStatus
+        if status not in jobs_service._VM_REQUEST_STATUS_MAP
+    ]
+    assert missing == []
+
+
+def test_expired_request_maps_to_cancelled_job() -> None:
+    # 什麼都沒失敗，申請只是失效了 —— 語意上貼近 cancelled 而非 failed。
+    assert (
+        jobs_service._VM_REQUEST_STATUS_MAP[VMRequestStatus.expired]
+        == JobStatus.cancelled
+    )

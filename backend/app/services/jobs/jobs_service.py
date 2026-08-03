@@ -53,6 +53,7 @@ _VM_REQUEST_STATUS_MAP: dict[VMRequestStatus, JobStatus] = {
     VMRequestStatus.approved: JobStatus.pending,        # 已核准、等待派發
     VMRequestStatus.rejected: JobStatus.failed,
     VMRequestStatus.cancelled: JobStatus.cancelled,
+    VMRequestStatus.expired: JobStatus.cancelled,       # 時段過完沒人審，失效
 }
 
 _SPEC_CHANGE_STATUS_MAP: dict[SpecChangeRequestStatus, JobStatus] = {
