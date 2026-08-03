@@ -359,3 +359,52 @@ def list_active_approved_vm_requests(
         )
     )
     return list(session.exec(statement).all())
+
+
+def list_expired_pending_vm_requests(
+    *,
+    session: Session,
+    at_time: datetime,
+    limit: int = 100,
+) -> list[VMRequest]:
+    """Pending requests whose usage window has already ended.
+
+    ``end_at IS NULL`` means an open-ended (immediate-mode) request, which
+    never expires. Rows are locked with SKIP LOCKED so concurrent scheduler
+    ticks pick disjoint batches instead of blocking on each other.
+    """
+    statement = (
+        select(VMRequest)
+        .where(
+            VMRequest.status == VMRequestStatus.pending,
+            VMRequest.end_at.is_not(None),  # type: ignore[union-attr]
+            VMRequest.end_at <= at_time,  # type: ignore[operator]
+        )
+        .order_by(VMRequest.end_at.asc())  # type: ignore[union-attr]
+        .limit(limit)
+        .with_for_update(skip_locked=True)
+    )
+    return list(session.exec(statement).all())
+
+
+def mark_vm_request_expired(
+    *,
+    session: Session,
+    db_request: VMRequest,
+    commit: bool = True,
+) -> VMRequest:
+    """Mark a request expired without touching any review field.
+
+    ``reviewer_id`` / ``reviewed_at`` / ``review_comment`` are deliberately
+    left alone: nobody reviewed this request, so no review trace should be
+    fabricated. This is why ``update_vm_request_status`` cannot be reused —
+    it requires a ``reviewer_id`` and always overwrites ``reviewed_at``.
+    """
+    db_request.status = VMRequestStatus.expired
+    session.add(db_request)
+    if commit:
+        session.commit()
+    else:
+        session.flush()
+    session.refresh(db_request)
+    return db_request
