@@ -958,6 +958,10 @@ async def run_scheduler(stop_event: asyncio.Event) -> None:
         tasks=[
             ScheduledTask(name="process_due_request_starts", handler=process_due_request_starts),
             ScheduledTask(name="process_due_request_stops", handler=process_due_request_stops),
+            ScheduledTask(
+                name="process_expired_requests",
+                handler=process_expired_requests_task,
+            ),
             ScheduledTask(name="process_pending_deletions", handler=process_pending_deletions_task),
             ScheduledTask(
                 name="process_recurrence_windows",
@@ -994,6 +998,15 @@ async def run_scheduler(stop_event: asyncio.Event) -> None:
         ],
     )
     logger.info("VM request scheduler stopped")
+
+
+def process_expired_requests_task() -> int:
+    """Scheduler tick：已過使用時段仍未審核的申請自動過期。"""
+    from app.services.vm import (
+        vm_request_expiry_service,  # noqa: PLC0415 — 避免 import cycle
+    )
+
+    return vm_request_expiry_service.process_expired_requests()
 
 
 def process_resource_alerts_task() -> int:

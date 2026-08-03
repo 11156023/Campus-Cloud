@@ -23,6 +23,7 @@ from app.models import (
     VMRequestStatus,
 )
 from app.repositories import vm_request as vm_request_repo
+from app.services.scheduling import coordinator
 from app.services.user import audit_service
 from app.services.vm import vm_request_expiry_service
 
@@ -256,3 +257,17 @@ def test_process_expired_requests_rolls_back_on_failure(
     assert vm_request_expiry_service.process_expired_requests() == 0
     assert fake_session.rolled_back
     assert not fake_session.committed
+
+
+def test_coordinator_task_delegates_to_expiry_service(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[bool] = []
+    monkeypatch.setattr(
+        vm_request_expiry_service,
+        "process_expired_requests",
+        lambda: calls.append(True) or 3,
+    )
+
+    assert coordinator.process_expired_requests_task() == 3
+    assert calls == [True]
