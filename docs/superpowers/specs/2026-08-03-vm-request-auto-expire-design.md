@@ -53,24 +53,35 @@ status == pending  AND  end_at IS NOT NULL  AND  end_at <= now
 
 ### 三、元件
 
-#### 1. Model — `backend/app/models/vm_request.py`
+#### 1. Model — 兩個 enum
 
-`VMRequestStatus` 新增 `expired = "expired"`。
+`backend/app/models/vm_request.py` 的 `VMRequestStatus` 新增 `expired = "expired"`。
 
-#### 2. Migration — `backend/app/alembic/versions/vmexp01_add_expired_to_vmrequeststatus.py`
+`backend/app/models/audit_log.py` 的 `AuditAction` 新增 `vm_request_expired = "vm_request_expired"`，並在 `audit_service.ACTION_CATEGORY` 補 `"request"` 分類（漏掉的話後台稽核頁的下拉分組會落到 "other"）。
 
-沿用 `cc01_cancelled_enum` 的寫法：
+`AuditLog.action` 同樣是 PostgreSQL enum 欄位（`Column(Enum(AuditAction))`），所以新增 audit action 也要 migration —— 這點與 `c3d4e5f6a7b0_add_vm_request_submit_auto_approved_audit_action` 的先例一致。
+
+#### 2. Migration — `backend/app/alembic/versions/vmexp01_add_expired_status_and_audit_action.py`
+
+兩個 enum 一次改完，沿用 `cc01_cancelled_enum` 的寫法：
 
 ```python
-revision = "vmexp01_expired_enum"
+revision = "vmexp01_expired"
 down_revision = "qc01_quota_config"   # 目前 head
 
 def upgrade() -> None:
+    bind = op.get_bind()
+    if bind.dialect.name != "postgresql":
+        return
     op.execute(
         "ALTER TYPE vmrequeststatus ADD VALUE IF NOT EXISTS 'expired' AFTER 'cancelled'"
     )
+    op.execute("ALTER TYPE auditaction ADD VALUE IF NOT EXISTS 'vm_request_expired'")
 
 def downgrade() -> None:
+    bind = op.get_bind()
+    if bind.dialect.name != "postgresql":
+        return
     # PostgreSQL 無法移除 enum 值；映回 rejected。
     op.execute("UPDATE vm_requests SET status = 'rejected' WHERE status = 'expired'")
 ```
@@ -106,7 +117,9 @@ def process_expired_requests() -> int:
     """把已過使用時段的 pending 申請標為 expired，回傳處理筆數。"""
 ```
 
-純協調流程：開 session → 查 → 逐筆標記 + audit log → commit → 回傳筆數。單筆失敗記 log 後續跑下一筆，不讓一筆壞資料卡住整個 tick。
+純協調流程：開 session → 查 → 逐筆標記 + audit log → **單次 commit** → 回傳筆數。
+
+整批一次 commit 而非逐筆 commit：這裡沒有任何外部 I/O（不碰 Proxmox），只是純 UPDATE，失敗機率極低；而逐筆 commit 會在第一次 commit 後釋放 `FOR UPDATE` 鎖，讓批次剩下的列失去 SKIP LOCKED 的併發保護。整批失敗則 rollback 並記 log，下個 tick 重試。
 
 audit log 以系統身分寫入（`user_id=None`，比照 coordinator 既有的自動關機紀錄）：
 
@@ -114,8 +127,8 @@ audit log 以系統身分寫入（`user_id=None`，比照 coordinator 既有的�
 audit_service.log_action(
     session=session,
     user_id=None,
-    action="vm_request_expired",
-    details=f"Auto-expired VM request {req.id}: window ended at {req.end_at}",
+    action=AuditAction.vm_request_expired,
+    details=f"Auto-expired VM request {req.id}: usage window ended at {req.end_at}",
     commit=False,
 )
 ```
@@ -141,10 +154,12 @@ def process_expired_requests_task() -> int:
 `_VM_REQUEST_STATUS_MAP`（第 51 行）補上：
 
 ```python
-VMRequestStatus.expired: JobStatus.failed,
+VMRequestStatus.expired: JobStatus.cancelled,
 ```
 
-**這是最容易漏的一處** —— 該 dict 以 `VMRequestStatus` 為鍵查表，缺鍵會在「工作」頁面炸 KeyError。
+**這是最容易漏的一處**。查表寫法是 `.get(req.status, JobStatus.pending)`，缺鍵不會拋錯，而是**靜默 fallback 成「等待中」** —— 過期申請會在「工作」頁面顯示成還在排隊，比拋錯更難發現。
+
+選 `cancelled` 而非 `failed`：什麼都沒失敗，申請只是失效了，語意上貼近既有的 `VMRequestStatus.cancelled → JobStatus.cancelled`。
 
 #### 7. 前端 — 個人申請頁
 
@@ -166,7 +181,7 @@ expired: { label: "已過期", color: "muted" },
 
 測試檔：`backend/tests/services/test_vm_request_expiry.py`（比照既有的 `test_vm_request_cancel_provisioned.py`）。
 
-**Repository 查詢邊界**（四種組合）：
+**Repository 查詢邊界** — 用 conftest 的 `db` fixture 打真實 PostgreSQL（WHERE 條件是唯一真相，不在 Python 端複製一份謂詞造成漂移）。四種組合：
 
 | status | end_at | 是否入選 |
 |---|---|---|
@@ -175,7 +190,13 @@ expired: { label: "已過期", color: "muted" },
 | pending | 未到 | ✗ |
 | approved | 已過 | ✗ |
 
-**Service 層**：呼叫 `process_expired_requests()` 後驗證 status 轉為 `expired`、`reviewer_id` / `reviewed_at` / `review_comment` 仍為 null、audit log 有記錄、回傳筆數正確。
+測試資料只 `flush()` 不 commit，結尾 `rollback()`，不污染共用的 session-scoped DB。
+
+**Repository 標記行為**：`mark_vm_request_expired` 後驗證 `reviewer_id` / `reviewed_at` / `review_comment` 仍為 null。
+
+**Service 層**（純單元，monkeypatch repo 與 audit_service，不需 DB）：驗證每筆都被標記、audit log 以 `user_id=None` 寫入且 action 正確、單次 commit、回傳筆數正確；查無資料時不 commit 並回 0。
+
+**Jobs 對應完整性**：斷言 `VMRequestStatus` 每個成員都在 `_VM_REQUEST_STATUS_MAP` 裡有鍵，防止日後再新增狀態時又靜默 fallback。
 
 ## 風險
 
