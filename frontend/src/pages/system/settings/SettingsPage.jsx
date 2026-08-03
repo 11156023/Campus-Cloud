@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import styles from "./SettingsPage.module.scss";
 import MIcon from "../../../components/MIcon";
 import { useToast } from "../../../hooks/useToast";
@@ -7,7 +8,6 @@ import GovernanceTab from "./GovernanceTab";
 import LdapTab from "./LdapTab";
 
 const TABS = [
-  { key: "overview",  label: "叢集概覽", icon: "layers"         },
   { key: "pve",       label: "PVE 連線",  icon: "device_hub"    },
   { key: "scheduler", label: "資源排程",  icon: "settings_input_component" },
   { key: "governance", label: "治理",     icon: "policy"        },
@@ -16,7 +16,13 @@ const TABS = [
   { key: "storage",   label: "Storage",   icon: "storage"       },
 ];
 
-/** PUT /proxmox-config 需要的完整欄位（password / ca_cert 另外處理） */
+/**
+ * PUT /proxmox-config 需要的完整欄位（password / ca_cert 另外處理）。
+ *
+ * 連線與叢集資源欄位（host / user / storage / pool / gateway…）已改由
+ * 「PVE 連線」的新增·編輯表單管理，這裡保留只是為了原樣送回 singleton，
+ * 讓排程設定能單獨儲存；UI 不再提供編輯入口。
+ */
 const UPDATE_KEYS = [
   "host", "user", "verify_ssl", "iso_storage", "data_storage",
   "api_timeout", "task_check_interval", "pool_name", "gateway_ip",
@@ -54,94 +60,6 @@ function buildPayload(form) {
   return payload;
 }
 
-function pct(used, total) {
-  if (!total) return 0;
-  return Math.min(Math.round((used / total) * 100), 100);
-}
-
-function UsageBar({ label, used, total, unit }) {
-  const percent = pct(used, total);
-  return (
-    <div className={styles.usageBarRow}>
-      <span className={styles.usageBarLabel}>{label}</span>
-      <div className={styles.usageBarTrack}>
-        <div className={styles.usageBarFill} style={{ width: `${percent}%` }} />
-      </div>
-      <span className={styles.usageBarValue}>
-        {Math.round(used)} / {Math.round(total)} {unit}（{percent}%）
-      </span>
-    </div>
-  );
-}
-
-/* ── 叢集概覽 ──────────────────────────────────────── */
-function OverviewTab() {
-  const toast = useToast();
-  const [stats, setStats] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    ProxmoxConfigService.getClusterStats()
-      .then(setStats)
-      .catch((err) => toast.error(err?.message ?? "載入叢集統計失敗"))
-      .finally(() => setLoading(false));
-  }, [toast]);
-
-  if (loading) return <div className={styles.loading}>載入叢集統計...</div>;
-  if (!stats) {
-    return (
-      <div className={styles.empty}>
-        <div className={styles.emptyIcon}><MIcon name="layers" size={40} /></div>
-        <h2 className={styles.emptyTitle}>尚無叢集資料</h2>
-        <p className={styles.emptyDesc}>請先完成 PVE 連線設定並同步</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className={styles.panelStack}>
-      <div className={styles.summaryGrid}>
-        <div className={styles.summaryItem}>
-          <span>節點</span>
-          <strong>
-            {stats.online_count} 在線
-            {stats.offline_count > 0 ? ` / ${stats.offline_count} 離線` : ""}
-          </strong>
-        </div>
-        <div className={styles.summaryItem}>
-          <span>VM / LXC 總數</span>
-          <strong>{stats.total_vm_count}</strong>
-        </div>
-        <div className={styles.summaryItem}>
-          <span>CPU 核心</span>
-          <strong>{Math.round(stats.used_cpu_cores)} / {stats.total_cpu_cores}</strong>
-        </div>
-        <div className={styles.summaryItem}>
-          <span>記憶體</span>
-          <strong>{Math.round(stats.used_mem_gb)} / {Math.round(stats.total_mem_gb)} GB</strong>
-        </div>
-      </div>
-
-      <div className={styles.nodeGrid}>
-        {stats.nodes.map((node) => (
-          <div key={node.name} className={styles.card}>
-            <div className={styles.cardHead}>
-              <h2 className={styles.cardTitle}>{node.name}</h2>
-              <span className={`${styles.badge} ${node.status === "online" ? styles.badge_success : styles.badge_danger}`}>
-                {node.status === "online" ? "在線" : node.status}
-              </span>
-            </div>
-            <UsageBar label="CPU" used={node.cpu_usage_pct} total={100} unit="%" />
-            <UsageBar label="RAM" used={node.mem_used_gb} total={node.mem_total_gb} unit="GB" />
-            <UsageBar label="Disk" used={node.disk_used_gb} total={node.disk_total_gb} unit="GB" />
-            <span className={styles.cardHint}>{node.vm_count} 台 VM / LXC · {node.cpu_cores} 核心</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 /* ── PVE 多連線管理 ─────────────────────────────────── */
 const EMPTY_CONNECTION_FORM = {
   name: "",
@@ -152,9 +70,38 @@ const EMPTY_CONNECTION_FORM = {
   verify_ssl: false,
   ca_cert: "",
   api_timeout: 30,
+  pool_name: "SkyLab",
+  iso_storage: "local",
+  data_storage: "local-lvm",
+  task_check_interval: 2,
+  gateway_ip: "",
+  local_subnet: "",
+  default_node: "",
   enabled: true,
   is_default: false,
 };
+
+/** 編輯既有連線時，把 API 回傳的連線資料轉成表單狀態 */
+function connectionToForm(conn) {
+  return {
+    ...EMPTY_CONNECTION_FORM,
+    name: conn.name,
+    host: conn.host,
+    port: conn.port,
+    user: conn.user,
+    verify_ssl: conn.verify_ssl,
+    api_timeout: conn.api_timeout,
+    pool_name: conn.pool_name ?? "",
+    iso_storage: conn.iso_storage ?? "",
+    data_storage: conn.data_storage ?? "",
+    task_check_interval: conn.task_check_interval ?? 2,
+    gateway_ip: conn.gateway_ip ?? "",
+    local_subnet: conn.local_subnet ?? "",
+    default_node: conn.default_node ?? "",
+    enabled: conn.enabled,
+    is_default: conn.is_default,
+  };
+}
 
 function ConnectionForm({ initial, isEdit, saving, onSubmit, onCancel }) {
   const [form, setForm] = useState(initial);
@@ -169,6 +116,13 @@ function ConnectionForm({ initial, isEdit, saving, onSubmit, onCancel }) {
       user: form.user.trim(),
       verify_ssl: Boolean(form.verify_ssl),
       api_timeout: Number(form.api_timeout) || 30,
+      pool_name: form.pool_name.trim() || "SkyLab",
+      iso_storage: form.iso_storage.trim() || "local",
+      data_storage: form.data_storage.trim() || "local-lvm",
+      task_check_interval: Number(form.task_check_interval) || 2,
+      gateway_ip: form.gateway_ip.trim() || null,
+      local_subnet: form.local_subnet.trim() || null,
+      default_node: form.default_node.trim() || null,
       enabled: Boolean(form.enabled),
       is_default: Boolean(form.is_default),
     };
@@ -185,6 +139,7 @@ function ConnectionForm({ initial, isEdit, saving, onSubmit, onCancel }) {
   return (
     <form className={styles.card} onSubmit={handleSubmit}>
       <h2 className={styles.cardTitle}>{isEdit ? "編輯連線" : "新增連線"}</h2>
+      <h3 className={styles.sectionTitle}>連線設定</h3>
       <div className={styles.formGrid}>
         <label className={styles.field}>
           <span>名稱 *</span>
@@ -233,14 +188,58 @@ function ConnectionForm({ initial, isEdit, saving, onSubmit, onCancel }) {
           />
         </label>
       )}
-      <label className={styles.checkRow}>
-        <input type="checkbox" checked={Boolean(form.enabled)} onChange={(e) => set("enabled", e.target.checked)} />
-        <span>啟用此連線</span>
-      </label>
-      <label className={styles.checkRow}>
-        <input type="checkbox" checked={Boolean(form.is_default)} onChange={(e) => set("is_default", e.target.checked)} />
-        <span>設為預設連線</span>
-      </label>
+
+      <h3 className={styles.sectionTitle}>此叢集的資源設定</h3>
+      <p className={styles.cardDesc}>
+        pool、storage 與網段是各叢集獨立的設定，建立於此連線的 VM / LXC 會套用這裡的值。
+      </p>
+      <div className={styles.formGrid}>
+        <label className={styles.field}>
+          <span>Pool 名稱</span>
+          <input value={form.pool_name} onChange={(e) => set("pool_name", e.target.value)} placeholder="SkyLab" />
+        </label>
+        <label className={styles.field}>
+          <span>ISO Storage</span>
+          <input value={form.iso_storage} onChange={(e) => set("iso_storage", e.target.value)} placeholder="local" />
+        </label>
+        <label className={styles.field}>
+          <span>Data Storage</span>
+          <input value={form.data_storage} onChange={(e) => set("data_storage", e.target.value)} placeholder="local-lvm" />
+        </label>
+        <label className={styles.field}>
+          <span>任務檢查間隔（秒）</span>
+          <input
+            type="number"
+            min={1}
+            max={60}
+            value={form.task_check_interval}
+            onChange={(e) => set("task_check_interval", e.target.value)}
+          />
+        </label>
+        <label className={styles.field}>
+          <span>Gateway IP</span>
+          <input value={form.gateway_ip} onChange={(e) => set("gateway_ip", e.target.value)} placeholder="選填" />
+        </label>
+        <label className={styles.field}>
+          <span>內網網段</span>
+          <input value={form.local_subnet} onChange={(e) => set("local_subnet", e.target.value)} placeholder="例：192.168.100.0/24" />
+        </label>
+        <label className={styles.field}>
+          <span>預設節點</span>
+          <input value={form.default_node} onChange={(e) => set("default_node", e.target.value)} placeholder="選填，未指定時優先使用" />
+        </label>
+      </div>
+
+      <div className={styles.toggleGrid}>
+        <label className={styles.checkRow}>
+          <input type="checkbox" checked={Boolean(form.enabled)} onChange={(e) => set("enabled", e.target.checked)} />
+          <span>啟用此連線</span>
+        </label>
+        <label className={styles.checkRow}>
+          <input type="checkbox" checked={Boolean(form.is_default)} onChange={(e) => set("is_default", e.target.checked)} />
+          <span>設為預設連線</span>
+        </label>
+      </div>
       <div className={styles.cardActions}>
         <button type="button" className={styles.btnSecondary} onClick={onCancel}>取消</button>
         <button type="submit" className={styles.btnPrimary} disabled={saving}>
@@ -251,25 +250,11 @@ function ConnectionForm({ initial, isEdit, saving, onSubmit, onCancel }) {
   );
 }
 
-function ConnectionsSection() {
+function ConnectionsSection({ connections, loading, onRefresh }) {
   const toast = useToast();
-  const [connections, setConnections] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(null); // null | "new" | connection 物件
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState(null);
-
-  const fetchConnections = useCallback(() => {
-    setLoading(true);
-    ProxmoxConfigService.listConnections()
-      .then(setConnections)
-      .catch((err) => toast.error(err?.message ?? "載入 PVE 連線清單失敗"))
-      .finally(() => setLoading(false));
-  }, [toast]);
-
-  useEffect(() => {
-    fetchConnections();
-  }, [fetchConnections]);
 
   async function handleSubmit(payload) {
     setSaving(true);
@@ -282,7 +267,7 @@ function ConnectionsSection() {
         toast.success("連線已更新");
       }
       setEditing(null);
-      fetchConnections();
+      onRefresh();
     } catch (err) {
       toast.error(err?.message ?? "儲存連線失敗");
     } finally {
@@ -296,7 +281,7 @@ function ConnectionsSection() {
     try {
       await ProxmoxConfigService.deleteConnection(conn.id);
       toast.success("連線已刪除");
-      fetchConnections();
+      onRefresh();
     } catch (err) {
       toast.error(err?.message ?? "刪除連線失敗");
     } finally {
@@ -323,7 +308,7 @@ function ConnectionsSection() {
       const res = await ProxmoxConfigService.syncConnection(conn.id);
       if (res.success) {
         toast.success(`同步完成：${res.nodes?.length ?? 0} 節點、${res.storage_count ?? 0} storage`);
-        fetchConnections();
+        onRefresh();
       } else {
         toast.error(res.error || "同步失敗");
       }
@@ -347,8 +332,8 @@ function ConnectionsSection() {
         {loading ? (
           <div className={styles.loading}>載入連線清單...</div>
         ) : connections.length === 0 ? (
-          <p className={styles.rowMeta}>
-            尚未建立連線。可在下方表單完成第一組連線設定（將自動成為預設連線），或點「新增連線」。
+          <p className={styles.cardDesc}>
+            尚未建立連線。點「新增連線」完成第一組設定（將自動成為預設連線）。
           </p>
         ) : (
           <div className={styles.list}>
@@ -384,6 +369,11 @@ function ConnectionsSection() {
             ))}
           </div>
         )}
+        <p className={styles.cardHint}>
+          節點即時用量、趨勢圖與告警請至{" "}
+          <Link to="/monitoring" className={styles.inlineLink}>監控與日誌 → 資源監控</Link>
+          {" "}查看。
+        </p>
       </div>
 
       {editing !== null && (
@@ -392,150 +382,13 @@ function ConnectionsSection() {
           isEdit={editing !== "new"}
           saving={saving}
           initial={
-            editing === "new"
-              ? EMPTY_CONNECTION_FORM
-              : {
-                  ...EMPTY_CONNECTION_FORM,
-                  name: editing.name,
-                  host: editing.host,
-                  port: editing.port,
-                  user: editing.user,
-                  verify_ssl: editing.verify_ssl,
-                  api_timeout: editing.api_timeout,
-                  enabled: editing.enabled,
-                  is_default: editing.is_default,
-                }
+            editing === "new" ? EMPTY_CONNECTION_FORM : connectionToForm(editing)
           }
           onSubmit={handleSubmit}
           onCancel={() => setEditing(null)}
         />
       )}
     </div>
-  );
-}
-
-/* ── PVE 連線 ──────────────────────────────────────── */
-function PveTab({ config, form, setField, onSave, saving }) {
-  const toast = useToast();
-  const [testing, setTesting] = useState(false);
-  const [syncing, setSyncing] = useState(false);
-
-  async function handleTest() {
-    setTesting(true);
-    try {
-      const res = await ProxmoxConfigService.testConnection();
-      if (res.success) toast.success(res.message || "連線成功");
-      else toast.error(res.message || "連線失敗");
-    } catch (err) {
-      toast.error(err?.message ?? "連線測試失敗");
-    } finally {
-      setTesting(false);
-    }
-  }
-
-  async function handleSync() {
-    setSyncing(true);
-    try {
-      const res = await ProxmoxConfigService.syncNow();
-      if (res.success) toast.success(`同步完成：${res.nodes?.length ?? 0} 節點、${res.storage_count ?? 0} storage`);
-      else toast.error(res.error || "同步失敗");
-    } catch (err) {
-      toast.error(err?.message ?? "同步失敗");
-    } finally {
-      setSyncing(false);
-    }
-  }
-
-  return (
-    <>
-    <ConnectionsSection />
-    <form className={styles.panelStack} onSubmit={onSave}>
-      <div className={styles.card}>
-        <h2 className={styles.cardTitle}>預設連線與全域設定</h2>
-        <div className={styles.formGrid}>
-          <label className={styles.field}>
-            <span>Host *</span>
-            <input value={form.host} onChange={(e) => setField("host", e.target.value)} placeholder="例：192.168.100.2" required />
-          </label>
-          <label className={styles.field}>
-            <span>API 使用者 *</span>
-            <input value={form.user} onChange={(e) => setField("user", e.target.value)} placeholder="root@pam" required />
-          </label>
-          <label className={styles.field}>
-            <span>密碼{config?.is_configured ? "（留空表示不變更）" : " *"}</span>
-            <input
-              type="password"
-              value={form.password}
-              onChange={(e) => setField("password", e.target.value)}
-              placeholder={config?.is_configured ? "已設定" : "PVE 密碼"}
-              required={!config?.is_configured}
-            />
-          </label>
-          <label className={styles.field}>
-            <span>Pool 名稱</span>
-            <input value={form.pool_name} onChange={(e) => setField("pool_name", e.target.value)} />
-          </label>
-          <label className={styles.field}>
-            <span>ISO Storage</span>
-            <input value={form.iso_storage} onChange={(e) => setField("iso_storage", e.target.value)} />
-          </label>
-          <label className={styles.field}>
-            <span>Data Storage</span>
-            <input value={form.data_storage} onChange={(e) => setField("data_storage", e.target.value)} />
-          </label>
-          <label className={styles.field}>
-            <span>API Timeout（秒）</span>
-            <input type="number" min={1} value={form.api_timeout} onChange={(e) => setField("api_timeout", Number(e.target.value))} />
-          </label>
-          <label className={styles.field}>
-            <span>任務檢查間隔（秒）</span>
-            <input type="number" min={1} value={form.task_check_interval} onChange={(e) => setField("task_check_interval", Number(e.target.value))} />
-          </label>
-          <label className={styles.field}>
-            <span>Gateway IP</span>
-            <input value={form.gateway_ip ?? ""} onChange={(e) => setField("gateway_ip", e.target.value)} placeholder="選填" />
-          </label>
-          <label className={styles.field}>
-            <span>內網網段</span>
-            <input value={form.local_subnet ?? ""} onChange={(e) => setField("local_subnet", e.target.value)} placeholder="例：192.168.100.0/24" />
-          </label>
-        </div>
-        <label className={styles.checkRow}>
-          <input type="checkbox" checked={Boolean(form.verify_ssl)} onChange={(e) => setField("verify_ssl", e.target.checked)} />
-          <span>驗證 SSL 憑證</span>
-        </label>
-        {form.verify_ssl && (
-          <label className={styles.field}>
-            <span>CA 憑證 PEM（留空表示不變更{config?.has_ca_cert ? "，目前已設定" : ""}）</span>
-            <textarea
-              rows={5}
-              value={form.ca_cert}
-              onChange={(e) => setField("ca_cert", e.target.value)}
-              placeholder="-----BEGIN CERTIFICATE-----"
-              spellCheck={false}
-            />
-            {config?.ca_fingerprint && (
-              <em className={styles.fieldHint}>目前憑證指紋：{config.ca_fingerprint}</em>
-            )}
-          </label>
-        )}
-      </div>
-
-      <div className={styles.cardActions}>
-        <button type="button" className={styles.btnSecondary} onClick={handleTest} disabled={testing || !config?.is_configured}>
-          <MIcon name="wifi_tethering" size={16} />
-          {testing ? "測試中..." : "測試連線"}
-        </button>
-        <button type="button" className={styles.btnSecondary} onClick={handleSync} disabled={syncing || !config?.is_configured}>
-          <MIcon name="sync" size={16} />
-          {syncing ? "同步中..." : "立即同步節點 / Storage"}
-        </button>
-        <button type="submit" className={styles.btnPrimary} disabled={saving}>
-          {saving ? "儲存中..." : "儲存設定"}
-        </button>
-      </div>
-    </form>
-    </>
   );
 }
 
@@ -671,10 +524,31 @@ function NodesTab() {
         host: editForm.host.trim(),
         port: Number(editForm.port) || 8006,
         priority: Number(editForm.priority) || 0,
+        enabled: node.enabled ?? true,
       });
       setNodes((prev) => prev.map((n) => (n.id === node.id ? updated : n)));
       toast.success("節點已更新");
       setEditing(null);
+    } catch (err) {
+      toast.error(err?.message ?? "更新節點失敗");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function toggleEnabled(node, enabled) {
+    setSaving(true);
+    try {
+      const updated = await ProxmoxConfigService.updateNode(node.id, {
+        host: node.host,
+        port: node.port,
+        priority: node.priority,
+        enabled,
+      });
+      setNodes((prev) => prev.map((n) => (n.id === node.id ? updated : n)));
+      toast.success(
+        enabled ? `${node.name} 已啟用` : `${node.name} 已停用（不再接收新 VM）`
+      );
     } catch (err) {
       toast.error(err?.message ?? "更新節點失敗");
     } finally {
@@ -701,14 +575,27 @@ function NodesTab() {
             <span className={styles.rowName}>
               {node.name}
               {node.is_primary && <span className={`${styles.badge} ${styles.badge_info}`}>主節點</span>}
+              {node.enabled === false && (
+                <span className={`${styles.badge} ${styles.badge_danger}`}>停用</span>
+              )}
             </span>
             <span className={styles.rowMeta}>
               {node.host}:{node.port} · Priority {node.priority}
+              {node.enabled === false && " · 不接收新 VM（既有 VM 不受影響）"}
             </span>
           </div>
           <span className={`${styles.badge} ${node.is_online ? styles.badge_success : styles.badge_danger}`}>
             {node.is_online ? "在線" : "離線"}
           </span>
+          <label className={styles.checkRow} title="停用後不再接收新 VM，既有 VM 不受影響">
+            <input
+              type="checkbox"
+              checked={node.enabled !== false}
+              disabled={saving || node.id == null}
+              onChange={(e) => toggleEnabled(node, e.target.checked)}
+            />
+            <span>啟用</span>
+          </label>
           {editing === node.id ? (
             <div className={styles.nodeEdit}>
               <input
@@ -761,6 +648,12 @@ function StorageTab() {
       .finally(() => setLoading(false));
   }, [toast]);
 
+  // 只有一組 PVE 連線時不必再標註連線名稱
+  const multiConnection = useMemo(
+    () => new Set(storages.map((s) => s.connection_id ?? null)).size > 1,
+    [storages],
+  );
+
   async function save(storage, patch) {
     setSavingId(storage.id);
     try {
@@ -770,7 +663,12 @@ function StorageTab() {
         user_priority: patch.user_priority ?? storage.user_priority,
       });
       setStorages((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
-      toast.success(`${storage.storage} 已更新`);
+      const nodeCount = updated.node_names?.length ?? 1;
+      toast.success(
+        updated.is_shared && nodeCount > 1
+          ? `${storage.storage} 已更新（套用至 ${nodeCount} 個節點）`
+          : `${storage.storage} 已更新`,
+      );
     } catch (err) {
       toast.error(err?.message ?? "更新 Storage 失敗");
     } finally {
@@ -796,8 +694,19 @@ function StorageTab() {
           <div className={styles.rowMain}>
             <span className={styles.rowName}>
               {storage.storage}
-              <span className={`${styles.badge} ${styles.badge_muted}`}>{storage.node_name}</span>
-              {storage.is_shared && <span className={`${styles.badge} ${styles.badge_info}`}>共享</span>}
+              {multiConnection && storage.connection_name && (
+                <span className={`${styles.badge} ${styles.badge_muted}`}>{storage.connection_name}</span>
+              )}
+              {storage.is_shared ? (
+                <span
+                  className={`${styles.badge} ${styles.badge_info}`}
+                  title={(storage.node_names ?? []).join("、")}
+                >
+                  共享 · {storage.node_names?.length ?? 1} 節點
+                </span>
+              ) : (
+                <span className={`${styles.badge} ${styles.badge_muted}`}>{storage.node_name}</span>
+              )}
             </span>
             <span className={styles.rowMeta}>
               {storage.storage_type ?? "?"} · {Math.round(storage.used_gb)} / {Math.round(storage.total_gb)} GB ·
@@ -841,21 +750,35 @@ function StorageTab() {
 /* ── Page ──────────────────────────────────────────── */
 export default function SettingsPage() {
   const toast = useToast();
-  const [activeTab, setActiveTab] = useState("overview");
-  const [config, setConfig] = useState(null);
+  const [activeTab, setActiveTab] = useState("pve");
   const [form, setForm] = useState(buildFormFromConfig(null));
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [connections, setConnections] = useState([]);
+  const [connectionsLoading, setConnectionsLoading] = useState(true);
 
   useEffect(() => {
     ProxmoxConfigService.getConfig()
-      .then((cfg) => {
-        setConfig(cfg);
-        setForm(buildFormFromConfig(cfg));
-      })
-      .catch((err) => toast.error(err?.message ?? "載入 PVE 設定失敗"))
+      .then((cfg) => setForm(buildFormFromConfig(cfg)))
+      .catch((err) => toast.error(err?.message ?? "載入排程設定失敗"))
       .finally(() => setLoading(false));
   }, [toast]);
+
+  const fetchConnections = useCallback(() => {
+    setConnectionsLoading(true);
+    ProxmoxConfigService.listConnections()
+      .then(setConnections)
+      .catch((err) => toast.error(err?.message ?? "載入 PVE 連線清單失敗"))
+      .finally(() => setConnectionsLoading(false));
+  }, [toast]);
+
+  useEffect(() => {
+    fetchConnections();
+  }, [fetchConnections]);
+
+  // 頁首徽章顯示實際生效的入口，而不是相容用的 singleton
+  const defaultConnection =
+    connections.find((c) => c.is_default) ?? connections[0] ?? null;
 
   const setField = useCallback((name, value) => {
     setForm((prev) => ({ ...prev, [name]: value }));
@@ -866,7 +789,6 @@ export default function SettingsPage() {
     setSaving(true);
     try {
       const updated = await ProxmoxConfigService.updateConfig(buildPayload(form));
-      setConfig(updated);
       setForm(buildFormFromConfig(updated));
       toast.success("設定已儲存");
     } catch (err) {
@@ -883,10 +805,10 @@ export default function SettingsPage() {
         <div className={styles.pageHeading}>
           <div className={styles.titleRow}>
             <h1 className={styles.pageTitle}>系統設定</h1>
-            {config?.is_configured && (
+            {defaultConnection && (
               <div className={styles.ipBadge}>
                 <MIcon name="check_circle" size={12} />
-                {config.host}
+                {defaultConnection.host}
               </div>
             )}
           </div>
@@ -917,9 +839,12 @@ export default function SettingsPage() {
           <div className={styles.loading}>載入設定...</div>
         ) : (
           <>
-            {activeTab === "overview" && <OverviewTab />}
             {activeTab === "pve" && (
-              <PveTab config={config} form={form} setField={setField} onSave={handleSave} saving={saving} />
+              <ConnectionsSection
+                connections={connections}
+                loading={connectionsLoading}
+                onRefresh={fetchConnections}
+              />
             )}
             {activeTab === "scheduler" && (
               <SchedulerTab form={form} setField={setField} onSave={handleSave} saving={saving} />

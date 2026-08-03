@@ -59,6 +59,7 @@ from .proxmox_config import (
 from .proxmox_connection import ProxmoxConnection
 from .proxmox_node import ProxmoxNode
 from .proxmox_storage import ProxmoxStorage
+from .quota_config import QuotaConfig
 from .resource import Resource
 from .resource_network import ResourceNetwork
 from .resource_quota import QuotaScope, ResourceQuota
@@ -136,6 +137,7 @@ __all__ = [
     "Resource",
     "ResourceNetwork",
     "ResourceQuota",
+    "QuotaConfig",
     "QuotaScope",
     # VM Request
     "VMProvisioningStatus",

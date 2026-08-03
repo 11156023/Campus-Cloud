@@ -24,7 +24,7 @@ from app.exceptions import (
     NotFoundError,
     PermissionDeniedError,
 )
-from app.infrastructure.proxmox import get_proxmox_settings
+from app.infrastructure.proxmox import get_proxmox_settings_for_node
 from app.infrastructure.proxmox import operations as proxmox_ops
 from app.infrastructure.queue import enqueue_task, report_progress
 from app.infrastructure.ssh.client import generate_ed25519_keypair
@@ -123,7 +123,7 @@ def clone_with_fallback(
     ``full_kwargs`` 只在退 full clone 時併入（例如指定 storage——
     linked clone 必須與範本同 storage，不能帶該參數）。
     """
-    pool = get_proxmox_settings().pool_name
+    pool = get_proxmox_settings_for_node(node).pool_name
     name_key = "hostname" if resource_type == "lxc" else "name"
     clone_fn = (
         proxmox_ops.clone_lxc if resource_type == "lxc" else proxmox_ops.clone_vm

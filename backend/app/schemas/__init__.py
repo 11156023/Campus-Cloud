@@ -105,6 +105,8 @@ from .proxmox_config import (
 )
 from .quota import (
     EffectiveQuotaPublic,
+    GlobalQuotaPublic,
+    GlobalQuotaUpdate,
     QuotaUsagePublic,
     ResourceQuotaCreate,
     ResourceQuotaPublic,
@@ -324,6 +326,8 @@ __all__ = [
     "ProxmoxConnectionTestResult",
     # Quota (module E)
     "EffectiveQuotaPublic",
+    "GlobalQuotaPublic",
+    "GlobalQuotaUpdate",
     "QuotaUsagePublic",
     "ResourceQuotaCreate",
     "ResourceQuotaPublic",

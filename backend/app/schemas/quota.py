@@ -42,6 +42,25 @@ class ResourceQuotaPublic(BaseModel):
     created_at: datetime
 
 
+class GlobalQuotaPublic(BaseModel):
+    """全域預設配額（未設定個人覆寫者套用）。"""
+
+    max_cpu_cores: int
+    max_memory_mb: int
+    max_disk_gb: int
+    max_instances: int
+    updated_at: datetime
+
+
+class GlobalQuotaUpdate(BaseModel):
+    """全域預設配額更新（partial；範圍約束與 model 一致）。"""
+
+    max_cpu_cores: int | None = Field(default=None, ge=1, le=256)
+    max_memory_mb: int | None = Field(default=None, ge=256, le=1048576)
+    max_disk_gb: int | None = Field(default=None, ge=1, le=65536)
+    max_instances: int | None = Field(default=None, ge=1, le=100)
+
+
 class EffectiveQuotaPublic(BaseModel):
     max_cpu_cores: int
     max_memory_mb: int

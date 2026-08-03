@@ -10,7 +10,7 @@ from sqlmodel import Session
 from app.core.security import decrypt_value, encrypt_value
 from app.domain.placement import advisor as placement_advisor
 from app.exceptions import ProxmoxError
-from app.infrastructure.proxmox import get_proxmox_settings
+from app.infrastructure.proxmox import get_proxmox_settings_for_node
 from app.infrastructure.ssh.client import generate_ed25519_keypair
 from app.repositories import resource as resource_repo
 from app.repositories import vm_request as vm_request_repo
@@ -322,7 +322,7 @@ def create_lxc(
             "net0": net0_parts,
             "unprivileged": int(lxc_data.unprivileged),
             "start": int(lxc_data.start),
-            "pool": get_proxmox_settings().pool_name,
+            "pool": get_proxmox_settings_for_node(target_node).pool_name,
             "features": "nesting=1",
             "ssh-public-keys": public_key,
         }
@@ -457,7 +457,7 @@ def create_vm(
             "name": to_punycode_hostname(vm_data.hostname),
             "full": 1,
             "storage": target_storage,
-            "pool": get_proxmox_settings().pool_name,
+            "pool": get_proxmox_settings_for_node(target_node).pool_name,
         }
 
         result = proxmox_service.clone_vm(
@@ -730,7 +730,7 @@ def execute_provision(plan: dict) -> tuple[int, str]:
     target_node = plan["target_node"]
     resource_type = plan["resource_type"]
     hostname = plan["hostname"]
-    pool_name = get_proxmox_settings().pool_name
+    pool_name = get_proxmox_settings_for_node(target_node).pool_name
     created = False
     actual_node = target_node
     net_cfg = plan.get("net_cfg", {})

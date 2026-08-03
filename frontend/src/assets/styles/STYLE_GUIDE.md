@@ -397,9 +397,12 @@ function closeMenu() {
 | 層級 | 值 | 用途 |
 |------|-----|------|
 | 基礎卡片 | 1 | 一般卡片 |
-| 卡片 hover / 選單 | 50 | Dropdown 選單 |
+| 卡片 hover / 選單 | 50 | 容器內的 Dropdown 選單 |
 | Sticky Header | 100 | 頁面頂部導覽列 |
+| Portal 浮層選單 | 150 | portal 到 body 的 Dropdown（如 `components/PowerMenu`） |
 | Dialog / Modal | 300 | 全頁覆蓋 Dialog |
 | Toast / Tooltip | 400 | 通知、提示 |
 
 > ⚠️ 注意：使用 `backdrop-filter` 或 `transform` 的元素會建立新的 stacking context，子元素的 `z-index` 無法穿透至外層。若發現 Dropdown 被其他卡片遮住，請確認父元素是否有這類屬性。
+>
+> 玻璃表面（`glass-surface`）搭配 `overflow: hidden` 的容器還會**裁掉**溢出的 absolute 選單。浮層若可能超出容器範圍，改用 `createPortal` 掛到 `document.body` 並以 `position: fixed` 定位（範例：`components/PowerMenu`），且背景要用不透明的 `var(--color-surface)`，否則會透出底下的列表內容。

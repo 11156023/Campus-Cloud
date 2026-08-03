@@ -24,6 +24,33 @@ def get_storages_by_node(session: Session, node_name: str) -> list[ProxmoxStorag
     return list(session.exec(stmt).all())
 
 
+def get_storage(session: Session, storage_id: int) -> ProxmoxStorage | None:
+    """依 id 取得單筆 Storage。"""
+    return session.get(ProxmoxStorage, storage_id)
+
+
+def get_shared_storage_peers(
+    session: Session,
+    storage_name: str,
+    node_names: set[str],
+) -> list[ProxmoxStorage]:
+    """取得 ``node_names`` 範圍內同名的共享 Storage 記錄。
+
+    共享 Storage 在叢集每個節點上都有一筆記錄（同一份實體儲存），
+    使用者設定必須整組一致，故更新時需一併寫入這些記錄。
+    """
+    if not node_names:
+        return []
+    stmt = (
+        select(ProxmoxStorage)
+        .where(ProxmoxStorage.storage == storage_name)
+        .where(ProxmoxStorage.is_shared == True)  # noqa: E712
+        .where(ProxmoxStorage.node_name.in_(node_names))  # type: ignore[attr-defined]
+        .order_by(ProxmoxStorage.node_name)
+    )
+    return list(session.exec(stmt).all())
+
+
 def upsert_storages(
     session: Session,
     storages: list[dict],
@@ -107,22 +134,41 @@ def update_storage_settings(
     enabled: bool,
     speed_tier: str,
     user_priority: int,
-) -> ProxmoxStorage | None:
-    """更新使用者可設定的欄位（enabled, speed_tier, user_priority）。"""
+    peer_node_names: set[str] | None = None,
+) -> tuple[ProxmoxStorage, list[str]] | None:
+    """更新使用者可設定的欄位（enabled, speed_tier, user_priority）。
+
+    ``peer_node_names`` 有值且該 Storage 為共享時，這些節點上同名的共享記錄
+    會一併套用相同設定（同一份實體儲存不應在叢集內各節點設定分歧）。
+
+    回傳 (目標 Storage, 實際套用的節點名稱清單)。
+    """
     s = session.get(ProxmoxStorage, storage_id)
     if s is None:
         return None
-    s.enabled = enabled
-    s.speed_tier = speed_tier
-    s.user_priority = user_priority
-    session.add(s)
+
+    targets = [s]
+    if s.is_shared and peer_node_names:
+        peers = get_shared_storage_peers(session, s.storage, peer_node_names)
+        targets = peers or targets
+        if all(p.id != s.id for p in targets):
+            targets.append(s)
+
+    for target in targets:
+        target.enabled = enabled
+        target.speed_tier = speed_tier
+        target.user_priority = user_priority
+        session.add(target)
     session.commit()
-    session.refresh(s)
-    return s
+    for target in targets:
+        session.refresh(target)
+    return s, sorted(str(t.node_name) for t in targets)
 
 
 __all__ = [
     "get_all_storages",
+    "get_shared_storage_peers",
+    "get_storage",
     "get_storages_by_node",
     "upsert_storages",
     "update_storage_settings",

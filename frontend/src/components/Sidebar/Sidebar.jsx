@@ -4,6 +4,7 @@ import { useAuth }  from "../../contexts/AuthContext";
 import styles from "./Sidebar.module.scss";
 import MIcon from "../MIcon";
 import Avatar from "../Avatar/Avatar";
+import JobsButton from "../Jobs/JobsButton";
 
 const topItems = [
   { key: "dashboard", label: "首頁", icon: "dashboard" },
@@ -336,6 +337,9 @@ export default function Sidebar({ collapsed, mobileOpen, onToggle, onClose }) {
 
       {/* ===== Bottom section ===== */}
       <div className={styles.bottom}>
+        {/* 背景任務（全站入口，狀態由 DashboardLayout 的 JobsProvider 提供） */}
+        <JobsButton collapsed={collapsed} />
+
         {/* 語言選擇 */}
         <div className={styles.appearanceWrap}>
           {langPopup.open && (

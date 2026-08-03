@@ -21,7 +21,7 @@ from app.exceptions import (
     NotFoundError,
     PermissionDeniedError,
 )
-from app.infrastructure.proxmox import get_proxmox_settings
+from app.infrastructure.proxmox import get_proxmox_settings_for_node
 from app.infrastructure.proxmox import operations as proxmox_ops
 from app.infrastructure.queue import enqueue_task, report_progress
 from app.models import (
@@ -580,7 +580,7 @@ def run_update_clone_task(
         new_vmid = proxmox_ops.next_vmid()
         report_progress(task_id, 10)
         clone_name = f"tpl-{pve_vmid}-edit"
-        pool = get_proxmox_settings().pool_name
+        pool = get_proxmox_settings_for_node(node).pool_name
         # 範本更新需要可獨立寫入的完整副本，一律 full clone
         if resource_type == "lxc":
             proxmox_ops.clone_lxc(

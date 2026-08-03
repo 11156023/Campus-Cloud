@@ -414,6 +414,7 @@ export default function MonitoringPage() {
               <th className={`${styles.th} ${styles.thWide}`}>CPU</th>
               <th className={`${styles.th} ${styles.thWide}`}>記憶體</th>
               <th className={`${styles.th} ${styles.thWide}`}>磁碟</th>
+              <th className={`${styles.th} ${styles.thRight}`}>VM / LXC</th>
               <th className={styles.th}>運行時間</th>
             </tr>
           </thead>
@@ -435,6 +436,9 @@ export default function MonitoringPage() {
                         <MIcon name={expanded ? "expand_more" : "chevron_right"} size={16} />
                         <MIcon name="dns" size={16} />
                         <strong>{node.node}</strong>
+                        {node.connection_name && (
+                          <span className={styles.typeBadge}>{node.connection_name}</span>
+                        )}
                       </span>
                     </td>
                     <td className={styles.td}>
@@ -475,13 +479,16 @@ export default function MonitoringPage() {
                         <UsageBar pct={nodeDisk} />
                       </div>
                     </td>
+                    <td className={`${styles.td} ${styles.numericCell}`}>
+                      {node.vm_count}
+                    </td>
                     <td className={`${styles.td} ${styles.mutedCell}`}>
                       {formatUptime(node.uptime)}
                     </td>
                   </tr>
                   {expanded && (
                     <tr className={styles.trExpand}>
-                      <td colSpan={6} className={styles.tdExpand}>
+                      <td colSpan={7} className={styles.tdExpand}>
                         <NodeTrends node={node.node} timeframe={timeframe} />
                       </td>
                     </tr>

@@ -47,8 +47,8 @@ def make_template(
 def fake_pool(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         clone_service,
-        "get_proxmox_settings",
-        lambda: SimpleNamespace(pool_name="testpool"),
+        "get_proxmox_settings_for_node",
+        lambda node: SimpleNamespace(pool_name="testpool"),
     )
 
 

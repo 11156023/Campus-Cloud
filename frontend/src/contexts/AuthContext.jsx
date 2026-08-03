@@ -1,150 +1,296 @@
 /**
  * AuthContext.jsx
- * 提供全域的認證狀態與操作：
- *   - user        當前用戶資料（null 表示未登入）
- *   - loading     初始化時驗證 token 的 loading 狀態
- *   - login()     登入，成功後更新 user
- *   - logout()    登出，清除 token 與 user
+ * 提供全域認證狀態，並區分「登入確實失效」與「暫時無法連線」。
  */
 
-import { createContext, useContext, useEffect, useRef, useState, useCallback } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { AuthStorage, loginLdap } from "../services/auth";
-import { apiGet, apiPost, apiPostForm, refreshTokens } from "../services/api";
+import { apiPost, apiPostForm, refreshTokens } from "../services/api";
+import {
+  AuthSessionStatus,
+  restoreStoredSession,
+} from "../services/authSession";
 
 const AuthContext = createContext(null);
 
 /** access token 到期前多久觸發續期 */
 const REFRESH_MARGIN_MS = 60 * 1000;
+/** 暫時無法 refresh 時保留 session，稍後再試。 */
+const REFRESH_RETRY_MS = 30 * 1000;
+const REFRESH_WARNING_ID = "auth-refresh-unavailable";
+
+const INITIAL_SESSION = {
+  status: AuthSessionStatus.CHECKING,
+  sessionId: null,
+  user: null,
+  error: null,
+};
 
 export function AuthProvider({ children }) {
-  const [user, setUser]       = useState(null);
-  const [loading, setLoading] = useState(true); // 啟動時驗證 token
-  const expiryTimerRef        = useRef(null);
+  const [session, setSession] = useState(INITIAL_SESSION);
+  const expiryTimerRef = useRef(null);
+  const refreshGenerationRef = useRef(0);
+  const sessionAbortRef = useRef(null);
 
-  /** 清除登出計時器 */
   const clearExpiryTimer = useCallback(() => {
-    if (expiryTimerRef.current) {
+    refreshGenerationRef.current += 1;
+    if (expiryTimerRef.current !== null) {
       clearTimeout(expiryTimerRef.current);
       expiryTimerRef.current = null;
     }
   }, []);
 
-  /** logout - 清除 token 與用戶狀態 */
-  const logout = useCallback(() => {
-    clearExpiryTimer();
-    AuthStorage.clearTokens();
-    setUser(null);
-  }, [clearExpiryTimer]);
+  const cancelSessionCheck = useCallback(() => {
+    sessionAbortRef.current?.abort();
+    sessionAbortRef.current = null;
+  }, []);
 
-  /** 強制登出（token 失效），與使用者主動登出不同，會顯示提示 */
-  const forceLogout = useCallback(() => {
-    logout();
+  /** 使用者主動登出。 */
+  const logout = useCallback(() => {
+    cancelSessionCheck();
+    clearExpiryTimer();
+    toast.dismiss(REFRESH_WARNING_ID);
+    AuthStorage.clearTokens();
+    setSession({
+      status: AuthSessionStatus.ANONYMOUS,
+      sessionId: null,
+      user: null,
+      error: null,
+    });
+  }, [cancelSessionCheck, clearExpiryTimer]);
+
+  /** API 已確認 token 失效；token 已由發出事件的請求條件式清除。 */
+  const finishExpiredSession = useCallback(() => {
+    cancelSessionCheck();
+    clearExpiryTimer();
+    toast.dismiss(REFRESH_WARNING_ID);
+    setSession({
+      status: AuthSessionStatus.ANONYMOUS,
+      sessionId: null,
+      user: null,
+      error: null,
+    });
     toast.error("登入已過期，請重新登入");
-  }, [logout]);
+  }, [cancelSessionCheck, clearExpiryTimer]);
 
   /**
-   * 依據 token 的 exp，在到期前自動用 refresh token 續期；
-   * 續期成功就重新排程，失敗才強制登出。
+   * 依 access token 的 exp 排程 refresh。
+   * 只有 refresh 端點明確回 401 才登出；暫時斷線或 5xx 會保留 session 重試。
    */
-  const scheduleTokenRefresh = useCallback(() => {
+  const scheduleTokenRefresh = useCallback((retryDelayMs = null) => {
     clearExpiryTimer();
+
     const expiry = AuthStorage.getTokenExpiry();
-    if (!expiry) return;
+    if (retryDelayMs === null && !expiry) return;
+    const delay = retryDelayMs ?? Math.max(expiry - Date.now() - REFRESH_MARGIN_MS, 0);
+    const generation = refreshGenerationRef.current;
 
-    const msUntilRefresh = expiry - Date.now() - REFRESH_MARGIN_MS;
     expiryTimerRef.current = setTimeout(async () => {
-      const ok = await refreshTokens();
-      if (ok) {
-        scheduleTokenRefresh();
-      } else {
-        forceLogout();
+      expiryTimerRef.current = null;
+      let outcome;
+      try {
+        outcome = await refreshTokens();
+      } catch (error) {
+        outcome = { kind: "unavailable", status: 0, error };
       }
-    }, Math.max(msUntilRefresh, 0));
-  }, [clearExpiryTimer, forceLogout]);
 
-  /** 啟動時若有 token，嘗試取得當前用戶以確認 token 仍有效 */
-  useEffect(() => {
-    if (!AuthStorage.isLoggedIn()) {
-      setLoading(false);
-      return;
+      // timer 啟動後若已登出、重新排程或卸載，不再更新狀態或建立新 timer。
+      if (refreshGenerationRef.current !== generation) return;
+
+      if (outcome.kind === "refreshed" || outcome.kind === "superseded") {
+        toast.dismiss(REFRESH_WARNING_ID);
+        if (AuthStorage.isLoggedIn()) scheduleTokenRefresh();
+        return;
+      }
+
+      if (outcome.kind === "invalid") {
+        if (AuthStorage.clearTokensIfCurrent(outcome.snapshot)) {
+          finishExpiredSession();
+        } else if (AuthStorage.isLoggedIn()) {
+          scheduleTokenRefresh();
+        }
+        return;
+      }
+
+      if (!AuthStorage.isLoggedIn()) return;
+      toast.warning("連線暫時中斷，系統會自動重試登入驗證", {
+        id: REFRESH_WARNING_ID,
+      });
+      scheduleTokenRefresh(REFRESH_RETRY_MS);
+    }, delay);
+  }, [clearExpiryTimer, finishExpiredSession]);
+
+  /** 驗證 localStorage 中的 session；暫時性錯誤會進 unavailable，不會刪 token。 */
+  const verifyStoredSession = useCallback(async ({ showChecking = true } = {}) => {
+    cancelSessionCheck();
+    const controller = new AbortController();
+    sessionAbortRef.current = controller;
+    const checkSessionId = AuthStorage.getSnapshot().sessionId;
+
+    if (showChecking) {
+      setSession((current) => {
+        const sameSession = current.sessionId === checkSessionId
+          && AuthStorage.isSameSession({ sessionId: checkSessionId })
+          && AuthStorage.isLoggedIn();
+        return {
+          status: AuthSessionStatus.CHECKING,
+          sessionId: checkSessionId,
+          user: sameSession ? current.user : null,
+          error: sameSession ? current.error : null,
+        };
+      });
     }
 
-    apiGet("/api/v1/users/me")
-      .then((me) => {
-        setUser(me);
-        scheduleTokenRefresh();
-      })
-      .catch(() => {
-        // token 無效或過期（api 層已嘗試續期失敗），清除
-        AuthStorage.clearTokens();
-      })
-      .finally(() => setLoading(false));
-  }, [scheduleTokenRefresh]);
+    let result;
+    try {
+      result = await restoreStoredSession({ signal: controller.signal });
+    } catch (error) {
+      if (controller.signal.aborted || error?.cancelled) return null;
+      result = { status: AuthSessionStatus.UNAVAILABLE, user: null, error };
+    }
 
-  /** 監聽 API 層拋出的 401 事件（續期也失敗時），強制登出 */
+    if (controller.signal.aborted || sessionAbortRef.current !== controller) return null;
+    sessionAbortRef.current = null;
+
+    if (result.status === AuthSessionStatus.AUTHENTICATED) {
+      setSession({
+        status: result.status,
+        sessionId: checkSessionId,
+        user: result.user,
+        error: null,
+      });
+      scheduleTokenRefresh();
+    } else if (result.status === AuthSessionStatus.ANONYMOUS) {
+      clearExpiryTimer();
+      setSession({
+        status: result.status,
+        sessionId: null,
+        user: null,
+        error: null,
+      });
+    } else {
+      setSession((current) => {
+        const sameSession = current.sessionId === checkSessionId
+          && AuthStorage.isSameSession({ sessionId: checkSessionId })
+          && AuthStorage.isLoggedIn();
+        return {
+          status: AuthSessionStatus.UNAVAILABLE,
+          sessionId: checkSessionId,
+          user: sameSession ? current.user : null,
+          error: result.error,
+        };
+      });
+    }
+
+    return result;
+  }, [cancelSessionCheck, clearExpiryTimer, scheduleTokenRefresh]);
+
   useEffect(() => {
-    window.addEventListener("auth:unauthorized", forceLogout);
-    return () => window.removeEventListener("auth:unauthorized", forceLogout);
-  }, [forceLogout]);
+    void verifyStoredSession();
+    return cancelSessionCheck;
+  }, [cancelSessionCheck, verifyStoredSession]);
 
-  /** 元件卸載時清除計時器 */
-  useEffect(() => () => clearExpiryTimer(), [clearExpiryTimer]);
+  useEffect(() => {
+    window.addEventListener("auth:unauthorized", finishExpiredSession);
+    return () => window.removeEventListener("auth:unauthorized", finishExpiredSession);
+  }, [finishExpiredSession]);
 
-  /**
-   * login - 呼叫後端取得 token，並載入用戶資料
-   * @param {string} username  email
-   * @param {string} password
-   * @throws {{ status, message }} 登入失敗時
-   */
+  /** 網路恢復時自動重新驗證，不要求使用者再次輸入帳密。 */
+  useEffect(() => {
+    const handleOnline = () => {
+      if (AuthStorage.isLoggedIn()) {
+        void verifyStoredSession();
+      }
+    };
+    window.addEventListener("online", handleOnline);
+    return () => window.removeEventListener("online", handleOnline);
+  }, [verifyStoredSession]);
+
+  /** 其他分頁登入、登出或 refresh 後，同步畫面身份與實際使用的 token。 */
+  useEffect(() => {
+    let syncTimer = null;
+    const handleStorage = (event) => {
+      if (!AuthStorage.isRelevantStorageKey(event.key)) return;
+      if (syncTimer !== null) clearTimeout(syncTimer);
+      syncTimer = setTimeout(() => {
+        syncTimer = null;
+        void verifyStoredSession();
+      }, 0);
+    };
+
+    window.addEventListener("storage", handleStorage);
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+      if (syncTimer !== null) clearTimeout(syncTimer);
+    };
+  }, [verifyStoredSession]);
+
+  useEffect(() => () => {
+    cancelSessionCheck();
+    clearExpiryTimer();
+  }, [cancelSessionCheck, clearExpiryTimer]);
+
+  const completeLogin = useCallback(async () => {
+    const result = await verifyStoredSession({ showChecking: false });
+    if (result?.status === AuthSessionStatus.ANONYMOUS) {
+      throw { status: 401, message: "登入驗證失敗，請重新登入" };
+    }
+    return result;
+  }, [verifyStoredSession]);
+
   const login = useCallback(async (username, password) => {
     const tokens = await apiPostForm("/api/v1/login/access-token", {
       username,
       password,
     });
     AuthStorage.setTokens(tokens);
-
-    const me = await apiGet("/api/v1/users/me");
-    setUser(me);
-    scheduleTokenRefresh();
-  }, [scheduleTokenRefresh]);
+    await completeLogin();
+  }, [completeLogin]);
 
   const googleLogin = useCallback(async (idToken) => {
-    const tokens = await apiPost("/api/v1/login/google", {
-      id_token: idToken,
-    });
+    const tokens = await apiPost("/api/v1/login/google", { id_token: idToken });
     AuthStorage.setTokens(tokens);
+    await completeLogin();
+  }, [completeLogin]);
 
-    const me = await apiGet("/api/v1/users/me");
-    setUser(me);
-    scheduleTokenRefresh();
-  }, [scheduleTokenRefresh]);
-
-  /**
-   * ldapLogin - 以校園 LDAP/AD 帳號登入（service 內成功後已儲存 tokens）
-   * @throws {{ status, message }} 登入失敗時
-   */
   const ldapLogin = useCallback(async (username, password) => {
     await loginLdap(username, password);
+    await completeLogin();
+  }, [completeLogin]);
 
-    const me = await apiGet("/api/v1/users/me");
-    setUser(me);
-    scheduleTokenRefresh();
-  }, [scheduleTokenRefresh]);
-
-  /** 個人資料更新後（如改名字/Email）同步全域 user 狀態，避免要求重新登入 */
   const updateUser = useCallback((patch) => {
-    setUser((prev) => (prev ? { ...prev, ...patch } : prev));
+    setSession((current) => ({
+      ...current,
+      user: current.user ? { ...current.user, ...patch } : current.user,
+    }));
   }, []);
 
+  const retrySession = useCallback(
+    () => verifyStoredSession(),
+    [verifyStoredSession],
+  );
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, googleLogin, ldapLogin, logout, updateUser }}>
+    <AuthContext.Provider
+      value={{
+        user: session.user,
+        loading: session.status === AuthSessionStatus.CHECKING,
+        authError: session.error,
+        authStatus: session.status,
+        login,
+        googleLogin,
+        ldapLogin,
+        logout,
+        retrySession,
+        updateUser,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
 }
 
-/** useAuth - 取得認證 context，必須在 AuthProvider 內使用 */
 export function useAuth() {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error("useAuth must be used within AuthProvider");

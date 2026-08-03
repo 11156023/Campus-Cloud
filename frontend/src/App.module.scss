@@ -1,0 +1,93 @@
+.authStatePage {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: $spacing-24;
+  place-items: center;
+}
+
+.authStateCard {
+  @include flex-column;
+  align-items: center;
+  width: min(100%, 440px);
+  gap: $spacing-16;
+  padding: $spacing-32 $spacing-24;
+  text-align: center;
+  border: 1px solid var(--color-border);
+  border-radius: $radius-16;
+  background: color-mix(in srgb, var(--color-surface) 92%, transparent);
+  box-shadow: 0 16px 48px color-mix(in srgb, #000 12%, transparent);
+  backdrop-filter: blur(12px);
+}
+
+.authStateIcon {
+  color: var(--color-warning);
+}
+
+.authStateTitle {
+  margin: 0;
+  font-size: $font-size-24;
+  color: var(--color-text);
+}
+
+.authStateDescription {
+  max-width: 36ch;
+  margin: 0;
+  font-size: $font-size-14;
+  line-height: 1.65;
+  color: var(--color-text-secondary);
+}
+
+.spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid color-mix(in srgb, var(--color-primary) 20%, transparent);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.retryButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: $spacing-8;
+  margin-top: $spacing-8;
+  padding: $spacing-8 $spacing-16;
+  border: 0;
+  border-radius: $radius-8;
+  background: var(--color-primary);
+  color: var(--color-text-on-primary);
+  font-size: $font-size-14;
+  font-weight: $font-weight-500;
+  cursor: pointer;
+  transition: background $transition-base, opacity $transition-base;
+
+  &:hover:not(:disabled) {
+    background: var(--color-primary-dark);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 3px;
+  }
+
+  &:disabled {
+    cursor: wait;
+    opacity: 0.65;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation: none;
+  }
+}

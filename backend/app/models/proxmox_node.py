@@ -30,6 +30,7 @@ class ProxmoxNode(SQLModel, table=True):
         sa_type=DateTime(timezone=True),
     )
     priority: int = Field(default=5, ge=1, le=10)   # 1=最高優先, 10=最低；對應 simulator ServerInput.priority
+    enabled: bool = Field(default=True)             # 停用後不接收新 VM（不參與放置）；既有 VM 不受影響
 
 
 __all__ = ["ProxmoxNode"]

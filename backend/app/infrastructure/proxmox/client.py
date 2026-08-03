@@ -300,7 +300,9 @@ def basic_blocking_task_status(
     繼續跑，不會被取消）— 供 best-effort 場景（如挖礦存證快照）設上限。
     """
     if check_interval is None:
-        check_interval = get_proxmox_settings().task_check_interval
+        check_interval = get_proxmox_settings(
+            get_connection_id_for_node(node_name)
+        ).task_check_interval
 
     proxmox = get_proxmox_api_for_node(node_name)
     logger.info("Waiting for task %s on node %s", task_id, node_name)

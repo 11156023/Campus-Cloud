@@ -12,6 +12,16 @@ export const QuotasService = {
     return apiGet("/api/v1/quotas");
   },
 
+  /** 全域預設配額：未設定個人覆寫者套用（admin） */
+  getGlobal() {
+    return apiGet("/api/v1/quotas/global");
+  },
+
+  /** 更新全域預設配額（partial，admin） */
+  updateGlobal(body) {
+    return apiPut("/api/v1/quotas/global", body);
+  },
+
   /** 建立個人配額覆寫。 */
   create(body) {
     return apiPost("/api/v1/quotas", body);

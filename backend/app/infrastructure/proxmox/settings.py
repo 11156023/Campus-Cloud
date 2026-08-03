@@ -1,10 +1,11 @@
 """Proxmox 設定載入。
 
-多連線架構：連線層欄位（host/user/password/SSL）來自 proxmox_connections
-表（每筆＝一個獨立 PVE 入口，單台或叢集皆可）；全域行為設定（pool、
-storage、timeout、placement 等）仍來自 proxmox_config singleton。
+多連線架構：每筆 proxmox_connections ＝ 一個獨立 PVE 入口（單台或叢集），
+連線層欄位（host/user/password/SSL）與該叢集自身的資源設定（pool、
+storage、gateway、預設節點）都存在該筆連線上；跨叢集共用的放置與排程
+策略（placement、scheduler）仍來自 proxmox_config singleton。
 
-尚未建立任何連線資料時，退回 proxmox_config 既有的 host/user 欄位
+尚未建立任何連線資料時，整體退回 proxmox_config 既有欄位
 （舊版單連線資料相容）。
 """
 
@@ -30,6 +31,7 @@ class ProxmoxSettings:
     task_check_interval: int
     pool_name: str
     ca_cert: str | None = None
+    gateway_ip: str | None = None
     local_subnet: str | None = None
     default_node: str | None = None
     connection_id: int | None = None
@@ -75,32 +77,35 @@ def get_proxmox_settings(connection_id: int | None = None) -> ProxmoxSettings:
             "Proxmox 尚未設定，請至管理員介面完成 Proxmox 連線設定。"
         )
 
-    # 全域行為設定：無 proxmox_config 時採用預設值
-    iso_storage = config.iso_storage if config else "local"
-    data_storage = config.data_storage if config else "local-lvm"
-    task_check_interval = config.task_check_interval if config else 2
-    pool_name = config.pool_name if config else DEFAULT_PROXMOX_POOL_NAME
-    local_subnet = config.local_subnet if config else None
-    default_node = config.default_node if config else None
-
     if connection is not None:
+        # 有連線資料時，資源設定一律以該連線（叢集）自身的值為準
         return ProxmoxSettings(
             host=connection.host,
             user=connection.user,
             password=conn_password,
             verify_ssl=connection.verify_ssl,
-            iso_storage=iso_storage,
-            data_storage=data_storage,
+            iso_storage=connection.iso_storage,
+            data_storage=connection.data_storage,
             api_timeout=connection.api_timeout,
-            task_check_interval=task_check_interval,
-            pool_name=pool_name,
+            task_check_interval=connection.task_check_interval,
+            pool_name=connection.pool_name,
             ca_cert=connection.ca_cert,
-            local_subnet=local_subnet,
-            default_node=default_node,
+            gateway_ip=connection.gateway_ip,
+            local_subnet=connection.local_subnet,
+            default_node=connection.default_node,
             connection_id=connection.id,
             connection_name=connection.name,
             port=connection.port,
         )
+
+    # 舊版相容路徑的行為設定：無 proxmox_config 時採用預設值
+    iso_storage = config.iso_storage if config else "local"
+    data_storage = config.data_storage if config else "local-lvm"
+    task_check_interval = config.task_check_interval if config else 2
+    pool_name = config.pool_name if config else DEFAULT_PROXMOX_POOL_NAME
+    gateway_ip = config.gateway_ip if config else None
+    local_subnet = config.local_subnet if config else None
+    default_node = config.default_node if config else None
 
     # 舊版相容：尚未建立連線資料，使用 proxmox_config 的連線欄位
     assert config is not None
@@ -123,11 +128,26 @@ def get_proxmox_settings(connection_id: int | None = None) -> ProxmoxSettings:
         task_check_interval=task_check_interval,
         pool_name=pool_name,
         ca_cert=config.ca_cert,
+        gateway_ip=gateway_ip,
         local_subnet=local_subnet,
         default_node=default_node,
         connection_id=None,
         connection_name=None,
     )
+
+
+def get_proxmox_settings_for_node(node_name: str | None) -> ProxmoxSettings:
+    """載入節點所屬連線的設定；查不到歸屬時退回預設連線。
+
+    pool / storage / gateway 皆為該叢集自身的設定，凡是「操作某個節點」
+    的呼叫端都應該走這個入口，而不是無參數的 get_proxmox_settings()。
+    """
+    if not node_name:
+        return get_proxmox_settings()
+
+    from app.infrastructure.proxmox.client import get_connection_id_for_node
+
+    return get_proxmox_settings(get_connection_id_for_node(node_name))
 
 
 def list_enabled_connection_ids() -> list[int]:

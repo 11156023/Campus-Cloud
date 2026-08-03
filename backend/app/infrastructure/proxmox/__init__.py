@@ -15,6 +15,7 @@ from .settings import (
     DEFAULT_PROXMOX_POOL_NAME,
     ProxmoxSettings,
     get_proxmox_settings,
+    get_proxmox_settings_for_node,
     list_enabled_connection_ids,
 )
 from .tls import _tcp_ping, _verify_server_with_ca, build_ws_ssl_context
@@ -35,6 +36,7 @@ __all__ = [
     "get_proxmox_api",
     "get_proxmox_api_for_node",
     "get_proxmox_settings",
+    "get_proxmox_settings_for_node",
     "invalidate_proxmox_client",
     "list_enabled_connection_ids",
     "wait_for_task_status",

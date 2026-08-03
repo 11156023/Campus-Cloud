@@ -22,6 +22,7 @@ from app.infrastructure.proxmox import (
     get_proxmox_api,
     get_proxmox_api_for_node,
     get_proxmox_settings,
+    get_proxmox_settings_for_node,
 )
 from app.infrastructure.proxmox.operations import iter_connection_clients
 from app.infrastructure.ssh import (
@@ -30,7 +31,6 @@ from app.infrastructure.ssh import (
     exec_command_streaming,
 )
 from app.infrastructure.worker import ExpiringStore
-from app.models.proxmox_config import ProxmoxConfig
 from app.services.network import firewall_service
 from app.services.proxmox import proxmox_service
 
@@ -369,11 +369,12 @@ def _find_resource_any(vmid: int) -> dict | None:
 
 
 def _add_to_pool(vmid: int) -> None:
-    """將容器加入 SkyLab Pool（在容器所屬連線上操作）。"""
-    pool_name = get_proxmox_settings().pool_name
+    """將容器加入所屬連線的 Pool（在容器所屬連線上操作）。"""
     resource = _find_resource_any(vmid)
-    if resource and resource.get("node"):
-        proxmox = get_proxmox_api_for_node(resource["node"])
+    node = resource.get("node") if resource else None
+    pool_name = get_proxmox_settings_for_node(node).pool_name
+    if node:
+        proxmox = get_proxmox_api_for_node(node)
     else:
         proxmox = get_proxmox_api()
     proxmox.pools(pool_name).put(vms=str(vmid))
@@ -650,18 +651,17 @@ def _cleanup_script_on_node(client, script_path: str) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _get_storage_settings() -> tuple[str, str]:
-    """從資料庫讀取 Proxmox storage 設定，回傳 (iso_storage, data_storage)。
+def _get_storage_settings(node: str | None = None) -> tuple[str, str]:
+    """讀取節點所屬連線的 storage 設定，回傳 (iso_storage, data_storage)。
 
-    若 DB 沒設定就向 PVE 詢問可用的 storage：第一個支援 vztmpl 的當 iso，
+    尚未設定任何連線時才向 PVE 詢問可用的 storage：第一個支援 vztmpl 的當 iso，
     第一個支援 rootdir/images 的當 container storage。最差才 fallback 為 local/local-lvm。
     """
-    from app.core.db import engine
-
-    with Session(engine) as session:
-        config = session.get(ProxmoxConfig, 1)
-        if config:
-            return config.iso_storage, config.data_storage
+    try:
+        cfg = get_proxmox_settings_for_node(node)
+        return cfg.iso_storage, cfg.data_storage
+    except Exception as exc:
+        logger.warning("讀取 Proxmox storage 設定失敗，改向 PVE 詢問: %s", exc)
 
     iso = "local"
     data = "local-lvm"

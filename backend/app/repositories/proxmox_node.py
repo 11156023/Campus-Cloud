@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 
 from sqlmodel import Session, select
 
+from app.models.proxmox_connection import ProxmoxConnection
 from app.models.proxmox_node import ProxmoxNode
 
 
@@ -27,6 +28,44 @@ def get_all_nodes(
 def get_node_by_name(session: Session, name: str) -> ProxmoxNode | None:
     stmt = select(ProxmoxNode).where(ProxmoxNode.name == name).limit(1)
     return session.exec(stmt).first()
+
+
+def get_disabled_node_names(session: Session) -> set[str]:
+    """回傳被管理員停用的節點名稱集合（停用＝不參與放置）。"""
+    stmt = select(ProxmoxNode.name).where(
+        ProxmoxNode.enabled == False  # noqa: E712
+    )
+    return set(session.exec(stmt).all())
+
+
+def get_node_connection_names(session: Session) -> dict[str, str]:
+    """節點名稱 → 所屬連線名稱的對應（未歸屬的節點不列入）。
+
+    節點名稱在多連線架構下全域唯一，因此可直接以名稱為 key。
+    """
+    stmt = select(ProxmoxNode.name, ProxmoxConnection.name).join(
+        ProxmoxConnection,
+        ProxmoxNode.connection_id == ProxmoxConnection.id,  # type: ignore[arg-type]
+    )
+    return dict(session.exec(stmt).all())
+
+
+def get_node_connection_map(session: Session) -> dict[str, tuple[int | None, str | None]]:
+    """節點名稱 → (連線 id, 連線名稱)，包含所有節點。
+
+    與 :func:`get_node_connection_names` 的差別：保留連線 id，且未歸屬連線的
+    節點（舊版單連線資料）也會列入、值為 ``(None, None)``，因此可直接用
+    連線 id 對節點分群（例如共享 Storage 以叢集為單位去重）。
+    """
+    stmt = select(ProxmoxNode.name, ProxmoxConnection.id, ProxmoxConnection.name).join(
+        ProxmoxConnection,
+        ProxmoxNode.connection_id == ProxmoxConnection.id,  # type: ignore[arg-type]
+        isouter=True,
+    )
+    return {
+        node_name: (conn_id, conn_name)
+        for node_name, conn_id, conn_name in session.exec(stmt).all()
+    }
 
 
 def upsert_nodes(
@@ -112,14 +151,17 @@ def update_node(
     host: str,
     port: int,
     priority: int,
+    enabled: bool | None = None,
 ) -> ProxmoxNode | None:
-    """更新單一節點的連線設定與優先級。"""
+    """更新單一節點的連線設定、優先級與啟用狀態。"""
     node = session.get(ProxmoxNode, node_id)
     if node is None:
         return None
     node.host = host
     node.port = port
     node.priority = priority
+    if enabled is not None:
+        node.enabled = enabled
     session.add(node)
     session.commit()
     session.refresh(node)
@@ -138,7 +180,10 @@ def update_node_status(session: Session, node_id: int, is_online: bool) -> None:
 
 __all__ = [
     "get_all_nodes",
+    "get_disabled_node_names",
     "get_node_by_name",
+    "get_node_connection_map",
+    "get_node_connection_names",
     "upsert_nodes",
     "update_node",
     "update_node_status",

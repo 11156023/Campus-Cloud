@@ -11,6 +11,8 @@ from app.exceptions import ConflictError, NotFoundError
 from app.models import AuditAction, ResourceQuota, User
 from app.schemas import (
     EffectiveQuotaPublic,
+    GlobalQuotaPublic,
+    GlobalQuotaUpdate,
     QuotaUsagePublic,
     ResourceQuotaCreate,
     ResourceQuotaPublic,
@@ -57,6 +59,30 @@ def get_my_usage(session: SessionDep, current_user: CurrentUser) -> QuotaUsagePu
             max_instances=quota.max_instances,
         ),
     )
+
+
+# NOTE: /global 必須註冊在 /{quota_id} 之前，否則會先被當成 quota_id
+# 解析成 UUID 而失敗（422）。
+@router.get("/global", response_model=GlobalQuotaPublic)
+def get_global_quota(session: SessionDep, _: AdminUser) -> GlobalQuotaPublic:
+    config = quota_service.get_global_quota(session)
+    return GlobalQuotaPublic.model_validate(config, from_attributes=True)
+
+
+@router.put("/global", response_model=GlobalQuotaPublic)
+def update_global_quota(
+    body: GlobalQuotaUpdate, session: SessionDep, current_user: AdminUser
+) -> GlobalQuotaPublic:
+    config = quota_service.update_global_quota(
+        session, body.model_dump(exclude_unset=True)
+    )
+    audit_service.log_action(
+        session=session,
+        user_id=current_user.id,
+        action=AuditAction.config_update,
+        details="Updated global default quota",
+    )
+    return GlobalQuotaPublic.model_validate(config, from_attributes=True)
 
 
 @router.get("", response_model=list[ResourceQuotaPublic])

@@ -19,6 +19,7 @@ from app.infrastructure.proxmox import (
     get_proxmox_api,
     get_proxmox_api_for_node,
     get_proxmox_settings,
+    get_proxmox_settings_for_node,
     list_enabled_connection_ids,
     wait_for_task_status,
 )
@@ -55,15 +56,15 @@ def iter_connection_clients():
 # Resource lookup
 # ---------------------------------------------------------------------------
 
-def _raw_vms() -> list[dict]:
-    """Return all resources of type vm across all connections, without pool filtering."""
-    results: list[dict] = []
+def _raw_vms_by_connection() -> list[tuple[int | None, list[dict]]]:
+    """Return (connection_key, resources) for every connection, without pool filtering."""
+    results: list[tuple[int | None, list[dict]]] = []
     errors: list[str] = []
     keys = _connection_keys()
     for key in keys:
         try:
             proxmox = get_proxmox_api(key)
-            results.extend(proxmox.cluster.resources.get(type="vm"))
+            results.append((key, list(proxmox.cluster.resources.get(type="vm"))))
         except Exception as exc:
             errors.append(str(exc))
             logger.warning(
@@ -74,33 +75,48 @@ def _raw_vms() -> list[dict]:
     return results
 
 
+def _raw_vms() -> list[dict]:
+    """Return all resources of type vm across all connections, without pool filtering."""
+    return [vm for _key, vms in _raw_vms_by_connection() for vm in vms]
+
+
+def _pool_vms() -> list[dict]:
+    """Return vm resources inside each connection's own pool.
+
+    pool 名稱是每個連線（叢集）自己的設定，因此比對必須逐連線進行，
+    不能用單一 pool 名稱去篩全部連線的資源。
+    """
+    matched: list[dict] = []
+    for key, vms in _raw_vms_by_connection():
+        pool = get_proxmox_settings(key).pool_name
+        matched.extend(vm for vm in vms if vm.get("pool") == pool)
+    return matched
+
+
 def list_all_vmids() -> set[int]:
     """回傳所有連線上既有的 VMID 集合（不限 pool）。"""
     return {int(r["vmid"]) for r in _raw_vms()}
 
 
 def find_resource(vmid: int) -> dict:
-    """Find any resource (qemu or lxc) by VMID in the configured pool."""
-    pool = get_proxmox_settings().pool_name
-    for r in _raw_vms():
-        if r["vmid"] == vmid and r.get("pool") == pool:
+    """Find any resource (qemu or lxc) by VMID in its connection's pool."""
+    for r in _pool_vms():
+        if r["vmid"] == vmid:
             return r
     raise NotFoundError(f"Resource {vmid} not found")
 
 
 def find_lxc(vmid: int) -> dict:
-    """Find an LXC container by VMID in the configured pool."""
-    pool = get_proxmox_settings().pool_name
-    for r in _raw_vms():
-        if r["vmid"] == vmid and r["type"] == "lxc" and r.get("pool") == pool:
+    """Find an LXC container by VMID in its connection's pool."""
+    for r in _pool_vms():
+        if r["vmid"] == vmid and r["type"] == "lxc":
             return r
     raise NotFoundError(f"LXC container {vmid} not found")
 
 
 def list_all_resources() -> list[dict]:
-    """Return all cluster resources of type vm in the configured pool."""
-    pool = get_proxmox_settings().pool_name
-    return [r for r in _raw_vms() if r.get("pool") == pool]
+    """Return all cluster resources of type vm in each connection's pool."""
+    return _pool_vms()
 
 
 def list_nodes() -> list[dict]:
@@ -122,31 +138,69 @@ def list_nodes() -> list[dict]:
     return results
 
 
+def _admin_disabled_node_names() -> set[str]:
+    """讀取被管理員停用的節點名稱；DB 讀取失敗時不過濾（fail-open）。"""
+    try:
+        from sqlmodel import Session
+
+        from app.core.db import engine
+        from app.repositories.proxmox_node import get_disabled_node_names
+
+        with Session(engine) as session:
+            return get_disabled_node_names(session)
+    except Exception:
+        return set()
+
+
 def get_available_nodes() -> list[dict]:
-    """Return online nodes first, or all nodes if status data is unavailable."""
-    nodes = list_nodes()
+    """Return online nodes first, or all nodes if status data is unavailable.
+
+    管理員停用的節點一律排除（停用＝不接收新 VM）。
+    """
+    disabled = _admin_disabled_node_names()
+    nodes = [
+        node for node in list_nodes()
+        if str(node.get("node") or node.get("name") or "") not in disabled
+    ]
     online_nodes = [node for node in nodes if node.get("status") == "online"]
     return online_nodes or nodes
+
+
+def _default_node_candidates() -> list[str]:
+    """各連線自己設定的預設節點，預設連線優先。"""
+    candidates: list[str] = []
+    for key in _connection_keys():
+        try:
+            default_node = get_proxmox_settings(key).default_node
+        except Exception as exc:
+            logger.warning(
+                "Unable to read default node for Proxmox connection %s: %s", key, exc
+            )
+            continue
+        if default_node and default_node not in candidates:
+            candidates.append(default_node)
+    return candidates
 
 
 def pick_target_node(preferred_node: str | None = None) -> str:
     """Pick a usable target node, preferring an explicitly requested one.
 
-    Priority: preferred_node > settings.default_node > nodes[0]
+    Priority: preferred_node > 各連線的 default_node（預設連線優先） > nodes[0]
     """
     nodes = get_available_nodes()
     if not nodes:
         raise ProxmoxError("No Proxmox nodes are available")
 
-    candidate = preferred_node or get_proxmox_settings().default_node
-    if candidate:
+    candidates = [preferred_node] if preferred_node else _default_node_candidates()
+    for candidate in candidates:
         for node in nodes:
             node_name = node.get("node") or node.get("name")
             if node_name == candidate:
                 return node_name
+    if candidates:
         logger.warning(
-            "Preferred node '%s' not found or offline; falling back to first available node",
-            candidate,
+            "Preferred node(s) %s not found or offline; falling back to first available node",
+            ", ".join(candidates),
         )
 
     selected = nodes[0].get("node") or nodes[0].get("name")
@@ -228,20 +282,15 @@ def resolve_target_storage(
     raise BadRequestError(
         "No enabled Proxmox storage is available on "
         f"node '{node}' for content '{required_content}'. "
-        f"Configured/requested storage: '{requested_storage or get_proxmox_settings().data_storage}'. "
+        f"Configured/requested storage: '{requested_storage or get_proxmox_settings_for_node(node).data_storage}'. "
         f"Node storages: {', '.join(available_names) if available_names else 'none'}."
     )
 
 
 def find_vm_template(template_id: int) -> dict:
-    """Find a VM template by VMID in the configured pool."""
-    pool = get_proxmox_settings().pool_name
-    for vm in _raw_vms():
-        if (
-            vm["vmid"] == template_id
-            and vm.get("template") == 1
-            and vm.get("pool") == pool
-        ):
+    """Find a VM template by VMID in its connection's pool."""
+    for vm in _pool_vms():
+        if vm["vmid"] == template_id and vm.get("template") == 1:
             return vm
     raise NotFoundError(f"VM template {template_id} not found")
 
@@ -527,17 +576,13 @@ def next_vmid() -> int:
 
 def get_lxc_templates(node: str) -> list[dict]:
     proxmox = get_proxmox_api_for_node(node)
-    return proxmox.nodes(node).storage(get_proxmox_settings().iso_storage).content.get()
+    iso_storage = get_proxmox_settings_for_node(node).iso_storage
+    return proxmox.nodes(node).storage(iso_storage).content.get()
 
 
 def get_vm_templates() -> list[dict]:
-    """Return all VM templates in the configured pool."""
-    pool = get_proxmox_settings().pool_name
-    return [
-        vm
-        for vm in _raw_vms()
-        if vm.get("template") == 1 and vm.get("pool") == pool
-    ]
+    """Return all VM templates in each connection's pool."""
+    return [vm for vm in _pool_vms() if vm.get("template") == 1]
 
 
 # ---------------------------------------------------------------------------

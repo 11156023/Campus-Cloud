@@ -14,7 +14,8 @@ from typing import Any
 from sqlmodel import Session, select
 
 from app.exceptions import AppError, ConflictError
-from app.models import QuotaScope, Resource, ResourceQuota
+from app.models import QuotaConfig, QuotaScope, Resource, ResourceQuota
+from app.models.base import get_datetime_utc
 from app.services.proxmox import proxmox_service
 from app.services.resource.quota_policy import (
     EffectiveQuota,
@@ -27,6 +28,41 @@ logger = logging.getLogger(__name__)
 
 _MIB = 1024**2
 _GIB = 1024**3
+_QUOTA_CONFIG_ID = 1
+
+
+def _global_quota_row(session: Session) -> QuotaConfig | None:
+    """純讀取全域預設配額 singleton。
+
+    刻意不 lazy-create：這條路徑會被 check_quota 在 provisioning 途中呼叫，
+    一旦在此 commit 就會把呼叫端未完成的交易一起提交。列不存在時由
+    quota_policy 退回內建預設。
+    """
+    return session.get(QuotaConfig, _QUOTA_CONFIG_ID)
+
+
+def get_global_quota(session: Session) -> QuotaConfig:
+    """管理 API 用：取得 singleton，不存在則以內建預設建立。"""
+    config = _global_quota_row(session)
+    if config is None:
+        config = QuotaConfig(id=_QUOTA_CONFIG_ID)
+        session.add(config)
+        session.commit()
+        session.refresh(config)
+    return config
+
+
+def update_global_quota(session: Session, data: dict[str, Any]) -> QuotaConfig:
+    """partial 更新全域預設配額；None 與未知欄位一律忽略。"""
+    config = get_global_quota(session)
+    for key, value in data.items():
+        if value is not None and hasattr(config, key):
+            setattr(config, key, value)
+    config.updated_at = get_datetime_utc()
+    session.add(config)
+    session.commit()
+    session.refresh(config)
+    return config
 
 
 def _quota_for_user(session: Session, user_id: uuid.UUID) -> ResourceQuota | None:
@@ -48,7 +84,9 @@ def _owned_vmids(session: Session, user_id: uuid.UUID) -> list[int]:
 
 
 def get_effective_quota(session: Session, user_id: uuid.UUID) -> EffectiveQuota:
-    return resolve_effective_quota(_quota_for_user(session, user_id))
+    return resolve_effective_quota(
+        _quota_for_user(session, user_id), _global_quota_row(session)
+    )
 
 
 def get_usage(
@@ -111,5 +149,7 @@ __all__ = [
     "AppError",
     "check_quota",
     "get_effective_quota",
+    "get_global_quota",
     "get_usage",
+    "update_global_quota",
 ]

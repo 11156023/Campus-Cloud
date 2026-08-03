@@ -53,6 +53,13 @@ def create_connection(
     verify_ssl: bool,
     ca_cert: str | None,
     api_timeout: int,
+    pool_name: str,
+    iso_storage: str,
+    data_storage: str,
+    task_check_interval: int,
+    gateway_ip: str | None = None,
+    local_subnet: str | None = None,
+    default_node: str | None = None,
     enabled: bool = True,
     is_default: bool = False,
 ) -> ProxmoxConnection:
@@ -67,6 +74,13 @@ def create_connection(
         verify_ssl=verify_ssl,
         ca_cert=ca_cert or None,
         api_timeout=api_timeout,
+        pool_name=pool_name,
+        iso_storage=iso_storage,
+        data_storage=data_storage,
+        task_check_interval=task_check_interval,
+        gateway_ip=gateway_ip or None,
+        local_subnet=local_subnet or None,
+        default_node=default_node or None,
         enabled=enabled,
         is_default=is_default,
     )
@@ -88,6 +102,13 @@ def update_connection(
     verify_ssl: bool,
     ca_cert: str | None,  # None = 不更新；空字串 = 清除
     api_timeout: int,
+    pool_name: str,
+    iso_storage: str,
+    data_storage: str,
+    task_check_interval: int,
+    gateway_ip: str | None,
+    local_subnet: str | None,
+    default_node: str | None,
     enabled: bool,
     is_default: bool,
 ) -> ProxmoxConnection | None:
@@ -106,6 +127,13 @@ def update_connection(
     if ca_cert is not None:
         conn.ca_cert = ca_cert if ca_cert else None
     conn.api_timeout = api_timeout
+    conn.pool_name = pool_name
+    conn.iso_storage = iso_storage
+    conn.data_storage = data_storage
+    conn.task_check_interval = task_check_interval
+    conn.gateway_ip = gateway_ip or None
+    conn.local_subnet = local_subnet or None
+    conn.default_node = default_node or None
     conn.enabled = enabled
     conn.is_default = is_default
     conn.updated_at = datetime.now(timezone.utc)

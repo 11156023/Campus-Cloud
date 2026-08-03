@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import styles from "./ResourcesPage.module.scss";
 import MIcon from "../../../components/MIcon";
+import PowerMenu from "../../../components/PowerMenu/PowerMenu";
 import { ResourcesService } from "../../../services/resources";
 import {
   PENDING_POLL_INTERVAL,
@@ -106,58 +107,6 @@ function ConfirmModal({ title, desc, confirmLabel = "確定", danger = false, lo
             {loading ? "處理中…" : confirmLabel}
           </button>
         </div>
-      </div>
-    </div>
-  );
-}
-
-/* ── Power dropdown ── */
-function PowerMenu({ resource, actionLoading, onControl, onDeleteClick, onClose, anchorRef, closing }) {
-  const ref = useRef(null);
-
-  useEffect(() => {
-    function handler(e) {
-      if (!ref.current?.contains(e.target) && !anchorRef?.current?.contains(e.target)) onClose();
-    }
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [onClose, anchorRef]);
-
-  const isRunning = resource.status === "running";
-  const isStopped = resource.status === "stopped" || resource.status === "paused";
-
-  return (
-    <div
-      ref={ref}
-      className={`${styles.powerMenu} ${closing ? styles.powerMenuOut : ""}`}
-    >
-      <div className={styles.powerMenuTitle}>電源控制</div>
-      <div className={styles.powerMenuGrid}>
-        <button type="button" className={styles.powerMenuItem}
-          disabled={!isStopped || !!actionLoading} onClick={() => { onClose(); onControl("start"); }}>
-          <span style={{ color: "var(--color-success)", lineHeight: 1 }}><MIcon name="play_arrow" size={15} /></span>
-          啟動
-        </button>
-        <button type="button" className={`${styles.powerMenuItem} ${styles.powerMenuItemWarn}`}
-          disabled={!isRunning || !!actionLoading} onClick={() => { onClose(); onControl("stop"); }}>
-          <MIcon name="stop" size={15} />強制停止
-        </button>
-        <button type="button" className={styles.powerMenuItem}
-          disabled={!isRunning || !!actionLoading} onClick={() => { onClose(); onControl("shutdown"); }}>
-          <MIcon name="power_settings_new" size={15} />關機
-        </button>
-        <button type="button" className={`${styles.powerMenuItem} ${styles.powerMenuItemWarn}`}
-          disabled={!isRunning || !!actionLoading} onClick={() => { onClose(); onControl("reset"); }}>
-          <MIcon name="restart_alt" size={15} />強制重置
-        </button>
-        <button type="button" className={styles.powerMenuItem}
-          disabled={!isRunning || !!actionLoading} onClick={() => { onClose(); onControl("reboot"); }}>
-          <MIcon name="replay" size={15} />重新啟動
-        </button>
-        <button type="button" className={`${styles.powerMenuItem} ${styles.powerMenuItemDanger}`}
-          onClick={() => onDeleteClick()}>
-          <MIcon name="delete_outline" size={15} />刪除
-        </button>
       </div>
     </div>
   );

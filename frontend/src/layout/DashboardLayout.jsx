@@ -37,7 +37,7 @@ export default function DashboardLayout() {
 
   return (
     <LayoutContext.Provider value={{ setCompactFooter }}>
-    {/* 任務狀態全站常駐（WS + toast + 詳情 dialog）；顯示按鈕放在首頁 pageHeader */}
+    {/* 任務狀態全站常駐（WS + toast + 詳情 dialog）；顯示按鈕在 Sidebar 底部 */}
     <JobsProvider>
     <div className={`${styles.layout} ${collapsed ? styles.collapsed : ""}`}>
       {mobileOpen && (

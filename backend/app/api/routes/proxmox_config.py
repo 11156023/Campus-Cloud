@@ -20,6 +20,7 @@ from app.infrastructure.proxmox import (
     invalidate_proxmox_client,
 )
 from app.models import AuditAction
+from app.models.proxmox_storage import ProxmoxStorage
 from app.repositories import proxmox_config as proxmox_config_repo
 from app.repositories import proxmox_connection as proxmox_connection_repo
 from app.repositories import proxmox_node as proxmox_node_repo
@@ -27,9 +28,7 @@ from app.repositories import proxmox_storage as proxmox_storage_repo
 from app.schemas.proxmox_config import (
     CertParseResult,
     ClusterPreviewResult,
-    ClusterStatsPublic,
     ConnectionSyncResult,
-    NodeStatsPublic,
     ProxmoxConfigPublic,
     ProxmoxConfigUpdate,
     ProxmoxConnectionCreate,
@@ -122,6 +121,13 @@ def _connection_to_public(session, conn) -> ProxmoxConnectionPublic:
         user=conn.user,
         verify_ssl=conn.verify_ssl,
         api_timeout=conn.api_timeout,
+        pool_name=conn.pool_name,
+        iso_storage=conn.iso_storage,
+        data_storage=conn.data_storage,
+        task_check_interval=conn.task_check_interval,
+        gateway_ip=conn.gateway_ip,
+        local_subnet=conn.local_subnet,
+        default_node=conn.default_node,
         enabled=conn.enabled,
         is_default=conn.is_default,
         has_ca_cert=bool(conn.ca_cert),
@@ -224,13 +230,74 @@ def _node_to_public(node) -> ProxmoxNodePublic:
         is_online=node.is_online,
         last_checked=node.last_checked,
         priority=node.priority,
+        enabled=getattr(node, "enabled", True),
     )
 
 
-def _storage_to_public(s) -> ProxmoxStoragePublic:
+ConnMap = dict[str, tuple[int | None, str | None]]
+
+
+def _cluster_node_names(node_name: str, conn_map: ConnMap) -> set[str]:
+    """回傳與 ``node_name`` 屬於同一 PVE 連線（叢集）的所有節點名稱。
+
+    未歸屬連線的節點（舊版單連線資料）彼此視為同一叢集。
+    """
+    conn_id = conn_map.get(node_name, (None, None))[0]
+    return {name for name, (cid, _) in conn_map.items() if cid == conn_id} | {node_name}
+
+
+def _dedupe_shared_storages(
+    storages: list[ProxmoxStorage], conn_map: ConnMap
+) -> list[ProxmoxStoragePublic]:
+    """共享 Storage 每個叢集只保留一筆代表，其餘節點併入 ``node_names``。
+
+    共享 Storage 是整個叢集共用同一份實體儲存，PVE 會在每個節點各回報一次；
+    非共享（local / local-lvm 之類）則是各節點獨立的實體儲存，仍逐一列出。
+    """
+    result: list[ProxmoxStoragePublic] = []
+    shared_index: dict[tuple[int | None, str], ProxmoxStoragePublic] = {}
+
+    for s in storages:
+        node_name = str(s.node_name)
+        if not s.is_shared:
+            result.append(_storage_to_public(s, conn_map))
+            continue
+
+        conn_id = conn_map.get(node_name, (None, None))[0]
+        key = (conn_id, str(s.storage))
+        existing = shared_index.get(key)
+        if existing is None:
+            public = _storage_to_public(s, conn_map)
+            shared_index[key] = public
+            result.append(public)
+        else:
+            existing.node_names.append(node_name)
+
+    # 同連線內：叢集級共享排在各節點的本機儲存之前
+    result.sort(
+        key=lambda p: (
+            p.connection_name or "",
+            not p.is_shared,
+            "" if p.is_shared else p.node_name,
+            p.storage,
+        )
+    )
+    return result
+
+
+def _storage_to_public(
+    s: ProxmoxStorage,
+    conn_map: ConnMap | None = None,
+    node_names: list[str] | None = None,
+) -> ProxmoxStoragePublic:
+    conn = (conn_map or {}).get(str(s.node_name))
+    assert s.id is not None, "已持久化的 Storage 記錄必有主鍵"
     return ProxmoxStoragePublic(
         id=s.id,
         node_name=s.node_name,
+        node_names=node_names or [s.node_name],
+        connection_id=conn[0] if conn else None,
+        connection_name=conn[1] if conn else None,
         storage=s.storage,
         storage_type=s.storage_type,
         total_gb=s.total_gb,
@@ -346,8 +413,14 @@ def update_proxmox_config(
 ) -> Any:
     """新增或更新 Proxmox 連線設定"""
     existing = proxmox_config_repo.get_proxmox_config(session)
-    if existing is None and config_in.password is None:
-        raise BadRequestError("初次設定必須提供密碼")
+    password = config_in.password
+    if existing is None and password is None:
+        # 連線帳密已改由 proxmox_connections 管理，此 singleton 只承載放置與
+        # 排程參數；已經有連線時不必再要一次密碼。
+        if proxmox_connection_repo.get_all_connections(session):
+            password = ""
+        else:
+            raise BadRequestError("初次設定必須提供密碼")
 
     if config_in.ca_cert:
         try:
@@ -361,7 +434,7 @@ def update_proxmox_config(
         session=session,
         host=config_in.host,
         user=config_in.user,
-        password=config_in.password,
+        password=password,
         verify_ssl=config_in.verify_ssl,
         iso_storage=config_in.iso_storage,
         data_storage=config_in.data_storage,
@@ -398,24 +471,8 @@ def update_proxmox_config(
         practice_warning_minutes=config_in.practice_warning_minutes,
     )
 
-    # 多連線相容：同步更新預設連線的連線欄位，避免兩處設定不一致
-    default_conn = proxmox_connection_repo.get_default_connection(session)
-    if default_conn is not None and default_conn.id is not None:
-        proxmox_connection_repo.update_connection(
-            session,
-            default_conn.id,
-            name=default_conn.name,
-            host=config_in.host,
-            port=default_conn.port,
-            user=config_in.user,
-            password=config_in.password,
-            verify_ssl=config_in.verify_ssl,
-            ca_cert=config_in.ca_cert,
-            api_timeout=config_in.api_timeout,
-            enabled=default_conn.enabled,
-            is_default=True,
-        )
-
+    # 連線欄位與 pool / storage / gateway 的唯一真相來源是 proxmox_connections，
+    # 這裡不再回寫預設連線；此 singleton 僅在尚無任何連線時作為相容退路。
     invalidate_proxmox_client()
 
     audit_service.log_action(
@@ -561,6 +618,7 @@ def update_node(
         host=node_in.host,
         port=node_in.port,
         priority=node_in.priority,
+        enabled=node_in.enabled,
     )
     if node is None:
         raise HTTPException(status_code=404, detail="Node not found")
@@ -570,7 +628,8 @@ def update_node(
         action=AuditAction.proxmox_node_update,
         details=(
             f"Updated node {node.name}: host={node_in.host} "
-            f"port={node_in.port} priority={node_in.priority}"
+            f"port={node_in.port} priority={node_in.priority} "
+            f"enabled={node_in.enabled}"
         ),
     )
     return _node_to_public(node)
@@ -580,9 +639,10 @@ def update_node(
 def get_storages(
     session: SessionDep, current_user: AdminUser
 ) -> list[ProxmoxStoragePublic]:
-    """取得所有已儲存的 Storage 清單。"""
+    """取得 Storage 清單（共享 Storage 每個叢集只列一筆）。"""
     storages = proxmox_storage_repo.get_all_storages(session)
-    return [_storage_to_public(s) for s in storages]
+    conn_map = proxmox_node_repo.get_node_connection_map(session)
+    return _dedupe_shared_storages(storages, conn_map)
 
 
 @router.put("/storages/{storage_id}", response_model=ProxmoxStoragePublic)
@@ -592,26 +652,38 @@ def update_storage(
     current_user: AdminUser,
     storage_in: ProxmoxStorageUpdate,
 ) -> ProxmoxStoragePublic:
-    """更新 Storage 的使用者設定（enabled, speed_tier, user_priority）。"""
-    s = proxmox_storage_repo.update_storage_settings(
+    """更新 Storage 的使用者設定（enabled, speed_tier, user_priority）。
+
+    共享 Storage 會把設定套用到同叢集所有節點上的同名記錄。
+    """
+    conn_map = proxmox_node_repo.get_node_connection_map(session)
+    target = proxmox_storage_repo.get_storage(session, storage_id)
+    if target is None:
+        raise HTTPException(status_code=404, detail="Storage not found")
+
+    peer_node_names = _cluster_node_names(str(target.node_name), conn_map)
+    result = proxmox_storage_repo.update_storage_settings(
         session,
         storage_id=storage_id,
         enabled=storage_in.enabled,
         speed_tier=storage_in.speed_tier,
         user_priority=storage_in.user_priority,
+        peer_node_names=peer_node_names,
     )
-    if s is None:
+    if result is None:
         raise HTTPException(status_code=404, detail="Storage not found")
+    s, applied_nodes = result
     audit_service.log_action(
         session=session,
         user_id=current_user.id,
         action=AuditAction.proxmox_storage_update,
         details=(
-            f"Updated storage {s.storage}: enabled={storage_in.enabled} "
+            f"Updated storage {s.storage} on {len(applied_nodes)} node(s) "
+            f"[{', '.join(applied_nodes)}]: enabled={storage_in.enabled} "
             f"speed_tier={storage_in.speed_tier} priority={storage_in.user_priority}"
         ),
     )
-    return _storage_to_public(s)
+    return _storage_to_public(s, conn_map, node_names=applied_nodes)
 
 
 # ── PVE 連線管理（多入口） ───────────────────────────────────────────────────
@@ -653,6 +725,13 @@ def create_connection(
         verify_ssl=conn_in.verify_ssl,
         ca_cert=conn_in.ca_cert,
         api_timeout=conn_in.api_timeout,
+        pool_name=conn_in.pool_name,
+        iso_storage=conn_in.iso_storage,
+        data_storage=conn_in.data_storage,
+        task_check_interval=conn_in.task_check_interval,
+        gateway_ip=conn_in.gateway_ip,
+        local_subnet=conn_in.local_subnet,
+        default_node=conn_in.default_node,
         enabled=conn_in.enabled,
         is_default=is_default,
     )
@@ -693,6 +772,13 @@ def update_connection(
         verify_ssl=conn_in.verify_ssl,
         ca_cert=conn_in.ca_cert,
         api_timeout=conn_in.api_timeout,
+        pool_name=conn_in.pool_name,
+        iso_storage=conn_in.iso_storage,
+        data_storage=conn_in.data_storage,
+        task_check_interval=conn_in.task_check_interval,
+        gateway_ip=conn_in.gateway_ip,
+        local_subnet=conn_in.local_subnet,
+        default_node=conn_in.default_node,
         enabled=conn_in.enabled,
         is_default=conn_in.is_default,
     )
@@ -899,61 +985,6 @@ def sync_now(
         nodes=[_node_to_public(n) for n in all_nodes],
         storage_count=total_storages,
         error="；".join(errors) if errors else None,
-    )
-
-
-@router.get("/cluster-stats", response_model=ClusterStatsPublic)
-def get_cluster_stats(current_user: AdminUser) -> Any:
-    """取得各節點即時資源使用狀態與叢集加總"""
-    try:
-        from app.services.proxmox import proxmox_service
-        raw_nodes = proxmox_service.list_nodes()
-        raw_resources = proxmox_service.list_all_resources()
-    except Exception as e:
-        logger.warning(f"cluster-stats failed: {e}")
-        raise HTTPException(status_code=503, detail="無法連線至 Proxmox，請確認連線設定")
-
-    # VM count per node (running + stopped, exclude templates)
-    vm_count_map: dict[str, int] = {}
-    for r in raw_resources:
-        if r.get("template") == 1:
-            continue
-        if str(r.get("type") or "") not in {"lxc", "qemu"}:
-            continue
-        node_name = str(r.get("node") or "")
-        vm_count_map[node_name] = vm_count_map.get(node_name, 0) + 1
-
-    node_stats: list[NodeStatsPublic] = []
-    for n in raw_nodes:
-        name = str(n.get("node") or n.get("name") or "unknown")
-        cpu_ratio = float(n.get("cpu") or 0)
-        maxcpu = int(n.get("maxcpu") or 0)
-        node_stats.append(NodeStatsPublic(
-            name=name,
-            status=str(n.get("status") or "unknown").lower(),
-            cpu_usage_pct=round(cpu_ratio * 100, 1),
-            cpu_cores=maxcpu,
-            mem_used_gb=round(int(n.get("mem") or 0) / 1024 ** 3, 2),
-            mem_total_gb=round(int(n.get("maxmem") or 0) / 1024 ** 3, 2),
-            disk_used_gb=round(int(n.get("disk") or 0) / 1024 ** 3, 2),
-            disk_total_gb=round(int(n.get("maxdisk") or 0) / 1024 ** 3, 2),
-            vm_count=vm_count_map.get(name, 0),
-        ))
-
-    online = [n for n in node_stats if n.status == "online"]
-    offline = [n for n in node_stats if n.status != "online"]
-
-    return ClusterStatsPublic(
-        nodes=node_stats,
-        total_cpu_cores=sum(n.cpu_cores for n in node_stats),
-        used_cpu_cores=round(sum(n.cpu_usage_pct * n.cpu_cores / 100 for n in node_stats), 2),
-        total_mem_gb=round(sum(n.mem_total_gb for n in node_stats), 2),
-        used_mem_gb=round(sum(n.mem_used_gb for n in node_stats), 2),
-        total_disk_gb=round(sum(n.disk_total_gb for n in node_stats), 2),
-        used_disk_gb=round(sum(n.disk_used_gb for n in node_stats), 2),
-        online_count=len(online),
-        offline_count=len(offline),
-        total_vm_count=sum(n.vm_count for n in node_stats),
     )
 
 

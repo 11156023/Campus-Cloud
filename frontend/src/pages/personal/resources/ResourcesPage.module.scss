@@ -381,9 +381,11 @@
   gap: $spacing-8;
 }
 
-/* ── ⋮ Menu ── */
+/* ── ⋮ Menu ──
+   選單本體是 components/PowerMenu，portal 到 body 後自行以 fixed 定位，
+   不吃這裡的定位脈絡（.card 的 backdrop-filter / hover transform 會困住 absolute 選單） */
 .menuWrap {
-  position: relative;
+  display: flex;
 }
 
 .menuBtn {
@@ -402,68 +404,6 @@
 .menuBtnActive {
   background: var(--color-hover);
   color: var(--color-text);
-}
-
-/* ── Power dropdown ── */
-.powerMenu {
-  position: absolute;
-  bottom: calc(100% + 6px);
-  right: 0;
-  width: 240px;
-  @include glass-surface($shadow: var(--shadow-md));
-  border-radius: $radius-12;
-  padding: $spacing-8 0;
-  z-index: 50;
-  animation: slideUp 0.14s cubic-bezier(0.25, 0.8, 0.25, 1);
-  opacity: 1;
-  transform: translateY(0);
-  transition: opacity 0.12s ease, transform 0.12s ease;
-}
-
-.powerMenuOut {
-  animation: none;
-  opacity: 0;
-  transform: translateY(6px);
-  pointer-events: none;
-}
-
-.powerMenuTitle {
-  font-size: $font-size-12;
-  font-weight: $font-weight-500;
-  color: var(--color-text-muted);
-  padding: 2px $spacing-16 $spacing-8;
-}
-
-.powerMenuGrid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 2px;
-  padding: 0 $spacing-8;
-}
-
-.powerMenuItem {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 7px $spacing-8;
-  font-size: $font-size-12;
-  color: var(--color-text);
-  text-align: left;
-  border-radius: $radius-8;
-  transition: background $transition-base;
-
-  &:hover:not(:disabled) { background: var(--color-hover); }
-  &:disabled { opacity: 0.35; cursor: not-allowed; }
-}
-
-.powerMenuItemWarn {
-  color: #dc3545;
-  &:hover:not(:disabled) { background: color-mix(in srgb, #dc3545 8%, transparent); }
-}
-
-.powerMenuItemDanger {
-  color: #dc3545;
-  &:hover:not(:disabled) { background: color-mix(in srgb, #dc3545 8%, transparent); }
 }
 
 /* ── Power action buttons (legacy, kept for skeleton) ── */

@@ -4,7 +4,6 @@ import { useAuth } from "../../../contexts/AuthContext";
 import { useDragScroll } from "../../../hooks/useDragScroll";
 import { TemplatesService } from "../../../services/templates";
 import MIcon from "../../../components/MIcon";
-import JobsButton from "../../../components/Jobs/JobsButton";
 import styles from "./DashboardPage.module.scss";
 import { COURSES } from "./dashboard.data";
 
@@ -175,7 +174,6 @@ export default function DashboardPage() {
           <h1 className={styles.pageTitle}>嗨，{firstName} 👋</h1>
           <p className={styles.pageSubtitle}>歡迎回來，很高興再次見到你！</p>
         </div>
-        <JobsButton />
       </div>
 
       {/* ── 快速操作（非管理員）── */}

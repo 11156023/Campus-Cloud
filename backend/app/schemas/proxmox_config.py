@@ -104,6 +104,13 @@ class ProxmoxConnectionPublic(BaseModel):
     user: str
     verify_ssl: bool
     api_timeout: int
+    pool_name: str
+    iso_storage: str
+    data_storage: str
+    task_check_interval: int
+    gateway_ip: str | None = None
+    local_subnet: str | None = None
+    default_node: str | None = None
     enabled: bool
     is_default: bool
     has_ca_cert: bool
@@ -122,6 +129,13 @@ class ProxmoxConnectionCreate(BaseModel):
     verify_ssl: bool = False
     ca_cert: str | None = None
     api_timeout: int = Field(default=30, ge=1, le=300)
+    pool_name: str = Field(default=DEFAULT_PROXMOX_POOL_NAME, max_length=255)
+    iso_storage: str = Field(default="local", max_length=255)
+    data_storage: str = Field(default="local-lvm", max_length=255)
+    task_check_interval: int = Field(default=2, ge=1, le=60)
+    gateway_ip: str | None = None
+    local_subnet: str | None = None
+    default_node: str | None = None
     enabled: bool = True
     is_default: bool = False
 
@@ -137,6 +151,13 @@ class ProxmoxConnectionUpdateIn(BaseModel):
     verify_ssl: bool = False
     ca_cert: str | None = None  # None 表示不更新；空字串表示清除
     api_timeout: int = Field(default=30, ge=1, le=300)
+    pool_name: str = Field(default=DEFAULT_PROXMOX_POOL_NAME, max_length=255)
+    iso_storage: str = Field(default="local", max_length=255)
+    data_storage: str = Field(default="local-lvm", max_length=255)
+    task_check_interval: int = Field(default=2, ge=1, le=60)
+    gateway_ip: str | None = None
+    local_subnet: str | None = None
+    default_node: str | None = None
     enabled: bool = True
     is_default: bool = False
 
@@ -171,6 +192,7 @@ class ProxmoxNodePublic(BaseModel):
     is_online: bool
     last_checked: datetime | None = None
     priority: int = 5
+    enabled: bool = True
 
 
 class ProxmoxNodeUpdate(BaseModel):
@@ -179,6 +201,7 @@ class ProxmoxNodeUpdate(BaseModel):
     host: str
     port: int = Field(default=8006, ge=1, le=65535)
     priority: int = Field(default=5, ge=1, le=10)
+    enabled: bool = True
 
 
 class ConnectionSyncResult(BaseModel):
@@ -201,10 +224,17 @@ class ClusterPreviewResult(BaseModel):
 
 
 class ProxmoxStoragePublic(BaseModel):
-    """回傳給前端的 Storage 資訊"""
+    """回傳給前端的 Storage 資訊。
+
+    共享 Storage（``is_shared``）是整個叢集共用同一份實體儲存，
+    列表中只保留一筆代表記錄，涵蓋的節點列在 ``node_names``。
+    """
 
     id: int
-    node_name: str
+    node_name: str            # 代表記錄所在的節點
+    node_names: list[str] = []  # 這筆代表的所有節點（非共享時僅一個）
+    connection_id: int | None = None
+    connection_name: str | None = None
     storage: str
     storage_type: str | None = None
     total_gb: float
@@ -238,35 +268,6 @@ class SyncNowResult(BaseModel):
     error: str | None = None
 
 
-class NodeStatsPublic(BaseModel):
-    """單一節點的即時資源使用狀態"""
-
-    name: str
-    status: str
-    cpu_usage_pct: float   # 0–100
-    cpu_cores: int
-    mem_used_gb: float
-    mem_total_gb: float
-    disk_used_gb: float
-    disk_total_gb: float
-    vm_count: int = 0
-
-
-class ClusterStatsPublic(BaseModel):
-    """整個叢集的資源加總與各節點狀態"""
-
-    nodes: list[NodeStatsPublic]
-    total_cpu_cores: int
-    used_cpu_cores: float   # weighted sum from cpu_ratio * maxcpu
-    total_mem_gb: float
-    used_mem_gb: float
-    total_disk_gb: float
-    used_disk_gb: float
-    online_count: int
-    offline_count: int
-    total_vm_count: int
-
-
 __all__ = [
     "ConnectionSyncResult",
     "ProxmoxConfigPublic",
@@ -282,6 +283,4 @@ __all__ = [
     "ProxmoxStoragePublic",
     "ProxmoxStorageUpdate",
     "SyncNowResult",
-    "NodeStatsPublic",
-    "ClusterStatsPublic",
 ]

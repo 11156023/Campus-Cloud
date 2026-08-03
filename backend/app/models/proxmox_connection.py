@@ -1,8 +1,9 @@
 """Proxmox 連線（多入口）模型
 
 每筆代表一組獨立的 PVE 入口：可能是單台主機，也可能是一個叢集的
-入口節點。連線層帳密與 SSL 設定各自獨立；全域行為設定（pool、
-placement、scheduler 等）仍在 proxmox_config singleton。
+入口節點。連線層帳密、SSL 與叢集自身的資源設定（pool、storage、
+gateway、預設節點）各自獨立；跨叢集共用的排程與放置策略
+（placement、scheduler）仍在 proxmox_config singleton。
 """
 
 from datetime import datetime
@@ -28,6 +29,14 @@ class ProxmoxConnection(SQLModel, table=True):
     verify_ssl: bool = Field(default=False)
     ca_cert: str | None = Field(default=None, sa_type=sa.Text())
     api_timeout: int = Field(default=30, ge=1, le=300)
+    # ── 該叢集自身的資源設定（各連線獨立） ──
+    pool_name: str = Field(default="SkyLab", max_length=255)
+    iso_storage: str = Field(default="local", max_length=255)
+    data_storage: str = Field(default="local-lvm", max_length=255)
+    task_check_interval: int = Field(default=2, ge=1, le=60)
+    gateway_ip: str | None = Field(default=None, max_length=255)
+    local_subnet: str | None = Field(default=None, max_length=50)
+    default_node: str | None = Field(default=None, max_length=255)
     enabled: bool = Field(default=True)             # 停用後不參與彙總與放置
     is_default: bool = Field(default=False)         # 未指定連線時的預設入口
     created_at: datetime = Field(

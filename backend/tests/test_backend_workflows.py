@@ -1277,8 +1277,8 @@ def test_create_vm_prefers_admin_selected_storage(
         lambda *args, **kwargs: None,
     )
     monkeypatch.setattr(
-        "app.services.proxmox.provisioning_service.get_proxmox_settings",
-        lambda: SimpleNamespace(pool_name="SkyLab"),
+        "app.services.proxmox.provisioning_service.get_proxmox_settings_for_node",
+        lambda _node: SimpleNamespace(pool_name="SkyLab"),
     )
 
     provisioning_service.create_vm(
@@ -1577,8 +1577,8 @@ def test_create_vm_uses_template_node_and_normalizes_disk_size(
         lambda *args, **kwargs: None,
     )
     monkeypatch.setattr(
-        "app.services.proxmox.provisioning_service.get_proxmox_settings",
-        lambda: SimpleNamespace(pool_name="SkyLab"),
+        "app.services.proxmox.provisioning_service.get_proxmox_settings_for_node",
+        lambda _node: SimpleNamespace(pool_name="SkyLab"),
     )
 
     result = provisioning_service.create_vm(
@@ -1665,8 +1665,8 @@ def test_create_vm_falls_back_when_requested_storage_is_unavailable(
         lambda *args, **kwargs: None,
     )
     monkeypatch.setattr(
-        "app.services.proxmox.provisioning_service.get_proxmox_settings",
-        lambda: SimpleNamespace(pool_name="SkyLab"),
+        "app.services.proxmox.provisioning_service.get_proxmox_settings_for_node",
+        lambda _node: SimpleNamespace(pool_name="SkyLab"),
     )
 
     provisioning_service.create_vm(
@@ -1731,23 +1731,39 @@ def test_delete_user_rejects_owned_resources(db: Session) -> None:
 
 
 def test_vm_templates_are_filtered_by_pool(monkeypatch: pytest.MonkeyPatch) -> None:
+    """每個連線各自比對自己的 pool 名稱，不是共用一個。"""
     monkeypatch.setattr(
         "app.infrastructure.proxmox.operations.get_proxmox_settings",
-        type("Cfg", (), {"pool_name": "SkyLab"}),
+        lambda key=None: SimpleNamespace(
+            pool_name={1: "SkyLab", 2: "LabB"}.get(key, "SkyLab")
+        ),
     )
     monkeypatch.setattr(
-        "app.infrastructure.proxmox.operations._raw_vms",
+        "app.infrastructure.proxmox.operations._raw_vms_by_connection",
         lambda: [
-            {"vmid": 100, "name": "allowed", "node": "node-a", "template": 1, "pool": "SkyLab"},
-            {"vmid": 101, "name": "blocked", "node": "node-b", "template": 1, "pool": "OtherPool"},
-            {"vmid": 102, "name": "not-template", "node": "node-c", "template": 0, "pool": "SkyLab"},
+            (
+                1,
+                [
+                    {"vmid": 100, "name": "allowed", "node": "node-a", "template": 1, "pool": "SkyLab"},
+                    {"vmid": 101, "name": "blocked", "node": "node-b", "template": 1, "pool": "OtherPool"},
+                    {"vmid": 102, "name": "not-template", "node": "node-c", "template": 0, "pool": "SkyLab"},
+                ],
+            ),
+            (
+                2,
+                [
+                    {"vmid": 200, "name": "allowed-b", "node": "node-d", "template": 1, "pool": "LabB"},
+                    {"vmid": 201, "name": "blocked-b", "node": "node-e", "template": 1, "pool": "SkyLab"},
+                ],
+            ),
         ],
     )
 
     templates = proxmox_service.get_vm_templates()
 
     assert templates == [
-        {"vmid": 100, "name": "allowed", "node": "node-a", "template": 1, "pool": "SkyLab"}
+        {"vmid": 100, "name": "allowed", "node": "node-a", "template": 1, "pool": "SkyLab"},
+        {"vmid": 200, "name": "allowed-b", "node": "node-d", "template": 1, "pool": "LabB"},
     ]
 
 

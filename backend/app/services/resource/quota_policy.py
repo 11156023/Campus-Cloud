@@ -1,6 +1,6 @@
 """配額解析與執法純函式（無 I/O，可單測）。
 
-解析順序：user 覆寫（整列全勝）→ 所屬群組逐欄位取最大 → 內建預設。
+解析順序：user 覆寫（整列全勝）→ 全域預設（quota_config singleton）→ 內建預設。
 """
 
 from __future__ import annotations
@@ -30,14 +30,18 @@ DEFAULT_QUOTA = EffectiveQuota(
 )
 
 
-def resolve_effective_quota(user_quota: Any | None) -> EffectiveQuota:
-    if user_quota is not None:
-        return EffectiveQuota(
-            max_cpu_cores=int(user_quota.max_cpu_cores),
-            max_memory_mb=int(user_quota.max_memory_mb),
-            max_disk_gb=int(user_quota.max_disk_gb),
-            max_instances=int(user_quota.max_instances),
-        )
+def resolve_effective_quota(
+    user_quota: Any | None, global_quota: Any | None = None
+) -> EffectiveQuota:
+    """個人覆寫整列全勝；無覆寫時套用全域預設；全域列不存在才走內建預設。"""
+    for source in (user_quota, global_quota):
+        if source is not None:
+            return EffectiveQuota(
+                max_cpu_cores=int(source.max_cpu_cores),
+                max_memory_mb=int(source.max_memory_mb),
+                max_disk_gb=int(source.max_disk_gb),
+                max_instances=int(source.max_instances),
+            )
     return DEFAULT_QUOTA
 
 
