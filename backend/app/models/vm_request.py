@@ -23,6 +23,8 @@ class VMRequestStatus(str, enum.Enum):
     approved = "approved"
     rejected = "rejected"
     cancelled = "cancelled"
+    # 使用時段已結束卻始終沒被審核 —— 由 scheduler 自動標記，非人為決定。
+    expired = "expired"
 
 
 class VMProvisioningStatus(str, enum.Enum):

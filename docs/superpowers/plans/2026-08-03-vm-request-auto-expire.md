@@ -18,7 +18,7 @@
 - `approved` / `rejected` / `cancelled` 一律不動。
 - 不寄信、不加治理設定開關、不做歷史資料 backfill。
 - 遵守 CLAUDE.md：業務規則放 `services/`，DB 查詢放 `repositories/`，route 不變（本功能不新增 API）。
-- 後端 lint：`uv run ruff check .` 與 `uv run mypy .` 必須通過。函式內 import 一律加 `# noqa: PLC0415` 註明避免 import cycle。
+- 後端 lint：`uv run ruff check .` 全域必須通過。**mypy 不能全域跑** —— 專案動工前就有 1543 個既有錯誤（199 個檔案），只檢查本次改動的檔案：`uv run mypy <改到的檔案...>` 必須 Success。函式內 import 一律加 `# noqa: PLC0415` 註明避免 import cycle。
 - 所有新測試放 `backend/tests/services/test_vm_request_expiry.py`（單一檔案，逐 Task 累加）。
 - 專案指令一律在 `backend/` 目錄下執行。
 

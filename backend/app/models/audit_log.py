@@ -44,6 +44,7 @@ class AuditAction(str, enum.Enum):
     vm_request_submit = "vm_request_submit"
     vm_request_submit_auto_approved = "vm_request_submit_auto_approved"
     vm_request_review = "vm_request_review"
+    vm_request_expired = "vm_request_expired"
     ai_api_request_submit = "ai_api_request_submit"
     ai_api_request_review = "ai_api_request_review"
 

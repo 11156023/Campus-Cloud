@@ -47,6 +47,7 @@ ACTION_CATEGORY: dict[AuditAction, str] = {
     AuditAction.vm_request_submit: "request",
     AuditAction.vm_request_submit_auto_approved: "request",
     AuditAction.vm_request_review: "request",
+    AuditAction.vm_request_expired: "request",
     AuditAction.ai_api_request_submit: "request",
     AuditAction.ai_api_request_review: "request",
     # 使用者 / 群組
