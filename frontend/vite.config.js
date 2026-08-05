@@ -12,6 +12,7 @@ export default defineConfig(({ mode }) => {
     },
     plugins: [react()],
     server: {
+      host: process.env.HOST || "127.0.0.1",
       port: Number(process.env.PORT) || 5173,
       // VITE_API_URL 留空（same-origin）時，/api 由 dev server 轉發到後端，
       // 讓 dev server 不必落在後端 CORS 白名單的埠
