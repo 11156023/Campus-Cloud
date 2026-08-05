@@ -1,5 +1,5 @@
 import { useContext, useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import styles from "./QuickTemplateFormPage.module.scss";
 import MIcon from "../../../components/MIcon";
 import AiSidePanel from "../requests/AiSidePanel";
@@ -87,11 +87,12 @@ function ToggleGroup({ value, onChange }) {
 export default function QuickTemplateFormPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const toast = useToast();
   const { setCompactFooter } = useContext(LayoutContext);
   useEffect(() => { setCompactFooter(true); return () => setCompactFooter(false); }, [setCompactFooter]);
 
-  const onBack       = () => navigate("/dashboard");
+  const onBack       = () => navigate(location.state?.from ?? "/dashboard");
   const onSubmitted  = () => navigate("/my-resources");
 
   /* 範本系統：載入單一範本（僅 ready 的 LXC 範本可秒開） */
