@@ -17,6 +17,11 @@ export const CoursesService = {
     return apiGet(`/api/v1/courses/paths/${pathId}`);
   },
 
+  /** 取得老師已核准、可讓學生查看的 AI 評分任務。 */
+  getAiAssignments(pathId) {
+    return apiGet(`/api/v1/courses/paths/${pathId}/ai-assignments`);
+  },
+
   /** 房間詳情：任務 + 題目（不含答案）+ 我的部署狀態 */
   getRoom(roomId) {
     return apiGet(`/api/v1/courses/rooms/${roomId}`);

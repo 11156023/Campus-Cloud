@@ -183,6 +183,30 @@ class CourseTaskStudent(BaseModel):
     questions: list[CourseQuestionStudent]
 
 
+class CourseAITaskItemStudent(BaseModel):
+    """學生可見的 AI 評分要求；不包含命令、腳本與內部判分提示。"""
+
+    id: str
+    title: str
+    description: str = ""
+    detectable: Literal["auto", "partial", "manual"] = "manual"
+    order: int = 0
+
+
+class CourseAIAssignmentStudent(BaseModel):
+    """老師核准後，公開給所屬學生的 AI 評分任務。"""
+
+    id: uuid.UUID
+    teaching_class_id: uuid.UUID
+    teaching_class_name: str
+    title: str
+    summary: str = ""
+    template_key: str
+    version: int
+    approved_at: datetime | None = None
+    items: list[CourseAITaskItemStudent]
+
+
 DeploymentStatus = Literal["provisioning", "running", "failed", "expired"]
 
 
@@ -266,6 +290,8 @@ __all__ = [
     "CoursePathDetail",
     "CourseQuestionStudent",
     "CourseTaskStudent",
+    "CourseAITaskItemStudent",
+    "CourseAIAssignmentStudent",
     "CourseDeploymentPublic",
     "CourseRoomStudentDetail",
     "CourseAnswerSubmit",

@@ -6,6 +6,7 @@ from fastapi import APIRouter
 
 from app.api.deps import CurrentUser, SessionDep
 from app.schemas.course import (
+    CourseAIAssignmentStudent,
     CourseAnswerResult,
     CourseAnswerSubmit,
     CourseDeploymentPublic,
@@ -14,6 +15,7 @@ from app.schemas.course import (
     CourseRoomStudentDetail,
 )
 from app.services.course import (
+    ai_assignment_service,
     course_service,
     deployment_service,
     progress_service,
@@ -36,6 +38,20 @@ def get_path(
 ) -> CoursePathDetail:
     return course_service.get_path_detail(
         session, user_id=current_user.id, path_id=path_id
+    )
+
+
+@router.get(
+    "/paths/{path_id}/ai-assignments",
+    response_model=list[CourseAIAssignmentStudent],
+)
+def list_ai_assignments(
+    session: SessionDep, current_user: CurrentUser, path_id: uuid.UUID
+) -> list[CourseAIAssignmentStudent]:
+    return ai_assignment_service.list_student_ai_assignments(
+        session,
+        user_id=current_user.id,
+        path_id=path_id,
     )
 
 
