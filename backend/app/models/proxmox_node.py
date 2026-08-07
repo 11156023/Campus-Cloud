@@ -2,7 +2,8 @@
 
 from datetime import datetime
 
-from sqlalchemy import DateTime
+import sqlalchemy as sa
+from sqlalchemy import Column, DateTime
 from sqlmodel import Field, SQLModel, UniqueConstraint
 
 
@@ -17,8 +18,16 @@ class ProxmoxNode(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     connection_id: int | None = Field(
         default=None,
-        foreign_key="proxmox_connections.id",
-        index=True,
+        sa_column=Column(
+            sa.Integer,
+            sa.ForeignKey(
+                "proxmox_connections.id",
+                name="fk_proxmox_nodes_connection_id",
+                ondelete="CASCADE",
+            ),
+            nullable=True,
+            index=True,
+        ),
     )  # 所屬連線；None 表示尚未歸屬（舊資料，視同預設連線）
     name: str = Field(max_length=255)           # PVE 節點名稱，例如 "pve", "pve2"
     host: str = Field(max_length=255)           # IP 或 hostname
