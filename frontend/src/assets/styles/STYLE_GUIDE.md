@@ -111,6 +111,8 @@ src/pages/personal/resources/
 | —（灰色） | `--color-hover` / `--color-text-muted` | ⚫ 未啟用 | 已停止、已暫停、disabled |
 
 > **例外**：可用名額不足的日曆格（AvailabilityPanel `calendarDayLimited`）保留黃色 `#f59e0b`，因其屬視覺漸層語意，非 UI 警示色。
+>
+> **例外**：Gateway 頁的類 VSCode 設定檔編輯器（`ConfigCodeEditor.module.scss`）整組寫死 vs-dark 色票（`#1e1e1e`、`#252526`、`#007acc` 等）與 13px/12px 字級，刻意不隨主題切換——外框需與 Monaco `theme="vs-dark"` 一致，模擬 VSCode 視窗本身即為獨立配色的容器。
 
 #### 狀態 Badge 的標準寫法
 

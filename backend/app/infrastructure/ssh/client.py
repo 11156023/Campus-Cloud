@@ -87,11 +87,12 @@ class _TrustOnFirstUsePolicy:
 
 
 def _configure_host_key_verification(client: Any) -> None:
-    """載入持久化 known_hosts 並啟用 trust-on-first-use 驗證。"""
-    try:
-        client.load_system_host_keys()
-    except Exception:  # pragma: no cover - 系統 known_hosts 不可讀時忽略
-        pass
+    """載入平台自管 known_hosts 並啟用 trust-on-first-use 驗證。
+
+    刻意不載入系統 ~/.ssh/known_hosts：paramiko 比對時系統檔優先於
+    client 自載的 host keys，但 forget_host_key() 只清平台自管檔，
+    若載入系統檔，殘留其中的舊 key 會讓「重設 host key」失效。
+    """
     path = _known_hosts_file()
     with _KNOWN_HOSTS_LOCK:
         client.load_host_keys(path)

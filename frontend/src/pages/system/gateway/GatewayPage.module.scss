@@ -3,7 +3,7 @@
 
 .page {
   @include flex-column;
-  gap: $spacing-24;
+  gap: $spacing-16;
   padding: $spacing-8 $spacing-16;
   flex: 1;
 
@@ -12,7 +12,6 @@
   }
 }
 
-/* ── Header ── */
 .pageHeader {
   @include flex-between;
   flex-wrap: wrap;
@@ -40,7 +39,7 @@
   color: var(--color-text-secondary);
 }
 
-/* ── Tabs（pill 樣式，同 AI API / AI API Review） ── */
+/* ── Tabs ── */
 .tabs {
   display: flex;
   gap: $spacing-4;
@@ -74,7 +73,6 @@
 .content {
   flex: 1;
   @include flex-column;
-  gap: $spacing-24;
 }
 
 /* ── Empty state ── */
@@ -117,11 +115,33 @@
   text-align: center;
 }
 
-/* 卡片之間 24、卡片內元素 16，維持外鬆內緊的層級 */
 .panelStack {
   @include flex-column;
-  gap: $spacing-24;
+  gap: $spacing-16;
 }
+
+/* ── 服務 Tab 左右分割：左 = 狀態 + 日誌，右 = 設定檔編輯器 ── */
+.serviceLayout {
+  display: grid;
+  gap: $spacing-16;
+  align-items: start;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    "status"
+    "editor"
+    "logs";
+
+  @include respond-to(lg) {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+    grid-template-areas:
+      "status editor"
+      "logs   editor";
+  }
+}
+
+.areaStatus { grid-area: status; min-width: 0; }
+.areaLogs   { grid-area: logs;   min-width: 0; }
+.areaEditor { grid-area: editor; min-width: 0; }
 
 .card {
   @include flex-column;
@@ -143,45 +163,27 @@
   gap: $spacing-8;
 }
 
-/* 卡片內的分組標題（如連線設定 / 叢集資源設定） */
-.sectionTitle {
-  padding-top: $spacing-8;
-  border-top: 1px solid var(--color-divider);
-  font-size: $font-size-14;
-  font-weight: $font-weight-700;
-  color: var(--color-text-primary);
-
-  &:first-of-type {
-    padding-top: 0;
-    border-top: none;
-  }
-}
-
-/* 卡片標題下的說明文字（貼近標題） */
-.cardDesc {
-  margin-top: -$spacing-8;
-  font-size: $font-size-12;
-  color: var(--color-text-muted);
+.cardHeadActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $spacing-8;
 }
 
 .cardHint {
   font-size: $font-size-12;
   color: var(--color-text-muted);
-}
-
-.inlineLink {
-  color: var(--color-primary);
-  text-decoration: none;
-
-  &:hover {
-    text-decoration: underline;
-  }
+  line-height: $line-height-base;
 }
 
 .cardActions {
   display: flex;
-  flex-wrap: wrap;
   justify-content: flex-end;
+  gap: $spacing-8;
+}
+
+.statusRow {
+  display: flex;
+  align-items: center;
   gap: $spacing-8;
 }
 
@@ -232,11 +234,7 @@
   gap: $spacing-16;
 
   @include respond-to(md) {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  @include respond-to(xl) {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: 2fr 1fr 1fr;
   }
 }
 
@@ -247,9 +245,7 @@
   font-weight: $font-weight-500;
   color: var(--color-text-secondary);
 
-  input,
-  select,
-  textarea {
+  input {
     min-height: 38px;
     padding: 8px $spacing-16;
     border: 1px solid var(--color-border);
@@ -264,46 +260,8 @@
       box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 12%, transparent);
     }
   }
-
-  textarea {
-    font-family: monospace;
-    resize: vertical;
-  }
 }
 
-.fieldHint {
-  font-style: normal;
-  font-size: $font-size-12;
-  color: var(--color-text-muted);
-  word-break: break-all;
-}
-
-.checkRow {
-  display: inline-flex;
-  align-items: center;
-  gap: $spacing-8;
-  min-height: 34px;
-  padding: 0 $spacing-16;
-  border: 1px solid var(--color-border);
-  border-radius: $radius-8;
-  color: var(--color-text-primary);
-  font-size: $font-size-14;
-  cursor: pointer;
-  align-self: flex-start;
-}
-
-/* 同一組連續開關收緊成 8（抵銷 .card 的 gap 16） */
-.checkRow + .checkRow {
-  margin-top: -$spacing-8;
-}
-
-.toggleGrid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: $spacing-8;
-}
-
-/* ── Badge ── */
 .badge {
   display: inline-flex;
   align-items: center;
@@ -316,134 +274,22 @@
 }
 
 .badge_success { background: color-mix(in srgb, #28a745 12%, transparent); color: #28a745; }
-.badge_info    { background: color-mix(in srgb, var(--color-primary-dark) 12%, transparent); color: var(--color-primary-dark); }
 .badge_danger  { background: color-mix(in srgb, #dc3545 12%, transparent); color: #dc3545; }
 .badge_muted   { background: var(--color-hover); color: var(--color-text-muted); }
 
-/* ── 放置策略 ── */
-.strategyGrid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: $spacing-16;
-
-  @include respond-to(md) {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-.strategyCard,
-.strategyCardActive {
-  @include flex-column;
-  gap: $spacing-4;
+.keyBlock,
+.statusBlock,
+.logBlock {
   padding: $spacing-16;
-  border-radius: $radius-12;
-  text-align: left;
-  cursor: pointer;
-  transition: border-color $transition-base, background $transition-base;
-}
-
-.strategyCard {
-  border: 2px solid var(--color-border);
-  background: transparent;
-
-  &:hover { border-color: var(--color-text-muted); }
-}
-
-.strategyCardActive {
-  border: 2px solid var(--color-primary);
-  background: color-mix(in srgb, var(--color-primary) 6%, transparent);
-}
-
-.strategyTitle {
-  font-size: $font-size-14;
-  font-weight: $font-weight-700;
-  color: var(--color-text-primary);
-}
-
-.strategyDesc {
-  font-size: $font-size-12;
-  color: var(--color-text-secondary);
-  line-height: $line-height-base;
-}
-
-/* ── 節點 / Storage 列表 ── */
-.list {
-  @include flex-column;
-  gap: $spacing-8;
-}
-
-.nodeRow,
-.storageRow {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: $spacing-16;
-  padding: $spacing-16;
-  @include glass-surface($shadow: var(--shadow-sm));
-  border-radius: $radius-12;
-}
-
-.rowMain {
-  @include flex-column;
-  gap: 2px;
-  flex: 1;
-  min-width: 200px;
-}
-
-.rowName {
-  display: inline-flex;
-  align-items: center;
-  gap: $spacing-8;
-  font-size: $font-size-14;
-  font-weight: $font-weight-500;
-  color: var(--color-text-primary);
-}
-
-.rowMeta {
-  font-size: $font-size-12;
-  color: var(--color-text-muted);
-}
-
-.nodeEdit {
-  display: flex;
-  flex-wrap: wrap;
-  gap: $spacing-8;
-  align-items: center;
-
-  input {
-    min-height: 34px;
-    max-width: 160px;
-    padding: 4px $spacing-8;
-    border: 1px solid var(--color-border);
-    border-radius: $radius-8;
-    background: var(--color-surface);
-    color: var(--color-text-primary);
-    font-size: $font-size-14;
-    outline: none;
-
-    &:focus { border-color: var(--color-primary); }
-  }
-}
-
-.inlineSelect,
-.inlineInput {
-  min-height: 34px;
-  padding: 4px $spacing-8;
   border: 1px solid var(--color-border);
   border-radius: $radius-8;
-  background: var(--color-surface);
+  background: var(--color-hover);
   color: var(--color-text-primary);
-  font-size: $font-size-14;
-  outline: none;
-
-  &:focus { border-color: var(--color-primary); }
-
-  &:disabled {
-    opacity: 0.55;
-    cursor: not-allowed;
-  }
+  font-size: $font-size-12;
+  font-family: monospace;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 320px;
+  overflow-y: auto;
 }
 
-.inlineInput {
-  width: 80px;
-}

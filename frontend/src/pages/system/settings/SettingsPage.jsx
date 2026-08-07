@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import styles from "./SettingsPage.module.scss";
 import MIcon from "../../../components/MIcon";
+import { useConfirm } from "../../../components/ConfirmDialog/ConfirmProvider";
 import { useToast } from "../../../hooks/useToast";
 import { ProxmoxConfigService } from "../../../services/proxmoxConfig";
 import GovernanceTab from "./GovernanceTab";
@@ -252,6 +253,7 @@ function ConnectionForm({ initial, isEdit, saving, onSubmit, onCancel }) {
 
 function ConnectionsSection({ connections, loading, onRefresh }) {
   const toast = useToast();
+  const confirm = useConfirm();
   const [editing, setEditing] = useState(null); // null | "new" | connection 物件
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState(null);
@@ -276,7 +278,13 @@ function ConnectionsSection({ connections, loading, onRefresh }) {
   }
 
   async function handleDelete(conn) {
-    if (!window.confirm(`確定刪除連線「${conn.name}」？其節點與 Storage 記錄將一併移除。`)) return;
+    const ok = await confirm({
+      title: "刪除 PVE 連線",
+      message: `確定刪除連線「${conn.name}」？其節點與 Storage 記錄將一併移除。`,
+      confirmText: "刪除",
+      danger: true,
+    });
+    if (!ok) return;
     setBusyId(conn.id);
     try {
       await ProxmoxConfigService.deleteConnection(conn.id);
@@ -776,10 +784,6 @@ export default function SettingsPage() {
     fetchConnections();
   }, [fetchConnections]);
 
-  // 頁首徽章顯示實際生效的入口，而不是相容用的 singleton
-  const defaultConnection =
-    connections.find((c) => c.is_default) ?? connections[0] ?? null;
-
   const setField = useCallback((name, value) => {
     setForm((prev) => ({ ...prev, [name]: value }));
   }, []);
@@ -803,15 +807,7 @@ export default function SettingsPage() {
       {/* ── 頁首 ── */}
       <div className={styles.pageHeader}>
         <div className={styles.pageHeading}>
-          <div className={styles.titleRow}>
-            <h1 className={styles.pageTitle}>系統設定</h1>
-            {defaultConnection && (
-              <div className={styles.ipBadge}>
-                <MIcon name="check_circle" size={12} />
-                {defaultConnection.host}
-              </div>
-            )}
-          </div>
+          <h1 className={styles.pageTitle}>系統設定</h1>
           <p className={styles.pageSubtitle}>
             管理 Proxmox VE 連線、節點、Storage 與資源排程設定。
           </p>

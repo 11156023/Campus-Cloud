@@ -343,7 +343,6 @@ def create_lxc(
             expiry_date=lxc_data.expiry_date,
             ssh_private_key_encrypted=encrypt_value(private_key_pem),
             ssh_public_key=public_key,
-            service_template_slug=lxc_data.service_template_slug,
             batch_job_id=batch_job_id,
             commit=False,
         )
@@ -517,7 +516,6 @@ def create_vm(
             template_id=vm_data.template_id,
             ssh_private_key_encrypted=encrypt_value(private_key_pem),
             ssh_public_key=public_key,
-            service_template_slug=vm_data.service_template_slug,
             batch_job_id=batch_job_id,
             commit=False,
         )
@@ -968,7 +966,6 @@ def provision_from_request(
         template_id=getattr(db_request, "template_id", None),
         ssh_private_key_encrypted=plan.get("ssh_private_key_encrypted"),
         ssh_public_key=plan.get("ssh_public_key"),
-        service_template_slug=getattr(db_request, "service_template_slug", None),
         request_id=getattr(db_request, "id", None),
         commit=False,
     )

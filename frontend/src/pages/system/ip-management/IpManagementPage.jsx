@@ -4,6 +4,7 @@ import MIcon from "../../../components/MIcon";
 import SubnetConfigForm from "./SubnetConfigForm";
 import { useAuth } from "../../../contexts/AuthContext";
 import { IpManagementService } from "../../../services/ipManagement";
+import { useConfirm } from "../../../components/ConfirmDialog/ConfirmProvider";
 import { useToast } from "../../../hooks/useToast";
 import useAutoRefresh from "../../../hooks/useAutoRefresh";
 
@@ -67,6 +68,7 @@ function PurposeBadge({ purpose }) {
 
 export default function IpManagementPage() {
   const toast = useToast();
+  const confirm = useConfirm();
   const { user } = useAuth();
   const isAdmin = Boolean(user?.is_superuser || user?.role === "admin");
 
@@ -150,9 +152,12 @@ export default function IpManagementPage() {
   }
 
   async function handleDelete() {
-    const ok = window.confirm(
-      "確定刪除子網設定？刪除後全站 VM / LXC 建立功能將被停用，且需無任何 VM / LXC 仍佔用 IP 才能刪除。",
-    );
+    const ok = await confirm({
+      title: "刪除子網設定",
+      message: "確定刪除子網設定？刪除後全站 VM / LXC 建立功能將被停用，且需無任何 VM / LXC 仍佔用 IP 才能刪除。",
+      confirmText: "刪除",
+      danger: true,
+    });
     if (!ok) return;
     setDeleting(true);
     try {

@@ -10,14 +10,12 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
-from app.ai.template_recommendation.catalog_service import get_catalog
 from app.ai.template_recommendation.config import settings
 from app.ai.template_recommendation.node_service import (
     build_resource_option_bundle,
     load_live_device_nodes,
 )
 from app.ai.template_recommendation.prompt import (
-    build_chat_catalog_context,
     build_chat_runtime_context,
     build_chat_system_prompt,
 )
@@ -229,13 +227,7 @@ async def chat(
             detail="AI model binding is missing in config/system-ai.json.",
         )
 
-    catalog = get_catalog()
     is_first_turn = len(request.messages) <= 1
-    catalog_context = build_chat_catalog_context(
-        catalog,
-        request.messages,
-        top_k=request.top_k,
-    )
     form_context = request.form_context
     gpu_options = _resolve_chat_gpu_options(request, session)
     runtime_context = (
@@ -261,7 +253,6 @@ async def chat(
     )
     system_prompt = build_chat_system_prompt(
         is_first_turn=is_first_turn,
-        catalog_context=catalog_context,
         runtime_context=runtime_context,
     )
 
@@ -370,13 +361,11 @@ async def recommend(
         top_k=request.top_k,
     )
 
-    catalog = get_catalog()
     resource_options = _resolve_resource_options(request, gpu_options)
 
     try:
         ai_result, ai_metrics = await generate_ai_plan(
             merged_request,
-            catalog,
             request.messages,
             resource_options=resource_options,
         )
@@ -393,7 +382,6 @@ async def recommend(
             ai_result,
             merged_request,
             merged_request.device_nodes,
-            catalog,
             resource_options=resource_options,
         )
         result["live_device_nodes"] = [

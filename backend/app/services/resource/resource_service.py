@@ -137,9 +137,6 @@ def _build_resource_public(
         expiry_date=db_resource.expiry_date if db_resource else None,
         ip_address=ip_address,
         ssh_public_key=db_resource.ssh_public_key if db_resource else None,
-        service_template_slug=(
-            db_resource.service_template_slug if db_resource else None
-        ),
         cpu=resource.get("cpu"),
         maxcpu=resource.get("maxcpu"),
         mem=resource.get("mem"),
@@ -262,7 +259,6 @@ def list_by_user(
                                 os_info=db_r.os_info,
                                 expiry_date=db_r.expiry_date,
                                 ssh_public_key=db_r.ssh_public_key,
-                                service_template_slug=db_r.service_template_slug,
                             )
                         )
                         shown_vmids.add(db_r.vmid)

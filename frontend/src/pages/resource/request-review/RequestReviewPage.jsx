@@ -135,7 +135,6 @@ function normalizeVmRequest(request) {
     paramText:
       request.os_info ||
       request.ostemplate ||
-      request.service_template_slug ||
       (request.template_id ? `Template #${request.template_id}` : "未設定"),
     gpuText: request.gpu_mapping_id || "未申請",
     nodeText: request.assigned_node || request.desired_node || "尚未評估",

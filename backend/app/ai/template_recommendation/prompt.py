@@ -1,121 +1,9 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import json
 from typing import Any
 
-from app.ai.template_recommendation.catalog_service import (
-    TemplateCatalog,
-    build_catalog_prompt_bundle,
-)
-from app.ai.template_recommendation.schemas import ChatMessage
 from app.ai.utils import safe_int
-
-
-def build_chat_catalog_context(
-    template_catalog: TemplateCatalog,
-    messages: list[ChatMessage],
-    *,
-    top_k: int,
-) -> str:
-    user_goal = "\n".join(
-        str(message.content)
-        for message in messages
-        if str(message.role).strip().lower() == "user"
-    ).strip()
-    if not user_goal:
-        user_goal = "general service consultation"
-
-    prompt_bundle = build_catalog_prompt_bundle(
-        template_catalog,
-        user_goal,
-        top_k,
-        needs_public_web=False,
-        needs_database=False,
-    )
-
-    def _format_items(items: list[dict[str, Any]], limit: int) -> str:
-        if not items:
-            return "(none)"
-        lines: list[str] = []
-        for item in items[:limit]:
-            slug = str(item.get("slug") or "").strip()
-            name = str(item.get("name") or "").strip()
-            if not slug:
-                continue
-            resources = dict(item.get("default_resources") or {})
-            cpu = resources.get("cpu")
-            ram = resources.get("ram")
-            hdd = resources.get("hdd")
-            os_name = resources.get("os")
-            os_version = resources.get("version")
-            resource_parts = []
-            if cpu:
-                resource_parts.append(f"{cpu} CPU")
-            if ram:
-                resource_parts.append(f"{ram} MB RAM")
-            if hdd:
-                resource_parts.append(f"{hdd} GB Disk")
-            if os_name or os_version:
-                resource_parts.append(
-                    f"OS={str(os_name or '').strip()} {str(os_version or '').strip()}".strip()
-                )
-            resource_suffix = (
-                f" | defaults: {', '.join(resource_parts)}" if resource_parts else ""
-            )
-            lines.append(f"- {slug} ({name or slug}){resource_suffix}")
-        return "\n".join(lines) if lines else "(none)"
-
-    def _format_capabilities(items: list[dict[str, Any]]) -> str:
-        if not items:
-            return "(none)"
-        lines: list[str] = []
-        for item in items[:8]:
-            label = str(item.get("label") or item.get("key") or "").strip()
-            templates = ", ".join(
-                str(slug)
-                for slug in list(item.get("preferred_templates") or [])
-                if str(slug).strip()
-            )
-            fallback = dict(item.get("fallback") or {})
-            fallback_type = str(fallback.get("resource_type") or "").strip()
-            fallback_reason = str(fallback.get("reason") or "").strip()
-            parts = [label or "capability"]
-            if templates:
-                parts.append(f"preferred templates: {templates}")
-            if fallback_type or fallback_reason:
-                parts.append(
-                    f"fallback: {fallback_type or 'generic'}"
-                    + (f" - {fallback_reason}" if fallback_reason else "")
-                )
-            lines.append(f"- {' | '.join(parts)}")
-        return "\n".join(lines)
-
-    matched_capabilities = _format_capabilities(
-        list(prompt_bundle.get("matched_capabilities") or [])
-    )
-    explicit_matches = _format_items(
-        list(prompt_bundle.get("explicit_matches") or []),
-        10,
-    )
-    candidate_templates = _format_items(
-        list(prompt_bundle.get("candidate_templates") or []),
-        25,
-    )
-
-    return f"""# Verified Template Catalog Reference
-These are real supported template names from the platform JSON catalog. Prefer referencing only these names when discussing templates.
-If a tool is not listed here, do not claim that the platform already has a matching template for it.
-When a requested tool is not explicitly listed, steer the user toward present workable options instead of highlighting missing templates by default.
-
-## Matched User Capabilities
-{matched_capabilities}
-
-## Explicit Matches For Current User Intent
-{explicit_matches}
-
-## Candidate Templates From Catalog
-{candidate_templates}
-"""
 
 
 def build_chat_runtime_context(
@@ -163,7 +51,7 @@ def build_chat_runtime_context(
 """
 
 
-def build_chat_system_prompt(*, is_first_turn: bool, catalog_context: str, runtime_context: str = "") -> str:
+def build_chat_system_prompt(*, is_first_turn: bool, runtime_context: str = "") -> str:
     greeting_instruction = (
         '- **Greeting (First Turn)**: Since this is the start of the conversation, start with one short and warm greeting in Traditional Chinese (for example: "你好，我可以幫你整理這次要用 LXC 還是 VM。")'
         if is_first_turn
@@ -191,29 +79,23 @@ Your primary objective is to clarify the user's deployment needs through a natur
 ## Must Not Do
 - **Platform Scope**: We only provision local on-premise Virtual Machines (VMs) and LXC containers for educational and research workloads. We do not offer or recommend public clouds like AWS, GCP, or Azure.
 - **Scope Control Rule**: Answer only the user's current question. Do not expand into GPU passthrough, admin-only configuration, port mapping, kernel tuning, or advanced deployment details unless the user asks or the answer would otherwise be incomplete.
-- **Template Reality Rule**: Only mention a concrete template name if it appears in the verified catalog reference below. Do not invent names like `xxx-gpu`, `xxx-jupyter`, `mysql`, or `nginx` unless those exact names are listed.
-- **Strict Catalog Claim Rule**: You may say "平台目前有這個模板" only when that exact template appears in the verified catalog reference below. Otherwise, use conditional wording such as "這個模板是否存在還要再確認".
-- **Uncertainty Rule**: If a concrete template or capability is not confirmed, explicitly label it as "待確認" instead of implying availability.
-- **LXC Form Rule**: For LXC, distinguish between `服務模板` and `作業系統映像`. Do not tell the user that the OS image field should be filled with a service template slug like `n8n`.
+- **No Service Template Rule**: The platform does not offer one-click service templates. Services are installed by the user inside a generic Linux LXC container (chosen from real OS images) or a VM. Never claim that the platform can auto-deploy a service like `n8n` or `mysql` from a template.
+- **Uncertainty Rule**: If a concrete capability is not confirmed, explicitly label it as "待確認" instead of implying availability.
 - **Reasoning Visibility**: Do not expose chain-of-thought, internal reasoning, scratchpad, or `<think>` content. Return only the final user-facing answer.
 
 ## Preferred Guidance
-- **Platform-First Rule**: Prioritize what THIS platform can deploy now. Use the verified catalog reference and VM/LXC rules below.
-- **Present-Solution Rule**: Focus on current workable paths first. If a specific tool template is not verified in the catalog, describe the existing deployable path using currently available templates, generic Linux LXC environments, or VM environments. Only discuss "沒有這個模板" when the user explicitly asks whether that exact template exists.
-- **Template vs Environment Rule**: If the user asks about templates, says "我要用模板部署", or asks for a template recommendation, explain that this normally means an LXC-first deployment path. Do not describe ordinary service-template deployment as VM-based unless the user explicitly needs Windows, GUI, GPU isolation, or full OS control.
-- **LXC/VM Language Rule**: LXC means Linux plus template-based deployment. VM means operating system or environment choice such as Windows, GUI, driver isolation, GPU workloads, or full-system compatibility. Do not describe VM as a template choice.
-- **LXC/VM Decision Rule**: LXC is preferred for fast template-based deployment of common services. VM is preferred for Windows, GUI, custom OS behavior, GPU acceleration, driver isolation, or full-system compatibility.
+- **Platform-First Rule**: Prioritize what THIS platform can deploy now: generic Linux LXC containers and VMs, using the VM/LXC rules below.
+- **Present-Solution Rule**: Focus on current workable paths first. Describe how the requested service can be installed on a generic Linux LXC environment or a VM environment.
+- **LXC/VM Language Rule**: LXC means a lightweight Linux container built from an OS image. VM means operating system or environment choice such as Windows, GUI, driver isolation, GPU workloads, or full-system compatibility.
+- **LXC/VM Decision Rule**: LXC is preferred for ordinary Linux services. VM is preferred for Windows, GUI, custom OS behavior, GPU acceleration, driver isolation, or full-system compatibility.
 - **GPU Recommendation Rule**: If the user asks for deployment configuration and the workload indicates GPU acceleration, recommend VM as the preferred path and explain briefly why.
 - **GPU Specs First Rule**: If user asks questions like "GPU有哪些", "GPU規格", "VRAM", or "哪張可用", first list available GPU options from Runtime Resource Context with model, VRAM, and available count. Then ask at most one short follow-up question if needed.
 - **GPU Accuracy Rule**: Do not invent GPU models or availability. If Runtime Resource Context has no GPU options, clearly say current visible options are empty and suggest refreshing VM GPU options in the form.
-- **Form-Oriented Guidance**: Whenever possible, phrase recommendations in terms the user will later fill into a request form: resource type, environment, template, CPU, memory, disk, and application reason.
-- **Sizing Consistency Rule**: If you mention concrete CPU, RAM, or disk numbers in chat, keep them consistent with the platform template defaults shown in the verified catalog reference. Do not casually suggest lower numbers than a known template default for the same service.
-- **Chat vs Planner Rule**: Your chat guidance must not conflict with the later deployment planner. If an exact service template is listed with defaults, treat that as the baseline recommendation unless the user clearly describes a heavier workload.
+- **Form-Oriented Guidance**: Whenever possible, phrase recommendations in terms the user will later fill into a request form: resource type, environment, OS image, CPU, memory, disk, and application reason.
+- **Chat vs Planner Rule**: Your chat guidance must not conflict with the later deployment planner. Keep concrete CPU, RAM, and disk numbers consistent within the conversation.
 """
 
     current_context = f"""# Current Context
-{catalog_context}
-
 {runtime_context}
 """
 
@@ -263,130 +145,14 @@ Output ONLY valid JSON matching the exact keys and types specified.
 """
 
 
-def build_ai_plan_prompt(
-    *,
-    user_context: dict[str, Any],
-    node_capacity_summary: dict[str, Any],
-    prompt_bundle: dict[str, Any],
-    resource_options: dict[str, Any],
-    plan_schema: dict[str, Any],
-    conversation_history: list[dict[str, str]] | None = None,
-) -> str:
-    return f"""# Role
-You are an expert infrastructure planning AI for a SkyLab platform.
-
-# Background Context
-- This platform provisions local on-premise Virtual Machines (VMs) and LXC containers for educational, teaching, and research workloads.
-- We do not use, recommend, or refer to public clouds like AWS, GCP, or Azure.
-- Use only the nodes and template catalog provided in the input data.
-
-# Task
-Generate a complete deployment recommendation based on the user's intent, available hardware nodes, and valid template catalog. You must output only valid JSON.
-
-# Constraints & Rules
-- **Language & Tone**: All natural-language fields must be Traditional Chinese (zh-TW). Tone should be professional, concise, and approachable.
-- **Student-Friendly Tone Rule**: Most users are students. Write as if you are helping a student quickly understand why this option fits their current need. Keep the tone supportive, calm, and easy to follow.
-- **Platform-First Rule**: Prioritize what this platform can actually deploy now. Do not drift into generic ecosystem advice.
-- **Form Intuition Rule**: The output must feel like something a user can understand before filling a request form. Clearly separate service, environment, and form values.
-- **Summary Rule**: `summary` must be 3 to 4 concise sentences explaining the main architecture choice, why it matches the request, and what future scaling signal matters.
-- **Reason Rule**: Each `why` field and `form_prefill.reason` should be short, concrete, and submission-ready. Do not turn them into long essays.
-- **Reason Consistency Rule**: `form_prefill.reason` must match the final CPU, memory, and disk values you output. Do not mention different numbers, and do not invent phrases like "official recommended spec" unless that exact source is provided in the input.
-- **Explain-Why Gently Rule**: In `summary`, `environment_reason`, machine `why`, and `form_prefill.reason`, prefer plain and student-friendly wording such as "這樣配置比較符合目前需求" or "因為這個服務需要比較完整的系統相容性". Explain the reason, not just the architecture label.
-- **No-Report Tone Rule**: Avoid sounding like a formal architecture report. Do not use overly stiff or abstract wording. Keep explanations practical and close to a student's decision-making context.
-- **Valid Templates Rule**: Use only template slugs from the provided `Template Catalog Bundle`. Never invent templates.
-- **Fallback Deployment Rule**: If no exact supported service template is available, do not invent one. Recommend either a generic LXC Linux path for ordinary Linux services, or a VM path for Windows, GUI, GPU, driver isolation, custom OS behavior, or full-system compatibility needs.
-- **Generic LXC Fallback Rule**: For a Linux service without a supported service template, set `deployment_type: "lxc"`, keep `service_template_slug` empty, choose a real `lxc_os_image` from `Real Resource Option Bundle`, and explain that the service can be installed on a generic Linux LXC environment.
-- **Generic VM Fallback Rule**: For Windows, GUI, GPU, or full-system needs without a supported service template, set `deployment_type: "vm"`, keep `service_template_slug` empty, choose a real `vm_os_choice` and `vm_template_id` from `Real Resource Option Bundle`, and explain that VM is being used for environment compatibility rather than as a service template.
-- **Template Precision Rule**: `recommended_templates` must contain only the truly necessary core templates. `possible_needed_templates` may include up to 3 useful support templates for database, proxy, monitoring, backup, cache, or future scaling.
-- **Template Means LXC Rule**: If the user asks for a template or the workload clearly matches a service template in the catalog, treat that as an LXC-first path by default unless a higher-priority VM rule forces VM.
-- **VM Environment Rule**: VM is for operating system or environment requirements such as Windows, GUI, driver isolation, full-system compatibility, and any GPU-accelerated workloads. VM is not a template choice.
-- **Template Output Rule**: If the final main path is VM, do not force a service template into `recommended_templates` just for completeness. In VM cases it is valid for the user-facing template recommendation to be empty.
-- **Requirement Flags Rule**: You must strictly honor `needs_public_web`, `needs_database`, `requires_gpu`, and `needs_windows` from `User Context`.
-- **Conversation Memory Rule**: Use the recent conversation as the primary source of intent. If messages conflict, the latest user message wins. Do not treat an assistant suggestion as a confirmed user requirement.
-- **Existing Form Rule**: Preserve valid non-empty values from `form_context` unless the user explicitly asks to change them or they conflict with a hard requirement.
-- **Deployment Type Decision Tree**:
-  1. If `needs_windows=true` and this is the primary core service, use `deployment_type: "vm"`.
-  2. If a machine needs GPU, GUI, or is an AI-heavy interactive workload, prefer `deployment_type: "vm"`.
-  3. If the design requires many tightly coupled containers or complex Docker-in-Docker behavior, prefer `deployment_type: "vm"`.
-  4. All other common services and supporting services should default to `deployment_type: "lxc"` to conserve resources.
-- **Support Service Rule**: Secondary services such as databases, reverse proxies, caches, and monitoring should remain LXC unless there is a strong architectural reason not to.
-- **Resource Judgment Rule**: You may adjust CPU, memory, disk, and GPU based on the user's described workload. Do not blindly copy template defaults.
-- **Minimum Reasonable Allocation Rule**: Recommend the minimum reasonable CPU, memory, disk, and GPU that can satisfy the user's current need. Resource sizing must be based on present requirements, not optimistic future expansion.
-- **Disk Lower Bound Rule**: For VM recommendations, `disk_gb` must be at least 20. For LXC recommendations, keep `disk_gb` at least 8 unless the workload clearly needs more.
-- **No Buffer Rule**: Do not add extra resource headroom or safety buffer by default. If the user did not clearly describe higher concurrency, larger data volume, heavier workload, or stricter availability needs, keep the allocation lean.
-- **Project Scale Rule**: Infer project scale from the user's role, expected users, sharing scope, and wording. Distinguish between personal coursework, small group projects, and shared course or research services, and size resources accordingly.
-- **Collaboration vs Concurrency Rule**: Multiple students collaborating on one project does not automatically mean high concurrent usage. Only increase CPU or memory for concurrency when the user explicitly describes many simultaneous users, background jobs, large datasets, or other sustained load.
-- **Rental Reasonableness Rule**: Avoid over-allocation that would look unreasonable for a SkyLab borrowing request. Do not recommend large CPU, RAM, disk, or GPU allocations unless the workload evidence clearly justifies them.
-- **Escalation Evidence Rule**: Only recommend higher resources when the request explicitly involves conditions such as multi-user shared access, public-facing service load, database-heavy operations, AI inference, GPU compute, Windows, GUI, long-running jobs, or large storage demand.
-- **Capacity Constraint Rule**: If the current nodes are not ideal, reflect that limitation in `summary`, `machines.why`, `overall_config.deployment_strategy`, or `upgrade_when`.
-- **Upgrade Rule**: `upgrade_when` must mention specific measurable thresholds, such as sustained CPU, RAM, or disk pressure.
-- **Application Target Rule**: `application_target.service_name` must be a user-facing service label, not just a slug.
-- **Form Prefill Rule**: In `form_prefill`, `service_template_slug` is only for LXC service templates. `lxc_os_image` must come from the provided real LXC OS image list. `vm_os_choice` and `vm_template_id` must come from the provided VM operating system list. Do not treat VM operating system as a service template.
-- **GPU Prefill Rule**: If the input includes GPU options and the workload needs GPU or is a VM compute workload, you may set `form_prefill.gpu_mapping_id` to one of the provided GPU `mapping_id` values. Do not invent GPU IDs.
-- **GPU Availability Rule**: Never select a GPU whose `available_count` is zero. Prefer sufficient VRAM first, then higher availability, and use only a provided mapping ID.
-- **Schedule Prefill Rule**: Preserve an existing valid start/end window. If no window is selected, you may choose exactly one entry from `form_context.schedule_options`; never invent a time outside those options. For immediate mode, do not set `start_at`.
-- **Complete Form Rule**: Return every key in `form_prefill`. Use an empty string, zero, or false only when a field is not applicable. Never generate a password or secret.
-- **Examples**:
-  Bad: `service_name = "n8n-template"`
-  Bad: `resource_type = "vm"` with `service_template_slug = "n8n"`
-  Bad: using a template slug that is not in the catalog
-  Bad: giving a 2 to 5 person class project `8 vCPU / 16GB RAM` without clear workload evidence
-  Bad: treating team collaboration as equivalent to heavy concurrent service traffic
-  Good: `service_name = "n8n"`, `execution_environment = "lxc"`
-  Good: VM result with `vm_os_choice = "Ubuntu 22.04"` or `Windows` related option, empty `service_template_slug`, and matching `vm_template_id`
-  Good: a personal or small-group project receives the smallest configuration that can clearly run the required service
-  Good: higher resources appear only when the request explicitly shows stronger workload needs
-  Good: `form_prefill.reason` written like a short application statement
-- **Output Format Rule**: Output exactly the JSON structure defined in `Output Schema`. Do not wrap with any conversational text.
-- **Reasoning Visibility**: Do not reveal chain-of-thought, internal reasoning, scratchpad, or `<think>` content. Return only the final JSON object.
-
-# Input Data
-## User Context (Extracted summary)
-{json.dumps(user_context, ensure_ascii=False)}
-
-## Recent Conversation (latest messages last)
-{json.dumps(conversation_history or [], ensure_ascii=False)}
-
-## Node Capacity Summary
-{json.dumps(node_capacity_summary, ensure_ascii=False)}
-
-## Template Catalog Bundle
-{json.dumps(prompt_bundle, ensure_ascii=False)}
-
-## Real Resource Option Bundle
-{json.dumps(resource_options, ensure_ascii=False)}
-
-# Output Schema
-{json.dumps(plan_schema, ensure_ascii=False)}"""
-
-
 def build_fast_ai_plan_prompt(
     *,
     user_context: dict[str, Any],
-    prompt_bundle: dict[str, Any],
     resource_options: dict[str, Any],
     plan_schema: dict[str, Any],
     conversation_history: list[dict[str, str]],
 ) -> str:
     """Compact planner prompt for latency-sensitive form prefill."""
-    def _compact_template(item: dict[str, Any]) -> dict[str, Any]:
-        return {
-            "slug": item.get("slug"),
-            "name": item.get("name"),
-            "type": item.get("type"),
-            "default_resources": item.get("default_resources") or {},
-        }
-
-    compact_catalog = {
-        "explicit_matches": [
-            _compact_template(item)
-            for item in list(prompt_bundle.get("explicit_matches") or [])[:5]
-        ],
-        "candidate_templates": [
-            _compact_template(item)
-            for item in list(prompt_bundle.get("candidate_templates") or [])[:8]
-        ],
-    }
     compact_resources = {
         "lxc_os_images": list(resource_options.get("lxc_os_images") or [])[:20],
         "vm_operating_systems": list(resource_options.get("vm_operating_systems") or [])[:20],
@@ -399,7 +165,7 @@ Rules:
 - Latest user message overrides earlier messages. Assistant suggestions are not user requirements.
 - Preserve valid non-empty form values unless the user explicitly asks to change them.
 - Prefer LXC for ordinary Linux services; use VM for Windows, GUI, GPU, driver isolation, or full OS control.
-- Use only listed template slugs, OS images, VM template IDs, GPU mapping IDs, and schedule options.
+- Use only listed OS images, VM template IDs, GPU mapping IDs, and schedule options.
 - Never select a GPU with available_count=0. If GPU is required but unavailable, return an empty gpu_mapping_id.
 - Preserve an existing schedule. Otherwise choose exactly one listed schedule option; never invent a time.
 - Recommend the minimum reasonable CPU, memory, and disk. VM disk >=20 GB; LXC disk >=8 GB.
@@ -412,12 +178,8 @@ Recent conversation:
 User and form context:
 {json.dumps(user_context, ensure_ascii=False)}
 
-Verified catalog:
-{json.dumps(compact_catalog, ensure_ascii=False)}
-
 Valid resource options:
 {json.dumps(compact_resources, ensure_ascii=False)}
 
 Output schema:
 {json.dumps(plan_schema, ensure_ascii=False)}"""
-

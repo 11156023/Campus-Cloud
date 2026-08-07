@@ -55,8 +55,6 @@ def create_vm_request(
         disk_size=vm_request_in.disk_size,
         username=vm_request_in.username,
         gpu_mapping_id=vm_request_in.gpu_mapping_id,
-        service_template_slug=vm_request_in.service_template_slug,
-        service_template_script_path=vm_request_in.service_template_script_path,
         requested_mode=getattr(vm_request_in, "requested_mode", "manual"),
         auto_decision_reason=auto_decision_reason,
         status=VMRequestStatus.pending,

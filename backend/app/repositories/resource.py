@@ -18,7 +18,6 @@ def create_resource(
     template_id: int | None = None,
     ssh_private_key_encrypted: str | None = None,
     ssh_public_key: str | None = None,
-    service_template_slug: str | None = None,
     batch_job_id: uuid.UUID | None = None,
     request_id: uuid.UUID | None = None,
     commit: bool = True,
@@ -33,7 +32,6 @@ def create_resource(
         template_id=template_id,
         ssh_private_key_encrypted=ssh_private_key_encrypted,
         ssh_public_key=ssh_public_key,
-        service_template_slug=service_template_slug,
         batch_job_id=batch_job_id,
         created_at=datetime.now(timezone.utc),
     )

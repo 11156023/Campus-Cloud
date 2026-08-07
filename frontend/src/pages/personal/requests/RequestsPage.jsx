@@ -84,7 +84,6 @@ function getFormInfoItems(req) {
   const items = [];
   if (req.username)             items.push({ label: "帳號",   value: req.username });
   if (req.gpu_mapping_id)       items.push({ label: "GPU",    value: req.gpu_mapping_id });
-  if (req.service_template_slug) items.push({ label: "服務模板", value: req.service_template_slug });
   return items;
 }
 

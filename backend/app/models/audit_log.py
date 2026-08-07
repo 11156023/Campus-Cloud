@@ -57,7 +57,7 @@ class AuditAction(str, enum.Enum):
     batch_provision_vm = "batch_provision_vm"
     batch_provision_lxc = "batch_provision_lxc"
 
-    # 腳本部署
+    # 腳本部署（功能已移除；保留枚舉值以讀取歷史稽核紀錄）
     script_deploy = "script_deploy"
 
     # 反挖礦（模組D）

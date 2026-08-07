@@ -64,7 +64,6 @@ from .resource import Resource
 from .resource_network import ResourceNetwork
 from .resource_quota import QuotaScope, ResourceQuota
 from .reverse_proxy_rule import ReverseProxyRule
-from .script_deploy_log import ScriptDeployLog
 from .spec_change_request import (
     SpecChangeRequest,
     SpecChangeRequestStatus,
@@ -198,7 +197,6 @@ __all__ = [
     # Subnet & IP Management
     "SubnetConfig",
     "IpAllocation",
-    "ScriptDeployLog",
     "TeacherJudgeFile",
     "TeacherJudgeFileStatus",
     "TeacherJudgeMessageRole",

@@ -4,6 +4,7 @@ import MIcon from "../../../components/MIcon";
 import { useAuth } from "../../../contexts/AuthContext";
 import { TemplatesService } from "../../../services/templates";
 import { useToast } from "../../../hooks/useToast";
+import { useConfirm } from "../../../components/ConfirmDialog/ConfirmProvider";
 import { TemplateStatusBadge } from "./TemplateBadges";
 import TemplateCloneDialog from "./TemplateCloneDialog";
 import TemplateFormDialog from "./TemplateFormDialog";
@@ -215,6 +216,7 @@ function StudentCatalog({ templates, onClone }) {
 
 export default function TemplatesPage() {
   const toast = useToast();
+  const confirm = useConfirm();
   const { user } = useAuth();
   const canManage =
     user?.role === "admin" || user?.role === "teacher" || user?.is_superuser === true;
@@ -266,6 +268,16 @@ export default function TemplatesPage() {
   };
 
   const handleCycle = async (templateId, action) => {
+    if (action === "finish") {
+      const ok = await confirm({
+        title: "完成更新並轉為新版範本？",
+        message:
+          "暫存母機會被關機，且其所有快照（備份點）會被移除，接著轉為新版唯讀範本並汰換舊版。此動作無法復原。",
+        confirmText: "關機並轉換",
+        danger: true,
+      });
+      if (!ok) return;
+    }
     setCycleBusy(true);
     try {
       if (action === "start") await TemplatesService.startUpdateCycle(templateId);
@@ -287,10 +299,18 @@ export default function TemplatesPage() {
   };
 
   const handleRetry = async (templateId) => {
+    const ok = await confirm({
+      title: "重新轉換為範本？",
+      message:
+        "母機會被關機，且其所有快照（備份點）會被移除，再轉為唯讀範本。此動作無法復原。",
+      confirmText: "關機並轉換",
+      danger: true,
+    });
+    if (!ok) return;
     setCycleBusy(true);
     try {
       await TemplatesService.retry(templateId);
-      toast.success("已重新送出轉換；母機會先安全關機，再轉為唯讀範本");
+      toast.success("已重新送出轉換；母機會先安全關機、移除所有快照，再轉為唯讀範本");
       await load();
     } catch (e) {
       toast.error(e?.message ?? "重新轉換失敗");

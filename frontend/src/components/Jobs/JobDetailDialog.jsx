@@ -46,7 +46,6 @@ const EXTRA_LABELS = {
   task_id: "Task ID",
   template_slug: "模板 slug",
   template_name: "模板名稱",
-  script_path: "腳本路徑",
   raw_status: "原始狀態",
   progress_text: "進度文字",
   resource_type: "資源類型",
@@ -57,7 +56,6 @@ const EXTRA_LABELS = {
   rootfs_size: "rootfs (GB)",
   ostemplate: "OS 模板",
   template_id: "模板 ID",
-  service_template_slug: "服務模板",
   assigned_node: "指派節點",
   actual_node: "實際節點",
   desired_node: "期望節點",
@@ -245,7 +243,7 @@ export default function JobDetailDialog({ jobId, onClose }) {
               </div>
             )}
 
-            {/* 輸出 (script_deploy) */}
+            {/* 輸出 */}
             {data.output && (
               <div>
                 <div className={styles.dialogFieldLabel}>輸出</div>

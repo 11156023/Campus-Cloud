@@ -1,7 +1,6 @@
 """統一背景任務 (Jobs) 的 API schemas。
 
 聚合來自不同領域的「需要等待的任務」：
-- script_deploy:  服務模板部署 (script_deploy_logs)
 - vm_request:     VM/LXC 開機申請 (vm_requests)
 - spec_change:    規格變更申請 (spec_change_requests)
 - deletion:       VM/LXC 刪除 (deletion_requests)
@@ -21,7 +20,6 @@ from pydantic import BaseModel, Field
 
 
 class JobKind(str, enum.Enum):
-    script_deploy = "script_deploy"
     vm_request = "vm_request"
     spec_change = "spec_change"
     deletion = "deletion"
@@ -81,7 +79,7 @@ class JobDetail(BaseModel):
     # 各 kind 特定的詳細欄位（前端按 kind 渲染對應區塊）
     output: str | None = Field(
         default=None,
-        description="完整文字輸出（例如 script_deploy 的 stdout/stderr）",
+        description="完整文字輸出",
     )
     error: str | None = None
     extra: dict[str, Any] = Field(

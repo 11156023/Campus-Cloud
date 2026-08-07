@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import styles from "./GpuMgmtPage.module.scss";
 import MIcon from "../../../components/MIcon";
 import { GpuService } from "../../../services/gpu";
+import { useConfirm } from "../../../components/ConfirmDialog/ConfirmProvider";
 import { useToast } from "../../../hooks/useToast";
 import useAutoRefresh from "../../../hooks/useAutoRefresh";
 
@@ -93,6 +94,7 @@ function VmChips({ vms }) {
 
 export default function GpuMgmtPage() {
   const toast = useToast();
+  const confirm = useConfirm();
   const [rows, setRows] = useState([]);
   const [filter, setFilter] = useState("");
   const [loading, setLoading] = useState(true);
@@ -114,7 +116,13 @@ export default function GpuMgmtPage() {
   useAutoRefresh(() => load(true));
 
   const handleDelete = async (id) => {
-    if (!window.confirm(`確定要刪除 mapping "${id}"?`)) return;
+    const ok = await confirm({
+      title: "刪除 GPU mapping",
+      message: `確定要刪除 mapping "${id}"?`,
+      confirmText: "刪除",
+      danger: true,
+    });
+    if (!ok) return;
     try {
       await GpuService.deleteMapping(id);
       toast.success("已刪除");

@@ -3,6 +3,7 @@ import styles from "./QuotasPage.module.scss";
 import MIcon from "../../../components/MIcon";
 import { QuotasService } from "../../../services/quotas";
 import { UsersService } from "../../../services/users";
+import { useConfirm } from "../../../components/ConfirmDialog/ConfirmProvider";
 import { useToast } from "../../../hooks/useToast";
 
 const NUMBER_FIELDS = [
@@ -301,6 +302,7 @@ function GlobalQuotaCard({ config, onSaved }) {
 
 export default function QuotasPage() {
   const toast = useToast();
+  const confirm = useConfirm();
   const [quotas, setQuotas] = useState(null);
   const [globalQuota, setGlobalQuota] = useState(null);
   const [users, setUsers] = useState([]);
@@ -350,7 +352,13 @@ export default function QuotasPage() {
 
   const handleDelete = async (quota) => {
     const target = quota.user_email ?? quota.id;
-    if (!window.confirm(`確定要刪除「${target}」的配額？刪除後將套用全域預設。`)) return;
+    const ok = await confirm({
+      title: "刪除配額",
+      message: `確定要刪除「${target}」的配額？刪除後將套用全域預設。`,
+      confirmText: "刪除",
+      danger: true,
+    });
+    if (!ok) return;
     setDeleting(quota.id);
     try {
       await QuotasService.remove(quota.id);

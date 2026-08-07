@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import styles from "./BatchReviewPage.module.scss";
 import MIcon from "../../../components/MIcon";
 import { BatchProvisionService } from "../../../services/batchProvision";
+import { useConfirm } from "../../../components/ConfirmDialog/ConfirmProvider";
 import { useToast } from "../../../hooks/useToast";
 import useAutoRefresh from "../../../hooks/useAutoRefresh";
 
@@ -99,6 +100,7 @@ function groupClassReviews(batches) {
 
 export default function BatchReviewPage() {
   const toast = useToast();
+  const confirm = useConfirm();
   const [batches, setBatches] = useState([]);
   const [status, setStatus] = useState("all");
   const [query, setQuery] = useState("");
@@ -141,7 +143,14 @@ export default function BatchReviewPage() {
     const target = row.teaching_class_id
       ? `「${row.teaching_class_name}」的 ${row.jobs.length} 個機器節點`
       : "此批次";
-    if (!window.confirm(decision === "approved" ? `確定核准${target}？` : `確定駁回${target}？`)) return;
+    const approved = decision === "approved";
+    const ok = await confirm({
+      title: approved ? "核准批量申請" : "駁回批量申請",
+      message: approved ? `確定核准${target}？` : `確定駁回${target}？`,
+      confirmText: approved ? "核准" : "駁回",
+      danger: !approved,
+    });
+    if (!ok) return;
     try {
       if (row.teaching_class_id) {
         await BatchProvisionService.reviewClass(row.teaching_class_id, { decision });

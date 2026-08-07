@@ -46,12 +46,11 @@ const QuotasPage = lazy(() => import("./pages/system/quotas/QuotasPage"));
 const IpManagementPage = lazy(() => import("./pages/system/ip-management/IpManagementPage"));
 const AuditPage = lazy(() => import("./pages/system/audit/AuditPage"));
 const JobsPage = lazy(() => import("./pages/system/jobs/JobsPage"));
-const DeployLogsPage = lazy(() => import("./pages/system/deploy-logs/DeployLogsPage"));
 
 // 網路
 const FirewallPage = lazy(() => import("./pages/network/firewall/FirewallPage"));
-const DomainPage = lazy(() => import("./pages/network/domain/DomainPage"));
-const GatewayPage = lazy(() => import("./pages/network/gateway/GatewayPage"));
+const DomainPage = lazy(() => import("./pages/system/domain/DomainPage"));
+const GatewayPage = lazy(() => import("./pages/system/gateway/GatewayPage"));
 const ReverseProxyPage = lazy(() => import("./pages/network/reverse-proxy/ReverseProxyPage"));
 
 function AuthBootstrapState({ unavailable = false, retrying = false, onRetry }) {
@@ -170,7 +169,6 @@ function App() {
           <Route path="/monitoring" element={<MonitoringPage />} />
           <Route path="/audit"     element={<AuditPage />} />
           <Route path="/jobs"      element={<JobsPage />} />
-          <Route path="/deploy-logs" element={<DeployLogsPage />} />
 
           {/* 網路 */}
           <Route path="/firewall"       element={<FirewallPage />} />

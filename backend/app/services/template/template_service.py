@@ -507,6 +507,20 @@ def _ensure_stopped(
         raise RuntimeError(f"VM {vmid} 無法停止")
 
 
+def _remove_snapshots_for_convert(
+    node: str, vmid: int, resource_type: proxmox_ops.ResourceType
+) -> None:
+    """轉範本前清掉所有快照（PVE 拒絕帶快照的 CT 轉範本）。
+
+    qemu 雖允許帶快照轉換，但範本化後快照不可回滾、只佔空間，一併清掉。
+    由新到舊刪，避免鏈中間節點的合併順序問題。
+    """
+    snapshots = proxmox_ops.list_snapshots(node, vmid, resource_type)
+    real = [s for s in snapshots if s.get("name") and s["name"] != "current"]
+    for snap in sorted(real, key=lambda s: s.get("snaptime") or 0, reverse=True):
+        proxmox_ops.delete_snapshot(node, vmid, resource_type, snap["name"])
+
+
 def _set_template_error(
     template_id: uuid.UUID,
     error: str,
@@ -533,7 +547,9 @@ def run_convert_task(task_id: uuid.UUID, payload: dict[str, Any]) -> dict[str, A
     try:
         report_progress(task_id, 10)
         _ensure_stopped(node, pve_vmid, resource_type)
-        report_progress(task_id, 50)
+        report_progress(task_id, 40)
+        _remove_snapshots_for_convert(node, pve_vmid, resource_type)
+        report_progress(task_id, 60)
         proxmox_ops.convert_to_template(node, pve_vmid, resource_type)
         report_progress(task_id, 90)
     except Exception as exc:
@@ -648,6 +664,8 @@ def run_update_convert_task(
         report_progress(task_id, 10)
         _ensure_stopped(node, temp_vmid, resource_type)
         report_progress(task_id, 40)
+        _remove_snapshots_for_convert(node, temp_vmid, resource_type)
+        report_progress(task_id, 55)
         proxmox_ops.convert_to_template(node, temp_vmid, resource_type)
         report_progress(task_id, 70)
     except Exception as exc:
