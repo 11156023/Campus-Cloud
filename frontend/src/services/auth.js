@@ -19,8 +19,11 @@ const SESSION_REVOKED_PREFIX = "auth_session_revoked:";
 const SESSION_RECORD_PREFIX = "auth_session_tokens:";
 
 function createSessionId() {
-  return globalThis.crypto?.randomUUID?.()
-    ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const cryptoObj = globalThis.crypto;
+  if (cryptoObj?.randomUUID) return cryptoObj.randomUUID();
+  // randomUUID 需要 secure context；getRandomValues 沒有這個限制
+  const bytes = cryptoObj.getRandomValues(new Uint8Array(16));
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 function sessionVersionKey(sessionId) {
