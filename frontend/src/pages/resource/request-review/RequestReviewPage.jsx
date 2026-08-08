@@ -55,12 +55,16 @@ function formatRange(startAt, endAt) {
   return `${formatDateTime(startAt)} - ${formatDateTime(endAt)}`;
 }
 
+const CONSUMED_REQUEST_MARKERS = [
+  "Resource deleted by user",
+  "Resource deleted (orphan DB cleanup)",
+  "Resource converted to template",
+];
+
 function isDeletedApprovedVm(request) {
   return (
-    request?.review_comment === "Resource deleted by user" ||
-    request?.review_comment === "Resource deleted (orphan DB cleanup)" ||
-    request?.resource_warning === "Resource deleted by user" ||
-    request?.resource_warning === "Resource deleted (orphan DB cleanup)"
+    CONSUMED_REQUEST_MARKERS.includes(request?.review_comment) ||
+    CONSUMED_REQUEST_MARKERS.includes(request?.resource_warning)
   );
 }
 

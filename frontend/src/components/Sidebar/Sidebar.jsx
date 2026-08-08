@@ -12,19 +12,12 @@ const topItems = [
 
 const navGroups = [
   {
-    key: "apply",
-    label: "申請",
-    icon: "edit_note",
-    items: [
-      { key: "my-requests", label: "我的申請",    icon: "assignment" },
-    ],
-  },
-  {
     key: "resource",
     label: "資源",
     icon: "storage",
     items: [
       { key: "my-resources",  label: "我的資源",    icon: "inventory_2" },
+      { key: "my-requests",   label: "我的申請",    icon: "assignment" },
       { key: "resource-mgmt", label: "資源管理",    icon: "storage" },
       { key: "templates",     label: "機器範本",    icon: "library_books" },
       { key: "gpu-mgmt",      label: "GPU 管理",    icon: "memory" },

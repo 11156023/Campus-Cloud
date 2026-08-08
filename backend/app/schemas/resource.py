@@ -48,6 +48,7 @@ ResourceStatus = Literal[
     "running",
     "stopped",
     "paused",
+    "deleting",
     "failed",
     "deleted",
     "unknown",

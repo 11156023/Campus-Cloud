@@ -567,6 +567,15 @@ def run_convert_task(task_id: uuid.UUID, payload: dict[str, Any]) -> dict[str, A
         resource = session.get(Resource, pve_vmid)
         if resource is not None:
             session.delete(resource)
+        # 母機若來自申請單，一併標為已消耗；否則排程器會反覆嘗試
+        # 啟動範本，資源頁也會把申請單復活成「建立失敗」placeholder
+        from app.services.resource import resource_service  # noqa: PLC0415
+
+        resource_service.mark_linked_request_consumed(
+            session=session,
+            vmid=pve_vmid,
+            marker=resource_service.RESOURCE_CONVERTED_TO_TEMPLATE_MARKER,
+        )
         session.commit()
     return {"vmid": pve_vmid}
 

@@ -23,6 +23,7 @@ const STATUS_MAP = {
   running:      { label: "執行中",   color: "success", icon: "play_circle"    },
   stopped:      { label: "已關機",   color: "muted",   icon: "stop_circle"    },
   paused:       { label: "已暫停",   color: "muted",   icon: "pause_circle"   },
+  deleting:     { label: "刪除中",   color: "danger",  icon: "hourglass_empty"},
   failed:       { label: "建立失敗", color: "danger",  icon: "error_outline"  },
   deleted:      { label: "已刪除",   color: "danger",  icon: "delete_forever" },
   unknown:      { label: "狀態未知", color: "muted",   icon: "help_outline"   },
@@ -450,6 +451,7 @@ function ErrorState({ onRetry }) {
 
 /* ── Page ── */
 export default function ResourcesPage() {
+  const navigate = useNavigate();
   const [resources, setResources] = useState([]);
   const [pending, setPending]     = useState([]);
   const [loading, setLoading]     = useState(true);
@@ -509,6 +511,13 @@ export default function ResourcesPage() {
     setResources((prev) => prev.filter((r) => r.vmid !== vmid));
   }
 
+  // 開通期間同一張申請單會同時有 CreatingCard（前端 placeholder）與後端
+  // list_by_user 塞的 is_placeholder 資源，去重後只留下可取消的 CreatingCard
+  const pendingRequestIds = new Set(pending.map((req) => req.id));
+  const visibleResources = resources.filter(
+    (r) => !(r.is_placeholder && r.request_id != null && pendingRequestIds.has(r.request_id))
+  );
+
   return (
     <div className={styles.page}>
       <div className={styles.pageHeader}>
@@ -516,6 +525,14 @@ export default function ResourcesPage() {
           <h1 className={styles.pageTitle}>我的資源</h1>
           <p className={styles.pageSubtitle}>查看與管理申請通過的虛擬機和容器</p>
         </div>
+        <button
+          type="button"
+          className={styles.btnPrimary}
+          onClick={() => navigate("/my-requests", { state: { create: true } })}
+        >
+          <MIcon name="add" size={16} />
+          申請資源
+        </button>
       </div>
 
       {/* 我的配額用量（模組 E） */}
@@ -528,7 +545,7 @@ export default function ResourcesPage() {
           </div>
         ) : error ? (
           <ErrorState onRetry={() => fetchResources()} />
-        ) : resources.length === 0 && pending.length === 0 ? (
+        ) : visibleResources.length === 0 && pending.length === 0 ? (
           <EmptyState />
         ) : (
           <div className={styles.grid}>
@@ -539,7 +556,7 @@ export default function ResourcesPage() {
                 onCancelled={refreshPending}
               />
             ))}
-            {resources.map((r, index) => (
+            {visibleResources.map((r, index) => (
               <ResourceCard
                 key={resourceCardKey(r, index)}
                 resource={r}

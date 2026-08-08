@@ -190,9 +190,34 @@ DELETED_TOMBSTONE_DAYS = 30
 # consumed request from the applications list.
 RESOURCE_DELETED_BY_USER_MARKER = "Resource deleted by user"
 RESOURCE_DELETED_ORPHAN_MARKER = "Resource deleted (orphan DB cleanup)"
+RESOURCE_CONVERTED_TO_TEMPLATE_MARKER = "Resource converted to template"
 _RESOURCE_DELETED_MARKERS = frozenset(
-    {RESOURCE_DELETED_BY_USER_MARKER, RESOURCE_DELETED_ORPHAN_MARKER}
+    {
+        RESOURCE_DELETED_BY_USER_MARKER,
+        RESOURCE_DELETED_ORPHAN_MARKER,
+        RESOURCE_CONVERTED_TO_TEMPLATE_MARKER,
+    }
 )
+
+
+def mark_linked_request_consumed(
+    *, session: Session, vmid: int, marker: str
+) -> None:
+    """把連結到 vmid 的 approved 申請單標為已消耗（機器已刪除或轉為範本）。
+
+    provisioning_status=failed 讓排程器不再接管該申請單；marker 寫入
+    resource_warning / review_comment 讓資源頁與審核頁不再顯示它。
+    """
+    linked_request = vm_request_repo.get_latest_approved_vm_request_by_vmid(
+        session=session, vmid=vmid,
+    )
+    if linked_request is None:
+        return
+    linked_request.provisioning_status = VMProvisioningStatus.failed
+    linked_request.provisioning_error = marker
+    linked_request.resource_warning = marker
+    linked_request.review_comment = marker
+    session.add(linked_request)
 
 
 def list_by_user(
@@ -299,6 +324,21 @@ def list_by_user(
             )
             if req.vmid:
                 shown_vmids.add(req.vmid)
+
+        # 3. Overlay in-progress deletions. Deletion runs from a background
+        # queue (shutdown → wait → destroy), so the VM stays visible in
+        # Proxmox as "stopped" for a while after the user hits delete;
+        # without this overlay the card would reappear as 已關機.
+        if shown_vmids:
+            from app.services.resource import deletion_service  # noqa: PLC0415
+
+            deleting_map = deletion_service.list_active_for_vmids(
+                session=session, vmids=list(shown_vmids)
+            )
+            for item in result:
+                if item.vmid in deleting_map:
+                    item.status = "deleting"
+                    item.can_control = False
 
         return result
     except Exception as e:
@@ -576,15 +616,9 @@ def delete(
         # Keep the original approval result for audit/review reporting.
         # Mark it as no longer schedulable so the scheduler will not
         # re-provision a resource that the user intentionally deleted.
-        linked_request = vm_request_repo.get_latest_approved_vm_request_by_vmid(
-            session=session, vmid=vmid,
+        mark_linked_request_consumed(
+            session=session, vmid=vmid, marker=RESOURCE_DELETED_BY_USER_MARKER,
         )
-        if linked_request is not None:
-            linked_request.provisioning_status = VMProvisioningStatus.failed
-            linked_request.provisioning_error = RESOURCE_DELETED_BY_USER_MARKER
-            linked_request.resource_warning = RESOURCE_DELETED_BY_USER_MARKER
-            linked_request.review_comment = RESOURCE_DELETED_BY_USER_MARKER
-            session.add(linked_request)
 
         audit_service.log_action(
             session=session,
@@ -639,13 +673,9 @@ def delete_orphan_db_record(
     resource_repo.delete_resource(session=session, vmid=vmid)
     audit_log_repo.delete_audit_logs_by_vmid(session=session, vmid=vmid)
 
-    linked_request = vm_request_repo.get_latest_approved_vm_request_by_vmid(session=session, vmid=vmid)
-    if linked_request is not None:
-        linked_request.provisioning_status = VMProvisioningStatus.failed
-        linked_request.provisioning_error = RESOURCE_DELETED_ORPHAN_MARKER
-        linked_request.resource_warning = RESOURCE_DELETED_ORPHAN_MARKER
-        linked_request.review_comment = RESOURCE_DELETED_ORPHAN_MARKER
-        session.add(linked_request)
+    mark_linked_request_consumed(
+        session=session, vmid=vmid, marker=RESOURCE_DELETED_ORPHAN_MARKER,
+    )
 
     audit_service.log_action(
         session=session,
