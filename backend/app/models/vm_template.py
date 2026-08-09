@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime
 
 import sqlalchemy as sa
-from sqlmodel import Column, DateTime, Enum, Field, SQLModel, UniqueConstraint
+from sqlmodel import Column, DateTime, Enum, Field, SQLModel
 
 from .base import get_datetime_utc
 
@@ -20,7 +20,7 @@ class VMTemplateStatus(str, enum.Enum):
 
 class VMTemplateVisibility(str, enum.Enum):
     global_ = "global"
-    groups = "groups"
+    private = "private"
 
 
 class VMTemplate(SQLModel, table=True):
@@ -67,7 +67,7 @@ class VMTemplate(SQLModel, table=True):
         ),
     )
     visibility: VMTemplateVisibility = Field(
-        default=VMTemplateVisibility.groups,
+        default=VMTemplateVisibility.private,
         sa_column=Column(
             # global_ 成員名與值 "global" 不同，必須以值入庫
             Enum(
@@ -75,7 +75,7 @@ class VMTemplate(SQLModel, table=True):
                 values_callable=lambda enum_cls: [m.value for m in enum_cls],
             ),
             nullable=False,
-            default=VMTemplateVisibility.groups,
+            default=VMTemplateVisibility.private,
         ),
     )
     default_cores: int | None = Field(default=None, description="克隆預設 CPU 核數")
@@ -97,38 +97,8 @@ class VMTemplate(SQLModel, table=True):
     )
 
 
-class VMTemplateGroupLink(SQLModel, table=True):
-    """範本 ↔ 群組可見範圍關聯"""
-
-    __tablename__ = "vm_template_group_links"
-    __table_args__ = (
-        UniqueConstraint(
-            "template_id", "group_id", name="uq_vm_template_group_links"
-        ),
-    )
-
-    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    template_id: uuid.UUID = Field(
-        sa_column=Column(
-            sa.Uuid,
-            sa.ForeignKey("vm_templates.id", ondelete="CASCADE"),
-            nullable=False,
-            index=True,
-        )
-    )
-    group_id: uuid.UUID = Field(
-        sa_column=Column(
-            sa.Uuid,
-            sa.ForeignKey("group.id", ondelete="CASCADE"),
-            nullable=False,
-            index=True,
-        )
-    )
-
-
 __all__ = [
     "VMTemplate",
-    "VMTemplateGroupLink",
     "VMTemplateStatus",
     "VMTemplateVisibility",
 ]

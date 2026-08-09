@@ -27,10 +27,12 @@ from app.infrastructure.queue import enqueue_task, report_progress
 from app.models import (
     Resource,
     TaskRecord,
+    TaskRecordStatus,
     User,
     VMTemplate,
     VMTemplateStatus,
 )
+from app.repositories import task_record as task_record_repo
 from app.repositories import vm_template as template_repo
 from app.schemas.template import (
     VMTemplateCreate,
@@ -50,15 +52,11 @@ TASK_UPDATE_CANCEL = "template.update_cancel"
 # ---------------------------------------------------------------------------
 
 def _to_public(
-    session: Session,
     template: VMTemplate,
     *,
     pve_vmids: set[int] | None = None,
 ) -> VMTemplatePublic:
     public = VMTemplatePublic.model_validate(template)
-    public.group_ids = template_repo.get_group_ids(
-        session=session, template_id=template.id
-    )
     if pve_vmids is not None:
         public.pve_exists = template.pve_vmid in pve_vmids
     return public
@@ -82,9 +80,10 @@ def list_templates(*, session: Session, user: User) -> list[VMTemplatePublic]:
             user_id=user.id,
             only_ready=not _can_manage(user),
         )
+    _reconcile_failed_template_tasks(session, templates)
     pve_vmids = _pve_template_vmids()
     return [
-        _to_public(session, t, pve_vmids=pve_vmids) for t in templates
+        _to_public(t, pve_vmids=pve_vmids) for t in templates
     ]
 
 
@@ -93,7 +92,33 @@ def get_template_for_user(
 ) -> VMTemplatePublic:
     template = _get_or_404(session, template_id)
     _require_view(session, user, template)
-    return _to_public(session, template, pve_vmids=_pve_template_vmids())
+    _reconcile_failed_template_tasks(session, [template])
+    return _to_public(template, pve_vmids=_pve_template_vmids())
+
+
+def _reconcile_failed_template_tasks(
+    session: Session,
+    templates: list[VMTemplate],
+) -> None:
+    changed = False
+    for template in templates:
+        if template.status not in {
+            VMTemplateStatus.creating,
+            VMTemplateStatus.updating,
+        }:
+            continue
+        task = task_record_repo.get_latest_template_task(
+            session=session,
+            template_id=template.id,
+        )
+        if task is None or task.status != TaskRecordStatus.failed:
+            continue
+        template.status = VMTemplateStatus.failed
+        template.error_message = task.error or "背景任務執行失敗"
+        template_repo.touch(session=session, template=template, commit=False)
+        changed = True
+    if changed:
+        session.commit()
 
 
 def _get_or_404(session: Session, template_id: uuid.UUID) -> VMTemplate:
@@ -116,10 +141,11 @@ def _can_manage(user: User) -> bool:
 
 
 def _require_view(session: Session, user: User, template: VMTemplate) -> None:
+    _ = session  # 保留服務層既有呼叫介面；私人/公開判斷已不需查詢群組。
     if is_admin(user):
         return
     if not template_repo.is_template_visible_to_user(
-        session=session, template=template, user_id=user.id
+        template=template, user_id=user.id
     ):
         raise NotFoundError("Template not found")
 
@@ -134,26 +160,6 @@ def _require_owner(user: User, template: VMTemplate) -> None:
 # 建立（VM → 範本）
 # ---------------------------------------------------------------------------
 
-def _validate_group_ids(
-    session: Session, user: User, group_ids: list[uuid.UUID]
-) -> None:
-    if not group_ids:
-        return
-    groups = template_repo.get_groups_by_ids(
-        session=session, group_ids=group_ids
-    )
-    found = {g.id for g in groups}
-    missing = [str(gid) for gid in group_ids if gid not in found]
-    if missing:
-        raise BadRequestError(f"Group(s) not found: {', '.join(missing)}")
-    if not is_admin(user):
-        not_owned = [g.name for g in groups if g.owner_id != user.id]
-        if not_owned:
-            raise PermissionDeniedError(
-                f"You can only bind templates to your own groups: {', '.join(not_owned)}"
-            )
-
-
 async def create_template(
     *, session: Session, user: User, data: VMTemplateCreate
 ) -> tuple[VMTemplatePublic, TaskRecord]:
@@ -161,7 +167,6 @@ async def create_template(
     from app.core.authorizers import require_template_manage
 
     require_template_manage(user)
-    _validate_group_ids(session, user, data.group_ids)
 
     if (
         template_repo.get_template_by_pve_vmid(
@@ -207,23 +212,96 @@ async def create_template(
         default_disk=data.default_disk,
         source_vmid=data.source_vmid,
     )
-    template_repo.set_group_links(
-        session=session, template_id=template.id, group_ids=data.group_ids
-    )
+    try:
+        record = await enqueue_task(
+            session=session,
+            task_type=TASK_CONVERT,
+            user_id=user.id,
+            template_id=template.id,
+            payload={
+                "template_id": str(template.id),
+                "pve_vmid": template.pve_vmid,
+                "resource_type": resource_type,
+                "node": node,
+            },
+        )
+    except Exception as exc:
+        template.status = VMTemplateStatus.failed
+        template.error_message = f"無法啟動轉換任務: {exc}"[:1000]
+        template_repo.touch(session=session, template=template)
+        raise
+    return _to_public(template), record
 
-    record = await enqueue_task(
-        session=session,
-        task_type=TASK_CONVERT,
-        user_id=user.id,
-        template_id=template.id,
-        payload={
-            "template_id": str(template.id),
-            "pve_vmid": template.pve_vmid,
-            "resource_type": resource_type,
-            "node": node,
-        },
+
+async def retry_template_conversion(
+    *,
+    session: Session,
+    user: User,
+    template_id: uuid.UUID,
+) -> tuple[VMTemplatePublic, TaskRecord]:
+    template = _get_or_404(session, template_id)
+    _require_owner(user, template)
+    _reconcile_failed_template_tasks(session, [template])
+    if template.status != VMTemplateStatus.failed:
+        raise ConflictError("Only failed template conversions can be retried")
+
+    try:
+        pve_resource = proxmox_ops.find_resource(template.pve_vmid)
+    except NotFoundError:
+        raise NotFoundError(
+            f"Source VM {template.pve_vmid} no longer exists"
+        )
+    if pve_resource.get("template") == 1:
+        template.status = VMTemplateStatus.ready
+        template.error_message = None
+        template_repo.touch(session=session, template=template)
+        record = task_record_repo.create_task_record(
+            session=session,
+            task_type=TASK_CONVERT,
+            user_id=user.id,
+            template_id=template.id,
+            payload={
+                "template_id": str(template.id),
+                "pve_vmid": template.pve_vmid,
+                "resource_type": template.resource_type,
+                "node": template.node,
+            },
+        )
+        task_record_repo.mark_task_finished(
+            session=session,
+            task_id=record.id,
+            status=TaskRecordStatus.succeeded,
+            result={"vmid": template.pve_vmid, "already_converted": True},
+            resource_vmid=template.pve_vmid,
+        )
+        return _to_public(template), session.get(TaskRecord, record.id) or record
+
+    template.node = str(pve_resource["node"])
+    template.resource_type = (
+        "lxc" if pve_resource.get("type") == "lxc" else "qemu"
     )
-    return _to_public(session, template), record
+    template.status = VMTemplateStatus.creating
+    template.error_message = None
+    template_repo.touch(session=session, template=template)
+    try:
+        record = await enqueue_task(
+            session=session,
+            task_type=TASK_CONVERT,
+            user_id=user.id,
+            template_id=template.id,
+            payload={
+                "template_id": str(template.id),
+                "pve_vmid": template.pve_vmid,
+                "resource_type": template.resource_type,
+                "node": template.node,
+            },
+        )
+    except Exception as exc:
+        template.status = VMTemplateStatus.failed
+        template.error_message = f"無法啟動轉換任務: {exc}"[:1000]
+        template_repo.touch(session=session, template=template)
+        raise
+    return _to_public(template), record
 
 
 # ---------------------------------------------------------------------------
@@ -240,22 +318,11 @@ def update_template(
     template = _get_or_404(session, template_id)
     _require_owner(user, template)
 
-    if data.group_ids is not None:
-        _validate_group_ids(session, user, data.group_ids)
-        template_repo.set_group_links(
-            session=session,
-            template_id=template.id,
-            group_ids=data.group_ids,
-            commit=False,
-        )
-
-    updates: dict[str, Any] = data.model_dump(
-        exclude_unset=True, exclude={"group_ids"}
-    )
+    updates: dict[str, Any] = data.model_dump(exclude_unset=True)
     for field, value in updates.items():
         setattr(template, field, value)
     template_repo.touch(session=session, template=template)
-    return _to_public(session, template)
+    return _to_public(template)
 
 
 # ---------------------------------------------------------------------------

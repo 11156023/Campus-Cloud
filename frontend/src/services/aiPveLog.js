@@ -2,8 +2,8 @@ import { apiPost } from "./api";
 
 export const AiPveLogService = {
   /**
-   * AI-PVE 對話。
-   * 第一輪帶 { message, group_id }；之後帶完整 { messages, group_id } 歷史。
+   * 管理員層級的 AI-PVE 對話。
+   * 第一輪帶 { message }；之後帶完整 { messages } 歷史。
    * 回應含 reply / tools_called / needs_confirmation / messages / error。
    */
   chat(payload) {

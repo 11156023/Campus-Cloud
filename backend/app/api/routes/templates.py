@@ -105,6 +105,24 @@ def update_template(
     )
 
 
+@router.post("/{template_id}/retry", response_model=VMTemplateTaskResponse)
+async def retry_template_conversion(
+    session: SessionDep,
+    current_user: CurrentUser,
+    template_id: uuid.UUID,
+) -> VMTemplateTaskResponse:
+    """Retry a failed VM/LXC-to-template conversion."""
+    template, record = await template_service.retry_template_conversion(
+        session=session,
+        user=current_user,
+        template_id=template_id,
+    )
+    return VMTemplateTaskResponse(
+        template=template,
+        task=TaskRecordPublic.from_record(record),
+    )
+
+
 @router.delete("/{template_id}", response_model=TaskRecordPublic)
 async def delete_template(
     session: SessionDep, current_user: CurrentUser, template_id: uuid.UUID

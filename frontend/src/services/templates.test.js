@@ -49,4 +49,14 @@ describe("TemplatesService", () => {
     const [url] = fetchMock.mock.calls[0];
     expect(url).toContain("/api/v1/templates/tpl-1/update-cycle/start");
   });
+
+  test("retry 以 POST 重新送出失敗的轉換", async () => {
+    fetchMock.mockResolvedValueOnce(jsonRes(200, { template: {}, task: {} }));
+
+    await TemplatesService.retry("tpl-1");
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toContain("/api/v1/templates/tpl-1/retry");
+    expect(init.method).toBe("POST");
+  });
 });

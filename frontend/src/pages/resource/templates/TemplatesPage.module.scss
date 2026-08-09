@@ -529,28 +529,49 @@
   }
 }
 
-.checkLabel {
-  @include text-truncate;
+.visibilityOptions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: $spacing-8;
 }
 
-.groupBox {
-  @include flex-column;
+.visibilityOption {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
   gap: $spacing-8;
   padding: $spacing-8 $spacing-16;
   border: 1px solid var(--color-border);
   border-radius: $radius-8;
+  color: var(--color-text);
+  cursor: pointer;
+  transition: border-color $transition-base, background-color $transition-base;
+
+  input {
+    width: auto;
+    margin-top: 2px;
+    accent-color: var(--color-primary);
+  }
+
+  span {
+    @include flex-column;
+    min-width: 0;
+    gap: 3px;
+  }
+
+  strong {
+    font-size: $font-size-14;
+  }
+
+  small {
+    color: var(--color-text-muted);
+    font-size: $font-size-12;
+  }
 }
 
-.groupGrid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: $spacing-8;
-  max-height: 160px;
-  overflow-y: auto;
-
-  @include respond-to(sm) {
-    grid-template-columns: 1fr 1fr;
-  }
+.visibilityOptionActive {
+  border-color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 7%, transparent);
 }
 
 .tripleGrid {

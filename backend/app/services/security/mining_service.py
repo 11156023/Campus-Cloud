@@ -22,11 +22,11 @@ from app.models import (
     AlertEvent,
     AlertMetric,
     AlertScope,
-    Group,
-    GroupMember,
     MiningIncident,
     MiningIncidentStatus,
     Resource,
+    TeachingClass,
+    TeachingClassStudent,
     User,
 )
 from app.repositories import governance as governance_repo
@@ -241,12 +241,18 @@ def _create_alert_event(
 
 
 def _teacher_emails(session: Session, user_id: uuid.UUID) -> list[str]:
-    """使用者所屬全部群組的 owner（老師）email。"""
+    """使用者所屬正式班級的老師 email。"""
     stmt = (
         select(User.email)
-        .join(Group, Group.owner_id == User.id)  # type: ignore[arg-type]
-        .join(GroupMember, GroupMember.group_id == Group.id)  # type: ignore[arg-type]
-        .where(GroupMember.user_id == user_id, User.is_active == True)  # noqa: E712
+        .join(TeachingClass, TeachingClass.owner_id == User.id)  # type: ignore[arg-type]
+        .join(
+            TeachingClassStudent,
+            TeachingClassStudent.class_id == TeachingClass.id,
+        )
+        .where(
+            TeachingClassStudent.user_id == user_id,
+            User.is_active == True,  # noqa: E712
+        )
     )
     return [str(e) for e in session.exec(stmt).all() if e]
 

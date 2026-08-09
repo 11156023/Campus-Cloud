@@ -24,10 +24,9 @@ const AiApiPage = lazy(() => import("./pages/ai/ai-api/AiApiPage"));
 const AiApiReviewPage = lazy(() => import("./pages/ai/ai-api-review/AiApiReviewPage"));
 const AiApiKeysPage = lazy(() => import("./pages/ai/ai-api-keys/AiApiKeysPage"));
 const AiMonitoringPage = lazy(() => import("./pages/ai/ai-monitoring/AiMonitoringPage"));
+const AiPvePage = lazy(() => import("./pages/system/ai-pve/AiPvePage"));
 
 // 教學
-const TeachingPage = lazy(() => import("./pages/teaching/TeachingPage"));
-const ClassroomPage = lazy(() => import("./pages/classroom/ClassroomPage"));
 const CoursePathsPage = lazy(() => import("./pages/courses/paths/CoursePathsPage"));
 const CourseRoomPage = lazy(() => import("./pages/courses/room/CourseRoomPage"));
 const CourseCmsPage = lazy(() => import("./pages/teaching/course-cms/CourseCmsPage"));
@@ -37,7 +36,6 @@ const ClassManagementPage = lazy(() => import("./pages/course-operations/ClassMa
 const ClassWorkspacePage = lazy(() => import("./pages/course-operations/ClassWorkspacePage"));
 
 // 系統管理
-const GroupsPage = lazy(() => import("./pages/system/groups/GroupsPage"));
 const AdminPage = lazy(() => import("./pages/system/admin/AdminPage"));
 const SettingsPage = lazy(() => import("./pages/system/settings/SettingsPage"));
 const MonitoringPage = lazy(() => import("./pages/system/monitoring/MonitoringPage"));
@@ -93,6 +91,7 @@ function App() {
               <Route path="/ai-api-review" element={<AiApiReviewPage />} />
               <Route path="/ai-api-keys" element={<AiApiKeysPage />} />
               <Route path="/ai-monitoring" element={<AiMonitoringPage />} />
+              <Route path="/ai-pve" element={<AiPvePage />} />
             </>
           )}
           <Route
@@ -101,8 +100,6 @@ function App() {
           />
 
           {/* 教學 */}
-          <Route path="/teaching"  element={<TeachingPage />} />
-          <Route path="/classroom" element={<ClassroomPage />} />
           <Route path="/courses"               element={<CoursePathsPage />} />
           <Route path="/courses/rooms/:roomId" element={<CourseRoomPage />} />
           <Route path="/course-cms"            element={<CourseCmsPage />} />
@@ -117,7 +114,6 @@ function App() {
           <Route path="/class-management/:classId/:section" element={<ClassWorkspacePage />} />
 
           {/* 系統管理 */}
-          <Route path="/groups"    element={<GroupsPage />} />
           <Route path="/admin"     element={<AdminPage />} />
           <Route path="/settings"  element={<SettingsPage />} />
           <Route path="/quotas"    element={<QuotasPage />} />

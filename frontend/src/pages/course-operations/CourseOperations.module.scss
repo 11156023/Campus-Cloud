@@ -416,7 +416,8 @@
 .machineTotals span { padding: 8px 12px; color: var(--color-text-muted); font-size: 11px; white-space: nowrap; }
 .machineTotals span + span { border-left: 1px solid var(--color-border); }
 .machineTotals strong { margin-right: 3px; color: var(--color-text-primary); font-size: 13px; font-variant-numeric: tabular-nums; }
-.machineAddBar { display: grid; grid-template-columns: minmax(280px, 560px) max-content; align-items: end; justify-content: start; gap: 10px; padding: 13px 22px; border-bottom: 1px solid var(--color-border); background: color-mix(in srgb, var(--color-hover) 24%, var(--color-surface)); }
+.nodeLimit { padding: 7px 10px; border: 1px solid var(--color-border); border-radius: 999px; color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 5%, var(--color-surface)); font-size: 11px; font-weight: 650; white-space: nowrap; }
+.machineAddBar { display: grid; grid-template-columns: repeat(3, minmax(150px, 1fr)) max-content; align-items: end; justify-content: start; gap: 10px; padding: 13px 22px; border-bottom: 1px solid var(--color-border); background: color-mix(in srgb, var(--color-hover) 24%, var(--color-surface)); }
 .machineAddBar .field { gap: 3px; }
 .machineAddBar .field > span { color: var(--color-text-secondary); font-size: 11px; }
 .machineAddBar .btnPrimary { min-width: 138px; min-height: 40px; }
@@ -434,6 +435,42 @@
 .templateMachineWorkspace .connection { width: 92px; }
 .templateMachineWorkspace .connection i { width: 60px; }
 .templateMachineWorkspace .connection span { display: block; width: 82px; overflow: hidden; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
+.topologyHelp { display: flex; align-items: center; gap: 7px; padding: 12px 22px 8px; color: var(--color-text-secondary); font-size: 11px; }
+.topologyWorkspace { display: grid; grid-template-columns: minmax(0, 1fr) 270px; gap: 12px; padding: 0 22px 22px; }
+.topologyCanvas { height: 360px; overflow: hidden; border: 1px solid var(--color-border); border-radius: 12px; background: color-mix(in srgb, var(--color-hover) 24%, var(--color-surface)); }
+.topologyCanvas :global(.react-flow) { background: transparent; }
+.topologyCanvas :global(.react-flow) svg { max-width: none; }
+.topologyCanvas :global(.react-flow__edge path) { stroke-opacity: 1 !important; }
+.topologyCanvas :global(.react-flow__node.selected) { box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 35%, transparent); }
+.topologyCanvas :global(.react-flow__edge.selected path) { stroke: var(--color-primary); }
+.flowMachineNode { position: relative; display: grid; width: 210px; grid-template-columns: 34px minmax(0, 1fr); align-items: center; gap: 9px; box-sizing: border-box; padding: 12px 14px; border: 1px solid color-mix(in srgb, var(--color-primary) 55%, var(--color-border)); border-radius: 11px; background: var(--color-surface); box-shadow: 0 5px 18px color-mix(in srgb, var(--color-primary) 8%, transparent); }
+.flowMachineNodeSelected { border-color: var(--color-primary); box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 16%, transparent), 0 6px 20px color-mix(in srgb, var(--color-primary) 10%, transparent); }
+.flowMachineNode :global(.react-flow__handle) { width: 12px; height: 12px; border: 2px solid var(--color-surface); background: var(--color-primary); }
+.flowMachineNode :global(.react-flow__handle-left) { left: -7px; }
+.flowMachineNode :global(.react-flow__handle-right) { right: -7px; }
+.flowNodeIcon { display: grid; width: 34px; height: 34px; place-items: center; border-radius: 9px; color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 9%, var(--color-surface)); }
+.flowNodeLabel { display: flex; min-width: 0; flex-direction: column; gap: 3px; padding: 3px 1px; text-align: left; }
+.flowNodeLabel strong { overflow: hidden; color: var(--color-text-primary); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.flowNodeLabel span, .flowNodeLabel small { color: var(--color-text-muted); font-size: 9px; }
+.topologyInspector { display: flex; min-width: 0; height: 360px; box-sizing: border-box; flex-direction: column; gap: 10px; overflow-y: auto; padding: 14px; border: 1px solid var(--color-border); border-radius: 12px; background: var(--color-surface); }
+.readonlyTopology { height: 320px; margin: 0 16px 16px; overflow: hidden; border: 1px solid var(--color-border); border-radius: 12px; background: color-mix(in srgb, var(--color-hover) 24%, var(--color-surface)); }
+.readonlyTopology :global(.react-flow) svg { max-width: none; }
+.readonlyTopology :global(.react-flow__edge path) { stroke-opacity: 1 !important; }
+.readonlyTopologyNode { display: flex; min-width: 0; flex-direction: column; gap: 3px; padding: 12px 14px; text-align: left; }
+.readonlyTopologyNode strong { overflow: hidden; color: var(--color-text-primary); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.readonlyTopologyNode span, .readonlyTopologyNode small { color: var(--color-text-muted); font-size: 9px; }
+.topologyEmptyNote { margin: -6px 16px 16px; color: var(--color-text-muted); font-size: 11px; }
+.setupActions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.topologyInspector label { display: flex; flex-direction: column; gap: 4px; color: var(--color-text-secondary); font-size: 10px; }
+.topologyInspector select, .topologyInspector input { width: 100%; min-height: 34px; box-sizing: border-box; padding: 6px 9px; border: 1px solid var(--color-border); border-radius: 7px; color: var(--color-text); background: var(--color-surface); }
+.inspectorTitle { display: grid; grid-template-columns: 30px minmax(0, 1fr); align-items: center; gap: 8px; padding-bottom: 3px; }
+.inspectorTitle > :first-child { color: var(--color-primary); }
+.inspectorTitle div { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
+.inspectorTitle strong { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.inspectorTitle small { overflow: hidden; color: var(--color-text-muted); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.inspectorSplit { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.inspectorHint { margin: 0; color: var(--color-text-muted); font-size: 9px; line-height: 1.5; }
+.inspectorDanger { display: inline-flex; min-height: 34px; align-items: center; justify-content: center; gap: 5px; margin-top: auto; padding: 0 10px; border: 1px solid color-mix(in srgb, var(--color-danger) 35%, var(--color-border)); border-radius: 7px; color: var(--color-danger); background: var(--color-surface); cursor: pointer; }
 .table { min-width: 720px; }
 .studentTools { grid-template-columns: minmax(0, 1.2fr) minmax(260px, .8fr); }
 .headerState { flex-wrap: wrap; justify-content: flex-end; }
@@ -471,6 +508,8 @@
   .machineWorkspaceHeader { align-items: flex-start; flex-direction: column; }
   .templateMachineWorkspace .blueprintCanvas { justify-content: flex-start; }
   .templateMachineWorkspace .machineBlock { width: 280px; }
+  .machineAddBar { grid-template-columns: repeat(2, minmax(180px, 1fr)); }
+  .topologyWorkspace { grid-template-columns: minmax(0, 1fr) 240px; }
   .weekRows article { grid-template-columns: 100px minmax(220px, 1fr); }
   .weekFiles { grid-column: 2; }
   .memberRow { grid-template-columns: minmax(200px, 1.3fr) minmax(100px, .7fr) 100px 34px; }
@@ -524,6 +563,9 @@
   .machineTotals span { flex: 1 0 auto; text-align: center; }
   .machineAddBar { grid-template-columns: 1fr; justify-content: stretch; padding: 14px 18px; }
   .machineAddBar .btnPrimary { width: 100%; }
+  .topologyWorkspace { grid-template-columns: 1fr; padding-inline: 18px; }
+  .topologyCanvas { height: 280px; }
+  .topologyInspector { height: auto; max-height: none; }
   .templateMachineWorkspace .blueprintCanvas { padding: 22px 18px 28px; }
   .weekRows article { grid-template-columns: 1fr; align-items: stretch; padding: 16px 18px; }
   .weekFiles { grid-column: auto; }

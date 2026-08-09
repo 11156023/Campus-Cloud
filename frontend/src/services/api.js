@@ -194,6 +194,7 @@ export function apiPost(path, body, options = {}) {
     method: "POST",
     body: JSON.stringify(body),
     signal: options.signal,
+    timeoutMs: options.timeoutMs,
   });
 }
 

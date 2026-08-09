@@ -69,7 +69,7 @@ def test_active_file_by_name_can_lock_existing_row_for_overwrite() -> None:
 
     file_service._active_file_by_name(
         session=DummySession(),
-        group_id=uuid.uuid4(),
+        teaching_class_id=uuid.uuid4(),
         original_filename="rubric.pdf",
         for_update=True,
     )
@@ -84,11 +84,11 @@ def test_save_file_requires_conflict_strategy_for_same_active_name(
 ) -> None:
     monkeypatch.setattr(file_service, "DATA_ROOT", tmp_path)
     session = _session()
-    group_id = uuid.uuid4()
+    teaching_class_id = uuid.uuid4()
 
     first = file_service.save_analyzed_file(
         session=session,
-        group_id=group_id,
+        teaching_class_id=teaching_class_id,
         uploaded_by=uuid.uuid4(),
         original_filename="rubric.pdf",
         file_hash="a" * 64,
@@ -101,7 +101,7 @@ def test_save_file_requires_conflict_strategy_for_same_active_name(
     with pytest.raises(HTTPException) as exc_info:
         file_service.save_analyzed_file(
             session=session,
-            group_id=group_id,
+            teaching_class_id=teaching_class_id,
             uploaded_by=uuid.uuid4(),
             original_filename="rubric.pdf",
             file_hash="b" * 64,
@@ -121,11 +121,11 @@ def test_copy_strategy_creates_filename_copy(
 ) -> None:
     monkeypatch.setattr(file_service, "DATA_ROOT", tmp_path)
     session = _session()
-    group_id = uuid.uuid4()
+    teaching_class_id = uuid.uuid4()
 
     file_service.save_analyzed_file(
         session=session,
-        group_id=group_id,
+        teaching_class_id=teaching_class_id,
         uploaded_by=uuid.uuid4(),
         original_filename="rubric.pdf",
         file_hash="a" * 64,
@@ -136,7 +136,7 @@ def test_copy_strategy_creates_filename_copy(
     )
     copy = file_service.save_analyzed_file(
         session=session,
-        group_id=group_id,
+        teaching_class_id=teaching_class_id,
         uploaded_by=uuid.uuid4(),
         original_filename="rubric.pdf",
         file_hash="b" * 64,
@@ -148,7 +148,14 @@ def test_copy_strategy_creates_filename_copy(
 
     assert copy.original_filename == "rubric (2).pdf"
     assert copy.status == "active"
-    assert len(file_service.list_files(session=session, group_id=group_id)) == 2
+    assert (
+        len(
+            file_service.list_files(
+                session=session, teaching_class_id=teaching_class_id
+            )
+        )
+        == 2
+    )
 
 
 def test_save_file_write_failure_rolls_back_db(
@@ -157,7 +164,7 @@ def test_save_file_write_failure_rolls_back_db(
 ) -> None:
     monkeypatch.setattr(file_service, "DATA_ROOT", tmp_path)
     session = _session()
-    group_id = uuid.uuid4()
+    teaching_class_id = uuid.uuid4()
 
     def fail_write_bytes(self, data):
         raise OSError("disk full")
@@ -167,7 +174,7 @@ def test_save_file_write_failure_rolls_back_db(
     with pytest.raises(OSError):
         file_service.save_analyzed_file(
             session=session,
-            group_id=group_id,
+            teaching_class_id=teaching_class_id,
             uploaded_by=uuid.uuid4(),
             original_filename="rubric.pdf",
             file_hash="a" * 64,
@@ -183,10 +190,10 @@ def test_save_file_write_failure_rolls_back_db(
 
 def test_active_filename_unique_constraint_blocks_duplicate_active_files() -> None:
     session = _session()
-    group_id = uuid.uuid4()
+    teaching_class_id = uuid.uuid4()
     session.add(
         TeacherJudgeFile(
-            group_id=group_id,
+            teaching_class_id=teaching_class_id,
             uploaded_by=uuid.uuid4(),
             original_filename="rubric.pdf",
             file_hash="a" * 64,
@@ -198,7 +205,7 @@ def test_active_filename_unique_constraint_blocks_duplicate_active_files() -> No
     session.commit()
     session.add(
         TeacherJudgeFile(
-            group_id=group_id,
+            teaching_class_id=teaching_class_id,
             uploaded_by=uuid.uuid4(),
             original_filename="rubric.pdf",
             file_hash="b" * 64,
@@ -219,7 +226,7 @@ async def test_overwrite_linked_file_marks_old_file_replaced_and_keeps_script(
 ) -> None:
     monkeypatch.setattr(file_service, "DATA_ROOT", tmp_path)
     session = _session()
-    group_id = uuid.uuid4()
+    teaching_class_id = uuid.uuid4()
     user_id = uuid.uuid4()
 
     async def fake_build_reviewed_script(*, rubric_snapshot, template_key):
@@ -238,7 +245,7 @@ async def test_overwrite_linked_file_marks_old_file_replaced_and_keeps_script(
 
     first = file_service.save_analyzed_file(
         session=session,
-        group_id=group_id,
+        teaching_class_id=teaching_class_id,
         uploaded_by=user_id,
         original_filename="rubric.pdf",
         file_hash="a" * 64,
@@ -249,7 +256,7 @@ async def test_overwrite_linked_file_marks_old_file_replaced_and_keeps_script(
     )
     artifact = await script_artifact_service.create_artifact(
         session=session,
-        group_id=group_id,
+        teaching_class_id=teaching_class_id,
         name="rubric.pdf",
         template_key="linux",
         rubric_analysis=_analysis("one"),
@@ -258,7 +265,7 @@ async def test_overwrite_linked_file_marks_old_file_replaced_and_keeps_script(
     )
     second = file_service.save_analyzed_file(
         session=session,
-        group_id=group_id,
+        teaching_class_id=teaching_class_id,
         uploaded_by=user_id,
         original_filename="rubric.pdf",
         file_hash="b" * 64,
@@ -271,7 +278,7 @@ async def test_overwrite_linked_file_marks_old_file_replaced_and_keeps_script(
     old_file = session.get(TeacherJudgeFile, uuid.UUID(first.id))
     active_files = session.exec(
         select(TeacherJudgeFile).where(
-            TeacherJudgeFile.group_id == group_id,
+            TeacherJudgeFile.teaching_class_id == teaching_class_id,
             TeacherJudgeFile.status == TeacherJudgeFileStatus.active,
         )
     ).all()
@@ -292,7 +299,7 @@ async def test_delete_file_keeps_linked_script_with_snapshot(
 ) -> None:
     monkeypatch.setattr(file_service, "DATA_ROOT", tmp_path)
     session = _session()
-    group_id = uuid.uuid4()
+    teaching_class_id = uuid.uuid4()
     user_id = uuid.uuid4()
 
     async def fake_build_reviewed_script(*, rubric_snapshot, template_key):
@@ -311,7 +318,7 @@ async def test_delete_file_keeps_linked_script_with_snapshot(
 
     saved_file = file_service.save_analyzed_file(
         session=session,
-        group_id=group_id,
+        teaching_class_id=teaching_class_id,
         uploaded_by=user_id,
         original_filename="rubric.pdf",
         file_hash="a" * 64,
@@ -322,7 +329,7 @@ async def test_delete_file_keeps_linked_script_with_snapshot(
     )
     artifact = await script_artifact_service.create_artifact(
         session=session,
-        group_id=group_id,
+        teaching_class_id=teaching_class_id,
         name="rubric.pdf",
         template_key="linux",
         rubric_analysis=_analysis("one"),
@@ -332,7 +339,7 @@ async def test_delete_file_keeps_linked_script_with_snapshot(
 
     file_service.delete_file(
         session=session,
-        group_id=group_id,
+        teaching_class_id=teaching_class_id,
         file_id=uuid.UUID(saved_file.id),
     )
     db_artifact = session.get(TeacherJudgeScriptArtifact, uuid.UUID(artifact.id))

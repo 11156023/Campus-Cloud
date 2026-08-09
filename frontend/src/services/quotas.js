@@ -1,6 +1,6 @@
 import { apiDelete, apiGet, apiPost, apiPut } from "./api";
 
-/** 資源配額：admin 管理群組/個人配額；所有登入者可查自己的用量。 */
+/** 資源配額：admin 管理個人配額；所有登入者可查自己的用量。 */
 export const QuotasService = {
   /** 自己的配額與目前用量 */
   getMyUsage(options) {
@@ -12,7 +12,7 @@ export const QuotasService = {
     return apiGet("/api/v1/quotas");
   },
 
-  /** 建立配額（body: { scope, group_id|user_id, max_cpu_cores, max_memory_mb, max_disk_gb, max_instances }） */
+  /** 建立個人配額覆寫。 */
   create(body) {
     return apiPost("/api/v1/quotas", body);
   },

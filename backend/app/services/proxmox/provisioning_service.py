@@ -65,9 +65,7 @@ def _ensure_resource_stopped(
     try:
         status = proxmox_service.get_status(node, vmid, resource_type)
     except Exception:
-        logger.warning(
-            "Failed to fetch %s %s status before stop", resource_type, vmid
-        )
+        logger.warning("Failed to fetch %s %s status before stop", resource_type, vmid)
         return
 
     if status.get("status") != "running":
@@ -92,9 +90,7 @@ def _ensure_resource_stopped(
     logger.warning(
         "%s %s still appears running after stop timeout", resource_type, vmid
     )
-    raise ProxmoxError(
-        f"{resource_type} {vmid} is still running after stop timeout"
-    )
+    raise ProxmoxError(f"{resource_type} {vmid} is still running after stop timeout")
 
 
 def _cleanup_failed_resource(node: str, vmid: int, resource_type: str) -> None:
@@ -132,11 +128,7 @@ def _gpu_mapping_nodes(mapping_id: str | None) -> set[str]:
         return set()
 
     mapping = gpu_service.get_gpu_mapping(str(mapping_id))
-    return {
-        str(item.node).strip()
-        for item in mapping.maps
-        if str(item.node).strip()
-    }
+    return {str(item.node).strip() for item in mapping.maps if str(item.node).strip()}
 
 
 def _select_request_placement(
@@ -171,8 +163,8 @@ def _select_request_placement(
         node_capacities = [
             item for item in node_capacities if item.node == str(pinned_node)
         ]
-        effective_resource_type, resource_type_reason = placement_advisor._decide_resource_type(
-            placement_request
+        effective_resource_type, resource_type_reason = (
+            placement_advisor._decide_resource_type(placement_request)
         )
         placement = vm_request_placement_service.CurrentPlacementSelection(
             node=str(pinned_node),
@@ -184,12 +176,16 @@ def _select_request_placement(
                 effective_resource_type=effective_resource_type,
                 resource_type_reason=resource_type_reason,
                 placement_strategy=placement_strategy,
-                node_priorities=vm_request_placement_service.get_node_priorities(session),
+                node_priorities=vm_request_placement_service.get_node_priorities(
+                    session
+                ),
             ),
         )
         if not placement.plan.feasible or not placement.node:
             reserved_requests = []
-            if getattr(db_request, "start_at", None) and getattr(db_request, "end_at", None):
+            if getattr(db_request, "start_at", None) and getattr(
+                db_request, "end_at", None
+            ):
                 reserved_requests = [
                     item
                     for item in vm_request_repo.get_approved_vm_requests_overlapping_window(
@@ -223,7 +219,11 @@ def _select_request_placement(
         session=session,
         db_request=db_request,
     )
-    if compatible_nodes and selection.node and str(selection.node) not in compatible_nodes:
+    if (
+        compatible_nodes
+        and selection.node
+        and str(selection.node) not in compatible_nodes
+    ):
         raise ProxmoxError(
             f"Selected node '{selection.node}' is not compatible with GPU mapping "
             f"'{getattr(db_request, 'gpu_mapping_id', '')}'."
@@ -282,6 +282,7 @@ def create_lxc(
     lxc_data: LXCCreateRequest,
     user_id: uuid.UUID,
     batch_job_id: uuid.UUID | None = None,
+    ip_reservation_key: str | None = None,
 ) -> LXCCreateResponse:
     vmid = proxmox_service.next_vmid()
     target_node = _get_lxc_target_node()
@@ -295,7 +296,9 @@ def create_lxc(
     )
     # 取得網路配置並分配 IP
     net_cfg = ip_management_service.get_network_config_for_vm(session)
-    allocated_ip = ip_management_service.allocate_ip(session, vmid, "lxc")
+    allocated_ip = ip_management_service.allocate_ip(
+        session, vmid, "lxc", reservation_key=ip_reservation_key
+    )
 
     created = False
     try:
@@ -368,7 +371,9 @@ def create_lxc(
                 vm_type="lxc",
             )
         except Exception:
-            logger.warning("Failed to register tunnel proxies for LXC %s", vmid, exc_info=True)
+            logger.warning(
+                "Failed to register tunnel proxies for LXC %s", vmid, exc_info=True
+            )
 
         logger.info(f"Created LXC container {vmid}: {lxc_data.hostname}")
         return LXCCreateResponse(
@@ -381,7 +386,11 @@ def create_lxc(
         # 釋放已分配的 IP
         try:
             with Session(session.get_bind()) as cleanup_session:
-                ip_management_service.release_ip(cleanup_session, vmid)
+                ip_management_service.release_ip(
+                    cleanup_session,
+                    vmid,
+                    restore_reservation=bool(ip_reservation_key),
+                )
                 cleanup_session.commit()
         except Exception:
             logger.warning("Failed to release IP for LXC %d during cleanup", vmid)
@@ -392,16 +401,21 @@ def create_lxc(
                     pos = r.get("pos")
                     if pos is not None:
                         try:
-                            firewall_service.delete_rule_by_pos(target_node, vmid, "lxc", int(pos))
+                            firewall_service.delete_rule_by_pos(
+                                target_node, vmid, "lxc", int(pos)
+                            )
                         except Exception as fw_err:
                             logger.debug(
                                 "LXC %d firewall rule pos=%s cleanup failed: %s",
-                                vmid, pos, fw_err,
+                                vmid,
+                                pos,
+                                fw_err,
                             )
             except Exception as fw_err:
                 logger.debug(
                     "LXC %d firewall rule listing for cleanup failed: %s",
-                    vmid, fw_err,
+                    vmid,
+                    fw_err,
                 )
             _cleanup_failed_resource(target_node, vmid, "lxc")
         logger.error(f"Failed to create LXC container: {e}")
@@ -414,6 +428,7 @@ def create_vm(
     vm_data: VMCreateRequest,
     user_id: uuid.UUID,
     batch_job_id: uuid.UUID | None = None,
+    ip_reservation_key: str | None = None,
 ) -> VMCreateResponse:
     new_vmid = proxmox_service.next_vmid()
     target_node = _get_vm_target_node(vm_data.template_id)
@@ -428,7 +443,9 @@ def create_vm(
 
     # 取得網路配置並分配 IP
     net_cfg = ip_management_service.get_network_config_for_vm(session)
-    allocated_ip = ip_management_service.allocate_ip(session, new_vmid, "vm")
+    allocated_ip = ip_management_service.allocate_ip(
+        session, new_vmid, "vm", reservation_key=ip_reservation_key
+    )
 
     created = False
     try:
@@ -443,7 +460,9 @@ def create_vm(
             "pool": get_proxmox_settings().pool_name,
         }
 
-        result = proxmox_service.clone_vm(target_node, vm_data.template_id, **clone_config)
+        result = proxmox_service.clone_vm(
+            target_node, vm_data.template_id, **clone_config
+        )
         created = True
 
         config_updates = {
@@ -461,6 +480,7 @@ def create_vm(
         gpu_mapping_id = getattr(vm_data, "gpu_mapping_id", None)
         if gpu_mapping_id:
             from app.services.proxmox import gpu_service
+
             try:
                 gpu_detail = gpu_service.get_gpu_mapping(gpu_mapping_id)
                 if gpu_detail.available_count <= 0:
@@ -525,7 +545,9 @@ def create_vm(
                 vm_type="qemu",
             )
         except Exception:
-            logger.warning("Failed to register tunnel proxies for VM %d", new_vmid, exc_info=True)
+            logger.warning(
+                "Failed to register tunnel proxies for VM %d", new_vmid, exc_info=True
+            )
 
         logger.info(f"Created VM {new_vmid} from template {vm_data.template_id}")
         return VMCreateResponse(
@@ -538,27 +560,38 @@ def create_vm(
         # 釋放已分配的 IP
         try:
             with Session(session.get_bind()) as cleanup_session:
-                ip_management_service.release_ip(cleanup_session, new_vmid)
+                ip_management_service.release_ip(
+                    cleanup_session,
+                    new_vmid,
+                    restore_reservation=bool(ip_reservation_key),
+                )
                 cleanup_session.commit()
         except Exception:
             logger.warning("Failed to release IP for VM %d during cleanup", new_vmid)
         if created:
             try:
-                rules = firewall_service.get_vm_firewall_rules(target_node, new_vmid, "qemu")
+                rules = firewall_service.get_vm_firewall_rules(
+                    target_node, new_vmid, "qemu"
+                )
                 for r in sorted(rules, key=lambda x: x.get("pos", 0), reverse=True):
                     pos = r.get("pos")
                     if pos is not None:
                         try:
-                            firewall_service.delete_rule_by_pos(target_node, new_vmid, "qemu", int(pos))
+                            firewall_service.delete_rule_by_pos(
+                                target_node, new_vmid, "qemu", int(pos)
+                            )
                         except Exception as fw_err:
                             logger.debug(
                                 "VM %d firewall rule pos=%s cleanup failed: %s",
-                                new_vmid, pos, fw_err,
+                                new_vmid,
+                                pos,
+                                fw_err,
                             )
             except Exception as fw_err:
                 logger.debug(
                     "VM %d firewall rule listing for cleanup failed: %s",
-                    new_vmid, fw_err,
+                    new_vmid,
+                    fw_err,
                 )
             _cleanup_failed_resource(target_node, new_vmid, "qemu")
         logger.error(f"Failed to create VM: {e}")
@@ -745,9 +778,7 @@ def execute_provision(plan: dict) -> tuple[int, str]:
                 firewall_service.setup_default_rules(actual_node, new_vmid, "lxc")
                 if plan["start_immediately"]:
                     proxmox_service.control(actual_node, new_vmid, "lxc", "start")
-                logger.info(
-                    "Provisioned lxc VMID %s on node %s", new_vmid, actual_node
-                )
+                logger.info("Provisioned lxc VMID %s on node %s", new_vmid, actual_node)
                 return new_vmid, actual_node
 
             config = {
@@ -810,7 +841,9 @@ def execute_provision(plan: dict) -> tuple[int, str]:
                         template_node,
                     )
                     actual_node = template_node
-                    fallback_storage = plan.get("fallback_storage", plan["target_storage"])
+                    fallback_storage = plan.get(
+                        "fallback_storage", plan["target_storage"]
+                    )
                     proxmox_service.clone_vm(
                         template_node,
                         plan["template_id"],
@@ -831,8 +864,12 @@ def execute_provision(plan: dict) -> tuple[int, str]:
                 "ciupgrade": 0,
             }
             if allocated_ip and net_cfg and net_cfg.get("bridge_name"):
-                config_updates["net0"] = f"virtio,bridge={net_cfg['bridge_name']},firewall=1"
-                config_updates["ipconfig0"] = f"ip={allocated_ip}/{net_cfg['prefix_len']},gw={net_cfg['gateway']}"
+                config_updates["net0"] = (
+                    f"virtio,bridge={net_cfg['bridge_name']},firewall=1"
+                )
+                config_updates["ipconfig0"] = (
+                    f"ip={allocated_ip}/{net_cfg['prefix_len']},gw={net_cfg['gateway']}"
+                )
                 if net_cfg.get("dns_servers"):
                     config_updates["nameserver"] = net_cfg["dns_servers"]
             else:
@@ -843,6 +880,7 @@ def execute_provision(plan: dict) -> tuple[int, str]:
             if plan.get("gpu_mapping_id"):
                 # Validate GPU availability before assigning
                 from app.services.proxmox import gpu_service
+
                 try:
                     gpu_detail = gpu_service.get_gpu_mapping(plan["gpu_mapping_id"])
                     if gpu_detail.available_count <= 0:
@@ -853,11 +891,15 @@ def execute_provision(plan: dict) -> tuple[int, str]:
                 except ProxmoxError:
                     raise
                 except Exception as e:
-                    logger.error("GPU 可用性檢查失敗 (%s): %s", plan["gpu_mapping_id"], e)
+                    logger.error(
+                        "GPU 可用性檢查失敗 (%s): %s", plan["gpu_mapping_id"], e
+                    )
                     raise ProxmoxError(f"無法驗證 GPU '{plan['gpu_mapping_id']}'：{e}")
                 config_updates["hostpci0"] = f"mapping={plan['gpu_mapping_id']}"
             _ensure_resource_stopped(actual_node, new_vmid, "qemu")
-            proxmox_service.update_config(actual_node, new_vmid, "qemu", **config_updates)
+            proxmox_service.update_config(
+                actual_node, new_vmid, "qemu", **config_updates
+            )
 
             if plan.get("disk_size"):
                 proxmox_service.resize_disk(
@@ -871,27 +913,39 @@ def execute_provision(plan: dict) -> tuple[int, str]:
         if created:
             # Best-effort: drop any firewall rules created earlier on this VMID
             try:
-                rules = firewall_service.get_vm_firewall_rules(actual_node, new_vmid, resource_type)
+                rules = firewall_service.get_vm_firewall_rules(
+                    actual_node, new_vmid, resource_type
+                )
                 for rule in sorted(rules, key=lambda r: r.get("pos", 0), reverse=True):
                     pos = rule.get("pos")
                     if pos is not None:
                         try:
-                            firewall_service.delete_rule_by_pos(actual_node, new_vmid, resource_type, int(pos))
+                            firewall_service.delete_rule_by_pos(
+                                actual_node, new_vmid, resource_type, int(pos)
+                            )
                         except Exception as fw_err:
                             logger.debug(
                                 "execute_provision rollback: rule pos=%s on VMID %s failed: %s",
-                                pos, new_vmid, fw_err,
+                                pos,
+                                new_vmid,
+                                fw_err,
                             )
             except Exception as fw_err:
-                logger.debug("Firewall cleanup skipped for VMID %s: %s", new_vmid, fw_err)
+                logger.debug(
+                    "Firewall cleanup skipped for VMID %s: %s", new_vmid, fw_err
+                )
             _cleanup_failed_resource(actual_node, new_vmid, resource_type)
         raise
 
-    logger.info("Provisioned %s VMID %s on node %s", resource_type, new_vmid, actual_node)
+    logger.info(
+        "Provisioned %s VMID %s on node %s", resource_type, new_vmid, actual_node
+    )
     return new_vmid, actual_node
 
 
-def provision_from_request(*, session: Session, db_request) -> tuple[int, str | None, str | None]:
+def provision_from_request(
+    *, session: Session, db_request
+) -> tuple[int, str | None, str | None]:
     """Legacy wrapper: plan + execute in one call (session kept open).
 
     Prefer plan_provision() + execute_provision() for new code.

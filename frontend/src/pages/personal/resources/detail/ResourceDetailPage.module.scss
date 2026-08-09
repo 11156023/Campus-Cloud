@@ -50,26 +50,6 @@
   color: var(--color-primary);
 }
 
-.inviteBtn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px $spacing-16;
-  border-radius: $radius-8;
-  font-size: $font-size-14;
-  font-weight: $font-weight-500;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  color: var(--color-text);
-  box-shadow: var(--shadow-sm);
-  cursor: pointer;
-  transition: background $transition-base;
-
-  &:hover {
-    background: var(--color-hover);
-  }
-}
-
 /* ── Tabs（pill 樣式，同 SettingsPage） ── */
 .tabs {
   display: flex;

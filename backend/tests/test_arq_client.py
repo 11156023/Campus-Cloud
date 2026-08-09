@@ -1,8 +1,11 @@
+import uuid
+from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
 
-from app.infrastructure.queue import arq_client
+from app.infrastructure import worker
+from app.infrastructure.queue import arq_client, dispatch, registry
 
 
 @pytest.fixture(scope="session")
@@ -53,3 +56,47 @@ async def test_init_arq_pool_connects_when_redis_enabled(
 
     create_pool.assert_awaited_once()
     assert arq_client._pool is pool
+
+
+async def test_enqueue_uses_local_runner_when_redis_disabled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    record = SimpleNamespace(id=uuid.uuid4())
+    scheduled: list[object] = []
+    executed: list[tuple[str, str, dict[str, object]]] = []
+
+    monkeypatch.setattr(dispatch.settings, "redis_enabled", False)
+    monkeypatch.setattr(
+        dispatch.task_record_repo,
+        "create_task_record",
+        lambda **_: record,
+    )
+
+    async def fake_run(
+        name: str,
+        record_id: str,
+        payload: dict[str, object],
+    ) -> None:
+        executed.append((name, record_id, payload))
+
+    def fake_submit(coro: object, **kwargs: object) -> str:
+        scheduled.append(coro)
+        return str(kwargs["task_id"])
+
+    monkeypatch.setattr(registry, "run_registered_task_locally", fake_run)
+    monkeypatch.setattr(worker, "submit", fake_submit)
+
+    result = await dispatch.enqueue_task(
+        session=object(),  # type: ignore[arg-type]
+        task_type="template.convert",
+        user_id=uuid.uuid4(),
+        template_id=uuid.uuid4(),
+        payload={"vmid": 101},
+    )
+
+    assert result is record
+    assert len(scheduled) == 1
+    await scheduled[0]  # type: ignore[misc]
+    assert executed == [
+        ("template.convert", str(record.id), {"vmid": 101})
+    ]

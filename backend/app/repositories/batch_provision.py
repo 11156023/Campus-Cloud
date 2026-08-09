@@ -3,7 +3,7 @@
 import uuid
 from datetime import UTC, datetime
 
-from sqlmodel import Session, select
+from sqlmodel import Session, col, select
 
 from app.models.batch_provision import (
     BatchProvisionJob,
@@ -17,8 +17,7 @@ from app.models.resource import Resource
 def create_job(
     *,
     session: Session,
-    group_id: uuid.UUID | None,
-    teaching_class_id: uuid.UUID | None = None,
+    teaching_class_id: uuid.UUID,
     initiated_by: uuid.UUID,
     resource_type: str,
     hostname_prefix: str,
@@ -31,7 +30,6 @@ def create_job(
 ) -> BatchProvisionJob:
     now = datetime.now(UTC)
     job = BatchProvisionJob(
-        group_id=group_id,
         teaching_class_id=teaching_class_id,
         initiated_by=initiated_by,
         resource_type=resource_type,
@@ -101,6 +99,48 @@ def transition_pending_review(
     if job is not None:
         session.refresh(job)
     return job
+
+
+def transition_pending_reviews(
+    *,
+    session: Session,
+    job_ids: list[uuid.UUID],
+    reviewer_id: uuid.UUID,
+    decision: BatchProvisionJobStatus,
+    review_comment: str | None = None,
+) -> list[BatchProvisionJob]:
+    """Atomically review every job in one teaching-class submission."""
+    import sqlalchemy as sa
+
+    wanted = list(dict.fromkeys(job_ids))
+    if not wanted:
+        return []
+    now = datetime.now(UTC)
+    result = session.exec(
+        sa.update(BatchProvisionJob)
+        .where(
+            col(BatchProvisionJob.id).in_(wanted),
+            BatchProvisionJob.status == BatchProvisionJobStatus.pending_review,
+        )
+        .values(
+            status=decision,
+            reviewer_id=reviewer_id,
+            reviewed_at=now,
+            review_comment=(review_comment or None),
+        )
+    )
+    if result.rowcount != len(wanted):
+        session.rollback()
+        return []
+    session.commit()
+    jobs = list(
+        session.exec(
+            select(BatchProvisionJob).where(col(BatchProvisionJob.id).in_(wanted))
+        ).all()
+    )
+    for job in jobs:
+        session.refresh(job)
+    return jobs
 
 
 def mark_reviewed(
@@ -230,12 +270,12 @@ def update_job_status(
         session.commit()
 
 
-def list_jobs_by_group(
-    *, session: Session, group_id: uuid.UUID
+def list_jobs_by_teaching_class(
+    *, session: Session, teaching_class_id: uuid.UUID
 ) -> list[BatchProvisionJob]:
     stmt = (
         select(BatchProvisionJob)
-        .where(BatchProvisionJob.group_id == group_id)
+        .where(BatchProvisionJob.teaching_class_id == teaching_class_id)
         .order_by(BatchProvisionJob.created_at.desc())
     )
     return list(session.exec(stmt).all())

@@ -47,20 +47,20 @@ def require_resource_access(
     )
 
 
-def can_bypass_group_ownership(user: Any) -> bool:
-    return has_permission(user, Permission.GROUP_OWNERSHIP_BYPASS)
+def can_bypass_teaching_ownership(user: Any) -> bool:
+    return has_permission(user, Permission.TEACHING_OWNERSHIP_BYPASS)
 
 
-def require_group_access(
+def require_teaching_access(
     user: Any,
     owner_id: uuid.UUID | None,
     *,
-    detail: str = "Not authorized to access this group",
+    detail: str = "Not authorized to access this teaching resource",
 ) -> None:
     require_owner_or_permission(
         user,
         owner_id,
-        bypass_permission=Permission.GROUP_OWNERSHIP_BYPASS,
+        bypass_permission=Permission.TEACHING_OWNERSHIP_BYPASS,
         detail=detail,
     )
 

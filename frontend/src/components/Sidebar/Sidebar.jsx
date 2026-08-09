@@ -1,4 +1,4 @@
-﻿import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth }  from "../../contexts/AuthContext";
 import styles from "./Sidebar.module.scss";
@@ -25,7 +25,7 @@ const navGroups = [
     items: [
       { key: "my-resources",  label: "我的資源",    icon: "inventory_2" },
       { key: "resource-mgmt", label: "資源管理",    icon: "storage" },
-      { key: "templates",     label: "模板管理",    icon: "library_books" },
+      { key: "templates",     label: "機器範本",    icon: "library_books" },
       { key: "gpu-mgmt",      label: "GPU 管理",    icon: "memory" },
     ],
   },
@@ -59,6 +59,7 @@ const navGroups = [
       { key: "ai-api-review", label: "申請審核", icon: "rate_review", adminOnly: true },
       { key: "ai-api-keys",   label: "金鑰管理", icon: "vpn_key", adminOnly: true },
       { key: "ai-monitoring", label: "使用監控", icon: "monitor_heart", adminOnly: true },
+      { key: "ai-pve",        label: "PVE 維運助手", icon: "dns", adminOnly: true },
     ],
   },
   {
@@ -67,9 +68,8 @@ const navGroups = [
     icon: "school",
     items: [
       { key: "class-management", label: "班級管理", icon: "groups_2" },
-      { key: "course-template-management", label: "環境模板", icon: "view_quilt" },
-      { key: "teaching",   label: "教學面板", icon: "grid_view" },
-      { key: "courses",    label: "課程學習", icon: "flag" },
+      { key: "course-template-management", label: "課程環境", icon: "view_quilt" },
+      { key: "courses",    label: "課程學習（非正式）", icon: "flag" },
     ],
   },
   {
@@ -77,7 +77,6 @@ const navGroups = [
     label: "系統管理",
     icon: "tune",
     items: [
-      { key: "groups",        label: "群組",       icon: "groups" },
       { key: "admin",         label: "使用者管理", icon: "admin_panel_settings" },
       { key: "quotas",        label: "配額管理",   icon: "data_usage" },
       { key: "settings",      label: "系統設定",   icon: "settings" },

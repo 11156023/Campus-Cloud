@@ -11,11 +11,19 @@ from pydantic import BaseModel, Field
 from sqlmodel import delete, select
 
 from app.api.deps import InstructorUser, SessionDep
-from app.core.authorizers import require_group_access
+from app.core.authorizers import require_teaching_access
 from app.exceptions import BadRequestError, NotFoundError
 from app.models import (
     BatchProvisionJob,
+    BatchProvisionJobStatus,
     BatchProvisionTask,
+    BatchProvisionTaskStatus,
+    ClassCapacityReservation,
+    CourseEnvironment,
+    CourseEnvironmentEdge,
+    CourseEnvironmentNode,
+    CourseEnvironmentVersion,
+    CourseEnvironmentVersionStatus,
     TeachingClass,
     TeachingClassMachineNode,
     TeachingClassStatus,
@@ -27,14 +35,13 @@ from app.models import (
 )
 from app.models.base import get_datetime_utc
 from app.repositories.user import get_user_by_email
+from app.services.teaching import class_capacity_service, class_network_service
 from app.services.vm import batch_provision_service
 
 router = APIRouter(prefix="/teaching-classes", tags=["teaching-classes"])
 
 DAY_CODE = ["MO", "TU", "WE", "TH", "FR", "SA", "SU"]
-TASK_FILE_ROOT = (
-    Path(__file__).resolve().parents[3] / "data" / "teaching-class-tasks"
-)
+TASK_FILE_ROOT = Path(__file__).resolve().parents[3] / "data" / "teaching-class-tasks"
 MAX_TASK_FILE_BYTES = 100 * 1024 * 1024
 
 
@@ -70,7 +77,12 @@ class StudentAdd(BaseModel):
 
 class MachineNodeIn(BaseModel):
     node_key: str
-    source_template_id: uuid.UUID
+    source_type: str = "template"
+    source_template_id: uuid.UUID | None = None
+    custom_image_ref: str | None = None
+    custom_storage: str | None = None
+    custom_username: str | None = None
+    custom_unprivileged: bool = True
     name: str
     role: str
     resource_type: str
@@ -78,6 +90,10 @@ class MachineNodeIn(BaseModel):
     memory_mb: int
     disk_gb: int
     network: str | None = None
+
+
+class CourseSelect(BaseModel):
+    course_version_id: uuid.UUID
 
 
 class WeekFileIn(BaseModel):
@@ -99,7 +115,7 @@ def _get_class(session: SessionDep, current_user, class_id: uuid.UUID) -> Teachi
     item = session.get(TeachingClass, class_id)
     if not item:
         raise NotFoundError("Teaching class not found")
-    require_group_access(current_user, item.owner_id)
+    require_teaching_access(current_user, item.owner_id)
     return item
 
 
@@ -186,6 +202,38 @@ def _serialize(session: SessionDep, item: TeachingClass) -> dict:
     ready = sum(
         1 for row in machine_rows if row.status == "completed" and row.vmid is not None
     )
+    course_environment = None
+    topology_edges = []
+    if item.course_version_id:
+        version = session.get(CourseEnvironmentVersion, item.course_version_id)
+        environment = (
+            session.get(CourseEnvironment, version.environment_id) if version else None
+        )
+        if version and environment:
+            topology_edges = [
+                row.model_dump()
+                for row in session.exec(
+                    select(CourseEnvironmentEdge).where(
+                        CourseEnvironmentEdge.version_id == version.id
+                    )
+                ).all()
+            ]
+            course_environment = {
+                "id": environment.id,
+                "version_id": version.id,
+                "name": environment.name,
+                "code": environment.code,
+                "version": version.version,
+                "status": version.status,
+            }
+    capacity = class_capacity_service.preview(
+        session, nodes=nodes, students=enrollments
+    )
+    reservation = session.exec(
+        select(ClassCapacityReservation).where(
+            ClassCapacityReservation.class_id == item.id
+        )
+    ).first()
     return {
         **item.model_dump(),
         "member_count": len(enrollments),
@@ -205,6 +253,10 @@ def _serialize(session: SessionDep, item: TeachingClass) -> dict:
             for job in jobs
             if job
         ],
+        "course_environment": course_environment,
+        "topology_edges": topology_edges,
+        "capacity_preview": capacity,
+        "capacity_reservation": reservation.model_dump() if reservation else None,
     }
 
 
@@ -388,20 +440,65 @@ def replace_machines(
     session: SessionDep,
     current_user: InstructorUser,
 ):
+    _get_class(session, current_user, class_id)
+    raise BadRequestError("請從課程環境發布版本，並在班級管理選擇課程環境")
+
+
+@router.put("/{class_id}/course")
+def select_course(
+    class_id: uuid.UUID,
+    body: CourseSelect,
+    session: SessionDep,
+    current_user: InstructorUser,
+):
     item = _get_class(session, current_user, class_id)
-    if item.status != TeachingClassStatus.planning:
-        raise BadRequestError("已送出建機後不可修改機器")
+    if item.status != TeachingClassStatus.planning or item.locked_at is not None:
+        raise BadRequestError("班級已鎖定，不能更換課程")
+    version = session.get(CourseEnvironmentVersion, body.course_version_id)
+    if version is None or version.status != CourseEnvironmentVersionStatus.published:
+        raise BadRequestError("只能選擇已發布的課程版本")
+    environment = session.get(CourseEnvironment, version.environment_id)
+    if environment is None:
+        raise NotFoundError("Course environment not found")
+    require_teaching_access(current_user, environment.owner_id)
+    source_nodes = list(
+        session.exec(
+            select(CourseEnvironmentNode)
+            .where(CourseEnvironmentNode.version_id == version.id)
+            .order_by(CourseEnvironmentNode.sort_order)
+        ).all()
+    )
+    if not source_nodes:
+        raise BadRequestError("課程版本沒有可派發的機器")
     session.exec(
         delete(TeachingClassMachineNode).where(
             TeachingClassMachineNode.class_id == class_id
         )
     )
-    for index, node in enumerate(body):
+    for node in source_nodes:
         session.add(
             TeachingClassMachineNode(
-                class_id=class_id, sort_order=index, **node.model_dump()
+                class_id=class_id,
+                node_key=node.node_key,
+                source_type=node.source_type,
+                source_template_id=node.source_template_id,
+                custom_image_ref=node.custom_image_ref,
+                custom_storage=None,
+                custom_username=node.custom_username,
+                custom_unprivileged=node.custom_unprivileged,
+                name=node.name,
+                role=node.role,
+                resource_type=node.resource_type,
+                cpu=node.cpu,
+                memory_mb=node.memory_mb,
+                disk_gb=node.disk_gb,
+                network=node.network,
+                sort_order=node.sort_order,
             )
         )
+    item.course_version_id = version.id
+    item.updated_at = get_datetime_utc()
+    session.add(item)
     session.commit()
     return _serialize(session, item)
 
@@ -503,7 +600,12 @@ def delete_week_file(
         raise BadRequestError("已結束的班級不可修改每週內容")
     week = session.get(TeachingClassWeek, week_id)
     task_file = session.get(TeachingClassTaskFile, file_id)
-    if not week or week.class_id != class_id or not task_file or task_file.week_id != week_id:
+    if (
+        not week
+        or week.class_id != class_id
+        or not task_file
+        or task_file.week_id != week_id
+    ):
         raise NotFoundError("找不到指定任務檔案")
 
     storage_key = task_file.storage_key
@@ -530,10 +632,89 @@ def _recurrence(item: TeachingClass):
             / 60
         )
         + item.boot_lead_minutes
+        + int(getattr(item, "shutdown_grace_minutes", 0) or 0)
     )
     return (
         f"FREQ=WEEKLY;BYDAY={DAY_CODE[start.weekday()]};BYHOUR={start.hour};BYMINUTE={start.minute}",
         duration,
+    )
+
+
+def _node_source_params(node: TeachingClassMachineNode) -> dict:
+    if node.source_type == "template" and node.source_template_id:
+        return {"vm_template_id": str(node.source_template_id)}
+    if node.resource_type.lower() == "lxc":
+        return {
+            "ostemplate": node.custom_image_ref,
+            "storage": "local-lvm",
+            "unprivileged": node.custom_unprivileged,
+        }
+    return {
+        "template_id": int(node.custom_image_ref or "0"),
+        "storage": "local-lvm",
+        "username": node.custom_username or "student",
+    }
+
+
+def _submit_node_job(
+    session: SessionDep,
+    *,
+    item: TeachingClass,
+    node: TeachingClassMachineNode,
+    member_user_ids: list[uuid.UUID],
+    retry: bool = False,
+) -> uuid.UUID:
+    rule, duration = _recurrence(item)
+    retry_suffix = f"-r{uuid.uuid4().hex[:8]}" if retry else ""
+    return batch_provision_service.submit_batch_job_for_users(
+        session=session,
+        member_user_ids=member_user_ids,
+        teaching_class_id=item.id,
+        initiated_by_id=item.owner_id,
+        resource_type="lxc" if node.resource_type.lower() == "lxc" else "qemu",
+        hostname_prefix=(
+            f"{item.code.lower().replace('_', '-')[:35]}-"
+            f"{node.sort_order + 1}{retry_suffix}"
+        ),
+        params={
+            **_node_source_params(node),
+            "cores": node.cpu,
+            "memory": node.memory_mb,
+            "disk_size": node.disk_gb,
+            "rootfs_size": node.disk_gb,
+            "environment_type": f"{item.code}-{node.role}",
+            "expiry_date": item.end_date.isoformat(),
+            "ip_reservation_prefix": f"{item.id}:{node.node_key}",
+        },
+        recurrence_rule=rule,
+        recurrence_duration_minutes=duration,
+        schedule_timezone=item.timezone,
+        capacity_reserved=True,
+    )
+
+
+@router.get("/{class_id}/capacity-preview")
+def capacity_preview(
+    class_id: uuid.UUID,
+    session: SessionDep,
+    current_user: InstructorUser,
+):
+    item = _get_class(session, current_user, class_id)
+    if item.status != TeachingClassStatus.planning:
+        raise BadRequestError("只有準備中的班級可以重新執行容量預檢")
+    nodes = list(
+        session.exec(
+            select(TeachingClassMachineNode)
+            .where(TeachingClassMachineNode.class_id == class_id)
+            .order_by(TeachingClassMachineNode.sort_order)
+        ).all()
+    )
+    students = _students(session, class_id)
+    return class_capacity_service.preview(
+        session,
+        nodes=nodes,
+        students=students,
+        check_cluster=True,
     )
 
 
@@ -552,33 +733,150 @@ def provision_class(
     students = _students(session, class_id)
     if not nodes or not students:
         raise BadRequestError("學生名單與課程機器必須完成")
-    rule, duration = _recurrence(item)
-    for index, node in enumerate(nodes):
+    if item.status != TeachingClassStatus.planning or item.locked_at is not None:
+        raise BadRequestError("班級已鎖定或已送出建機")
+    if item.course_version_id is None:
+        raise BadRequestError("請先選擇已發布的課程版本")
+    class_capacity_service.reserve(
+        session,
+        class_id=item.id,
+        course_version_id=item.course_version_id,
+        nodes=nodes,
+        students=students,
+    )
+    item.locked_at = get_datetime_utc()
+    session.add(item)
+    session.commit()
+    for node in nodes:
         if node.batch_job_id:
             continue
-        node.batch_job_id = batch_provision_service.submit_batch_job_for_users(
+        node.batch_job_id = _submit_node_job(
             session=session,
+            item=item,
+            node=node,
             member_user_ids=[row.user_id for row in students],
-            teaching_class_id=item.id,
-            initiated_by_id=current_user.id,
-            resource_type="lxc" if node.resource_type.lower() == "lxc" else "qemu",
-            hostname_prefix=f"{item.code.lower().replace('_', '-')[:35]}-{index + 1}",
-            params={
-                "vm_template_id": str(node.source_template_id),
-                "cores": node.cpu,
-                "memory": node.memory_mb,
-                "disk_size": node.disk_gb,
-                "rootfs_size": node.disk_gb,
-                "environment_type": f"{item.code}-{node.role}",
-                "expiry_date": item.end_date.isoformat(),
-            },
-            recurrence_rule=rule,
-            recurrence_duration_minutes=duration,
-            schedule_timezone=item.timezone,
         )
         session.add(node)
         session.commit()
     item.status = TeachingClassStatus.pending_review
+    item.updated_at = get_datetime_utc()
+    session.add(item)
+    session.commit()
+    return _serialize(session, item)
+
+
+@router.post("/{class_id}/retry-failed")
+def retry_failed_class(
+    class_id: uuid.UUID,
+    session: SessionDep,
+    current_user: InstructorUser,
+):
+    item = _get_class(session, current_user, class_id)
+    if item.status != TeachingClassStatus.partial_failed:
+        raise BadRequestError("只有建立失敗的班級可以重試")
+    nodes = list(
+        session.exec(
+            select(TeachingClassMachineNode)
+            .where(TeachingClassMachineNode.class_id == class_id)
+            .order_by(TeachingClassMachineNode.sort_order)
+        ).all()
+    )
+    submitted = 0
+    for node in nodes:
+        job = session.get(BatchProvisionJob, node.batch_job_id) if node.batch_job_id else None
+        if not job:
+            continue
+        tasks = list(
+            session.exec(
+                select(BatchProvisionTask).where(BatchProvisionTask.job_id == job.id)
+            ).all()
+        )
+        retry_user_ids = [
+            task.user_id
+            for task in tasks
+            if task.status != BatchProvisionTaskStatus.completed
+            and (
+                task.status == BatchProvisionTaskStatus.failed
+                or job.status
+                in {
+                    BatchProvisionJobStatus.failed,
+                    BatchProvisionJobStatus.rejected,
+                    BatchProvisionJobStatus.cancelled,
+                }
+            )
+        ]
+        if not retry_user_ids:
+            continue
+        node.batch_job_id = _submit_node_job(
+            session=session,
+            item=item,
+            node=node,
+            member_user_ids=retry_user_ids,
+            retry=True,
+        )
+        session.add(node)
+        session.commit()
+        submitted += 1
+
+    if submitted:
+        item.status = TeachingClassStatus.pending_review
+    else:
+        topology_errors = class_network_service.apply_class_topology(
+            session, class_id=class_id
+        )
+        if topology_errors:
+            raise BadRequestError("網路拓撲重試失敗：" + "；".join(topology_errors))
+        item.status = TeachingClassStatus.active
+        reservation = session.exec(
+            select(ClassCapacityReservation).where(
+                ClassCapacityReservation.class_id == class_id
+            )
+        ).first()
+        if reservation:
+            reservation.status = "consumed"
+            session.add(reservation)
+    item.updated_at = get_datetime_utc()
+    session.add(item)
+    session.commit()
+    return _serialize(session, item)
+
+
+@router.post("/{class_id}/reset-failed")
+def reset_failed_class(
+    class_id: uuid.UUID,
+    session: SessionDep,
+    current_user: InstructorUser,
+):
+    item = _get_class(session, current_user, class_id)
+    if item.status != TeachingClassStatus.partial_failed:
+        raise BadRequestError("只有建立失敗的班級可以返回編輯")
+    enrollment_ids = [row.id for row in _students(session, class_id)]
+    machine_rows = (
+        list(
+            session.exec(
+                select(TeachingClassStudentMachine).where(
+                    TeachingClassStudentMachine.class_student_id.in_(enrollment_ids)
+                )
+            ).all()
+        )
+        if enrollment_ids
+        else []
+    )
+    if any(row.vmid is not None for row in machine_rows):
+        raise BadRequestError("已有部分機器建立完成，請使用「重試失敗機器」")
+    for row in machine_rows:
+        session.delete(row)
+    nodes = session.exec(
+        select(TeachingClassMachineNode).where(
+            TeachingClassMachineNode.class_id == class_id
+        )
+    ).all()
+    for node in nodes:
+        node.batch_job_id = None
+        session.add(node)
+    class_capacity_service.release(session, class_id=class_id)
+    item.status = TeachingClassStatus.planning
+    item.locked_at = None
     item.updated_at = get_datetime_utc()
     session.add(item)
     session.commit()
@@ -649,7 +947,22 @@ def provision_status(
         )
     )
     if all_ready:
-        item.status = TeachingClassStatus.active
+        session.flush()
+        topology_errors = class_network_service.apply_class_topology(
+            session, class_id=class_id
+        )
+        if topology_errors:
+            item.status = TeachingClassStatus.partial_failed
+        else:
+            item.status = TeachingClassStatus.active
+            reservation = session.exec(
+                select(ClassCapacityReservation).where(
+                    ClassCapacityReservation.class_id == class_id
+                )
+            ).first()
+            if reservation:
+                reservation.status = "consumed"
+                session.add(reservation)
     elif any_failed:
         item.status = TeachingClassStatus.partial_failed
     elif any(

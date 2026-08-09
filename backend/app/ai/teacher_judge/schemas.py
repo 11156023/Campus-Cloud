@@ -126,6 +126,77 @@ TeacherJudgeScriptRunTargetScopeLiteral = Literal[
 TeacherJudgeScriptRunStatusLiteral = Literal[
     "pending", "running", "completed", "failed", "cancelled"
 ]
+TeacherJudgeSessionStatusLiteral = Literal["active", "archived"]
+TeacherJudgeMessageRoleLiteral = Literal["user", "assistant"]
+TeacherJudgeMessageTypeLiteral = Literal["chat", "rubric_proposal", "system_notice"]
+
+
+class TeacherJudgeSessionCreateRequest(BaseModel):
+    title: str = Field(..., min_length=1, max_length=255)
+    selected_file_id: uuid.UUID | None = None
+
+    @field_validator("title")
+    @classmethod
+    def validate_title(cls, value: str) -> str:
+        title = value.strip()
+        if not title:
+            raise ValueError("title must not be blank")
+        return title
+
+
+class TeacherJudgeSessionUpdateRequest(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=255)
+    selected_file_id: uuid.UUID | None = None
+    status: TeacherJudgeSessionStatusLiteral | None = None
+
+    @field_validator("title")
+    @classmethod
+    def validate_title(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        title = value.strip()
+        if not title:
+            raise ValueError("title must not be blank")
+        return title
+
+
+class TeacherJudgeSessionPublic(BaseModel):
+    id: str
+    teaching_class_id: str
+    title: str
+    status: TeacherJudgeSessionStatusLiteral
+    selected_file_id: str | None
+    selected_file_name: str | None = None
+    template_key: str | None = None
+    summary: str
+    message_count: int = 0
+    script_count: int = 0
+    run_count: int = 0
+    created_by: str | None
+    created_at: str
+    updated_at: str
+    last_activity_at: str
+
+
+class TeacherJudgeSessionMessageCreateRequest(BaseModel):
+    content: str = Field(..., min_length=1, max_length=20000)
+
+
+class TeacherJudgeSessionMessagePublic(BaseModel):
+    id: str
+    session_id: str
+    role: TeacherJudgeMessageRoleLiteral
+    content: str
+    message_type: TeacherJudgeMessageTypeLiteral
+    metadata_json: dict[str, Any]
+    created_by: str | None
+    created_at: str
+
+
+class TeacherJudgeSessionChatResponse(BaseModel):
+    user_message: TeacherJudgeSessionMessagePublic
+    assistant_message: TeacherJudgeSessionMessagePublic
+    rubric_proposal: list[dict[str, Any]] | None = None
 
 
 class TeacherJudgeScriptCreateRequest(BaseModel):
@@ -158,7 +229,8 @@ class TeacherJudgeScriptRegenerateRequest(BaseModel):
 
 class TeacherJudgeScriptArtifactPublic(BaseModel):
     id: str
-    group_id: str
+    teaching_class_id: str
+    session_id: str | None = None
     name: str
     template_key: str
     rubric_snapshot_json: dict[str, Any]
@@ -180,7 +252,7 @@ class TeacherJudgeScriptArtifactPublic(BaseModel):
 
 class TeacherJudgeFilePublic(BaseModel):
     id: str
-    group_id: str
+    teaching_class_id: str
     uploaded_by: str | None
     original_filename: str
     file_hash: str
@@ -219,7 +291,7 @@ class TeacherJudgeScriptRunCreateRequest(BaseModel):
 
 class TeacherJudgeScriptRunPublic(BaseModel):
     id: str
-    group_id: str
+    teaching_class_id: str
     artifact_id: str
     target_scope: TeacherJudgeScriptRunTargetScopeLiteral
     target_snapshot_json: dict[str, Any]
@@ -228,6 +300,19 @@ class TeacherJudgeScriptRunPublic(BaseModel):
     result_summary_json: dict[str, Any]
     target_results_json: dict[str, Any]
     started_by: str | None
+    started_at: str | None
+    finished_at: str | None
+    created_at: str
+    updated_at: str
+
+
+class TeacherJudgeScriptRunSummary(BaseModel):
+    id: str
+    teaching_class_id: str
+    artifact_id: str
+    status: TeacherJudgeScriptRunStatusLiteral
+    progress_json: dict[str, Any]
+    result_summary_json: dict[str, Any]
     started_at: str | None
     finished_at: str | None
     created_at: str

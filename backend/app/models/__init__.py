@@ -11,6 +11,7 @@ from .ai_api_credential import AIAPICredential
 from .ai_api_rate_limit import AIAPIRateLimit
 from .ai_api_request import AIAPIRequest, AIAPIRequestStatus
 from .ai_api_usage import AIAPIUsage
+from .ai_pve_template import AIPVETemplate
 from .ai_template_call_log import AITemplateCallLog
 from .alert_event import AlertEvent, AlertMetric, AlertScope
 from .audit_log import AuditAction, AuditLog
@@ -33,12 +34,18 @@ from .course import (
     CourseTask,
     UserCourseProgress,
 )
+from .course_environment import (
+    ClassCapacityReservation,
+    CourseEnvironment,
+    CourseEnvironmentEdge,
+    CourseEnvironmentNode,
+    CourseEnvironmentVersion,
+    CourseEnvironmentVersionStatus,
+)
 from .deletion_request import DeletionRequest, DeletionRequestStatus
 from .firewall_layout import FirewallLayout
 from .gateway_config import GatewayConfig
 from .governance_config import GovernanceConfig
-from .group import Group
-from .group_member import GroupMember
 from .ip_allocation import IpAllocation
 from .ldap_config import LdapConfig
 from .mining_incident import MiningIncident, MiningIncidentStatus
@@ -75,6 +82,13 @@ from .teacher_judge_script_run import (
     TeacherJudgeScriptRunStatus,
     TeacherJudgeScriptRunTargetScope,
 )
+from .teacher_judge_session import (
+    TeacherJudgeMessageRole,
+    TeacherJudgeMessageType,
+    TeacherJudgeSession,
+    TeacherJudgeSessionMessage,
+    TeacherJudgeSessionStatus,
+)
 from .teacher_judge_template_command import TeacherJudgeTemplateCommand
 from .teaching_class import (
     TeachingClass,
@@ -97,7 +111,6 @@ from .vm_request import (
 )
 from .vm_template import (
     VMTemplate,
-    VMTemplateGroupLink,
     VMTemplateStatus,
     VMTemplateVisibility,
 )
@@ -116,6 +129,7 @@ __all__ = [
     "AIAPIRequestStatus",
     "AIAPIUsage",
     "AIAPIRateLimit",
+    "AIPVETemplate",
     "AITemplateCallLog",
     # Resource
     "Resource",
@@ -145,9 +159,6 @@ __all__ = [
     "SpecChangeRequest",
     "SpecChangeRequestStatus",
     "SpecChangeType",
-    # Groups
-    "Group",
-    "GroupMember",
     # Proxmox Config
     "ProxmoxConfig",
     "ProxmoxConnectionConfig",
@@ -165,6 +176,12 @@ __all__ = [
     "GatewayConfig",
     # Cloudflare Config
     "CloudflareConfig",
+    "CourseEnvironment",
+    "CourseEnvironmentEdge",
+    "CourseEnvironmentVersion",
+    "CourseEnvironmentVersionStatus",
+    "CourseEnvironmentNode",
+    "ClassCapacityReservation",
     # Reverse Proxy Rules
     "ReverseProxyRule",
     # Batch Provision
@@ -180,6 +197,11 @@ __all__ = [
     "ScriptDeployLog",
     "TeacherJudgeFile",
     "TeacherJudgeFileStatus",
+    "TeacherJudgeMessageRole",
+    "TeacherJudgeMessageType",
+    "TeacherJudgeSession",
+    "TeacherJudgeSessionMessage",
+    "TeacherJudgeSessionStatus",
     "TeacherJudgeScriptArtifact",
     "TeacherJudgeScriptLanguage",
     "TeacherJudgeScriptRun",
@@ -193,7 +215,6 @@ __all__ = [
     "DeletionRequestStatus",
     # VM Template (範本系統 2.0)
     "VMTemplate",
-    "VMTemplateGroupLink",
     "VMTemplateStatus",
     "VMTemplateVisibility",
     # Task Record (背景任務)

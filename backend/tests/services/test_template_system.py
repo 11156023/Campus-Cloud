@@ -16,7 +16,8 @@ from typing import Any
 import pytest
 
 from app.exceptions import ConflictError, PermissionDeniedError
-from app.models import VMTemplate, VMTemplateStatus
+from app.models import VMTemplate, VMTemplateStatus, VMTemplateVisibility
+from app.repositories import vm_template as template_repo
 from app.services.proxmox import provisioning_service
 from app.services.template import clone_service, template_service
 
@@ -273,6 +274,30 @@ def test_list_templates_student_sees_only_ready(
     template_service.list_templates(session=None, user=make_user("student"))  # type: ignore[arg-type]
     assert rbac_repo["fn"] == "list_visible"
     assert rbac_repo["only_ready"] is True
+
+
+def test_private_template_is_visible_only_to_owner() -> None:
+    owner = make_user("teacher")
+    template = make_template(owner_id=owner.id)
+    template.visibility = VMTemplateVisibility.private
+
+    assert template_repo.is_template_visible_to_user(
+        template=template, user_id=owner.id
+    )
+    assert not template_repo.is_template_visible_to_user(
+        template=template,
+        user_id=uuid.uuid4(),
+    )
+
+
+def test_global_template_is_visible_to_other_users() -> None:
+    template = make_template(owner_id=uuid.uuid4())
+    template.visibility = VMTemplateVisibility.global_
+
+    assert template_repo.is_template_visible_to_user(
+        template=template,
+        user_id=uuid.uuid4(),
+    )
 
 
 # ---------------------------------------------------------------------------

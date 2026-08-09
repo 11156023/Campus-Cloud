@@ -9,12 +9,11 @@ from pydantic import BaseModel, EmailStr, Field
 
 
 class ClassroomSessionCreate(BaseModel):
-    """建立教室 session（monitor=觀看學生 VM；broadcast=直播自己的 VM 給群組）"""
+    """建立班級教室 session（monitor=觀看學生 VM；broadcast=直播示範）。"""
 
     vmid: int
     mode: Literal["monitor", "broadcast"]
-    group_id: uuid.UUID | None = None  # broadcast 必填
-    class_id: uuid.UUID | None = None
+    class_id: uuid.UUID
 
 
 class ClassroomControlRequest(BaseModel):
@@ -51,14 +50,13 @@ class ClassroomSessionPublic(BaseModel):
     id: str
     vmid: int
     mode: str
-    group_id: uuid.UUID | None = None
-    class_id: uuid.UUID | None = None
+    class_id: uuid.UUID
     started_by: uuid.UUID
     controller_user_id: uuid.UUID | None = None
     subscriber_count: int = 0
 
 
 class ClassroomLivePublic(BaseModel):
-    """學生查詢自己群組進行中的直播（無直播時 session 為 null）"""
+    """學生查詢自己班級進行中的直播（無直播時 session 為 null）。"""
 
     session: ClassroomSessionPublic | None = None

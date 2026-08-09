@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import styles from "./TemplatesPage.module.scss";
 import MIcon from "../../../components/MIcon";
 import { useAuth } from "../../../contexts/AuthContext";
-import { GroupsService } from "../../../services/groups";
 import { ResourcesService } from "../../../services/resources";
 import { TemplatesService } from "../../../services/templates";
 import { useToast } from "../../../hooks/useToast";
@@ -20,8 +19,7 @@ export default function TemplateFormDialog({ template, onClose, onSaved }) {
   const [sourceVmid, setSourceVmid] = useState("");
   const [name, setName] = useState(template?.name ?? "");
   const [description, setDescription] = useState(template?.description ?? "");
-  const [visibility, setVisibility] = useState(template?.visibility ?? "groups");
-  const [groupIds, setGroupIds] = useState(template?.group_ids ?? []);
+  const [visibility, setVisibility] = useState(template?.visibility ?? "private");
   const [defaultCores, setDefaultCores] = useState(
     template?.default_cores ? String(template.default_cores) : "",
   );
@@ -32,7 +30,6 @@ export default function TemplateFormDialog({ template, onClose, onSaved }) {
     template?.default_disk ? String(template.default_disk) : "",
   );
   const [resources, setResources] = useState([]);
-  const [groups, setGroups] = useState([]);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -42,19 +39,10 @@ export default function TemplateFormDialog({ template, onClose, onSaved }) {
         .then((res) => !cancelled && setResources(res ?? []))
         .catch(() => {});
     }
-    GroupsService.list()
-      .then((res) => !cancelled && setGroups(res?.data ?? []))
-      .catch(() => {});
     return () => {
       cancelled = true;
     };
   }, [isEdit, isAdmin]);
-
-  const toggleGroup = (groupId) => {
-    setGroupIds((prev) =>
-      prev.includes(groupId) ? prev.filter((id) => id !== groupId) : [...prev, groupId],
-    );
-  };
 
   const handleSubmit = async () => {
     if (!isEdit && !sourceVmid) {
@@ -65,17 +53,12 @@ export default function TemplateFormDialog({ template, onClose, onSaved }) {
       toast.error("請輸入範本名稱");
       return;
     }
-    if (visibility === "groups" && groupIds.length === 0) {
-      toast.error("群組可見模式需要至少選擇一個群組");
-      return;
-    }
 
     const numOrNull = (v) => (String(v).trim() ? Number(v) : null);
     const common = {
       name: name.trim(),
       description: description.trim() || null,
       visibility,
-      group_ids: visibility === "groups" ? groupIds : [],
       default_cores: numOrNull(defaultCores),
       default_memory: numOrNull(defaultMemory),
       default_disk: numOrNull(defaultDisk),
@@ -160,35 +143,35 @@ export default function TemplateFormDialog({ template, onClose, onSaved }) {
         </div>
 
         <div className={styles.field}>
-          <label className={styles.checkLine}>
-            <input
-              type="checkbox"
-              checked={visibility === "global"}
-              onChange={(e) => setVisibility(e.target.checked ? "global" : "groups")}
-            />
-            全域可見（所有使用者都能克隆）
-          </label>
-          {visibility === "groups" && (
-            <div className={styles.groupBox}>
-              <p className={styles.fieldHint}>勾選可以看到這個範本的群組：</p>
-              {groups.length === 0 ? (
-                <span className={styles.fieldWarn}>你目前沒有任何群組，請先到群組頁建立。</span>
-              ) : (
-                <div className={styles.groupGrid}>
-                  {groups.map((group) => (
-                    <label key={group.id} className={styles.checkLine}>
-                      <input
-                        type="checkbox"
-                        checked={groupIds.includes(group.id)}
-                        onChange={() => toggleGroup(group.id)}
-                      />
-                      <span className={styles.checkLabel}>{group.name}</span>
-                    </label>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
+          <label>可見範圍</label>
+          <div className={styles.visibilityOptions}>
+            <label className={`${styles.visibilityOption} ${visibility !== "global" ? styles.visibilityOptionActive : ""}`}>
+              <input
+                type="radio"
+                name="template-visibility"
+                value="private"
+                checked={visibility !== "global"}
+                onChange={() => setVisibility("private")}
+              />
+              <span>
+                <strong>私人</strong>
+                <small>只有建立者與管理員可以看到及使用</small>
+              </span>
+            </label>
+            <label className={`${styles.visibilityOption} ${visibility === "global" ? styles.visibilityOptionActive : ""}`}>
+              <input
+                type="radio"
+                name="template-visibility"
+                value="global"
+                checked={visibility === "global"}
+                onChange={() => setVisibility("global")}
+              />
+              <span>
+                <strong>全部可見</strong>
+                <small>所有使用者都可以看到及克隆</small>
+              </span>
+            </label>
+          </div>
         </div>
 
         <div className={styles.tripleGrid}>

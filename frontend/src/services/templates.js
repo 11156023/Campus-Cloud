@@ -31,6 +31,11 @@ export const TemplatesService = {
     return apiPatch(`/api/v1/templates/${templateId}`, body);
   },
 
+  /** 重新送出失敗的母機轉換任務 */
+  retry(templateId) {
+    return apiPost(`/api/v1/templates/${templateId}/retry`, {});
+  },
+
   /** 刪除範本（仍有 linked clone 子機時後端回 409） */
   remove(templateId) {
     return apiDelete(`/api/v1/templates/${templateId}`);

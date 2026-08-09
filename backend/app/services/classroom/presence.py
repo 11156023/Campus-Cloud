@@ -3,7 +3,7 @@
 事件 payload 形如：
     {"type": "live_started" | "live_stopped" | "takeover_started"
              | "takeover_stopped" | "watch_force_closed",
-     "session_id": ..., "vmid": ..., "group_id": ...}
+     "session_id": ..., "vmid": ..., "class_id": ...}
 """
 
 import logging
@@ -25,7 +25,6 @@ class PresenceSocket(Protocol):
 @dataclass
 class _Connection:
     user_id: uuid.UUID
-    group_ids: set[uuid.UUID]
     class_ids: set[uuid.UUID]
     websocket: PresenceSocket
     # dataclass eq=False 效果：以身分比較，同一 user 多分頁各是一條連線
@@ -40,15 +39,13 @@ class ClassroomPresenceHub:
         self,
         *,
         user_id: uuid.UUID,
-        group_ids: set[uuid.UUID],
+        class_ids: set[uuid.UUID],
         websocket: PresenceSocket,
-        class_ids: set[uuid.UUID] | None = None,
     ) -> None:
         """註冊連線並常駐讀取直到斷線（訊息內容忽略，僅偵測斷線）。"""
         conn = _Connection(
             user_id=user_id,
-            group_ids=set(group_ids),
-            class_ids=set(class_ids or set()),
+            class_ids=set(class_ids),
             websocket=websocket,
         )
         self._connections[conn.key] = conn
@@ -60,24 +57,12 @@ class ClassroomPresenceHub:
         finally:
             self._connections.pop(conn.key, None)
 
-    def online_user_ids(self, group_id: uuid.UUID) -> set[uuid.UUID]:
-        return {
-            conn.user_id
-            for conn in self._connections.values()
-            if group_id in conn.group_ids
-        }
-
     def online_user_ids_for_class(self, class_id: uuid.UUID) -> set[uuid.UUID]:
         return {
             conn.user_id
             for conn in self._connections.values()
             if class_id in conn.class_ids
         }
-
-    async def broadcast_to_group(self, group_id: uuid.UUID, event: dict[str, Any]) -> None:
-        await self._send_to(
-            [c for c in self._connections.values() if group_id in c.group_ids], event
-        )
 
     async def broadcast_to_class(self, class_id: uuid.UUID, event: dict[str, Any]) -> None:
         await self._send_to(

@@ -1,8 +1,17 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
+import {
+  Background,
+  Handle,
+  Position,
+  ReactFlow,
+} from "@xyflow/react";
+import "@xyflow/react/dist/style.css";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import MIcon from "../../components/MIcon";
+import { CourseEnvironmentsService } from "../../services/courseEnvironments";
+import { apiGet } from "../../services/api";
 import { TemplatesService } from "../../services/templates";
-import { getCourseTemplate, saveCourseTemplate } from "./courseOperationsStore";
+import ConnectionEdge from "../network/firewall/edges/ConnectionEdge";
 import styles from "./CourseOperations.module.scss";
 
 const TABS = [
@@ -10,44 +19,208 @@ const TABS = [
   ["machines", "機器配置"],
 ];
 
-const emptyTemplate = { id: "new", name: "", code: "", description: "", status: "draft", classes: 0, updatedAt: "尚未儲存", nodes: [] };
+const emptyTemplate = { id: "new", name: "", code: "", description: "", status: "draft", classes: 0, updatedAt: "尚未儲存", nodes: [], edges: [] };
 
-function MachineEditor({ value, onChange, pveTemplates }) {
+const FIREWALL_PROTOCOLS = ["tcp", "udp", "icmp", "icmpv6", "sctp"];
+
+function TopologyMachineNode({ data, selected, isConnectable }) {
+  const node = data.node;
+  return <div className={`${styles.flowMachineNode} ${selected ? styles.flowMachineNodeSelected : ""}`}>
+    <Handle type="target" position={Position.Left} isConnectable={isConnectable} />
+    <div className={styles.flowNodeIcon}><MIcon name={node.type === "lxc" ? "deployed_code" : "dns"} size={18} /></div>
+    <div className={styles.flowNodeLabel}>
+      <strong>{node.name}</strong>
+      <span>{node.sourceType === "custom" ? "自訂" : "範本"} · {String(node.type).toUpperCase()}</span>
+      <small>{node.cpu} CPU · {node.memory} GB RAM · {node.disk} GB</small>
+    </div>
+    <Handle type="source" position={Position.Right} isConnectable={isConnectable} />
+  </div>;
+}
+
+const TOPOLOGY_NODE_TYPES = { courseMachine: TopologyMachineNode };
+const TOPOLOGY_EDGE_TYPES = { connection: ConnectionEdge };
+
+function MachineEditor({ value, edges, onChange, onEdgesChange, pveTemplates, vmImages, lxcImages, sourceNotice, locked = false }) {
+  const [sourceMode, setSourceMode] = useState("template");
   const [sourceId, setSourceId] = useState("");
+  const [customType, setCustomType] = useState("qemu");
+  const [selectedNodeId, setSelectedNodeId] = useState("");
+  const [selectedEdgeId, setSelectedEdgeId] = useState("");
   const atLimit = value.length >= 3;
-  const sources = pveTemplates.length ? pveTemplates : [
-    { id: "fallback-linux", name: "Ubuntu Server 24.04", resource_type: "LXC", default_cores: 2, default_memory: 2048, default_disk: 24 },
-    { id: "fallback-router", name: "Debian Router Lab", resource_type: "VM", default_cores: 2, default_memory: 2048, default_disk: 12 },
-  ];
+
   function addMachine() {
     if (atLimit || !sourceId) return;
-    const source = sources.find((item) => String(item.id) === sourceId) ?? sources[0];
-    onChange([...value, {
-      id: `node-${Date.now()}`, sourceTemplateId: source.id, name: source.name, role: "課程機器",
-      type: source.resource_type ?? "VM", image: source.name, cpu: source.default_cores ?? 2,
-      memory: Math.max(1, Math.round((source.default_memory ?? 2048) / 1024)), disk: source.default_disk ?? 24,
-      network: "lab-net", icon: "dns",
-    }]);
+    const nodeId = `node-${Date.now()}`;
+    if (sourceMode === "template") {
+      const source = pveTemplates.find((item) => String(item.id) === sourceId);
+      if (!source) return;
+      onChange([...value, {
+        id: nodeId, sourceType: "template", sourceTemplateId: source.id, name: source.name, role: "課程機器",
+        type: String(source.resource_type).toLowerCase() === "lxc" ? "lxc" : "qemu", image: source.name, cpu: source.default_cores ?? 2,
+        memory: Math.max(1, Math.round((source.default_memory ?? 2048) / 1024)), disk: source.default_disk ?? 24,
+        network: "lab-net", icon: "dns", positionX: 60 + value.length * 260, positionY: 120,
+      }]);
+    } else {
+      const source = (customType === "lxc" ? lxcImages : vmImages).find((item) => String(item.value) === sourceId);
+      if (!source) return;
+      onChange([...value, {
+        id: nodeId, sourceType: "custom", sourceTemplateId: null, customImageRef: source.value,
+        customUsername: "student", customUnprivileged: true,
+        name: source.label.split(" · ")[0], role: "課程機器", type: customType, image: source.label,
+        cpu: 2, memory: 2, disk: customType === "lxc" ? 8 : 20, network: "lab-net", icon: "dns",
+        positionX: 60 + value.length * 260, positionY: 120,
+      }]);
+    }
+    setSelectedNodeId(nodeId);
+    setSelectedEdgeId("");
     setSourceId("");
   }
-  const totals = useMemo(() => ({ cpu: value.reduce((sum, node) => sum + node.cpu, 0), ram: value.reduce((sum, node) => sum + node.memory, 0), disk: value.reduce((sum, node) => sum + node.disk, 0) }), [value]);
+
+  function removeMachine(nodeId) {
+    onChange(value.filter((item) => item.id !== nodeId));
+    onEdgesChange(edges.filter((edge) => edge.source !== nodeId && edge.target !== nodeId));
+    setSelectedNodeId("");
+  }
+
+  function connect(connection) {
+    if (locked || connection.source === connection.target) return;
+    const duplicate = edges.some((edge) => (
+      edge.source === connection.source
+      && edge.target === connection.target
+      && edge.direction === "one_way"
+      && edge.protocol === "tcp"
+      && Number(edge.port) === 22
+    ));
+    if (duplicate) return;
+    const edge = {
+      id: `edge-${Date.now()}`,
+      source: connection.source,
+      target: connection.target,
+      direction: "one_way",
+      protocol: "tcp",
+      port: 22,
+    };
+    onEdgesChange([...edges, edge]);
+    setSelectedEdgeId(edge.id);
+    setSelectedNodeId("");
+  }
+
+  function patchNode(nodeId, patch) {
+    onChange(value.map((item) => item.id === nodeId ? { ...item, ...patch } : item));
+  }
+
+  function patchEdge(patch) {
+    onEdgesChange(edges.map((edge) => edge.id === selectedEdgeId ? { ...edge, ...patch } : edge));
+  }
+
+  function removeEdge(edgeId) {
+    onEdgesChange(edges.filter((edge) => edge.id !== edgeId));
+    setSelectedEdgeId("");
+  }
+
+  function handleGraphNodesChange(changes) {
+    const positions = new Map(
+      changes
+        .filter((change) => change.type === "position" && change.position)
+        .map((change) => [change.id, change.position]),
+    );
+    if (!positions.size) return;
+    onChange(value.map((node) => {
+      const position = positions.get(String(node.id));
+      return position
+        ? { ...node, positionX: Math.round(position.x), positionY: Math.round(position.y) }
+        : node;
+    }));
+  }
+
+  const selectedEdge = edges.find((edge) => edge.id === selectedEdgeId);
+  const selectedNode = value.find((node) => node.id === selectedNodeId) ?? (!selectedEdge ? value[0] : null);
+  const graphNodes = value.map((node, index) => ({
+    id: String(node.id),
+    type: "courseMachine",
+    position: {
+      x: Number(node.positionX ?? (60 + index * 260)),
+      y: Number(node.positionY ?? (120 + (index % 2) * 45)),
+    },
+    data: { node },
+    selected: selectedNode?.id === node.id,
+  }));
+  const graphEdges = edges.map((edge) => ({
+    ...edge,
+    type: "connection",
+    data: {
+      edge: {
+        course_edge_id: edge.id,
+        source_vmid: edge.source,
+        target_vmid: edge.target,
+      },
+      label: `${edge.direction === "bidirectional" ? "雙向" : "單向"} · ${edge.protocol}${edge.port ? `/${edge.port}` : ""}`,
+      showLabel: true,
+      onSelect: () => { setSelectedEdgeId(edge.id); setSelectedNodeId(""); },
+      onDelete: locked ? null : () => removeEdge(edge.id),
+    },
+    zIndex: 5,
+  }));
+
   return <section className={`${styles.card} ${styles.templateMachineWorkspace}`}>
       <div className={styles.machineWorkspaceHeader}>
-        <div><h2>每位學生的上課環境</h2><p>下方這組機器會套用給班級中的每一位學生。</p></div>
-        <div className={styles.machineTotals}><span><strong>{value.length}</strong> 台機器</span><span><strong>{totals.cpu}</strong> CPU</span><span><strong>{totals.ram}</strong> GB RAM</span><span><strong>{totals.disk}</strong> GB 磁碟</span></div>
+        <div><h2>每位學生的上課環境</h2><p>新增節點，再用連線定義可互通的服務。</p></div>
+        <span className={styles.nodeLimit}>{value.length} / 3 節點</span>
       </div>
+      {sourceNotice && <p className={styles.persistentFeedback}><MIcon name="info" size={17} />{sourceNotice}</p>}
       <div className={styles.machineAddBar}>
-        <label className={styles.field}><span>新增機器來源（最多 3 台）</span><select value={sourceId} disabled={atLimit} onChange={(event) => setSourceId(event.target.value)}><option value="">{atLimit ? "已達 3 台上限" : "選擇既有 PVE 範本"}</option>{sources.map((source) => <option key={source.id} value={source.id}>{source.name} · {source.resource_type ?? "VM"}</option>)}</select></label>
-        <button type="button" className={styles.btnPrimary} disabled={atLimit || !sourceId} onClick={addMachine}><MIcon name={atLimit ? "check" : "add"} size={16} />{atLimit ? "已達上限" : "加入機器"}</button>
+        <label className={styles.field}><span>來源方式</span><select value={sourceMode} disabled={locked || atLimit} onChange={(event) => { setSourceMode(event.target.value); setSourceId(""); }}><option value="template">① 選擇既有範本</option><option value="custom">② 新增 VM/LXC 規格</option></select></label>
+        {sourceMode === "custom" && <label className={styles.field}><span>機器類型</span><select value={customType} disabled={locked || atLimit} onChange={(event) => { setCustomType(event.target.value); setSourceId(""); }}><option value="qemu">VM</option><option value="lxc">LXC</option></select></label>}
+        <label className={styles.field}><span>{sourceMode === "template" ? "既有範本" : "基礎映像"}</span><select value={sourceId} disabled={locked || atLimit} onChange={(event) => setSourceId(event.target.value)}><option value="">{locked ? "已發布版本不可修改" : atLimit ? "已達 3 台上限" : "請選擇"}</option>{sourceMode === "template" ? pveTemplates.map((source) => <option key={source.id} value={source.id}>{source.name} · {source.resource_type ?? "VM"}</option>) : (customType === "lxc" ? lxcImages : vmImages).map((source) => <option key={source.value} value={source.value}>{source.label}</option>)}</select></label>
+        <button type="button" className={styles.btnPrimary} disabled={locked || atLimit || !sourceId} onClick={addMachine}><MIcon name={atLimit ? "check" : "add"} size={16} />{atLimit ? "已達上限" : "加入機器"}</button>
       </div>
-      {value.length ? <div className={styles.blueprintCanvas}>{value.map((node, index) => <div className={styles.blueprintItem} key={node.id}>
-        <article className={styles.machineBlock}>
-          <div className={styles.machineTitle}><span><MIcon name={node.icon ?? "dns"} size={20} /></span><div><input aria-label={`機器 ${index + 1} 名稱`} value={node.name} onChange={(event) => onChange(value.map((item) => item.id === node.id ? { ...item, name: event.target.value } : item))} /><small>{node.image}</small></div><em>{node.type}</em></div>
-          <div className={styles.machineFields}><label>角色<input value={node.role} onChange={(event) => onChange(value.map((item) => item.id === node.id ? { ...item, role: event.target.value } : item))} /></label><label>網路<input value={node.network} onChange={(event) => onChange(value.map((item) => item.id === node.id ? { ...item, network: event.target.value } : item))} /></label></div>
-          <div className={styles.machineSpecs}><span>{node.cpu} CPU</span><span>{node.memory} GB RAM</span><span>{node.disk} GB Disk</span><button type="button" onClick={() => onChange(value.filter((item) => item.id !== node.id))}><MIcon name="delete_outline" size={16} />移除</button></div>
-        </article>
-        {index < value.length - 1 && <div className={styles.connection}><span>{node.network}</span><i /><MIcon name="arrow_forward" size={18} /></div>}
-      </div>)}</div> : <div className={styles.emptyState}><MIcon name="dns" size={32} /><p>請先從既有 PVE 範本加入第一台機器。</p></div>}
+      {value.length ? <>
+        <div className={styles.topologyHelp}><MIcon name="account_tree" size={17} /><span>從來源節點右側圓點拖到目標節點左側圓點；節點本體可直接拖曳移動。</span></div>
+        <div className={styles.topologyWorkspace}>
+          <div className={styles.topologyCanvas}><ReactFlow
+            nodes={graphNodes}
+            edges={graphEdges}
+            nodeTypes={TOPOLOGY_NODE_TYPES}
+            edgeTypes={TOPOLOGY_EDGE_TYPES}
+            onConnect={connect}
+            onNodesChange={handleGraphNodesChange}
+            onNodeClick={(_, node) => { setSelectedNodeId(node.id); setSelectedEdgeId(""); }}
+            onEdgeClick={(_, edge) => { setSelectedEdgeId(edge.id); setSelectedNodeId(""); }}
+            nodesDraggable={!locked}
+            nodesConnectable={!locked}
+            connectionLineStyle={{ stroke: "#4f6fdc", strokeWidth: 3 }}
+            elementsSelectable
+            minZoom={0.7}
+            maxZoom={1.4}
+            fitView
+            fitViewOptions={{ padding: 0.22, maxZoom: 1.1 }}
+            proOptions={{ hideAttribution: true }}
+          ><Background gap={20} size={1} /></ReactFlow></div>
+          <aside className={styles.topologyInspector}>
+            {selectedEdge ? <>
+              <div className={styles.inspectorTitle}><MIcon name="link" size={18} /><div><strong>連線規則</strong><small>{value.find((node) => node.id === selectedEdge.source)?.name} → {value.find((node) => node.id === selectedEdge.target)?.name}</small></div></div>
+              <label>方向<select disabled={locked} value={selectedEdge.direction} onChange={(event) => patchEdge({ direction: event.target.value })}><option value="one_way">單向</option><option value="bidirectional">雙向</option></select></label>
+              <div className={styles.inspectorSplit}>
+                <label>協定<select disabled={locked} value={selectedEdge.protocol} onChange={(event) => patchEdge({ protocol: event.target.value })}>{selectedEdge.protocol === "any" && <option value="any">全部（舊設定）</option>}{FIREWALL_PROTOCOLS.map((protocol) => <option key={protocol} value={protocol}>{protocol.toUpperCase()}</option>)}</select></label>
+                <label>Port<input disabled={locked || selectedEdge.protocol === "any"} type="number" min="1" max="65535" value={selectedEdge.port ?? ""} onChange={(event) => patchEdge({ port: event.target.value })} /></label>
+              </div>
+              <p className={styles.inspectorHint}>單向會建立來源 OUT 與目標 IN 規則；雙向會再建立反向規則。</p>
+              {!locked && <button type="button" className={styles.inspectorDanger} onClick={() => removeEdge(selectedEdge.id)}><MIcon name="delete_outline" size={16} />刪除連線</button>}
+            </> : selectedNode ? <>
+              <div className={styles.inspectorTitle}><MIcon name="dns" size={18} /><div><strong>{selectedNode.name}</strong><small>{selectedNode.sourceType === "custom" ? "自訂規格" : "既有範本"} · {String(selectedNode.type).toUpperCase()}</small></div></div>
+              <label>名稱<input disabled={locked} value={selectedNode.name} onChange={(event) => patchNode(selectedNode.id, { name: event.target.value })} /></label>
+              <label>角色<input disabled={locked} value={selectedNode.role} onChange={(event) => patchNode(selectedNode.id, { role: event.target.value })} /></label>
+              <div className={styles.inspectorSplit}>
+                <label>CPU<input disabled={locked || selectedNode.sourceType !== "custom"} type="number" min="1" max="32" value={selectedNode.cpu} onChange={(event) => patchNode(selectedNode.id, { cpu: Number(event.target.value) })} /></label>
+                <label>RAM (GB)<input disabled={locked || selectedNode.sourceType !== "custom"} type="number" min="1" max="64" value={selectedNode.memory} onChange={(event) => patchNode(selectedNode.id, { memory: Number(event.target.value) })} /></label>
+              </div>
+              <label>Disk (GB)<input disabled={locked || selectedNode.sourceType !== "custom"} type="number" min={selectedNode.type === "lxc" ? 1 : 10} max="1000" value={selectedNode.disk} onChange={(event) => patchNode(selectedNode.id, { disk: Number(event.target.value) })} /></label>
+              <p className={styles.inspectorHint}>儲存區由系統依容量、相容類型與管理優先序自動選擇。</p>
+              {!locked && <button type="button" className={styles.inspectorDanger} onClick={() => removeMachine(selectedNode.id)}><MIcon name="delete_outline" size={16} />移除節點</button>}
+            </> : null}
+          </aside>
+        </div>
+      </> : <div className={styles.emptyState}><MIcon name="dns" size={32} /><p>先加入一個節點，再設定機器之間的連線。</p></div>}
   </section>;
 }
 
@@ -58,22 +231,116 @@ export default function CourseTemplateEditorPage() {
   const requestedTab = params.get("tab") ?? "basic";
   const returnTo = params.get("returnTo");
   const tab = TABS.some(([key]) => key === requestedTab) ? requestedTab : "basic";
-  const source = getCourseTemplate(templateId);
-  const [template, setTemplate] = useState(() => structuredClone(source ?? emptyTemplate));
+  const [template, setTemplate] = useState(() => structuredClone(emptyTemplate));
   const [pveTemplates, setPveTemplates] = useState([]);
+  const [vmImages, setVmImages] = useState([]);
+  const [lxcImages, setLxcImages] = useState([]);
+  const [sourceNotice, setSourceNotice] = useState("");
+  const [loading, setLoading] = useState(Boolean(templateId));
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
   const isNew = !templateId;
-  useEffect(() => { let active = true; TemplatesService.list().then((result) => { const rows = result?.data ?? result ?? []; if (active) setPveTemplates(rows.filter((item) => item.status === "ready")); }).catch(() => {}); return () => { active = false; }; }, []);
+  const locked = template.status !== "draft";
+  const invalidTopology = (template.edges ?? []).some((edge) => (
+    edge.protocol !== "any"
+    && (!Number.isInteger(Number(edge.port)) || Number(edge.port) < 1 || Number(edge.port) > 65535)
+  ));
+  const saveBlockReason = !template.name.trim()
+    ? "請先輸入環境名稱"
+    : !template.code.trim()
+      ? "請先輸入環境代碼"
+      : template.nodes.length === 0
+        ? "請到「機器配置」加入至少一台機器"
+        : template.nodes.length > 3
+          ? "每位學生最多只能配置三台機器"
+          : invalidTopology
+            ? "請修正拓撲連線的 Port"
+            : "";
+  useEffect(() => {
+    if (!templateId) { setTemplate(structuredClone(emptyTemplate)); setLoading(false); return undefined; }
+    let active = true;
+    setLoading(true);
+    CourseEnvironmentsService.get(templateId)
+      .then((result) => active && setTemplate(result))
+      .catch((reason) => active && setMessage(reason?.message ?? "無法讀取課程環境"))
+      .finally(() => active && setLoading(false));
+    return () => { active = false; };
+  }, [templateId]);
+  useEffect(() => {
+    let active = true;
+    TemplatesService.list()
+      .then((result) => {
+        if (!active) return;
+        const rows = result?.data ?? result ?? [];
+        const ready = rows.filter((item) => item.status === "ready");
+        setPveTemplates(ready);
+        if (ready.length) setSourceNotice("");
+        else if (rows.some((item) => item.status === "creating" || item.status === "updating")) {
+          setSourceNotice("機器範本仍在處理中；可等待完成，或改用「② 新增 VM/LXC 規格」。");
+        } else if (rows.some((item) => item.status === "failed")) {
+          setSourceNotice("機器範本轉換失敗，請先到機器範本重新轉換，或改用「② 新增 VM/LXC 規格」。");
+        } else {
+          setSourceNotice("目前沒有可用的機器範本；仍可使用「② 新增 VM/LXC 規格」建立課程環境。");
+        }
+      })
+      .catch((reason) => {
+        if (active) setSourceNotice(reason?.message ?? "無法讀取機器範本；仍可改用自訂 VM/LXC 規格。");
+      });
+    return () => { active = false; };
+  }, []);
+  useEffect(() => {
+    let active = true;
+    Promise.all([apiGet("/api/v1/vm/templates"), apiGet("/api/v1/lxc/templates")])
+      .then(([vms, lxcs]) => {
+        if (!active) return;
+        setVmImages((vms ?? []).map((item) => ({ value: String(item.vmid), label: `${item.name} · VMID ${item.vmid} · ${item.node}` })));
+        setLxcImages((lxcs ?? []).map((item) => ({ value: item.volid, label: item.volid.split("/").pop() ?? item.volid })));
+      })
+      .catch((reason) => {
+        if (active) setSourceNotice(reason?.message ?? "無法讀取 VM/LXC 基礎映像，請稍後重試。");
+      });
+    return () => { active = false; };
+  }, []);
   function update(patch) { setTemplate((current) => ({ ...current, ...patch })); }
   function changeTab(nextTab) { setParams(returnTo ? { tab: nextTab, returnTo } : { tab: nextTab }); }
-  function save() {
-    const saved = saveCourseTemplate(template);
-    navigate(returnTo ?? `/course-template-management/${saved.id}`, { replace: true, state: returnTo ? { createdTemplateId: saved.id } : { saved: true } });
+  async function save() {
+    setSaving(true); setMessage("");
+    try {
+      const saved = isNew
+        ? await CourseEnvironmentsService.create(template)
+        : await CourseEnvironmentsService.update(template.id, template);
+      setTemplate(saved);
+      if (isNew) navigate(`/course-template-management/${saved.id}${returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : ""}`, { replace: true });
+      else setMessage("草稿已儲存。確認無誤後可以發布鎖定。");
+    } catch (reason) { setMessage(reason?.message ?? "儲存失敗"); }
+    finally { setSaving(false); }
   }
+  async function publish() {
+    if (!window.confirm("發布後這個版本將永久鎖定，確定要儲存目前設定並發布嗎？")) return;
+    setSaving(true); setMessage("");
+    try {
+      await CourseEnvironmentsService.update(template.id, template);
+      const published = await CourseEnvironmentsService.publish(template.id);
+      setTemplate(published);
+      setMessage("課程環境已發布並鎖定，現在可以在班級管理中選擇。");
+      if (returnTo) navigate(returnTo, { state: { createdTemplateId: published.id } });
+    } catch (reason) { setMessage(reason?.message ?? "發布失敗"); }
+    finally { setSaving(false); }
+  }
+  async function newVersion() {
+    setSaving(true); setMessage("");
+    try { setTemplate(await CourseEnvironmentsService.createVersion(template.id)); }
+    catch (reason) { setMessage(reason?.message ?? "建立新版本失敗"); }
+    finally { setSaving(false); }
+  }
+  if (loading) return <div className={styles.emptyState}><p>正在讀取課程環境…</p></div>;
   return <div className={styles.page}>
-    <button type="button" className={styles.backLink} onClick={() => navigate(returnTo ?? "/course-template-management")}><MIcon name="arrow_back" size={18} />{returnTo ? "返回班級上課環境" : "返回環境模板"}</button>
-    <div className={styles.pageHeader}><div className={styles.pageHeading}><div className={styles.titleLine}><h1 className={styles.pageTitle}>{isNew ? "建立環境模板" : template.name}</h1></div><p className={styles.pageSubtitle}>{isNew ? "定義可重複套用到班級的學生機器組合。" : `${template.code} · v${template.version} · ${template.updatedAt}`}</p></div><div className={styles.pageActions}><button type="button" className={styles.btnSecondary} onClick={() => navigate(returnTo ?? "/course-template-management")}>取消</button><button type="button" className={styles.btnPrimary} disabled={!template.name.trim() || !template.code.trim() || template.nodes.length === 0 || template.nodes.length > 3} onClick={save}><MIcon name="save" size={16} />儲存模板</button></div></div>
+    <button type="button" className={styles.backLink} onClick={() => navigate(returnTo ?? "/course-template-management")}><MIcon name="arrow_back" size={18} />{returnTo ? "返回班級上課環境" : "返回課程環境"}</button>
+    <div className={styles.pageHeader}><div className={styles.pageHeading}><div className={styles.titleLine}><h1 className={styles.pageTitle}>{isNew ? "建立課程環境" : template.name}</h1></div><p className={styles.pageSubtitle}>{isNew ? "定義可重複套用到班級的學生機器組合。" : `${template.code} · v${template.version} · ${template.updatedAt}`}</p></div><div className={styles.pageActions}><button type="button" className={styles.btnSecondary} onClick={() => navigate(returnTo ?? "/course-template-management")}>返回</button>{locked ? <button type="button" className={styles.btnPrimary} disabled={saving} onClick={newVersion}><MIcon name="content_copy" size={16} />建立新版本</button> : <><button type="button" className={styles.btnSecondary} disabled={isNew || saving || !template.name.trim() || !template.code.trim() || template.nodes.length === 0 || template.nodes.length > 3 || invalidTopology} onClick={publish}><MIcon name="lock" size={16} />儲存、發布並鎖定</button><button type="button" className={styles.btnPrimary} disabled={saving || !template.name.trim() || !template.code.trim() || template.nodes.length === 0 || template.nodes.length > 3 || invalidTopology} onClick={save}><MIcon name="save" size={16} />{saving ? "儲存中…" : "儲存草稿"}</button></>}</div></div>
+    {message && <p className={styles.persistentFeedback}><MIcon name="info" size={17} />{message}</p>}
+    {!locked && saveBlockReason && <p className={styles.persistentFeedback}><MIcon name="info" size={17} />尚不能儲存：{saveBlockReason}。</p>}
     <div className={styles.stepTabs}>{TABS.map(([key, label], index) => <button type="button" key={key} className={tab === key ? styles.stepActive : ""} onClick={() => changeTab(key)}><span>{index + 1}</span>{label}</button>)}</div>
-    {tab === "basic" && <section className={styles.card}><div className={styles.cardHeader}><div><h2>基本資料</h2><p>環境模板只定義機器組合，不包含班級名單、每週任務或進度。</p></div></div><div className={styles.formGrid}><label className={styles.field}><span>模板名稱</span><input value={template.name} onChange={(event) => update({ name: event.target.value })} placeholder="例如：Linux 三層式上課環境" /></label><label className={styles.field}><span>模板代碼</span><input value={template.code} onChange={(event) => update({ code: event.target.value })} placeholder="LINUX-3TIER" /></label><label className={`${styles.field} ${styles.fieldFull}`}><span>環境用途</span><textarea rows={5} value={template.description} onChange={(event) => update({ description: event.target.value })} /></label></div><div className={styles.actionFooter}><button type="button" className={styles.btnPrimary} onClick={() => changeTab("machines")}>下一步：機器配置<MIcon name="arrow_forward" size={16} /></button></div></section>}
-    {tab === "machines" && <MachineEditor value={template.nodes} onChange={(nodes) => update({ nodes })} pveTemplates={pveTemplates} />}
+    {tab === "basic" && <section className={styles.card}><div className={styles.cardHeader}><div><h2>基本資料</h2><p>{locked ? "這個版本已發布並鎖定；需要調整時請建立新版本。" : "課程環境只定義機器組合，不包含班級名單、每週任務或進度。"}</p></div></div><div className={styles.formGrid}><label className={styles.field}><span>環境名稱</span><input disabled={locked} value={template.name} onChange={(event) => update({ name: event.target.value })} placeholder="例如：Linux 三層式上課環境" /></label><label className={styles.field}><span>環境代碼</span><input disabled={locked} value={template.code} onChange={(event) => update({ code: event.target.value })} placeholder="LINUX-3TIER" /></label><label className={`${styles.field} ${styles.fieldFull}`}><span>環境用途</span><textarea disabled={locked} rows={5} value={template.description ?? ""} onChange={(event) => update({ description: event.target.value })} /></label></div><div className={styles.actionFooter}><button type="button" className={styles.btnPrimary} onClick={() => changeTab("machines")}>查看機器配置<MIcon name="arrow_forward" size={16} /></button></div></section>}
+    {tab === "machines" && <MachineEditor value={template.nodes} edges={template.edges ?? []} onChange={(nodes) => update({ nodes })} onEdgesChange={(edges) => update({ edges })} pveTemplates={pveTemplates} vmImages={vmImages} lxcImages={lxcImages} sourceNotice={sourceNotice} locked={locked} />}
   </div>;
 }
