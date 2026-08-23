@@ -207,6 +207,7 @@ class ResourcePublic(BaseModel):
     expiry_date: date | None = None
     ip_address: str | None = None
     ssh_public_key: str | None = None
+    has_login_password: bool = False
     cpu: float | None = None
     maxcpu: int | None = None
     mem: int | None = None
@@ -245,11 +246,12 @@ class ExtendSessionResponse(BaseModel):
 
 
 class SSHKeyResponse(BaseModel):
-    """SSH 金鑰回應"""
+    """SSH 金鑰與登入密碼回應"""
 
     vmid: int
     ssh_public_key: str | None = None
     ssh_private_key: str | None = None
+    login_password: str | None = None
 
 
 # ===== Monitoring Schemas =====

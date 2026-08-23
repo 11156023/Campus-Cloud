@@ -2,12 +2,20 @@
 
 請求端（request_clone）做權限/配額校驗與任務入列；worker 端（run_clone_task）
 執行 PVE 克隆：linked clone 優先、失敗自動退 full clone，克隆後重配置
-hostname / IP / SSH 金鑰 / 防火牆並寫入 Resource 紀錄。
+hostname / IP / SSH 金鑰 / 隨機登入密碼 / 防火牆並寫入 Resource 紀錄。
+
+登入密碼：每台克隆機各發一組隨機密碼。qemu 走 cloud-init ``cipassword``
+（首次開機由 guest 內 cloud-init / cloudbase-init 套用到預設使用者）；
+LXC 無 cloud-init，開機後 best-effort 以 ``pct exec chpasswd`` 設定 root
+密碼，失敗則沿用範本內建憑證且不記錄密碼。
 """
 
 from __future__ import annotations
 
 import logging
+import secrets
+import shlex
+import time
 import uuid
 from datetime import date
 from typing import Any
@@ -38,6 +46,19 @@ from app.utils.hostname import to_punycode_hostname
 logger = logging.getLogger(__name__)
 
 TASK_CLONE = "template.clone"
+
+# 排除易混淆字元（0O1lI）的英數字母表；密碼須可在 VNC console 徒手輸入
+_PASSWORD_ALPHABET = "abcdefghijkmnpqrstuvwxyzACDEFGHJKLMNPQRSTUVWXYZ23456789"
+_PASSWORD_LENGTH = 12
+
+_LXC_PASSWORD_ATTEMPTS = 6
+_LXC_PASSWORD_RETRY_SECONDS = 5.0
+
+
+def generate_login_password() -> str:
+    return "".join(
+        secrets.choice(_PASSWORD_ALPHABET) for _ in range(_PASSWORD_LENGTH)
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -163,12 +184,15 @@ def _reconfigure_qemu(
     memory: int | None,
     disk: int | None,
     public_key: str,
+    login_password: str,
     net_cfg: dict[str, Any],
     allocated_ip: str,
 ) -> None:
     config_updates: dict[str, Any] = {
         "name": hostname,
         "sshkeys": quote(public_key, safe=""),
+        # cloud-init 首次開機把預設使用者密碼設成本次隨機值（PVE 存 hash）
+        "cipassword": login_password,
         "ciupgrade": 0,
         "net0": f"virtio,bridge={net_cfg['bridge_name']},firewall=1",
         "ipconfig0": (
@@ -196,7 +220,8 @@ def _reconfigure_lxc(
     net_cfg: dict[str, Any],
     allocated_ip: str,
 ) -> None:
-    # LXC 無 cloud-init：SSH 金鑰無法在克隆後注入，登入沿用範本內建憑證
+    # LXC 無 cloud-init：SSH 金鑰無法在克隆後注入；root 密碼於開機後
+    # 以 pct exec 設定（見 _set_lxc_root_password），失敗才沿用範本內建憑證
     config_updates: dict[str, Any] = {
         "hostname": hostname,
         "net0": (
@@ -212,6 +237,33 @@ def _reconfigure_lxc(
     if net_cfg.get("dns_servers"):
         config_updates["nameserver"] = net_cfg["dns_servers"]
     proxmox_ops.update_config(node, vmid, "lxc", **config_updates)
+
+
+def _set_lxc_root_password(node: str, vmid: int, password: str) -> bool:
+    """開機後以 ``pct exec chpasswd`` 設定 root 密碼（容器啟動需時，重試等待）。
+
+    LXC config API 不接受 password（僅限建立時），只能進容器內改。
+    回傳是否成功；失敗方（呼叫端）不得記錄未生效的密碼。
+    """
+    from app.infrastructure.proxmox import guest
+
+    command = f"echo {shlex.quote(f'root:{password}')} | chpasswd"
+    last_error: str = ""
+    for attempt in range(_LXC_PASSWORD_ATTEMPTS):
+        if attempt:
+            time.sleep(_LXC_PASSWORD_RETRY_SECONDS)
+        try:
+            code, _out, err = guest.exec_lxc(node, vmid, command)
+        except Exception as exc:
+            last_error = str(exc)
+            continue
+        if code == 0:
+            return True
+        last_error = (err or "").strip()
+    logger.warning(
+        "Failed to set root password for CT %d: %s", vmid, last_error[:300]
+    )
+    return False
 
 
 def _parse_expiry(raw: Any) -> date | None:
@@ -283,6 +335,8 @@ def run_clone_task(task_id: uuid.UUID, payload: dict[str, Any]) -> dict[str, Any
         report_progress(task_id, 60)
 
         private_key_pem, public_key = generate_ed25519_keypair()
+        login_password = generate_login_password()
+        password_applied = False
         if resource_type == "qemu":
             _reconfigure_qemu(
                 node=node,
@@ -292,9 +346,12 @@ def run_clone_task(task_id: uuid.UUID, payload: dict[str, Any]) -> dict[str, Any
                 memory=memory,
                 disk=disk,
                 public_key=public_key,
+                login_password=login_password,
                 net_cfg=net_cfg,
                 allocated_ip=allocated_ip,
             )
+            # cipassword 已寫入 config，首次開機由 cloud-init 套用
+            password_applied = True
         else:
             _reconfigure_lxc(
                 node=node,
@@ -310,6 +367,10 @@ def run_clone_task(task_id: uuid.UUID, payload: dict[str, Any]) -> dict[str, Any
         firewall_service.setup_default_rules(node, new_vmid, resource_type)
         if start:
             proxmox_ops.control(node, new_vmid, resource_type, "start")
+            if resource_type == "lxc":
+                password_applied = _set_lxc_root_password(
+                    node, new_vmid, login_password
+                )
         report_progress(task_id, 90)
 
         with Session(engine) as session:
@@ -326,6 +387,9 @@ def run_clone_task(task_id: uuid.UUID, payload: dict[str, Any]) -> dict[str, Any
                     else None
                 ),
                 ssh_public_key=public_key if resource_type == "qemu" else None,
+                login_password_encrypted=(
+                    encrypt_value(login_password) if password_applied else None
+                ),
                 batch_job_id=batch_job_id,
             )
     except Exception:
@@ -371,12 +435,14 @@ def run_clone_task(task_id: uuid.UUID, payload: dict[str, Any]) -> dict[str, Any
         "clone_mode": clone_mode,
         "ip": allocated_ip,
         "hostname": hostname,
+        "login_password_set": password_applied,
     }
 
 
 __all__ = [
     "TASK_CLONE",
     "clone_with_fallback",
+    "generate_login_password",
     "request_clone",
     "run_clone_task",
 ]

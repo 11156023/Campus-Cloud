@@ -171,7 +171,7 @@ def test_run_convert_task_marks_linked_request_consumed(
         },
     )
 
-    assert result == {"vmid": 102}
+    assert result == {"vmid": 102, "cloud_init_reset": False}
     assert template.status == VMTemplateStatus.ready
     assert fake_session.deleted == [resource]
     assert fake_session.committed

@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import logging
 import time
 import uuid
 from datetime import datetime, timezone
@@ -39,6 +40,8 @@ from app.schemas.template import (
     VMTemplatePublic,
     VMTemplateUpdate,
 )
+
+logger = logging.getLogger(__name__)
 
 TASK_CONVERT = "template.convert"
 TASK_DELETE = "template.delete"
@@ -507,6 +510,80 @@ def _ensure_stopped(
         raise RuntimeError(f"VM {vmid} 無法停止")
 
 
+# cloud-init clean 讓克隆機首次開機重跑 first-boot 模組；host key 只在
+# guest 有 cloud-init 時才刪（否則克隆機 sshd 會因缺 host key 起不來）。
+# machine-id 清空後 systemd 會在下次開機自動重生，避免全班克隆機共用同一組。
+_CLOUD_INIT_RESET_SCRIPT = (
+    "if command -v cloud-init >/dev/null 2>&1; then "
+    "cloud-init clean --logs || true; "
+    "rm -f /etc/ssh/ssh_host_*; "
+    "fi; "
+    "truncate -s 0 /etc/machine-id 2>/dev/null || true; "
+    "rm -f /var/lib/dbus/machine-id 2>/dev/null || true"
+)
+
+
+_BOOT_AGENT_TIMEOUT_SECONDS = 120
+
+
+def _wait_for_guest_agent(node: str, vmid: int, timeout: float) -> bool:
+    """輪詢 agent ping 直到回應或逾時（開機後 agent 起來需時）。"""
+    from app.infrastructure.proxmox import guest  # noqa: PLC0415
+
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if guest.ping_qemu_agent(node, vmid):
+            return True
+        time.sleep(_POLL_INTERVAL_SECONDS)
+    return False
+
+
+def _reset_cloud_init_state(
+    node: str, vmid: int, resource_type: proxmox_ops.ResourceType
+) -> bool:
+    """轉範本關機前重設 guest 內 cloud-init 狀態（best-effort）。
+
+    僅 qemu 才執行；母機是關機狀態會先開機等 agent 起來再重設，
+    隨後 _ensure_stopped 照原流程關機。LXC 無 cloud-init、Windows 無
+    /bin/sh、agent 未裝都靜默略過，不阻擋轉換。回傳是否有執行成功。
+    """
+    if resource_type != "qemu":
+        return False
+    try:
+        from app.infrastructure.proxmox import guest  # noqa: PLC0415
+
+        status = proxmox_ops.get_status(node, vmid, resource_type)
+        if status.get("status") != "running":
+            # 關機的母機先開機重設；轉換流程接著會把它關回去
+            proxmox_ops.control(node, vmid, resource_type, "start")
+            if not _wait_for_guest_agent(
+                node, vmid, _BOOT_AGENT_TIMEOUT_SECONDS
+            ):
+                logger.warning(
+                    "VM %d booted for cloud-init reset but guest agent "
+                    "did not come up within %ds; skipping reset",
+                    vmid,
+                    _BOOT_AGENT_TIMEOUT_SECONDS,
+                )
+                return False
+
+        code, _out, err = guest.exec_qemu(
+            node, vmid, ["/bin/sh", "-c", _CLOUD_INIT_RESET_SCRIPT]
+        )
+        if code != 0:
+            logger.warning(
+                "cloud-init reset failed for VM %d (exit %d): %s",
+                vmid,
+                code,
+                (err or "").strip()[:300],
+            )
+            return False
+        return True
+    except Exception as exc:
+        logger.warning("cloud-init reset skipped for VM %d: %s", vmid, exc)
+        return False
+
+
 def _remove_snapshots_for_convert(
     node: str, vmid: int, resource_type: proxmox_ops.ResourceType
 ) -> None:
@@ -539,13 +616,15 @@ def _set_template_error(
 
 
 def run_convert_task(task_id: uuid.UUID, payload: dict[str, Any]) -> dict[str, Any]:
-    """建立範本：關機 → convert-to-template → 標記 ready、移除母機 Resource 紀錄。"""
+    """建立範本：重設 cloud-init → 關機 → convert → 標記 ready、移除母機 Resource。"""
     template_id = uuid.UUID(payload["template_id"])
     pve_vmid = int(payload["pve_vmid"])
     resource_type = _as_resource_type(payload["resource_type"])
     node = str(payload["node"])
     try:
         report_progress(task_id, 10)
+        cloud_init_reset = _reset_cloud_init_state(node, pve_vmid, resource_type)
+        report_progress(task_id, 25)
         _ensure_stopped(node, pve_vmid, resource_type)
         report_progress(task_id, 40)
         _remove_snapshots_for_convert(node, pve_vmid, resource_type)
@@ -577,7 +656,7 @@ def run_convert_task(task_id: uuid.UUID, payload: dict[str, Any]) -> dict[str, A
             marker=resource_service.RESOURCE_CONVERTED_TO_TEMPLATE_MARKER,
         )
         session.commit()
-    return {"vmid": pve_vmid}
+    return {"vmid": pve_vmid, "cloud_init_reset": cloud_init_reset}
 
 
 def run_delete_task(task_id: uuid.UUID, payload: dict[str, Any]) -> dict[str, Any]:
@@ -671,6 +750,8 @@ def run_update_convert_task(
     node = str(payload["node"])
     try:
         report_progress(task_id, 10)
+        cloud_init_reset = _reset_cloud_init_state(node, temp_vmid, resource_type)
+        report_progress(task_id, 25)
         _ensure_stopped(node, temp_vmid, resource_type)
         report_progress(task_id, 40)
         _remove_snapshots_for_convert(node, temp_vmid, resource_type)
@@ -701,7 +782,10 @@ def run_update_convert_task(
         if temp_resource is not None:
             session.delete(temp_resource)
         session.commit()
-    result: dict[str, Any] = {"vmid": temp_vmid}
+    result: dict[str, Any] = {
+        "vmid": temp_vmid,
+        "cloud_init_reset": cloud_init_reset,
+    }
     if warning:
         result["warning"] = warning
     return result

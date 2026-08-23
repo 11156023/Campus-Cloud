@@ -34,6 +34,7 @@ def _patch_common(monkeypatch: pytest.MonkeyPatch, *, vmid: int) -> None:
         os_info=None,
         expiry_date=None,
         ssh_public_key=None,
+        login_password_encrypted=None,
         idle_since=None,
         mining_exempt=False,
     )

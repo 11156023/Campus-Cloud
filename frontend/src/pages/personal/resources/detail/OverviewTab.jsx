@@ -15,6 +15,7 @@ export default function OverviewTab({ vmid }) {
   const [resource, setResource] = useState(null);
   const [sshKey, setSshKey] = useState(null);
   const [showPrivateKey, setShowPrivateKey] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [copied, setCopied] = useState("");
   const [error, setError] = useState(false);
 
@@ -24,7 +25,7 @@ export default function OverviewTab({ vmid }) {
       .then((r) => {
         if (cancelled) return;
         setResource(r);
-        if (r.ssh_public_key) {
+        if (r.ssh_public_key || r.has_login_password) {
           ResourcesService.getSshKey(vmid)
             .then((k) => !cancelled && setSshKey(k))
             .catch(() => {});
@@ -169,6 +170,53 @@ export default function OverviewTab({ vmid }) {
                 </span>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* 登入密碼 */}
+      {sshKey?.login_password && (
+        <div className={styles.card}>
+          <div className={styles.cardHeader}>
+            <div>
+              <h2 className={styles.cardTitle}>
+                <MIcon name="password" size={18} />
+                登入密碼
+              </h2>
+              <p className={styles.cardDesc}>
+                克隆時為此機器產生的初始密碼（VM 為範本預設使用者、容器為 root）
+              </p>
+            </div>
+          </div>
+          <div className={styles.cardBody}>
+            <div className={styles.keyBlock}>
+              <div className={styles.keyHead}>
+                <span className={styles.factLabel}>密碼</span>
+                <div className={styles.keyActions}>
+                  <button
+                    type="button"
+                    className={styles.ghostBtn}
+                    onClick={() => setShowPassword((v) => !v)}
+                  >
+                    <MIcon name={showPassword ? "visibility_off" : "visibility"} size={14} />
+                    {showPassword ? "隱藏" : "顯示"}
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.ghostBtn}
+                    onClick={() => copy(sshKey.login_password, "password")}
+                  >
+                    <MIcon name={copied === "password" ? "check" : "content_copy"} size={14} />
+                    {copied === "password" ? "已複製" : "複製"}
+                  </button>
+                </div>
+              </div>
+              {showPassword ? (
+                <pre className={styles.keyPre}>{sshKey.login_password}</pre>
+              ) : (
+                <div className={styles.keyHidden}>密碼已隱藏，點「顯示」查看</div>
+              )}
+            </div>
           </div>
         </div>
       )}
