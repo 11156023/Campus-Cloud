@@ -155,6 +155,8 @@ def test_reset_cloud_init_boots_stopped_vm_and_resets(
         "ping_qemu_agent",
         lambda node, vmid: (pings.append(vmid), len(pings) >= 3)[1],
     )
+    # 舊版 agent 不支援 get-osinfo → 走預設 /bin/sh 分支
+    monkeypatch.setattr(guest, "get_osinfo_qemu", lambda node, vmid: None)
     executed: list[list[str]] = []
     monkeypatch.setattr(
         guest,
@@ -207,6 +209,9 @@ def test_reset_cloud_init_runs_script_on_running_vm(
         "get_status",
         lambda node, vmid, rtype: {"status": "running"},
     )
+    monkeypatch.setattr(
+        guest, "get_osinfo_qemu", lambda node, vmid: {"id": "ubuntu"}
+    )
     executed: list[list[str]] = []
     monkeypatch.setattr(
         guest,
@@ -216,10 +221,42 @@ def test_reset_cloud_init_runs_script_on_running_vm(
 
     assert template_service._reset_cloud_init_state("pve1", 302, "qemu") is True
     assert len(executed) == 1
+    assert executed[0][0] == "/bin/sh"
     script = executed[0][-1]
     assert "cloud-init clean" in script
     assert "/etc/machine-id" in script
     assert "ssh_host_" in script
+
+
+def test_reset_cloud_init_windows_uses_cloudbase_reset(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        template_service.proxmox_ops,
+        "get_status",
+        lambda node, vmid, rtype: {"status": "running"},
+    )
+    monkeypatch.setattr(
+        guest,
+        "get_osinfo_qemu",
+        lambda node, vmid: {"id": "mswindows", "name": "Microsoft Windows"},
+    )
+    executed: list[list[str]] = []
+    monkeypatch.setattr(
+        guest,
+        "exec_qemu",
+        lambda node, vmid, command, **kw: (executed.append(command), (0, "", ""))[1],
+    )
+
+    assert template_service._reset_cloud_init_state("pve1", 304, "qemu") is True
+    assert len(executed) == 1
+    command = executed[0]
+    assert command[0] == "powershell.exe"
+    script = command[-1]
+    assert "Cloudbase Solutions\\Cloudbase-Init" in script
+    assert "ssh_host_" in script
+    # 雙引號會被 qemu-ga 的命令列跳脫弄壞，腳本必須只用單引號
+    assert '"' not in script
 
 
 def test_reset_cloud_init_tolerates_agent_failure(
@@ -234,6 +271,7 @@ def test_reset_cloud_init_tolerates_agent_failure(
     def agent_down(*a: Any, **kw: Any) -> None:
         raise RuntimeError("guest agent not responding")
 
+    monkeypatch.setattr(guest, "get_osinfo_qemu", lambda node, vmid: None)
     monkeypatch.setattr(guest, "exec_qemu", agent_down)
     assert template_service._reset_cloud_init_state("pve1", 303, "qemu") is False
 

@@ -68,6 +68,28 @@ def ping_qemu_agent(node: str, vmid: int) -> bool:
         return False
 
 
+def get_osinfo_qemu(node: str, vmid: int) -> dict[str, Any] | None:
+    """agent get-osinfo；失敗回 None（舊版 agent 不支援此指令）。
+
+    正常回傳如 {"id": "mswindows", "name": "Microsoft Windows", ...}。
+    """
+    try:
+        resp = (
+            get_proxmox_api_for_node(node)
+            .nodes(node)
+            .qemu(vmid)
+            .agent("get-osinfo")
+            .get()
+        )
+    except Exception:
+        return None
+    if isinstance(resp, dict):
+        result = resp.get("result", resp)
+        if isinstance(result, dict):
+            return result
+    return None
+
+
 def exec_qemu(
     node: str,
     vmid: int,

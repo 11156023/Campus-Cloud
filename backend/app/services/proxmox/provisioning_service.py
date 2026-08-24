@@ -467,13 +467,15 @@ def create_vm(
         config_updates = {
             "cores": vm_data.cores,
             "memory": vm_data.memory,
-            "ciuser": vm_data.username,
             "cipassword": vm_data.password,
             "sshkeys": quote(public_key, safe=""),
             "ciupgrade": 0,
             "net0": f"virtio,bridge={net_cfg['bridge_name']},firewall=1",
             "ipconfig0": f"ip={allocated_ip}/{net_cfg['prefix_len']},gw={net_cfg['gateway']}",
         }
+        # Windows 範本不帶 username（帳號由 cloudbase-init 設定檔固定）
+        if vm_data.username:
+            config_updates["ciuser"] = vm_data.username
         if net_cfg.get("dns_servers"):
             config_updates["nameserver"] = net_cfg["dns_servers"]
         gpu_mapping_id = getattr(vm_data, "gpu_mapping_id", None)
@@ -856,11 +858,13 @@ def execute_provision(plan: dict) -> tuple[int, str]:
             config_updates = {
                 "cores": plan["cores"],
                 "memory": plan["memory"],
-                "ciuser": plan.get("username"),
                 "cipassword": plan["password"],
                 "sshkeys": quote(plan.get("ssh_public_key", ""), safe=""),
                 "ciupgrade": 0,
             }
+            # Windows 範本不帶 username（帳號由 cloudbase-init 設定檔固定）
+            if plan.get("username"):
+                config_updates["ciuser"] = plan["username"]
             if allocated_ip and net_cfg and net_cfg.get("bridge_name"):
                 config_updates["net0"] = (
                     f"virtio,bridge={net_cfg['bridge_name']},firewall=1"
@@ -995,9 +999,30 @@ def get_lxc_templates() -> list[TemplateSchema]:
     ]
 
 
+def _template_ostype(vm: dict) -> str | None:
+    """讀範本 config 的 ostype；讀不到不阻擋清單（回 None）。"""
+    try:
+        config = proxmox_service.get_config(vm["node"], int(vm["vmid"]), "qemu")
+    except Exception:
+        return None
+    ostype = config.get("ostype")
+    return str(ostype) if ostype else None
+
+
 def get_vm_templates() -> list[VMTemplateSchema]:
     all_vms = proxmox_service.get_vm_templates()
-    return [
-        VMTemplateSchema(vmid=vm["vmid"], name=vm["name"], node=vm["node"])
-        for vm in all_vms
-    ]
+    templates: list[VMTemplateSchema] = []
+    for vm in all_vms:
+        ostype = _template_ostype(vm)
+        templates.append(
+            VMTemplateSchema(
+                vmid=vm["vmid"],
+                name=vm["name"],
+                node=vm["node"],
+                ostype=ostype,
+                # PVE 的 Windows ostype（wxp/w2k*/wvista/win7~11）皆以 w 開頭，
+                # Linux 為 l24/l26，不衝突
+                is_windows=bool(ostype and ostype.startswith("w")),
+            )
+        )
+    return templates

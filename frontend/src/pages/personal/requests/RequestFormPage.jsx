@@ -244,6 +244,11 @@ export default function RequestFormPage({ onBack, className }) {
   );
   const selectedTpl = lxcSysTemplates.find((t) => t.id === selectedTplId) || null;
 
+  /* Windows 範本帳號由 cloudbase-init 固定（PVE 的 ciuser 對 Windows 無效），不開放自訂 */
+  const selectedVmTemplate =
+    vmTemplates.find((t) => String(t.vmid) === String(form.template_id)) || null;
+  const isWindowsVm = resourceType === "vm" && Boolean(selectedVmTemplate?.is_windows);
+
   const canLoadGpu = resourceType === "vm";
   const gpuWindowReady = Boolean(mode === "scheduled" && form.start_at && form.end_at);
   const gpuOptionsRequestKey = canLoadGpu
@@ -427,7 +432,7 @@ export default function RequestFormPage({ onBack, className }) {
       errs.ostemplate = MSG.templateRequired;
     if (resourceType === "vm") {
       if (!form.template_id)            errs.template_id = MSG.osRequired;
-      if (!form.username.trim())        errs.username    = MSG.usernameRequired;
+      if (!isWindowsVm && !form.username.trim()) errs.username = MSG.usernameRequired;
     }
 
     if (mode === "scheduled") {
@@ -523,7 +528,7 @@ export default function RequestFormPage({ onBack, className }) {
             }
           : {
               template_id: Number(form.template_id),
-              username: form.username,
+              ...(isWindowsVm ? {} : { username: form.username }),
               disk_size: form.disk_size,
               os_info:
                 vmTemplates.find((t) => String(t.vmid) === String(form.template_id))?.name ||
@@ -703,7 +708,7 @@ export default function RequestFormPage({ onBack, className }) {
                 <FieldGroup label="Root 密碼" required error={errors.password}
                   hint={selectedTpl
                     ? "克隆建立的容器沿用範本內建帳密，此密碼僅作平台紀錄"
-                    : undefined}>
+                    : "LXC 容器登入帳號固定為 root，僅需設定密碼"}>
                   <input
                     className={styles.input}
                     type="password"
@@ -747,16 +752,25 @@ export default function RequestFormPage({ onBack, className }) {
                 </FieldGroup>
 
                 <div className={styles.formGrid}>
-                  <FieldGroup label="使用者名稱" required error={errors.username}>
-                    <input
-                      className={styles.input}
-                      placeholder="admin"
-                      value={form.username}
-                      onChange={(e) => set("username", e.target.value)}
-                    />
-                  </FieldGroup>
+                  {!isWindowsVm && (
+                    <FieldGroup label="使用者名稱" required error={errors.username}>
+                      <input
+                        className={styles.input}
+                        placeholder="admin"
+                        value={form.username}
+                        onChange={(e) => set("username", e.target.value)}
+                      />
+                    </FieldGroup>
+                  )}
 
-                  <FieldGroup label="密碼" required error={errors.password}>
+                  <FieldGroup
+                    label="密碼"
+                    required
+                    error={errors.password}
+                    hint={isWindowsVm
+                      ? "Windows 範本登入帳號固定為 Admin，僅需設定密碼"
+                      : undefined}
+                  >
                     <input
                       className={styles.input}
                       type="password"
@@ -1059,10 +1073,12 @@ export default function RequestFormPage({ onBack, className }) {
                         : "未選擇"}
                     </span>
                   </div>
-                  {form.username && (
+                  {(isWindowsVm || form.username) && (
                     <div className={styles.summaryRow}>
                       <span className={styles.summaryLabel}>使用者</span>
-                      <span className={styles.summaryValue}>{form.username}</span>
+                      <span className={styles.summaryValue}>
+                        {isWindowsVm ? "Admin（Windows 固定）" : form.username}
+                      </span>
                     </div>
                   )}
                 </>

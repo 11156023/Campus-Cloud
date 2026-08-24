@@ -125,6 +125,9 @@ class VMTemplateSchema(BaseModel):
     vmid: int
     name: str
     node: str
+    ostype: str | None = None
+    # Windows 範本帳號由 cloudbase-init 設定檔固定，前端不顯示帳號欄位
+    is_windows: bool = False
 
 
 class NextVMIDSchema(BaseModel):

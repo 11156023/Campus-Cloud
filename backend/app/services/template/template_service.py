@@ -522,6 +522,21 @@ _CLOUD_INIT_RESET_SCRIPT = (
     "rm -f /var/lib/dbus/machine-id 2>/dev/null || true"
 )
 
+# Windows 對應：刪整個 Cloudbase-Init registry key（含 per-instance plugin
+# 執行紀錄與 unattend 狀態），克隆機首次開機重跑全部 plugin；OpenSSH host
+# key 一併清掉（Win32-OpenSSH 的 sshd 服務啟動時會自動重生）。全部
+# SilentlyContinue：沒裝 Cloudbase-Init / OpenSSH 也照樣成功。sysprep 因
+# rearm 次數限制刻意不在此執行。字串刻意只用單引號，避免 qemu-ga 組
+# Windows 命令列時的雙引號跳脫問題。
+_CLOUDBASE_INIT_RESET_SCRIPT = (
+    "Remove-Item -Recurse -Force "
+    "'HKLM:\\SOFTWARE\\Cloudbase Solutions\\Cloudbase-Init' "
+    "-ErrorAction SilentlyContinue; "
+    "Remove-Item -Force 'C:\\ProgramData\\ssh\\ssh_host_*' "
+    "-ErrorAction SilentlyContinue; "
+    "exit 0"
+)
+
 
 _BOOT_AGENT_TIMEOUT_SECONDS = 120
 
@@ -541,11 +556,14 @@ def _wait_for_guest_agent(node: str, vmid: int, timeout: float) -> bool:
 def _reset_cloud_init_state(
     node: str, vmid: int, resource_type: proxmox_ops.ResourceType
 ) -> bool:
-    """轉範本關機前重設 guest 內 cloud-init 狀態（best-effort）。
+    """轉範本關機前重設 guest 內 cloud-init / Cloudbase-Init 狀態（best-effort）。
 
     僅 qemu 才執行；母機是關機狀態會先開機等 agent 起來再重設，
-    隨後 _ensure_stopped 照原流程關機。LXC 無 cloud-init、Windows 無
-    /bin/sh、agent 未裝都靜默略過，不阻擋轉換。回傳是否有執行成功。
+    隨後 _ensure_stopped 照原流程關機。agent get-osinfo 回 mswindows
+    時走 PowerShell 清 Cloudbase-Init registry 與 OpenSSH host key，
+    其餘（含 get-osinfo 不支援時）走 /bin/sh 的 cloud-init 清理。
+    LXC 無 cloud-init、agent 未裝都靜默略過，不阻擋轉換。回傳是否
+    有執行成功。
     """
     if resource_type != "qemu":
         return False
@@ -567,9 +585,19 @@ def _reset_cloud_init_state(
                 )
                 return False
 
-        code, _out, err = guest.exec_qemu(
-            node, vmid, ["/bin/sh", "-c", _CLOUD_INIT_RESET_SCRIPT]
-        )
+        osinfo = guest.get_osinfo_qemu(node, vmid) or {}
+        if str(osinfo.get("id") or "").lower() == "mswindows":
+            command = [
+                "powershell.exe",
+                "-NonInteractive",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-Command",
+                _CLOUDBASE_INIT_RESET_SCRIPT,
+            ]
+        else:
+            command = ["/bin/sh", "-c", _CLOUD_INIT_RESET_SCRIPT]
+        code, _out, err = guest.exec_qemu(node, vmid, command)
         if code != 0:
             logger.warning(
                 "cloud-init reset failed for VM %d (exit %d): %s",
