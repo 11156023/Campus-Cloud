@@ -114,6 +114,30 @@ def test_build_overview_top_lists() -> None:
     assert 300 in [e.vmid for e in overview.top_cpu]
 
 
+def test_build_overview_node_vm_counts() -> None:
+    """節點 VM 台數含已停止、排除範本與非 VM 類型（原叢集概覽提供的資訊）。"""
+    resources = [
+        *RESOURCES,
+        {"vmid": 900, "node": "pve1", "type": "qemu", "status": "stopped", "template": 1},
+        {"vmid": 901, "node": "pve1", "type": "storage", "status": "available"},
+    ]
+    by_node = {n.node: n for n in monitoring_service.build_overview(NODES, resources).nodes}
+
+    assert by_node["pve1"].vm_count == 3  # 100, 101, 200
+    assert by_node["pve2"].vm_count == 1  # 201
+
+
+def test_build_overview_connection_names() -> None:
+    """節點標示所屬 PVE 連線；未在對應表中的節點為 None。"""
+    overview = monitoring_service.build_overview(
+        NODES, RESOURCES, {"pve1": "機房A"}
+    )
+    by_node = {n.node: n for n in overview.nodes}
+
+    assert by_node["pve1"].connection_name == "機房A"
+    assert by_node["pve2"].connection_name is None
+
+
 def test_build_overview_empty() -> None:
     overview = monitoring_service.build_overview([], [])
     assert overview.nodes_total == 0

@@ -39,10 +39,6 @@ class Resource(SQLModel, table=True):
     os_info: str | None = Field(default=None, description="Operating system info")
     expiry_date: date | None = Field(default=None, description="Expiration date")
     template_id: int | None = Field(default=None, description="Proxmox template ID")
-    service_template_slug: str | None = Field(
-        default=None,
-        description="Service template slug",
-    )
     ip_address: str | None = Field(default=None, max_length=64)
     ip_address_cached_at: datetime | None = Field(
         default=None,

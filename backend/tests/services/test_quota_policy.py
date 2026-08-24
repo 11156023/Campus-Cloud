@@ -34,6 +34,30 @@ class TestResolveEffectiveQuota:
         assert result.max_cpu_cores == 2
         assert result.max_instances == 1
 
+    def test_global_used_when_no_user_override(self) -> None:
+        global_q = _quota_row(max_cpu_cores=16, max_memory_mb=32768)
+        result = resolve_effective_quota(None, global_q)
+        assert result.max_cpu_cores == 16
+        assert result.max_memory_mb == 32768
+
+    def test_user_override_beats_global(self) -> None:
+        user_q = _quota_row(max_cpu_cores=2)
+        global_q = _quota_row(max_cpu_cores=16)
+        assert resolve_effective_quota(user_q, global_q).max_cpu_cores == 2
+
+    def test_user_override_wins_whole_row_even_when_lower(self) -> None:
+        """個人覆寫整列全勝：低於全域的欄位不會被全域補回去。"""
+        user_q = _quota_row(max_cpu_cores=2, max_memory_mb=1024, max_instances=1)
+        global_q = _quota_row(
+            max_cpu_cores=16, max_memory_mb=32768, max_instances=20
+        )
+        assert resolve_effective_quota(user_q, global_q) == EffectiveQuota(
+            max_cpu_cores=2, max_memory_mb=1024, max_disk_gb=100, max_instances=1
+        )
+
+    def test_falls_back_to_default_when_both_missing(self) -> None:
+        assert resolve_effective_quota(None, None) == DEFAULT_QUOTA
+
 
 class TestCheckQuotaDelta:
     def _quota(self) -> EffectiveQuota:

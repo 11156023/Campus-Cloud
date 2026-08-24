@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import MIcon from "../../../components/MIcon";
 import { useAuth } from "../../../contexts/AuthContext";
+import { useConfirm } from "../../../components/ConfirmDialog/ConfirmProvider";
 import { useToast } from "../../../hooks/useToast";
 import { AuthStorage } from "../../../services/auth";
 import {
@@ -19,6 +20,7 @@ const DIFFICULTIES = [
 /* ══════════════ 路徑欄 ══════════════ */
 function PathColumn({ paths, selectedId, onSelect, onReload }) {
   const toast = useToast();
+  const confirm = useConfirm();
   const [title, setTitle] = useState("");
 
   async function handleCreate(e) {
@@ -47,7 +49,13 @@ function PathColumn({ paths, selectedId, onSelect, onReload }) {
 
   async function handleDelete(path, e) {
     e.stopPropagation();
-    if (!window.confirm(`確定刪除路徑「${path.title}」？（房間與任務會一併刪除）`)) return;
+    const ok = await confirm({
+      title: "刪除學習路徑",
+      message: `確定刪除路徑「${path.title}」？（房間與任務會一併刪除）`,
+      confirmText: "刪除",
+      danger: true,
+    });
+    if (!ok) return;
     try {
       await CourseAdminService.deletePath(path.id);
       onReload();
@@ -111,6 +119,7 @@ function PathColumn({ paths, selectedId, onSelect, onReload }) {
 /* ══════════════ 房間欄 ══════════════ */
 function RoomColumn({ pathId, rooms, templates, selectedId, onSelect, onReload }) {
   const toast = useToast();
+  const confirm = useConfirm();
   const [form, setForm] = useState({ title: "", difficulty: "easy", template_id: "" });
 
   async function handleCreate(e) {
@@ -134,7 +143,13 @@ function RoomColumn({ pathId, rooms, templates, selectedId, onSelect, onReload }
 
   async function handleDelete(room, e) {
     e.stopPropagation();
-    if (!window.confirm(`確定刪除房間「${room.title}」？`)) return;
+    const ok = await confirm({
+      title: "刪除房間",
+      message: `確定刪除房間「${room.title}」？`,
+      confirmText: "刪除",
+      danger: true,
+    });
+    if (!ok) return;
     try {
       await CourseAdminService.deleteRoom(room.id);
       onReload();
@@ -210,6 +225,7 @@ function RoomColumn({ pathId, rooms, templates, selectedId, onSelect, onReload }
 /* ══════════════ 題目編輯 ══════════════ */
 function QuestionEditor({ taskId }) {
   const toast = useToast();
+  const confirm = useConfirm();
   const [questions, setQuestions] = useState([]);
   const [form, setForm] = useState({ prompt: "", question_type: "flag", flag: "", points: 10 });
 
@@ -246,7 +262,13 @@ function QuestionEditor({ taskId }) {
   }
 
   async function handleDelete(q) {
-    if (!window.confirm("確定刪除此題？學生完成記錄會一併刪除")) return;
+    const ok = await confirm({
+      title: "刪除題目",
+      message: "確定刪除此題？學生完成記錄會一併刪除",
+      confirmText: "刪除",
+      danger: true,
+    });
+    if (!ok) return;
     try {
       await CourseAdminService.deleteQuestion(q.id);
       reload();
@@ -311,6 +333,7 @@ function QuestionEditor({ taskId }) {
 /* ══════════════ 任務欄（含內容編輯與題目） ══════════════ */
 function TaskColumn({ roomId }) {
   const toast = useToast();
+  const confirm = useConfirm();
   const [tasks, setTasks] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [draft, setDraft] = useState({ title: "", content: "" });
@@ -369,7 +392,13 @@ function TaskColumn({ roomId }) {
 
   async function handleDelete(task, e) {
     e.stopPropagation();
-    if (!window.confirm(`確定刪除任務「${task.title}」？`)) return;
+    const ok = await confirm({
+      title: "刪除任務",
+      message: `確定刪除任務「${task.title}」？`,
+      confirmText: "刪除",
+      danger: true,
+    });
+    if (!ok) return;
     try {
       await CourseAdminService.deleteTask(task.id);
       reload();

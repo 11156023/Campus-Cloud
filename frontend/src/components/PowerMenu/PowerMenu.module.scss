@@ -1,0 +1,85 @@
+@use "../../assets/styles/variables" as *;
+@use "../../assets/styles/mixins" as *;
+
+/* ── Power dropdown ──
+   位置由 PowerMenu.jsx 依錨點按鈕即時算好寫進 inline style，
+   這裡只負責外觀。刻意不套 glass-surface：選單浮在列表內容之上，
+   半透明背景會讓底下的列（節點名稱、終端機按鈕…）透出來。 */
+.powerMenu {
+  position: fixed;
+  width: 240px; // 需與 PowerMenu.jsx 的 MENU_WIDTH 一致
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: $radius-12;
+  box-shadow: var(--shadow-lg);
+  padding: $spacing-8 0;
+  z-index: 150; // 高於 Sticky Header(100)，低於 Dialog / Modal(200+)
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 0.12s ease, transform 0.12s ease;
+}
+
+/* 進場方向跟著展開方向：往下展開就由上滑入，往上展開就由下滑入 */
+.powerMenuDown { animation: powerMenuInDown 0.14s cubic-bezier(0.25, 0.8, 0.25, 1); }
+.powerMenuUp   { animation: powerMenuInUp   0.14s cubic-bezier(0.25, 0.8, 0.25, 1); }
+
+@keyframes powerMenuInDown {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+
+@keyframes powerMenuInUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0);   }
+}
+
+.powerMenuOut {
+  animation: none;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.powerMenuDown.powerMenuOut { transform: translateY(-6px); }
+.powerMenuUp.powerMenuOut   { transform: translateY(6px);  }
+
+.powerMenuTitle {
+  font-size: $font-size-12;
+  font-weight: $font-weight-500;
+  color: var(--color-text-muted);
+  padding: 2px $spacing-16 $spacing-8;
+}
+
+.powerMenuGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  padding: 0 $spacing-8;
+}
+
+.powerMenuItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px $spacing-8;
+  font-size: $font-size-12;
+  color: var(--color-text);
+  text-align: left;
+  border-radius: $radius-8;
+  transition: background $transition-base;
+
+  &:hover:not(:disabled) { background: var(--color-hover); }
+  &:disabled { opacity: 0.35; cursor: not-allowed; }
+}
+
+.powerMenuIcon   { line-height: 1; }
+.powerMenuIconOk { line-height: 1; color: var(--color-success); }
+
+.powerMenuItemWarn {
+  color: #dc3545;
+  &:hover:not(:disabled) { background: color-mix(in srgb, #dc3545 8%, transparent); }
+}
+
+.powerMenuItemDanger {
+  color: #dc3545;
+  &:hover:not(:disabled) { background: color-mix(in srgb, #dc3545 8%, transparent); }
+}

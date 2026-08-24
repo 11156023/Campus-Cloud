@@ -4,6 +4,7 @@ import { useAuth }  from "../../contexts/AuthContext";
 import styles from "./Sidebar.module.scss";
 import MIcon from "../MIcon";
 import Avatar from "../Avatar/Avatar";
+import JobsButton from "../Jobs/JobsButton";
 
 const topItems = [
   { key: "dashboard", label: "首頁", icon: "dashboard" },
@@ -45,9 +46,6 @@ const navGroups = [
     items: [
       { key: "firewall",      label: "防火牆",     icon: "security" },
       { key: "reverse-proxy", label: "反向代理",   icon: "swap_horiz" },
-      { key: "domain",        label: "網域管理",   icon: "domain" },
-      { key: "ip-management", label: "IP 管理",    icon: "lan" },
-      { key: "gateway",       label: "閘道 VM",    icon: "dns" },
     ],
   },
   {
@@ -79,6 +77,9 @@ const navGroups = [
     items: [
       { key: "admin",         label: "使用者管理", icon: "admin_panel_settings" },
       { key: "quotas",        label: "配額管理",   icon: "data_usage" },
+      { key: "ip-management", label: "IP 管理",    icon: "lan" },
+      { key: "domain",        label: "網域管理",   icon: "domain" },
+      { key: "gateway",       label: "閘道 VM",    icon: "dns" },
       { key: "settings",      label: "系統設定",   icon: "settings" },
     ],
   },
@@ -89,7 +90,6 @@ const navGroups = [
     items: [
       { key: "monitoring",    label: "資源監控",       icon: "monitor_heart" },
       { key: "jobs",          label: "背景任務",       icon: "task_alt" },
-      { key: "deploy-logs",   label: "部署日誌",       icon: "terminal" },
       { key: "audit",         label: "Audit Logs",     icon: "receipt_long" },
     ],
   },
@@ -336,6 +336,9 @@ export default function Sidebar({ collapsed, mobileOpen, onToggle, onClose }) {
 
       {/* ===== Bottom section ===== */}
       <div className={styles.bottom}>
+        {/* 背景任務（全站入口，狀態由 DashboardLayout 的 JobsProvider 提供） */}
+        <JobsButton collapsed={collapsed} />
+
         {/* 語言選擇 */}
         <div className={styles.appearanceWrap}>
           {langPopup.open && (

@@ -10,7 +10,7 @@ from sqlmodel import Session
 from app.core.security import decrypt_value, encrypt_value
 from app.domain.placement import advisor as placement_advisor
 from app.exceptions import ProxmoxError
-from app.infrastructure.proxmox import get_proxmox_settings
+from app.infrastructure.proxmox import get_proxmox_settings_for_node
 from app.infrastructure.ssh.client import generate_ed25519_keypair
 from app.repositories import resource as resource_repo
 from app.repositories import vm_request as vm_request_repo
@@ -322,7 +322,7 @@ def create_lxc(
             "net0": net0_parts,
             "unprivileged": int(lxc_data.unprivileged),
             "start": int(lxc_data.start),
-            "pool": get_proxmox_settings().pool_name,
+            "pool": get_proxmox_settings_for_node(target_node).pool_name,
             "features": "nesting=1",
             "ssh-public-keys": public_key,
         }
@@ -343,7 +343,6 @@ def create_lxc(
             expiry_date=lxc_data.expiry_date,
             ssh_private_key_encrypted=encrypt_value(private_key_pem),
             ssh_public_key=public_key,
-            service_template_slug=lxc_data.service_template_slug,
             batch_job_id=batch_job_id,
             commit=False,
         )
@@ -457,7 +456,7 @@ def create_vm(
             "name": to_punycode_hostname(vm_data.hostname),
             "full": 1,
             "storage": target_storage,
-            "pool": get_proxmox_settings().pool_name,
+            "pool": get_proxmox_settings_for_node(target_node).pool_name,
         }
 
         result = proxmox_service.clone_vm(
@@ -517,7 +516,6 @@ def create_vm(
             template_id=vm_data.template_id,
             ssh_private_key_encrypted=encrypt_value(private_key_pem),
             ssh_public_key=public_key,
-            service_template_slug=vm_data.service_template_slug,
             batch_job_id=batch_job_id,
             commit=False,
         )
@@ -730,7 +728,7 @@ def execute_provision(plan: dict) -> tuple[int, str]:
     target_node = plan["target_node"]
     resource_type = plan["resource_type"]
     hostname = plan["hostname"]
-    pool_name = get_proxmox_settings().pool_name
+    pool_name = get_proxmox_settings_for_node(target_node).pool_name
     created = False
     actual_node = target_node
     net_cfg = plan.get("net_cfg", {})
@@ -968,7 +966,6 @@ def provision_from_request(
         template_id=getattr(db_request, "template_id", None),
         ssh_private_key_encrypted=plan.get("ssh_private_key_encrypted"),
         ssh_public_key=plan.get("ssh_public_key"),
-        service_template_slug=getattr(db_request, "service_template_slug", None),
         request_id=getattr(db_request, "id", None),
         commit=False,
     )

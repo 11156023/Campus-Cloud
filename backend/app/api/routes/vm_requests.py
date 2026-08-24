@@ -59,7 +59,6 @@ def advise_workload(
         cores=request_in.cores,
         memory=request_in.memory,
         gpu_mapping_id=request_in.gpu_mapping_id,
-        service_template_slug=request_in.service_template_slug,
     )
     return WorkloadAdviceResponse(
         resource_type=advice.resource_type,

@@ -9,10 +9,10 @@ import useAutoRefresh from "../../../hooks/useAutoRefresh";
 const COLUMNS = ["任務", "類型", "狀態", "進度", "建立時間", "更新時間", "申請人"];
 
 const KIND_LABELS = {
-  script_deploy: "腳本部署",
   vm_request:    "VM 申請",
   spec_change:   "規格變更",
   deletion:      "刪除",
+  template:      "機器範本",
 };
 
 const STATUS_LABELS = {

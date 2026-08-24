@@ -54,7 +54,6 @@ def advise(
     cores: int | None,
     memory: int | None,
     gpu_mapping_id: str | None,
-    service_template_slug: str | None,
 ) -> WorkloadAdvice:
     """依申請內容判斷建議的資源型別（規則先命中先贏）。"""
     os_text = " ".join(filter(None, [os_info, environment_type]))
@@ -89,13 +88,6 @@ def advise(
             ],
         )
 
-    # 4) 服務範本走 community-scripts 容器部署
-    if service_template_slug:
-        return WorkloadAdvice(
-            resource_type="lxc",
-            confidence="high",
-            reasons=["服務範本以容器部署，啟動快、資源占用低"],
-        )
 
     # 5) 輕量 Linux 負載：容器密度高（需有實際規格才判斷）
     has_spec = cores is not None or memory is not None

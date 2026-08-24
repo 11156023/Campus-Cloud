@@ -93,8 +93,6 @@ def _to_public(req: VMRequest, user_override=None) -> VMRequestPublic:
         requested_mode=req.requested_mode,
         auto_decision_reason=req.auto_decision_reason,
         status=req.status,
-        service_template_slug=req.service_template_slug,
-        service_template_script_path=req.service_template_script_path,
         reviewer_id=req.reviewer_id,
         review_comment=req.review_comment,
         reviewed_at=req.reviewed_at,
@@ -352,7 +350,6 @@ def create(
             cores=request_in.cores,
             memory=request_in.memory,
             gpu_mapping_id=request_in.gpu_mapping_id,
-            service_template_slug=request_in.service_template_slug,
         )
         auto_decision_reason = "；".join(advice.reasons)
         if advice.resource_type != request_in.resource_type:

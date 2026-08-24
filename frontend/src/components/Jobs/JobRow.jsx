@@ -4,10 +4,10 @@ import styles from "./Jobs.module.scss";
 /** 任務類型顯示名稱（與 JobsPage 的 KIND_LABELS 對齊，popover 用短版） */
 export const JOB_KIND_LABEL = {
   migration:     "遷移",
-  script_deploy: "部署",
   vm_request:    "開機申請",
   spec_change:   "規格變更",
   deletion:      "刪除",
+  template:      "範本",
 };
 
 /** 狀態顯示名稱 + MIcon 名稱 + 色調 class key */

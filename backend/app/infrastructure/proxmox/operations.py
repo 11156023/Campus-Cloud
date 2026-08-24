@@ -6,16 +6,21 @@ duplicate the same cluster.resources iteration or qemu/lxc dispatch logic.
 """
 
 import logging
-from typing import Literal
+from typing import Any, Literal
 
 import httpx
 
 from app.exceptions import BadRequestError, NotFoundError, ProxmoxError
 from app.infrastructure.proxmox import (
+    ProxmoxSettings,
     basic_blocking_task_status,
     get_active_host,
+    get_connection_id_for_node,
     get_proxmox_api,
+    get_proxmox_api_for_node,
     get_proxmox_settings,
+    get_proxmox_settings_for_node,
+    list_enabled_connection_ids,
     wait_for_task_status,
 )
 
@@ -24,71 +29,178 @@ logger = logging.getLogger(__name__)
 ResourceType = Literal["qemu", "lxc"]
 
 
+def _connection_keys() -> list[int | None]:
+    """回傳要彙總的連線 key 清單；尚未建立連線資料時退回單連線行為。"""
+    connection_ids = list_enabled_connection_ids()
+    if connection_ids:
+        return list(connection_ids)
+    return [None]
+
+
+def iter_connection_clients():
+    """Yield (connection_key, client) for every enabled connection.
+
+    連不上的連線記 warning 後略過；全部失敗時 yield 不出任何項目，
+    由呼叫端決定要視為空結果或錯誤。
+    """
+    for key in _connection_keys():
+        try:
+            yield key, get_proxmox_api(key)
+        except Exception as exc:
+            logger.warning(
+                "Skipping unavailable Proxmox connection %s: %s", key, exc
+            )
+
+
 # ---------------------------------------------------------------------------
 # Resource lookup
 # ---------------------------------------------------------------------------
 
+def _raw_vms_by_connection() -> list[tuple[int | None, list[dict]]]:
+    """Return (connection_key, resources) for every connection, without pool filtering."""
+    results: list[tuple[int | None, list[dict]]] = []
+    errors: list[str] = []
+    keys = _connection_keys()
+    for key in keys:
+        try:
+            proxmox = get_proxmox_api(key)
+            results.append((key, list(proxmox.cluster.resources.get(type="vm"))))
+        except Exception as exc:
+            errors.append(str(exc))
+            logger.warning(
+                "Failed to list resources for Proxmox connection %s: %s", key, exc
+            )
+    if errors and not results and len(errors) == len(keys):
+        raise ProxmoxError(f"All Proxmox connections are unavailable. {errors[0]}")
+    return results
+
+
 def _raw_vms() -> list[dict]:
-    """Return all cluster resources of type vm without pool filtering."""
-    proxmox = get_proxmox_api()
-    return proxmox.cluster.resources.get(type="vm")
+    """Return all resources of type vm across all connections, without pool filtering."""
+    return [vm for _key, vms in _raw_vms_by_connection() for vm in vms]
+
+
+def _pool_vms() -> list[dict]:
+    """Return vm resources inside each connection's own pool.
+
+    pool 名稱是每個連線（叢集）自己的設定，因此比對必須逐連線進行，
+    不能用單一 pool 名稱去篩全部連線的資源。
+    """
+    matched: list[dict] = []
+    for key, vms in _raw_vms_by_connection():
+        pool = get_proxmox_settings(key).pool_name
+        matched.extend(vm for vm in vms if vm.get("pool") == pool)
+    return matched
+
+
+def list_all_vmids() -> set[int]:
+    """回傳所有連線上既有的 VMID 集合（不限 pool）。"""
+    return {int(r["vmid"]) for r in _raw_vms()}
 
 
 def find_resource(vmid: int) -> dict:
-    """Find any resource (qemu or lxc) by VMID in the configured pool."""
-    pool = get_proxmox_settings().pool_name
-    for r in _raw_vms():
-        if r["vmid"] == vmid and r.get("pool") == pool:
+    """Find any resource (qemu or lxc) by VMID in its connection's pool."""
+    for r in _pool_vms():
+        if r["vmid"] == vmid:
             return r
     raise NotFoundError(f"Resource {vmid} not found")
 
 
 def find_lxc(vmid: int) -> dict:
-    """Find an LXC container by VMID in the configured pool."""
-    pool = get_proxmox_settings().pool_name
-    for r in _raw_vms():
-        if r["vmid"] == vmid and r["type"] == "lxc" and r.get("pool") == pool:
+    """Find an LXC container by VMID in its connection's pool."""
+    for r in _pool_vms():
+        if r["vmid"] == vmid and r["type"] == "lxc":
             return r
     raise NotFoundError(f"LXC container {vmid} not found")
 
 
 def list_all_resources() -> list[dict]:
-    """Return all cluster resources of type vm in the configured pool."""
-    pool = get_proxmox_settings().pool_name
-    return [r for r in _raw_vms() if r.get("pool") == pool]
+    """Return all cluster resources of type vm in each connection's pool."""
+    return _pool_vms()
 
 
 def list_nodes() -> list[dict]:
-    """Return all cluster nodes."""
-    proxmox = get_proxmox_api()
-    return proxmox.nodes.get()
+    """Return all nodes across all connections."""
+    results: list[dict] = []
+    errors: list[str] = []
+    keys = _connection_keys()
+    for key in keys:
+        try:
+            proxmox = get_proxmox_api(key)
+            results.extend(proxmox.nodes.get())
+        except Exception as exc:
+            errors.append(str(exc))
+            logger.warning(
+                "Failed to list nodes for Proxmox connection %s: %s", key, exc
+            )
+    if errors and not results and len(errors) == len(keys):
+        raise ProxmoxError(f"All Proxmox connections are unavailable. {errors[0]}")
+    return results
+
+
+def _admin_disabled_node_names() -> set[str]:
+    """讀取被管理員停用的節點名稱；DB 讀取失敗時不過濾（fail-open）。"""
+    try:
+        from sqlmodel import Session
+
+        from app.core.db import engine
+        from app.repositories.proxmox_node import get_disabled_node_names
+
+        with Session(engine) as session:
+            return get_disabled_node_names(session)
+    except Exception:
+        return set()
 
 
 def get_available_nodes() -> list[dict]:
-    """Return online nodes first, or all nodes if status data is unavailable."""
-    nodes = list_nodes()
+    """Return online nodes first, or all nodes if status data is unavailable.
+
+    管理員停用的節點一律排除（停用＝不接收新 VM）。
+    """
+    disabled = _admin_disabled_node_names()
+    nodes = [
+        node for node in list_nodes()
+        if str(node.get("node") or node.get("name") or "") not in disabled
+    ]
     online_nodes = [node for node in nodes if node.get("status") == "online"]
     return online_nodes or nodes
+
+
+def _default_node_candidates() -> list[str]:
+    """各連線自己設定的預設節點，預設連線優先。"""
+    candidates: list[str] = []
+    for key in _connection_keys():
+        try:
+            default_node = get_proxmox_settings(key).default_node
+        except Exception as exc:
+            logger.warning(
+                "Unable to read default node for Proxmox connection %s: %s", key, exc
+            )
+            continue
+        if default_node and default_node not in candidates:
+            candidates.append(default_node)
+    return candidates
 
 
 def pick_target_node(preferred_node: str | None = None) -> str:
     """Pick a usable target node, preferring an explicitly requested one.
 
-    Priority: preferred_node > settings.default_node > nodes[0]
+    Priority: preferred_node > 各連線的 default_node（預設連線優先） > nodes[0]
     """
     nodes = get_available_nodes()
     if not nodes:
         raise ProxmoxError("No Proxmox nodes are available")
 
-    candidate = preferred_node or get_proxmox_settings().default_node
-    if candidate:
+    candidates = [preferred_node] if preferred_node else _default_node_candidates()
+    for candidate in candidates:
         for node in nodes:
             node_name = node.get("node") or node.get("name")
             if node_name == candidate:
                 return node_name
+    if candidates:
         logger.warning(
-            "Preferred node '%s' not found or offline; falling back to first available node",
-            candidate,
+            "Preferred node(s) %s not found or offline; falling back to first available node",
+            ", ".join(candidates),
         )
 
     selected = nodes[0].get("node") or nodes[0].get("name")
@@ -99,7 +211,7 @@ def pick_target_node(preferred_node: str | None = None) -> str:
 
 def list_node_storages(node: str) -> list[dict]:
     """Return storages visible on a node."""
-    proxmox = get_proxmox_api()
+    proxmox = get_proxmox_api_for_node(node)
     return proxmox.nodes(node).storage.get()
 
 
@@ -170,20 +282,15 @@ def resolve_target_storage(
     raise BadRequestError(
         "No enabled Proxmox storage is available on "
         f"node '{node}' for content '{required_content}'. "
-        f"Configured/requested storage: '{requested_storage or get_proxmox_settings().data_storage}'. "
+        f"Configured/requested storage: '{requested_storage or get_proxmox_settings_for_node(node).data_storage}'. "
         f"Node storages: {', '.join(available_names) if available_names else 'none'}."
     )
 
 
 def find_vm_template(template_id: int) -> dict:
-    """Find a VM template by VMID in the configured pool."""
-    pool = get_proxmox_settings().pool_name
-    for vm in _raw_vms():
-        if (
-            vm["vmid"] == template_id
-            and vm.get("template") == 1
-            and vm.get("pool") == pool
-        ):
+    """Find a VM template by VMID in its connection's pool."""
+    for vm in _pool_vms():
+        if vm["vmid"] == template_id and vm.get("template") == 1:
             return vm
     raise NotFoundError(f"VM template {template_id} not found")
 
@@ -194,7 +301,7 @@ def find_vm_template(template_id: int) -> dict:
 
 def _resource_api(node: str, vmid: int, resource_type: ResourceType):
     """Return the proxmoxer node resource handle (qemu or lxc)."""
-    proxmox = get_proxmox_api()
+    proxmox = get_proxmox_api_for_node(node)
     if resource_type == "qemu":
         return proxmox.nodes(node).qemu(vmid)
     return proxmox.nodes(node).lxc(vmid)
@@ -295,7 +402,7 @@ def get_rrd_data(
 
 def get_node_rrd_data(node: str, timeframe: str) -> list[dict]:
     """GET /nodes/{node}/rrddata"""
-    proxmox = get_proxmox_api()
+    proxmox = get_proxmox_api_for_node(node)
     return proxmox.nodes(node).rrddata.get(timeframe=timeframe)
 
 
@@ -327,7 +434,7 @@ def _is_usable_ipv4(ip: str) -> bool:
 
 def get_ip_address(node: str, vmid: int, resource_type: ResourceType) -> str | None:
     """取得 VM 的 IP 位址，掃描全部網卡（跳過 loopback / link-local）。"""
-    proxmox = get_proxmox_api()
+    proxmox = get_proxmox_api_for_node(node)
     try:
         if resource_type == "lxc":
             interfaces = proxmox.nodes(node).lxc(vmid).interfaces.get()
@@ -397,7 +504,7 @@ def get_current_specs(node: str, vmid: int, resource_type: ResourceType) -> dict
 
 def create_lxc(node: str, **config) -> str:
     """Create an LXC container and wait for the task to finish. Returns UPID."""
-    proxmox = get_proxmox_api()
+    proxmox = get_proxmox_api_for_node(node)
     task = proxmox.nodes(node).lxc.create(**config)
     basic_blocking_task_status(node, task)
     return task
@@ -409,7 +516,7 @@ def create_lxc(node: str, **config) -> str:
 
 def clone_vm(node: str, template_id: int, **clone_config) -> str:
     """Clone a VM template and wait. Returns UPID."""
-    proxmox = get_proxmox_api()
+    proxmox = get_proxmox_api_for_node(node)
     task = proxmox.nodes(node).qemu(template_id).clone.post(**clone_config)
     basic_blocking_task_status(node, task)
     return task
@@ -417,7 +524,7 @@ def clone_vm(node: str, template_id: int, **clone_config) -> str:
 
 def clone_lxc(node: str, template_id: int, **clone_config) -> str:
     """Clone an LXC template and wait. Returns UPID."""
-    proxmox = get_proxmox_api()
+    proxmox = get_proxmox_api_for_node(node)
     task = proxmox.nodes(node).lxc(template_id).clone.post(**clone_config)
     basic_blocking_task_status(node, task)
     return task
@@ -434,8 +541,33 @@ def convert_to_template(
 
 
 def next_vmid() -> int:
-    proxmox = get_proxmox_api()
-    return int(proxmox.cluster.nextid.get())
+    """回傳一個在所有連線上都未使用的 VMID。
+
+    多連線架構下各入口的 ``cluster.nextid`` 彼此獨立，可能互相碰撞，
+    因此取所有連線 nextid 的最大值，再對彙總的既有 VMID 遞增避讓。
+    """
+    keys = _connection_keys()
+    if len(keys) == 1:
+        proxmox = get_proxmox_api(keys[0])
+        return int(proxmox.cluster.nextid.get())
+
+    candidates: list[int] = []
+    for key in keys:
+        try:
+            proxmox = get_proxmox_api(key)
+            candidates.append(int(proxmox.cluster.nextid.get()))
+        except Exception as exc:
+            logger.warning(
+                "Failed to fetch nextid for Proxmox connection %s: %s", key, exc
+            )
+    if not candidates:
+        raise ProxmoxError("All Proxmox connections are unavailable.")
+
+    used = {int(r["vmid"]) for r in _raw_vms()}
+    candidate = max(candidates)
+    while candidate in used:
+        candidate += 1
+    return candidate
 
 
 # ---------------------------------------------------------------------------
@@ -443,33 +575,24 @@ def next_vmid() -> int:
 # ---------------------------------------------------------------------------
 
 def get_lxc_templates(node: str) -> list[dict]:
-    proxmox = get_proxmox_api()
-    return proxmox.nodes(node).storage(get_proxmox_settings().iso_storage).content.get()
+    proxmox = get_proxmox_api_for_node(node)
+    iso_storage = get_proxmox_settings_for_node(node).iso_storage
+    return proxmox.nodes(node).storage(iso_storage).content.get()
 
 
 def get_vm_templates() -> list[dict]:
-    """Return all VM templates in the configured pool."""
-    pool = get_proxmox_settings().pool_name
-    return [
-        vm
-        for vm in _raw_vms()
-        if vm.get("template") == 1 and vm.get("pool") == pool
-    ]
+    """Return all VM templates in each connection's pool."""
+    return [vm for vm in _pool_vms() if vm.get("template") == 1]
 
 
 # ---------------------------------------------------------------------------
 # Session ticket (for WebSocket auth — password-based, not API token)
 # ---------------------------------------------------------------------------
 
-async def get_session_ticket() -> tuple[str, str]:
-    """Authenticate via password and return (pve_auth_cookie, csrf_token).
-
-    Proxmox WebSocket endpoints (termproxy, vncproxy) require a session
-    ticket obtained via password auth; API tokens are not accepted.
-    """
+def _ws_verify(cfg: "ProxmoxSettings") -> "Any":
+    """Build the httpx verify parameter for a connection's TLS settings."""
     import ssl as _ssl
 
-    cfg = get_proxmox_settings()
     if cfg.ca_cert:
         # Build a custom SSL context that accepts the PVE self-signed CA cert
         _ctx = _ssl.SSLContext(_ssl.PROTOCOL_TLS_CLIENT)
@@ -478,13 +601,25 @@ async def get_session_ticket() -> tuple[str, str]:
         _ctx.load_verify_locations(cadata=cfg.ca_cert)
         if hasattr(_ssl, "VERIFY_X509_STRICT"):
             _ctx.verify_flags &= ~_ssl.VERIFY_X509_STRICT
-        verify: bool | _ssl.SSLContext = _ctx
-    else:
-        verify = cfg.verify_ssl
+        return _ctx
+    return cfg.verify_ssl
 
-    async with httpx.AsyncClient(verify=verify) as client:
+
+async def get_session_ticket(node: str | None = None) -> tuple[str, str]:
+    """Authenticate via password and return (pve_auth_cookie, csrf_token).
+
+    Proxmox WebSocket endpoints (termproxy, vncproxy) require a session
+    ticket obtained via password auth; API tokens are not accepted.
+
+    ``node`` 有值時對該節點所屬的連線認證（session ticket 不可跨連線）。
+    """
+    connection_id = get_connection_id_for_node(node) if node else None
+    cfg = get_proxmox_settings(connection_id)
+
+    async with httpx.AsyncClient(verify=_ws_verify(cfg)) as client:
         resp = await client.post(
-            f"https://{get_active_host()}:8006/api2/json/access/ticket",
+            f"https://{get_active_host(connection_id)}:{cfg.port}"
+            "/api2/json/access/ticket",
             data={
                 "username": cfg.user,
                 "password": cfg.password,
@@ -505,27 +640,17 @@ async def get_vnc_ticket_with_session(
     csrf_token: str,
 ) -> dict:
     """Get a VM VNC proxy ticket using the same PVE session used for websocket auth."""
-    import ssl as _ssl
-
-    cfg = get_proxmox_settings()
-    if cfg.ca_cert:
-        _ctx = _ssl.SSLContext(_ssl.PROTOCOL_TLS_CLIENT)
-        _ctx.check_hostname = False
-        _ctx.verify_mode = _ssl.CERT_REQUIRED
-        _ctx.load_verify_locations(cadata=cfg.ca_cert)
-        if hasattr(_ssl, "VERIFY_X509_STRICT"):
-            _ctx.verify_flags &= ~_ssl.VERIFY_X509_STRICT
-        verify: bool | _ssl.SSLContext = _ctx
-    else:
-        verify = cfg.verify_ssl
+    connection_id = get_connection_id_for_node(node)
+    cfg = get_proxmox_settings(connection_id)
 
     headers = {"Cookie": f"PVEAuthCookie={pve_auth_cookie}"}
     if csrf_token:
         headers["CSRFPreventionToken"] = csrf_token
 
-    async with httpx.AsyncClient(verify=verify) as client:
+    async with httpx.AsyncClient(verify=_ws_verify(cfg)) as client:
         resp = await client.post(
-            f"https://{get_active_host()}:8006/api2/json/nodes/{node}/qemu/{vmid}/vncproxy",
+            f"https://{get_active_host(connection_id)}:{cfg.port}"
+            f"/api2/json/nodes/{node}/qemu/{vmid}/vncproxy",
             data={"websocket": 1},
             headers=headers,
         )
@@ -550,11 +675,11 @@ async def wait_task(task_id: str, node: str, check_interval: int | None = None) 
 
 def get_terminal_ticket(node: str, vmid: int) -> dict:
     """Get termproxy ticket for an LXC container (port + ticket)."""
-    proxmox = get_proxmox_api()
+    proxmox = get_proxmox_api_for_node(node)
     return proxmox.nodes(node).lxc(vmid).termproxy.post()
 
 
 def get_vnc_ticket(node: str, vmid: int) -> dict:
     """Get VNC proxy ticket for a VM (port + ticket)."""
-    proxmox = get_proxmox_api()
+    proxmox = get_proxmox_api_for_node(node)
     return proxmox.nodes(node).qemu(vmid).vncproxy.post(websocket=1)

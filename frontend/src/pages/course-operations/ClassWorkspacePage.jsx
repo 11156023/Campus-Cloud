@@ -4,6 +4,7 @@ import "@xyflow/react/dist/style.css";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import MIcon from "../../components/MIcon";
 import ClassroomWatchDialog from "../../components/Classroom/ClassroomWatchDialog";
+import { useConfirm } from "../../components/ConfirmDialog/ConfirmProvider";
 import { ClassroomService } from "../../services/classroom";
 import { courseNodeHasUsableSource, CourseEnvironmentsService } from "../../services/courseEnvironments";
 import { TeachingClassesService } from "../../services/teachingClasses";
@@ -167,6 +168,7 @@ function Overview({
 }
 
 function Students({ item, onRefresh }) {
+  const confirm = useConfirm();
   const [emails, setEmails] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
@@ -199,7 +201,13 @@ function Students({ item, onRefresh }) {
     finally { if (fileRef.current) fileRef.current.value = ""; setBusy(false); }
   }
   async function remove(studentId) {
-    if (!window.confirm("確定從此班級移除這位學生？")) return;
+    const ok = await confirm({
+      title: "移除學生",
+      message: "確定從此班級移除這位學生？",
+      confirmText: "移除",
+      danger: true,
+    });
+    if (!ok) return;
     try { onRefresh(await TeachingClassesService.removeStudent(item.id, studentId)); }
     catch (error) { setMessage(error?.message ?? "移除失敗"); }
   }
@@ -464,6 +472,7 @@ function LockedFeature({ section }) {
 }
 
 export default function ClassWorkspacePage() {
+  const confirm = useConfirm();
   const { classId, section } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -503,7 +512,12 @@ export default function ClassWorkspacePage() {
   }, [item?.id, item?.status]);
 
   async function provision() {
-    if (!window.confirm("送出後學生名單、課程環境與課表將鎖定並交由管理員審核，確定送出嗎？")) return;
+    const ok = await confirm({
+      title: "送出審核",
+      message: "送出後學生名單、課程環境與課表將鎖定並交由管理員審核，確定送出嗎？",
+      confirmText: "送出",
+    });
+    if (!ok) return;
     setProvisioning(true); setMessage("");
     try { refresh(await TeachingClassesService.provision(classId)); setMessage("所有節點批次工作已送出，正在等待審核；頁面會自動更新結果。"); }
     catch (reason) { setMessage(reason?.message ?? "送出建機失敗"); }
@@ -521,7 +535,13 @@ export default function ClassWorkspacePage() {
   }
 
   async function resetFailed() {
-    if (!window.confirm("確定釋放已預留的容量與 IP，解除鎖定並返回編輯嗎？")) return;
+    const ok = await confirm({
+      title: "返回編輯",
+      message: "確定釋放已預留的容量與 IP，解除鎖定並返回編輯嗎？",
+      confirmText: "釋放並返回",
+      danger: true,
+    });
+    if (!ok) return;
     setRecovering(true); setMessage("");
     try {
       refresh(await TeachingClassesService.resetFailed(classId));

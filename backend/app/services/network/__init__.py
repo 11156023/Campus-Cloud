@@ -8,7 +8,6 @@ __all__ = [
     "gateway_service",
     "nat_service",
     "reverse_proxy_service",
-    "script_deploy_service",
     "snapshot_service",
     "traefik_runtime_service",
 ]
@@ -19,7 +18,6 @@ _MODULES = {
     "gateway_service": "app.services.network.gateway_service",
     "nat_service": "app.services.network.nat_service",
     "reverse_proxy_service": "app.services.network.reverse_proxy_service",
-    "script_deploy_service": "app.services.network.script_deploy_service",
     "snapshot_service": "app.services.network.snapshot_service",
     "traefik_runtime_service": "app.services.network.traefik_runtime_service",
 }

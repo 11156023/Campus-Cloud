@@ -21,9 +21,14 @@ logger = logging.getLogger(__name__)
 
 PROXMOX_TICKET_TTL = 7000
 PROXMOX_FAILURE_CACHE_TTL = 15.0
+NODE_CONNECTION_MAP_TTL = 60.0
+
+# 連線池的 key：connection_id；None 代表「預設連線」（含舊版單連線相容）。
+_ClientKey = int | None
+
 
 class _ProxmoxClientState:
-    """共享的 Proxmox 連線快取狀態。"""
+    """單一連線的 Proxmox client 快取狀態。"""
 
     def __init__(self) -> None:
         self.client: ProxmoxAPI | None = None
@@ -35,27 +40,96 @@ class _ProxmoxClientState:
         self.connection_event: threading.Event | None = None
 
 
-_state = _ProxmoxClientState()
-_proxmox_lock = threading.Lock()
+_states: dict[_ClientKey, _ProxmoxClientState] = {}
+_states_lock = threading.Lock()
+
+# node 名稱 → (connection_id, node host) 的快取映射（TTL 更新）
+_node_connection_map: dict[str, tuple[int | None, str]] = {}
+_node_connection_map_at = 0.0
+_node_connection_map_lock = threading.Lock()
 
 
-def invalidate_proxmox_client() -> None:
-    with _proxmox_lock:
-        _state.client = None
-        _state.created_at = 0.0
-        _state.active_host = None
-        _state.failure_until = 0.0
-        _state.last_error = None
+def _get_state(key: _ClientKey) -> _ProxmoxClientState:
+    with _states_lock:
+        state = _states.get(key)
+        if state is None:
+            state = _ProxmoxClientState()
+            _states[key] = state
+        return state
 
 
-def _connect_proxmox() -> tuple[ProxmoxAPI, str]:
-    """Probe configured nodes and return a validated client and active host.
+def invalidate_proxmox_client(connection_id: _ClientKey = None, *, all_connections: bool = True) -> None:
+    """清除連線快取。預設清除全部（設定變更後所有連線都可能失效）。
 
-    Network I/O deliberately happens outside ``_proxmox_lock``.  Callers are
-    coordinated by ``get_proxmox_api`` so only one probe is active at a time.
+    ``all_connections=False`` 時只清除指定的 ``connection_id``。
     """
-    cfg = get_proxmox_settings()
-    nodes = get_nodes_for_ha()
+    global _node_connection_map_at
+    with _states_lock:
+        if all_connections:
+            _states.clear()
+        else:
+            _states.pop(connection_id, None)
+    with _node_connection_map_lock:
+        _node_connection_map.clear()
+        _node_connection_map_at = 0.0
+
+
+def _refresh_node_connection_map() -> None:
+    global _node_connection_map_at
+    try:
+        from sqlmodel import Session
+
+        from app.core.db import engine
+        from app.repositories.proxmox_node import get_all_nodes
+
+        with Session(engine) as session:
+            nodes = get_all_nodes(session)
+        with _node_connection_map_lock:
+            _node_connection_map.clear()
+            for node in nodes:
+                _node_connection_map[node.name] = (node.connection_id, node.host)
+            _node_connection_map_at = time.monotonic()
+    except Exception as exc:
+        logger.warning("Unable to refresh node-connection map: %s", exc)
+
+
+def _node_map_entry(node_name: str) -> tuple[int | None, str] | None:
+    now = time.monotonic()
+    with _node_connection_map_lock:
+        fresh = (now - _node_connection_map_at) < NODE_CONNECTION_MAP_TTL
+        if fresh and node_name in _node_connection_map:
+            return _node_connection_map[node_name]
+    _refresh_node_connection_map()
+    with _node_connection_map_lock:
+        return _node_connection_map.get(node_name)
+
+
+def get_connection_id_for_node(node_name: str) -> int | None:
+    """查出節點所屬的連線 id；查不到時回 None（使用預設連線）。"""
+    entry = _node_map_entry(node_name)
+    return entry[0] if entry is not None else None
+
+
+def get_node_host(node_name: str) -> str | None:
+    """查出節點自身的 host（IP/hostname）；查不到時回 None。
+
+    SSH（pct push/exec）必須直接連到節點本身，不能靠 API 入口轉發。
+    """
+    entry = _node_map_entry(node_name)
+    return entry[1] if entry is not None else None
+
+
+def _connect_proxmox(connection_id: _ClientKey) -> tuple[ProxmoxAPI, str]:
+    """Probe the connection's nodes and return a validated client and active host.
+
+    Network I/O deliberately happens outside the state lock.  Callers are
+    coordinated by ``get_proxmox_api`` so only one probe is active at a time
+    per connection.
+    """
+    cfg = get_proxmox_settings(connection_id)
+    nodes = get_nodes_for_ha(
+        connection_id if connection_id is not None else cfg.connection_id
+    )
 
     if nodes:
         last_error: Exception | None = None
@@ -75,9 +149,10 @@ def _connect_proxmox() -> tuple[ProxmoxAPI, str]:
                 client = try_connect(node.host, cfg)
                 update_node_online(node.id, True)
                 logger.info(
-                    "Connected to Proxmox node %s (%s)",
+                    "Connected to Proxmox node %s (%s) via connection %s",
                     node.name,
                     node.host,
+                    cfg.connection_name or "default",
                 )
                 return client, node.host
             except Exception as exc:
@@ -93,38 +168,43 @@ def _connect_proxmox() -> tuple[ProxmoxAPI, str]:
         detail = str(last_error) if last_error else (
             "TCP connection failed for " + ", ".join(unreachable)
         )
-        raise ProxmoxError(f"All Proxmox nodes are unavailable. {detail}")
+        raise ProxmoxError(
+            f"All Proxmox nodes are unavailable for connection "
+            f"{cfg.connection_name or cfg.host}. {detail}"
+        )
 
-    logger.info("Using configured single Proxmox host %s", cfg.host)
+    logger.info("Using configured Proxmox host %s", cfg.host)
     return try_connect(cfg.host, cfg), cfg.host
 
 
-def get_proxmox_api() -> ProxmoxAPI:
+def get_proxmox_api(connection_id: _ClientKey = None) -> ProxmoxAPI:
+    """取得指定連線的 ProxmoxAPI client（None = 預設連線）。"""
+    state = _get_state(connection_id)
     now = time.monotonic()
-    if _state.client is not None and (now - _state.created_at) < PROXMOX_TICKET_TTL:
-        return _state.client
+    if state.client is not None and (now - state.created_at) < PROXMOX_TICKET_TTL:
+        return state.client
 
     while True:
-        with _proxmox_lock:
+        with _states_lock:
             now = time.monotonic()
             if (
-                _state.client is not None
-                and (now - _state.created_at) < PROXMOX_TICKET_TTL
+                state.client is not None
+                and (now - state.created_at) < PROXMOX_TICKET_TTL
             ):
-                return _state.client
-            if now < _state.failure_until:
-                retry_in = max(_state.failure_until - now, 0.0)
+                return state.client
+            if now < state.failure_until:
+                retry_in = max(state.failure_until - now, 0.0)
                 raise ProxmoxError(
                     "Proxmox is temporarily unavailable; "
-                    f"retry in {retry_in:.1f}s. {_state.last_error or ''}".strip()
+                    f"retry in {retry_in:.1f}s. {state.last_error or ''}".strip()
                 )
-            if _state.connecting:
-                connection_event = _state.connection_event
+            if state.connecting:
+                connection_event = state.connection_event
                 is_probe_owner = False
             else:
                 connection_event = threading.Event()
-                _state.connection_event = connection_event
-                _state.connecting = True
+                state.connection_event = connection_event
+                state.connecting = True
                 is_probe_owner = True
 
         if is_probe_owner:
@@ -133,35 +213,46 @@ def get_proxmox_api() -> ProxmoxAPI:
             connection_event.wait()
 
     try:
-        client, active_host = _connect_proxmox()
+        client, active_host = _connect_proxmox(connection_id)
     except Exception as exc:
-        with _proxmox_lock:
-            _state.client = None
-            _state.created_at = 0.0
-            _state.active_host = None
-            _state.failure_until = time.monotonic() + PROXMOX_FAILURE_CACHE_TTL
-            _state.last_error = str(exc)
-            _state.connecting = False
-            if _state.connection_event is not None:
-                _state.connection_event.set()
+        with _states_lock:
+            state.client = None
+            state.created_at = 0.0
+            state.active_host = None
+            state.failure_until = time.monotonic() + PROXMOX_FAILURE_CACHE_TTL
+            state.last_error = str(exc)
+            state.connecting = False
+            if state.connection_event is not None:
+                state.connection_event.set()
         raise
 
-    with _proxmox_lock:
-        _state.client = client
-        _state.created_at = time.monotonic()
-        _state.active_host = active_host
-        _state.failure_until = 0.0
-        _state.last_error = None
-        _state.connecting = False
-        if _state.connection_event is not None:
-            _state.connection_event.set()
+    with _states_lock:
+        state.client = client
+        state.created_at = time.monotonic()
+        state.active_host = active_host
+        state.failure_until = 0.0
+        state.last_error = None
+        state.connecting = False
+        if state.connection_event is not None:
+            state.connection_event.set()
         return client
 
 
-def get_active_host() -> str:
-    if _state.active_host:
-        return _state.active_host
-    return get_proxmox_settings().host
+def get_proxmox_api_for_node(node_name: str) -> ProxmoxAPI:
+    """取得可操作指定節點的 ProxmoxAPI client（依節點歸屬路由連線）。"""
+    return get_proxmox_api(get_connection_id_for_node(node_name))
+
+
+def get_active_host(connection_id: _ClientKey = None) -> str:
+    state = _get_state(connection_id)
+    if state.active_host:
+        return state.active_host
+    return get_proxmox_settings(connection_id).host
+
+
+def get_host_for_node(node_name: str) -> str:
+    """回傳可存取指定節點的 API 入口 host（該節點所屬連線的 active host）。"""
+    return get_active_host(get_connection_id_for_node(node_name))
 
 
 def _task_log_tail(
@@ -209,9 +300,11 @@ def basic_blocking_task_status(
     繼續跑，不會被取消）— 供 best-effort 場景（如挖礦存證快照）設上限。
     """
     if check_interval is None:
-        check_interval = get_proxmox_settings().task_check_interval
+        check_interval = get_proxmox_settings(
+            get_connection_id_for_node(node_name)
+        ).task_check_interval
 
-    proxmox = get_proxmox_api()
+    proxmox = get_proxmox_api_for_node(node_name)
     logger.info("Waiting for task %s on node %s", task_id, node_name)
     deadline = (
         time.monotonic() + timeout_seconds if timeout_seconds is not None else None

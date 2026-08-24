@@ -13,7 +13,6 @@ def _advise(**overrides: object) -> WorkloadAdvice:
         "cores": None,
         "memory": None,
         "gpu_mapping_id": None,
-        "service_template_slug": None,
     }
     params.update(overrides)
     return advise(**params)  # type: ignore[arg-type]
@@ -31,12 +30,6 @@ CASES: list[tuple[str, dict, str, str]] = [
     ("vpn_keyword_vm", {"reason": "架設 WireGuard VPN 伺服器"}, "vm", "medium"),
     ("nested_keyword_vm", {"reason": "需要嵌套虛擬化測試"}, "vm", "medium"),
     (
-        "service_template_lxc",
-        {"service_template_slug": "nginx", "cores": 8, "memory": 16384},
-        "lxc",
-        "high",
-    ),
-    (
         "light_linux_lxc",
         {"os_info": "Ubuntu 24.04", "cores": 2, "memory": 2048},
         "lxc",
@@ -49,13 +42,7 @@ CASES: list[tuple[str, dict, str, str]] = [
         "low",
     ),
     ("all_empty_default_lxc", {}, "lxc", "low"),
-    # 優先序：GPU 蓋過 service template；Windows 蓋過輕量規格
-    (
-        "gpu_beats_service_template",
-        {"gpu_mapping_id": "gpu-1", "service_template_slug": "nginx"},
-        "vm",
-        "high",
-    ),
+    # 優先序：Windows 蓋過輕量規格
     (
         "windows_beats_light_spec",
         {"os_info": "Windows 11", "cores": 1, "memory": 1024},

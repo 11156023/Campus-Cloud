@@ -43,6 +43,60 @@
   overflow: hidden;
 }
 
+.cardHeader {
+  @include flex-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: $spacing-8;
+  padding: $spacing-16;
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.cardHeading {
+  @include flex-column;
+  gap: $spacing-4;
+  min-width: 0;
+}
+
+.cardTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: $spacing-8;
+  font-size: $font-size-16;
+  font-weight: $font-weight-700;
+  color: var(--color-text-primary);
+}
+
+.cardSubtitle {
+  font-size: $font-size-12;
+  line-height: 1.6;
+  color: var(--color-text-secondary);
+  max-width: 62ch;
+}
+
+.updatedAt {
+  font-size: $font-size-12;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.cardBody {
+  @include flex-column;
+  gap: $spacing-16;
+  padding: $spacing-16;
+}
+
+.cardActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: $spacing-8;
+}
+
+.hint {
+  font-size: $font-size-12;
+  color: var(--color-text-muted);
+}
+
 .stateText {
   padding: $spacing-32 $spacing-16;
   text-align: center;
@@ -99,7 +153,13 @@
 .thRight,
 .tdRight {
   text-align: right;
-  width: 64px;
+  width: 96px;
+}
+
+.rowActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: $spacing-4;
 }
 
 /* ── 徽章 ── */
@@ -171,6 +231,18 @@
   }
 }
 
+.btnIcon {
+  @extend %btn-base;
+  padding: 4px 8px;
+  background: transparent;
+  color: var(--color-text-secondary);
+
+  &:hover:not(:disabled) {
+    background: var(--color-hover);
+    color: var(--color-text-primary);
+  }
+}
+
 /* ── Modal ── */
 .modalOverlay {
   position: fixed;
@@ -216,6 +288,60 @@
   gap: $spacing-16 $spacing-8;
 }
 
+/* ── 可搜尋的使用者選擇欄位 ── */
+.picker {
+  position: relative;
+}
+
+.pickerList {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 10;
+  max-height: 220px;
+  overflow-y: auto;
+  padding: $spacing-4;
+  list-style: none;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: $radius-8;
+  box-shadow: var(--shadow-lg);
+}
+
+.pickerEmpty {
+  padding: $spacing-8;
+  font-size: $font-size-12;
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.pickerItem {
+  @include flex-column;
+  gap: 2px;
+  width: 100%;
+  padding: 6px $spacing-8;
+  border-radius: $radius-8;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background $transition-base;
+
+  &:hover {
+    background: var(--color-hover);
+  }
+}
+
+.pickerPrimary {
+  font-size: $font-size-14;
+  color: var(--color-text-primary);
+}
+
+.pickerSecondary {
+  font-size: $font-size-12;
+  color: var(--color-text-muted);
+}
+
 .field {
   @include flex-column;
   gap: $spacing-4;
@@ -243,6 +369,12 @@
 
     &:focus {
       border-color: var(--color-primary);
+    }
+
+    &:disabled {
+      background: var(--color-hover);
+      color: var(--color-text-muted);
+      cursor: not-allowed;
     }
   }
 }

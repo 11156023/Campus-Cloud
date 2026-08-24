@@ -24,7 +24,8 @@ from app.core.config import settings
 from app.exceptions import AppError, ConflictError, NotFoundError
 from app.infrastructure.proxmox import (
     build_ws_ssl_context,
-    get_active_host,
+    get_connection_id_for_node,
+    get_host_for_node,
     get_proxmox_settings,
 )
 from app.infrastructure.vnc.handshake import (
@@ -389,16 +390,16 @@ class VncSessionManager:
         vm_info = await asyncio.to_thread(proxmox_service.find_resource, vmid)
         node = vm_info["node"]
 
-        pve_auth_cookie, csrf_token = await proxmox_service.get_session_ticket()
+        pve_auth_cookie, csrf_token = await proxmox_service.get_session_ticket(node)
         console = await proxmox_service.get_vnc_ticket_with_session(
             node, vmid, pve_auth_cookie, csrf_token
         )
         vnc_ticket = str(console["ticket"])
         vnc_port = console["port"]
 
-        cfg = get_proxmox_settings()
+        cfg = get_proxmox_settings(get_connection_id_for_node(node))
         url = (
-            f"wss://{get_active_host()}:8006"
+            f"wss://{get_host_for_node(node)}:{cfg.port}"
             f"/api2/json/nodes/{node}/qemu/{vmid}/vncwebsocket"
             f"?port={vnc_port}&vncticket={quote(vnc_ticket, safe='')}"
         )

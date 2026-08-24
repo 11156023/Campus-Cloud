@@ -129,7 +129,6 @@ class RecommendationFormContext(BaseModel):
     mode: Literal["immediate", "scheduled"] | None = None
     hostname: str | None = None
     reason: str | None = None
-    service_template_slug: str | None = None
     lxc_os_image: str | None = None
     vm_template_id: int | None = None
     username: str | None = None

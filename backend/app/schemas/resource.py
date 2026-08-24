@@ -150,7 +150,6 @@ class LXCCreateRequest(BaseModel):
     expiry_date: date | None = None
     start: bool = True
     unprivileged: bool = True
-    service_template_slug: str | None = None
 
 
 class VMCreateRequest(BaseModel):
@@ -168,7 +167,6 @@ class VMCreateRequest(BaseModel):
     os_info: str | None = None
     expiry_date: date | None = None
     start: bool = True
-    service_template_slug: str | None = None
 
 
 # ===== Resource Response Schemas =====
@@ -208,7 +206,6 @@ class ResourcePublic(BaseModel):
     expiry_date: date | None = None
     ip_address: str | None = None
     ssh_public_key: str | None = None
-    service_template_slug: str | None = None
     cpu: float | None = None
     maxcpu: int | None = None
     mem: int | None = None

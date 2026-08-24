@@ -23,6 +23,8 @@ class VMRequestStatus(str, enum.Enum):
     approved = "approved"
     rejected = "rejected"
     cancelled = "cancelled"
+    # 使用時段已結束卻始終沒被審核 —— 由 scheduler 自動標記，非人為決定。
+    expired = "expired"
 
 
 class VMProvisioningStatus(str, enum.Enum):
@@ -113,9 +115,6 @@ class VMRequest(SQLModel, table=True):
     disk_size: int | None = Field(default=None)
     username: str | None = Field(default=None)
     gpu_mapping_id: str | None = Field(default=None)
-
-    service_template_slug: str | None = Field(default=None)
-    service_template_script_path: str | None = Field(default=None)
 
     # VM vs LXC 自動判斷（模組C）：manual = 使用者自選；auto = 規則引擎決定
     requested_mode: str = Field(default="manual")

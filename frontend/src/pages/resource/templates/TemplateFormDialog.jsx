@@ -5,6 +5,7 @@ import { useAuth } from "../../../contexts/AuthContext";
 import { ResourcesService } from "../../../services/resources";
 import { TemplatesService } from "../../../services/templates";
 import { useToast } from "../../../hooks/useToast";
+import { useConfirm } from "../../../components/ConfirmDialog/ConfirmProvider";
 
 /**
  * 建立（從 VM 轉換）或編輯範本的 dialog。
@@ -12,6 +13,7 @@ import { useToast } from "../../../hooks/useToast";
  */
 export default function TemplateFormDialog({ template, onClose, onSaved }) {
   const toast = useToast();
+  const confirm = useConfirm();
   const { user } = useAuth();
   const isEdit = Boolean(template);
   const isAdmin = user?.role === "admin" || user?.is_superuser === true;
@@ -64,6 +66,17 @@ export default function TemplateFormDialog({ template, onClose, onSaved }) {
       default_disk: numOrNull(defaultDisk),
     };
 
+    if (!isEdit) {
+      const ok = await confirm({
+        title: "開始轉換為範本？",
+        message:
+          "轉換時來源機會被關機，且其所有快照（備份點）會被移除，之後變成唯讀範本、無法再直接開機。此動作無法復原。",
+        confirmText: "關機並轉換",
+        danger: true,
+      });
+      if (!ok) return;
+    }
+
     setBusy(true);
     try {
       if (isEdit) {
@@ -71,7 +84,7 @@ export default function TemplateFormDialog({ template, onClose, onSaved }) {
         toast.success("範本已更新");
       } else {
         await TemplatesService.create({ ...common, source_vmid: Number(sourceVmid) });
-        toast.success("已開始轉換範本，來源 VM 會先關機再轉為唯讀範本");
+        toast.success("已開始轉換範本，來源 VM 會先關機、移除所有快照，再轉為唯讀範本");
       }
       onSaved();
       onClose();
@@ -92,7 +105,7 @@ export default function TemplateFormDialog({ template, onClose, onSaved }) {
         <p className={styles.modalDesc}>
           {isEdit
             ? "更新範本的名稱、說明、可見範圍與克隆預設規格。"
-            : "選擇一台已裝好環境的母機。轉換會先關機，完成後原 VM 變成唯讀範本，無法再直接開機。"}
+            : "選擇一台已裝好環境的母機。轉換會先關機並移除該機的所有快照，完成後原 VM 變成唯讀範本，無法再直接開機。"}
         </p>
 
         {!isEdit && (
