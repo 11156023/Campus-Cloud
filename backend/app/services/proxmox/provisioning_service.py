@@ -498,10 +498,9 @@ def create_vm(
         _ensure_resource_stopped(target_node, new_vmid, "qemu")
         proxmox_service.update_config(target_node, new_vmid, "qemu", **config_updates)
 
-        if vm_data.disk_size:
-            proxmox_service.resize_disk(
-                target_node, new_vmid, "qemu", "scsi0", f"{vm_data.disk_size}G"
-            )
+        _resize_clone_disk_if_needed(
+            target_node, new_vmid, vm_data.template_id, vm_data.disk_size
+        )
 
         firewall_service.setup_default_rules(target_node, new_vmid, "qemu")
 
@@ -903,10 +902,9 @@ def execute_provision(plan: dict) -> tuple[int, str]:
                 actual_node, new_vmid, "qemu", **config_updates
             )
 
-            if plan.get("disk_size"):
-                proxmox_service.resize_disk(
-                    actual_node, new_vmid, "qemu", "scsi0", f"{plan['disk_size']}G"
-                )
+            _resize_clone_disk_if_needed(
+                actual_node, new_vmid, plan["template_id"], plan.get("disk_size")
+            )
 
             firewall_service.setup_default_rules(actual_node, new_vmid, "qemu")
             if plan["start_immediately"]:
@@ -999,6 +997,41 @@ def get_lxc_templates() -> list[TemplateSchema]:
     ]
 
 
+def _template_disk_gb(template: dict) -> int:
+    """cluster resource 的 maxdisk 換算 GB（無條件進位）；缺值回 0。"""
+    maxdisk = template.get("maxdisk")
+    return -(-int(maxdisk) // (1024**3)) if maxdisk else 0
+
+
+def _resize_clone_disk_if_needed(
+    node: str, vmid: int, template_id: int, disk_size: int | None
+) -> None:
+    """克隆磁碟只能放大：requested <= 範本大小時跳過 resize。
+
+    PVE 對縮小磁碟直接報錯；範本本體大於申請值時（例如範本超過表單
+    上限）克隆機天生就是範本大小，跳過即可。範本查不到時照舊 resize，
+    交由 PVE 端把關。
+    """
+    if not disk_size:
+        return
+    template_gb = 0
+    try:
+        template_gb = _template_disk_gb(
+            proxmox_service.find_vm_template(template_id)
+        )
+    except Exception:
+        pass
+    if template_gb and int(disk_size) <= template_gb:
+        logger.info(
+            "Skip disk resize for VM %d: requested %dG <= template %dG",
+            vmid,
+            int(disk_size),
+            template_gb,
+        )
+        return
+    proxmox_service.resize_disk(node, vmid, "qemu", "scsi0", f"{int(disk_size)}G")
+
+
 def _template_ostype(vm: dict) -> str | None:
     """讀範本 config 的 ostype；讀不到不阻擋清單（回 None）。"""
     try:
@@ -1009,11 +1042,27 @@ def _template_ostype(vm: dict) -> str | None:
     return str(ostype) if ostype else None
 
 
+def is_windows_template(template_id: int) -> bool:
+    """範本 ostype 是否為 Windows（w 開頭）；查不到一律當非 Windows。
+
+    Windows 範本的帳號由 cloudbase-init 設定檔固定，申請單可不帶 username。
+    """
+    try:
+        template = proxmox_service.find_vm_template(template_id)
+    except Exception:
+        return False
+    ostype = _template_ostype(template)
+    return bool(ostype and ostype.startswith("w"))
+
+
 def get_vm_templates() -> list[VMTemplateSchema]:
     all_vms = proxmox_service.get_vm_templates()
     templates: list[VMTemplateSchema] = []
     for vm in all_vms:
         ostype = _template_ostype(vm)
+        # cluster resources 的 maxcpu/maxmem/maxdisk 即範本自身規格
+        maxcpu = vm.get("maxcpu")
+        maxmem = vm.get("maxmem")
         templates.append(
             VMTemplateSchema(
                 vmid=vm["vmid"],
@@ -1023,6 +1072,10 @@ def get_vm_templates() -> list[VMTemplateSchema]:
                 # PVE 的 Windows ostype（wxp/w2k*/wvista/win7~11）皆以 w 開頭，
                 # Linux 為 l24/l26，不衝突
                 is_windows=bool(ostype and ostype.startswith("w")),
+                cores=int(maxcpu) if maxcpu else None,
+                memory_mb=int(maxmem) // (1024 * 1024) if maxmem else None,
+                # 磁碟無條件進位：克隆後 resize 只能放大，下限不可低估
+                disk_gb=_template_disk_gb(vm) or None,
             )
         )
     return templates

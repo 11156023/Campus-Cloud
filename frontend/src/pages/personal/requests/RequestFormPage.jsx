@@ -550,6 +550,18 @@ export default function RequestFormPage({ onBack, className }) {
     }
   }
 
+  /* ── VM 範本選擇：以範本自身規格帶入預設值（磁碟為克隆下限，不可低於範本） ── */
+  function handleSelectVmTemplate(v) {
+    set("template_id", v);
+    if (errors.template_id) setErrors((prev) => ({ ...prev, template_id: "" }));
+    const tpl = vmTemplates.find((t) => String(t.vmid) === String(v));
+    if (!tpl) return;
+    if (tpl.cores)     set("cores", Math.min(8, Math.max(1, tpl.cores)));
+    if (tpl.memory_mb) set("memory", Math.min(32768, Math.max(512, tpl.memory_mb)));
+    // 不以 500 截斷：範本大於上限時，克隆機天生就是範本大小
+    if (tpl.disk_gb)   set("disk_size", tpl.disk_gb);
+  }
+
   /* ── 範本選擇（範本系統 2.0）── */
   function handleSelectSysTemplate(id) {
     setSelectedTplId(id);
@@ -558,7 +570,7 @@ export default function RequestFormPage({ onBack, className }) {
     if (!tpl) return;
     if (tpl.default_cores)  set("cores", Math.min(8, Math.max(1, tpl.default_cores)));
     if (tpl.default_memory) set("memory", Math.min(32768, Math.max(512, tpl.default_memory)));
-    if (tpl.default_disk)   set("rootfs_size", Math.min(500, Math.max(8, tpl.default_disk)));
+    if (tpl.default_disk)   set("rootfs_size", Math.max(8, tpl.default_disk));
     if (!form.hostname.trim()) set("hostname", normalizeHostname(tpl.name));
   }
 
@@ -738,7 +750,7 @@ export default function RequestFormPage({ onBack, className }) {
                 <FieldGroup label="作業系統" required error={errors.template_id}>
                   <SelectField
                     value={form.template_id}
-                    onChange={(v) => set("template_id", v)}
+                    onChange={handleSelectVmTemplate}
                     disabled={vmLoading}
                     placeholder={vmLoading ? "載入中…" : "選擇作業系統"}
                   >
@@ -818,21 +830,26 @@ export default function RequestFormPage({ onBack, className }) {
               {(() => {
                 const isLxc   = resourceType === "lxc";
                 const diskKey = isLxc ? "rootfs_size" : "disk_size";
-                const diskMin = isLxc ? 8 : 20;
+                // 選了範本時磁碟下限為範本自身大小（克隆後只能放大，不能縮小）；
+                // 範本若大於 500 上限，上限跟著放寬——克隆機天生就是範本大小
+                const diskMin = isLxc
+                  ? (selectedTpl?.default_disk || 8)
+                  : (selectedVmTemplate?.disk_gb || 20);
+                const diskMax = Math.max(500, diskMin);
                 return (
                   <FieldGroup label="硬碟空間 (Disk)" labelRight={
                     <div className={styles.diskInput}>
                       <input
-                        type="number" min={diskMin} max={500}
+                        type="number" min={diskMin} max={diskMax}
                         className={`${styles.input} ${styles.inputNumber}`}
                         value={form[diskKey]}
-                        onChange={(e) => set(diskKey, Math.min(500, Math.max(diskMin, Number(e.target.value) || diskMin)))}
+                        onChange={(e) => set(diskKey, Math.min(diskMax, Math.max(diskMin, Number(e.target.value) || diskMin)))}
                       />
                       <span className={styles.diskUnit}>GB</span>
                     </div>
                   }>
                     <input
-                      type="range" min={diskMin} max={500} step={1}
+                      type="range" min={diskMin} max={diskMax} step={1}
                       className={styles.slider}
                       value={form[diskKey]}
                       onChange={(e) => set(diskKey, Number(e.target.value))}

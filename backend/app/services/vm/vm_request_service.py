@@ -363,10 +363,15 @@ def create(
             )
         elif not request_in.ostemplate:
             raise BadRequestError("LXC request requires ostemplate or template_id")
-    if request_in.resource_type == "vm" and (
-        not request_in.template_id or not request_in.username
-    ):
-        raise BadRequestError("VM request requires template_id and username")
+    if request_in.resource_type == "vm":
+        if not request_in.template_id:
+            raise BadRequestError("VM request requires template_id")
+        # Windows 範本帳號由 cloudbase-init 設定檔固定，前端不送 username
+        if not request_in.username:
+            from app.services.proxmox import provisioning_service  # noqa: PLC0415
+
+            if not provisioning_service.is_windows_template(request_in.template_id):
+                raise BadRequestError("VM request requires username")
 
     # ---------- mode validation ----------
     mode = getattr(request_in, "mode", "scheduled") or "scheduled"

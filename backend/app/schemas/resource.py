@@ -128,6 +128,10 @@ class VMTemplateSchema(BaseModel):
     ostype: str | None = None
     # Windows 範本帳號由 cloudbase-init 設定檔固定，前端不顯示帳號欄位
     is_windows: bool = False
+    # 範本自身的規格：前端以此帶入預設值；磁碟為克隆下限（不可縮小）
+    cores: int | None = None
+    memory_mb: int | None = None
+    disk_gb: int | None = None
 
 
 class NextVMIDSchema(BaseModel):
