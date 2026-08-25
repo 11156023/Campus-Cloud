@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import styles from "./AiApiPage.module.scss";
 import MIcon from "../../../components/MIcon";
+import SharedEmptyState from "../../../components/EmptyState/EmptyState";
 import { AiApiService } from "../../../services/aiApi";
 import { useConfirm } from "../../../components/ConfirmDialog/ConfirmProvider";
 import { useToast } from "../../../hooks/useToast";
@@ -69,13 +70,7 @@ function credStatusInfo(item) {
 /* ── Empty ── */
 function EmptyState({ icon, title, desc }) {
   return (
-    <div className={styles.empty}>
-      <div className={styles.emptyIcon}>
-        <MIcon name={icon} size={40} />
-      </div>
-      <h2 className={styles.emptyTitle}>{title}</h2>
-      <p className={styles.emptyDesc}>{desc}</p>
-    </div>
+    <SharedEmptyState icon={icon} title={title} description={desc} />
   );
 }
 

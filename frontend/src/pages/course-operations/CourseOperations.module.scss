@@ -570,3 +570,19 @@
   .weekRows article { grid-template-columns: 1fr; align-items: stretch; padding: 16px 18px; }
   .weekFiles { grid-column: auto; }
 }
+
+/* 班級管理 / 環境模板：頁面外框對齊其他列表頁（滿版寬度、無標題分隔線、玻璃卡片） */
+.page.listPage { max-width: none; margin: 0; gap: 24px; }
+.listPage .pageHeader { min-height: 0; padding-bottom: 0; border-bottom: 0; }
+.listPage .pageHeading { gap: 4px; }
+.listPage .pageTitle { font-size: 24px; font-weight: 700; letter-spacing: normal; }
+.listPage .pageSubtitle { max-width: none; line-height: 1.5; }
+.listPage .card {
+  border-radius: 16px;
+  border-color: var(--color-surface-glass-border);
+  background: var(--color-surface-glass);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
+  backdrop-filter: var(--glass-backdrop-filter);
+  box-shadow: var(--shadow-sm);
+}
+@media (min-width: 768px) { .listPage .pageTitle { font-size: 28px; } }

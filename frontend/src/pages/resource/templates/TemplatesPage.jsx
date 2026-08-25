@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import styles from "./TemplatesPage.module.scss";
 import MIcon from "../../../components/MIcon";
+import EmptyState from "../../../components/EmptyState/EmptyState";
 import { useAuth } from "../../../contexts/AuthContext";
 import { TemplatesService } from "../../../services/templates";
 import { useToast } from "../../../hooks/useToast";
@@ -169,7 +170,7 @@ function StudentCatalog({ templates, onClone }) {
   if (templates.length === 0) {
     return (
       <div className={styles.card}>
-        <p className={styles.stateText}>目前沒有可用的範本。老師發布範本後，就會出現在這裡。</p>
+        <EmptyState icon="widgets" title="目前沒有可用的範本" />
       </div>
     );
   }
@@ -378,9 +379,11 @@ export default function TemplatesPage() {
       ) : canManage ? (
         list.length === 0 ? (
           <div className={styles.card}>
-            <p className={styles.stateText}>
-              還沒有任何範本。先準備好一台母機（裝好系統與課程環境），再點右上角「從 VM 建立範本」。
-            </p>
+            <EmptyState
+              icon="widgets"
+              title="還沒有任何範本"
+              description="先準備好一台母機（裝好系統與課程環境），再點右上角「從 VM 建立範本」。"
+            />
           </div>
         ) : (
           <div className={styles.card}>

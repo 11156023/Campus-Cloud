@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import styles from "./AiApiReviewPage.module.scss";
 import MIcon from "../../../components/MIcon";
+import SharedEmptyState from "../../../components/EmptyState/EmptyState";
 import { AiApiService } from "../../../services/aiApi";
 import { useToast } from "../../../hooks/useToast";
 import useAutoRefresh from "../../../hooks/useAutoRefresh";
@@ -31,13 +32,7 @@ function EmptyState({ tab }) {
     all:      "目前沒有任何 AI API 申請紀錄",
   };
   return (
-    <div className={styles.empty}>
-      <div className={styles.emptyIcon}>
-        <MIcon name="assignment_turned_in" size={40} />
-      </div>
-      <h2 className={styles.emptyTitle}>尚無資料</h2>
-      <p className={styles.emptyDesc}>{text[tab]}</p>
-    </div>
+    <SharedEmptyState icon="assignment_turned_in" title="尚無資料" description={text[tab]} />
   );
 }
 

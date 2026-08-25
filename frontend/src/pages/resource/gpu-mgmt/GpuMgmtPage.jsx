@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import styles from "./GpuMgmtPage.module.scss";
 import MIcon from "../../../components/MIcon";
+import SharedEmptyState from "../../../components/EmptyState/EmptyState";
 import { GpuService } from "../../../services/gpu";
 import { useConfirm } from "../../../components/ConfirmDialog/ConfirmProvider";
 import { useToast } from "../../../hooks/useToast";
@@ -43,17 +44,7 @@ function flattenMappings(mappings) {
 }
 
 function EmptyState() {
-  return (
-    <div className={styles.empty}>
-      <div className={styles.emptyIcon}>
-        <MIcon name="memory" size={40} />
-      </div>
-      <h2 className={styles.emptyTitle}>尚未偵測到 GPU</h2>
-      <p className={styles.emptyDesc}>
-        在 Proxmox 節點上完成 PCI Passthrough 設定後，GPU 將會出現在這裡
-      </p>
-    </div>
-  );
+  return <SharedEmptyState icon="memory" title="尚未偵測到 GPU" />;
 }
 
 function StatusBadge({ used, total }) {
