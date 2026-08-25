@@ -11,6 +11,11 @@ from app.models.teacher_judge_script_artifact import (
     TeacherJudgeScriptArtifact,
     TeacherJudgeScriptStatus,
 )
+from app.models.teacher_judge_script_run import (
+    TeacherJudgeScriptRun,
+    TeacherJudgeScriptRunStatus,
+    TeacherJudgeScriptRunTargetScope,
+)
 from app.models.teaching_class import TeachingClass, TeachingClassStudent
 from app.services.course.ai_assignment_service import list_student_ai_assignments
 
@@ -125,3 +130,87 @@ def test_student_sees_only_approved_assignments_from_own_teacher_group() -> None
     assert assignment.items[0].detectable == "auto"
     assert not hasattr(assignment.items[0], "detection_method")
     assert not hasattr(assignment.items[0], "check_steps")
+
+
+def test_student_assignment_includes_only_safe_latest_ai_feedback() -> None:
+    session = _session()
+    teacher_id = uuid.uuid4()
+    student_id = uuid.uuid4()
+    path = CoursePath(
+        title="Linux",
+        status=CoursePathStatus.published,
+        created_by=teacher_id,
+    )
+    teaching_class = TeachingClass(
+        name="Linux A 班",
+        code="linux-a",
+        term="2026-1",
+        owner_id=teacher_id,
+        start_date=date(2026, 8, 1),
+        end_date=date(2026, 12, 31),
+        weekday=1,
+        start_time=time(9),
+        end_time=time(11),
+    )
+    session.add(path)
+    session.add(teaching_class)
+    session.commit()
+    session.add(TeachingClassStudent(class_id=teaching_class.id, user_id=student_id))
+    artifact = _artifact(
+        teaching_class_id=teaching_class.id,
+        status=TeacherJudgeScriptStatus.approved,
+        name="Linux 權限任務",
+    )
+    session.add(artifact)
+    session.commit()
+    session.refresh(artifact)
+    session.add(
+        TeacherJudgeScriptRun(
+            teaching_class_id=teaching_class.id,
+            artifact_id=artifact.id,
+            target_scope=TeacherJudgeScriptRunTargetScope.manual,
+            status=TeacherJudgeScriptRunStatus.completed,
+            started_by=student_id,
+            target_snapshot_json={"script": {"secret": "must-not-leak"}},
+            target_results_json={
+                "targets": [
+                    {
+                        "stdout": "internal output must not leak",
+                        "ai_judgement": {
+                            "status": "completed",
+                            "score": 4,
+                            "max_score": 5,
+                            "summary": "權限設定正確，說明可以再完整一點。",
+                            "item_judgements": [
+                                {
+                                    "item_id": "permissions",
+                                    "title": "設定檔案權限",
+                                    "status": "passed",
+                                    "score": 1,
+                                    "max_score": 1,
+                                    "comment": "chmod 結果符合要求。",
+                                    "evidence_refs": ["secret-command-output"],
+                                }
+                            ],
+                        },
+                    }
+                ]
+            },
+        )
+    )
+    session.commit()
+
+    assignments = list_student_ai_assignments(
+        session,
+        user_id=student_id,
+        path_id=path.id,
+    )
+
+    check = assignments[0].latest_check
+    assert check is not None
+    assert check.status == "completed"
+    assert check.score == 4
+    assert check.summary == "權限設定正確，說明可以再完整一點。"
+    assert check.items[0].comment == "chmod 結果符合要求。"
+    assert not hasattr(check, "target_snapshot_json")
+    assert not hasattr(check.items[0], "evidence_refs")

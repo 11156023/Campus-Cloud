@@ -193,6 +193,31 @@ class CourseAITaskItemStudent(BaseModel):
     order: int = 0
 
 
+class CourseAICheckItemStudent(BaseModel):
+    """AI Check 單一評分項目，僅包含學生需要的回饋。"""
+
+    item_id: str = ""
+    title: str = ""
+    status: str = "unknown"
+    score: int | None = None
+    max_score: int | None = None
+    comment: str = ""
+
+
+class CourseAICheckStudent(BaseModel):
+    """學生自己送出的 AI Check 狀態與安全化回饋。"""
+
+    run_id: uuid.UUID
+    status: Literal["pending", "running", "completed", "failed", "cancelled"]
+    submitted_at: datetime
+    finished_at: datetime | None = None
+    score: int | None = None
+    max_score: int | None = None
+    summary: str = ""
+    error: str = ""
+    items: list[CourseAICheckItemStudent] = Field(default_factory=list)
+
+
 class CourseAIAssignmentStudent(BaseModel):
     """老師核准後，公開給所屬學生的 AI 評分任務。"""
 
@@ -205,6 +230,21 @@ class CourseAIAssignmentStudent(BaseModel):
     version: int
     approved_at: datetime | None = None
     items: list[CourseAITaskItemStudent]
+    latest_check: CourseAICheckStudent | None = None
+
+
+class CoursePracticeMachineStudent(BaseModel):
+    """學生在該課程可直接操作的班級機器。"""
+
+    teaching_class_id: uuid.UUID
+    teaching_class_name: str
+    machine_node_id: uuid.UUID
+    node_key: str
+    name: str
+    role: str
+    resource_type: str
+    vmid: int | None = None
+    status: str
 
 
 DeploymentStatus = Literal["provisioning", "running", "failed", "expired"]
@@ -291,7 +331,10 @@ __all__ = [
     "CourseQuestionStudent",
     "CourseTaskStudent",
     "CourseAITaskItemStudent",
+    "CourseAICheckItemStudent",
+    "CourseAICheckStudent",
     "CourseAIAssignmentStudent",
+    "CoursePracticeMachineStudent",
     "CourseDeploymentPublic",
     "CourseRoomStudentDetail",
     "CourseAnswerSubmit",

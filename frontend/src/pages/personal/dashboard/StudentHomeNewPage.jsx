@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import MIcon from "../../../components/MIcon";
 import { useAuth } from "../../../contexts/AuthContext";
+import TerminalDialog from "../resources/TerminalDialog";
+import VncDialog from "../resources/VncDialog";
 import { CoursesService } from "../../../services/courses";
 import { ResourcesService } from "../../../services/resources";
 import { TemplatesService } from "../../../services/templates";
-import useGuideDemo from "../../../hooks/useGuideDemo";
 import styles from "./StudentHomeNewPage.module.scss";
 import dashboardStyles from "./DashboardPage.module.scss";
 
@@ -31,20 +32,12 @@ const TOUR_STEPS = [
     tip: "課堂機器由老師或課程準備，不需要另外送申請。",
   },
   {
-    selector: '[data-student-tour="environment"]',
-    icon: "computer",
-    eyebrow: "上課環境",
-    title: "確認機器是否可以使用",
-    description: "這裡會顯示環境狀態、作業系統、IP 與使用期限。看到「環境已就緒」就可以直接進入課堂。",
-    tip: "若環境仍在準備，只要留在課堂頁面查看進度即可。",
-  },
-  {
     selector: '[data-student-tour="tasks"]',
     icon: "checklist",
     eyebrow: "課堂任務",
-    title: "照順序完成今天的任務",
-    description: "系統會標出建議的下一步，也會保留已完成的作答進度。點任一任務即可回到同一個課堂。",
-    tip: "不用一次做完，下次回來會從尚未完成的地方繼續。",
+    title: "完成任務後交給 AI 檢查",
+    description: "這裡會列出截至今天老師已發布的任務。展開任務可以先看 AI 整理的要求，完成後直接送出 AI Check。",
+    tip: "AI 回覆會保留在同一列，方便你依照每一項建議修正後再次送檢。",
   },
   {
     selector: '[data-student-tour="practice"]',
@@ -64,255 +57,54 @@ const TOUR_STEPS = [
   },
 ];
 
-function formatDemoTime(date) {
-  return new Intl.DateTimeFormat("zh-TW", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(date);
-}
-
-function createDemoPaths() {
-  const now = new Date();
-  const atOffset = (minutes) => new Date(now.getTime() + minutes * 60 * 1000);
-  const timeRange = (startMinutes, endMinutes) => (
-    `${formatDemoTime(atOffset(startMinutes))}–${formatDemoTime(atOffset(endMinutes))}`
-  );
-
-  return [{
-    id: "demo-linux-path",
-    title: "Linux 系統管理實務",
-    description: "練習帳號權限、檔案管理與常用系統指令。",
-    room_count: 4,
-    total_questions: 12,
-    completed_questions: 3,
-    progress_percent: 25,
-    schedule: {
-      time: timeRange(-30, 70),
-      place: "電腦教室 A",
-      teacher: "陳老師",
-      state: "now",
-      label: "正在上課",
-    },
-  }, {
-    id: "demo-cloud-path",
-    title: "雲端服務部署",
-    description: "從應用程式部署到網路發布的基礎實作。",
-    room_count: 3,
-    total_questions: 10,
-    completed_questions: 0,
-    progress_percent: 0,
-    schedule: {
-      time: timeRange(150, 260),
-      place: "電腦教室 B",
-      teacher: "林老師",
-      state: "later",
-      label: "今天稍後",
-    },
-  }];
-}
-
-const DEMO_PATH_DETAIL = {
-  id: "demo-linux-path",
-  title: "Linux 系統管理實務",
-  description: "練習帳號權限、檔案管理與常用系統指令。",
-  rooms: [
-    {
-      id: "demo-linux-permissions",
-      title: "Linux 檔案權限與使用者",
-      description: "完成權限判讀、chmod 與群組設定練習。",
-      difficulty: "easy",
-      category: "Linux 基礎",
-      has_lab: true,
-      order: 1,
-      total_questions: 5,
-      completed_questions: 2,
-      progress_percent: 40,
-    },
-    {
-      id: "demo-linux-process",
-      title: "程序與服務管理",
-      description: "觀察程序並練習服務的啟動與停止。",
-      difficulty: "easy",
-      category: "Linux 基礎",
-      has_lab: true,
-      order: 2,
-      total_questions: 4,
-      completed_questions: 0,
-      progress_percent: 0,
-    },
-  ],
-};
-
-const DEMO_ROOM_DETAIL = {
-  id: "demo-linux-permissions",
-  path_id: "demo-linux-path",
-  title: "Linux 檔案權限與使用者",
-  description: "完成權限判讀、chmod 與群組設定練習。",
-  difficulty: "easy",
-  category: "Linux 基礎",
-  has_lab: true,
-  tasks: [
-    {
-      id: "demo-task-login",
-      title: "登入課堂機器並確認帳號",
-      content: "",
-      order: 1,
-      questions: [
-        { id: "demo-q-1", prompt: "確認目前帳號", completed: true },
-      ],
-    },
-    {
-      id: "demo-task-permission",
-      title: "判讀檔案權限",
-      content: "",
-      order: 2,
-      questions: [
-        { id: "demo-q-2", prompt: "判讀權限", completed: true },
-      ],
-    },
-    {
-      id: "demo-task-chmod",
-      title: "使用 chmod 修改權限",
-      content: "",
-      order: 3,
-      questions: [
-        { id: "demo-q-3", prompt: "完成指定權限", completed: false },
-        { id: "demo-q-4", prompt: "驗證結果", completed: false },
-      ],
-    },
-    {
-      id: "demo-task-group",
-      title: "完成群組權限練習",
-      content: "",
-      order: 4,
-      questions: [
-        { id: "demo-q-5", prompt: "完成群組設定", completed: false },
-      ],
-    },
-  ],
-  my_deployment: {
-    id: "demo-deployment",
-    room_id: "demo-linux-permissions",
-    vm_request_id: "demo-request",
-    vmid: 218,
-    status: "running",
-    created_at: "2026-07-31T09:00:00+08:00",
-    expires_at: "2026-07-31T18:00:00+08:00",
-  },
-};
-
-const DEMO_RESOURCES = [
-  {
-    vmid: 218,
-    request_id: "demo-request",
-    name: "linux-class-student-01",
-    status: "running",
-    node: "classroom-node",
-    type: "qemu",
-    can_control: true,
-    environment_type: "Course Lab",
-    os_info: "Ubuntu 24.04 LTS",
-    expiry_date: "2026-07-31",
-    ip_address: "10.20.31.18",
-  },
-];
-
-const DEMO_CLOUD_PATH_DETAIL = {
-  id: "demo-cloud-path",
-  title: "雲端服務部署",
-  description: "從應用程式部署到網路發布的基礎實作。",
-  rooms: [{
-    id: "demo-cloud-deploy",
-    title: "部署第一個 Web 服務",
-    description: "準備應用程式、啟動服務並確認對外連線。",
-    difficulty: "easy",
-    category: "雲端部署",
-    has_lab: true,
-    order: 1,
-    total_questions: 4,
-    completed_questions: 0,
-    progress_percent: 0,
-  }],
-};
-
-const DEMO_CLOUD_ROOM_DETAIL = {
-  id: "demo-cloud-deploy",
-  path_id: "demo-cloud-path",
-  title: "部署第一個 Web 服務",
-  description: "準備應用程式、啟動服務並確認對外連線。",
-  difficulty: "easy",
-  category: "雲端部署",
-  has_lab: true,
-  tasks: [
-    { id: "demo-cloud-task-1", title: "確認課堂環境與服務 Port", order: 1, questions: [{ id: "demo-cloud-q-1", completed: false }] },
-    { id: "demo-cloud-task-2", title: "啟動 Web 應用程式", order: 2, questions: [{ id: "demo-cloud-q-2", completed: false }] },
-    { id: "demo-cloud-task-3", title: "測試服務回應", order: 3, questions: [{ id: "demo-cloud-q-3", completed: false }] },
-  ],
-  my_deployment: {
-    id: "demo-cloud-deployment",
-    room_id: "demo-cloud-deploy",
-    vm_request_id: "demo-cloud-request",
-    vmid: 219,
-    status: "stopped",
-    created_at: "2026-07-31T13:00:00+08:00",
-    expires_at: "2026-07-31T20:00:00+08:00",
-  },
-};
-
-const DEMO_CLOUD_RESOURCE = {
-  vmid: 219,
-  request_id: "demo-cloud-request",
-  name: "cloud-class-student-01",
-  status: "stopped",
-  node: "classroom-node",
-  type: "qemu",
-  can_control: true,
-  environment_type: "Course Lab",
-  os_info: "Ubuntu 24.04 LTS",
-  expiry_date: "2026-07-31",
-  ip_address: "10.20.31.19",
-};
-
-const DEMO_AI_ASSIGNMENTS = [{
-  id: "demo-ai-linux-permissions",
-  teaching_class_id: "demo-linux-class",
-  teaching_class_name: "Linux 系統管理實務 A 班",
-  title: "Linux 權限與使用者設定",
-  summary: "老師已核准本次 AI 評分要求；完成課堂操作後會依下列項目檢查。",
-  template_key: "linux",
-  version: 1,
-  approved_at: "2026-08-04T09:00:00+08:00",
-  items: [
-    {
-      id: "permission",
-      title: "設定指定目錄權限",
-      description: "依題目要求完成擁有者、群組與 chmod 權限設定。",
-      detectable: "auto",
-      order: 0,
-    },
-    {
-      id: "user-group",
-      title: "建立課堂使用者與群組",
-      description: "建立指定帳號，並確認帳號已加入正確群組。",
-      detectable: "partial",
-      order: 1,
-    },
-    {
-      id: "explanation",
-      title: "說明權限設計",
-      description: "簡短說明這組權限如何符合題目需求。",
-      detectable: "manual",
-      order: 2,
-    },
-  ],
-}];
-
 const AI_DETECTABLE_META = {
   auto: { label: "可自動檢查", icon: "smart_toy", tone: "auto" },
   partial: { label: "部分自動檢查", icon: "rule", tone: "partial" },
   manual: { label: "老師人工確認", icon: "person_check", tone: "manual" },
 };
+
+const AI_CHECK_STATUS_META = {
+  pending: { label: "等待 AI Check", icon: "hourglass_top", tone: "pending" },
+  running: { label: "AI 檢查中", icon: "sync", tone: "running" },
+  completed: { label: "已收到 AI 回覆", icon: "task_alt", tone: "completed" },
+  failed: { label: "檢查失敗", icon: "error_outline", tone: "failed" },
+  cancelled: { label: "已取消", icon: "block", tone: "cancelled" },
+};
+
+export function assignmentsUntilToday(assignments, now = new Date()) {
+  const dateKey = (value) => {
+    const parts = new Intl.DateTimeFormat("en", {
+      timeZone: "Asia/Taipei",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(value);
+    const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+    return `${values.year}-${values.month}-${values.day}`;
+  };
+  const todayKey = dateKey(now);
+  return [...(assignments ?? [])]
+    .filter((assignment) => {
+      if (!assignment?.approved_at) return true;
+      const approvedAt = new Date(assignment.approved_at);
+      return !Number.isNaN(approvedAt.getTime()) && dateKey(approvedAt) <= todayKey;
+    })
+    .sort((left, right) => {
+      const leftTime = left.approved_at ? new Date(left.approved_at).getTime() : 0;
+      const rightTime = right.approved_at ? new Date(right.approved_at).getTime() : 0;
+      return leftTime - rightTime;
+    });
+}
+
+function formatAssignmentDate(value) {
+  if (!value) return "已發布";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "已發布";
+  return new Intl.DateTimeFormat("zh-TW", {
+    month: "numeric",
+    day: "numeric",
+  }).format(date);
+}
 
 function getTourStorageKey(user) {
   return `skylab:student-home-tour:v1:${user?.id ?? user?.email ?? "student"}`;
@@ -480,27 +272,44 @@ function chooseNextRoom(rooms) {
   );
 }
 
-function taskIsComplete(task) {
-  return task.questions?.length > 0 && task.questions.every((question) => question.completed);
+export function buildPracticeMachines(classMachines, resources, deployment, roomTitle) {
+  const machines = (classMachines ?? []).map((machine) => {
+    const resource = (resources ?? []).find(
+      (item) => machine.vmid != null && Number(item.vmid) === Number(machine.vmid),
+    );
+    return {
+      ...machine,
+      ...resource,
+      classMachineName: machine.name,
+      classMachineRole: machine.role,
+      type: resource?.type ?? machine.resource_type,
+      name: resource?.name ?? machine.name,
+    };
+  });
+
+  if (machines.length === 0 && deployment?.vmid) {
+    const fallbackResource = (resources ?? []).find(
+      (resource) => Number(resource.vmid) === Number(deployment.vmid),
+    );
+    machines.push({
+      ...fallbackResource,
+      vmid: deployment.vmid,
+      status: fallbackResource?.status ?? deployment.status,
+      type: fallbackResource?.type ?? "qemu",
+      name: fallbackResource?.name ?? roomTitle ?? "課堂練習機",
+      classMachineName: roomTitle ?? "課堂練習機",
+      classMachineRole: "本章節練習環境",
+    });
+  }
+
+  return machines;
 }
 
-function isClassResource(resource) {
-  const environmentType = resource?.environment_type;
-  if (environmentType === "Course Lab") return true;
-  return typeof environmentType === "string"
-    && /^[A-Za-z0-9_.]+-[A-Za-z0-9_.-]+$/.test(environmentType);
-}
-
-function formatExpiry(value) {
-  if (!value) return "依課程設定";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return String(value);
-  return new Intl.DateTimeFormat("zh-TW", {
-    month: "numeric",
-    day: "numeric",
-    hour: value.includes?.("T") ? "2-digit" : undefined,
-    minute: value.includes?.("T") ? "2-digit" : undefined,
-  }).format(date);
+export function practiceMachineActionLabel(machine, openingMachineId = null) {
+  if (machine?.vmid == null) return "環境配置中";
+  if (openingMachineId === machine.vmid) return "確認狀態中…";
+  if (machine.status === "running") return "直接開啟";
+  return "等待自動開機";
 }
 
 function StatusBadge({ meta }) {
@@ -524,148 +333,10 @@ function LoadingState() {
   );
 }
 
-const HOME_REMINDERS = [
-  {
-    id: "resource-expiry",
-    icon: "schedule",
-    tone: "warning",
-    title: "課堂機器即將到期",
-    description: "course-web-lab 將於今天 18:00 到期，請先保存需要的檔案。",
-    time: "今天 18:00",
-    target: "/my-resources",
-  },
-  {
-    id: "request-approved",
-    icon: "check_circle",
-    tone: "success",
-    title: "資源申請已核准",
-    description: "你的 research-ubuntu 已建立完成，可以前往我的資源查看。",
-    time: "10 分鐘前",
-    target: "/my-requests",
-  },
-  {
-    id: "task-due",
-    icon: "assignment_late",
-    tone: "danger",
-    title: "課堂任務明天到期",
-    description: "Linux 檔案權限與使用者還有 3 個項目尚未完成。",
-    time: "明天 23:59",
-    target: "course",
-  },
-];
-
-function ReminderCenter({ reminders = [], onNavigate }) {
-  const [open, setOpen] = useState(false);
-  const [readIds, setReadIds] = useState([]);
-  const rootRef = useRef(null);
-  const unreadCount = reminders.filter((item) => !readIds.includes(item.id)).length;
-
-  useEffect(() => {
-    if (reminders.length > 0) return;
-    setReadIds([]);
-    setOpen(false);
-  }, [reminders.length]);
-
-  useEffect(() => {
-    if (!open) return undefined;
-    const closeOnOutsideClick = (event) => {
-      if (!rootRef.current?.contains(event.target)) setOpen(false);
-    };
-    const closeOnEscape = (event) => {
-      if (event.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("mousedown", closeOnOutsideClick);
-    document.addEventListener("keydown", closeOnEscape);
-    return () => {
-      document.removeEventListener("mousedown", closeOnOutsideClick);
-      document.removeEventListener("keydown", closeOnEscape);
-    };
-  }, [open]);
-
-  const openReminder = (reminder) => {
-    setReadIds((current) => current.includes(reminder.id) ? current : [...current, reminder.id]);
-    setOpen(false);
-    onNavigate(reminder.target);
-  };
-
-  return (
-    <div className={styles.reminderCenter} ref={rootRef} data-guide="home-reminders">
-      <button
-        type="button"
-        className={`${styles.reminderButton} ${open ? styles.reminderButtonOpen : ""}`}
-        onClick={() => setOpen((value) => !value)}
-        aria-expanded={open}
-        aria-haspopup="dialog"
-      >
-        <MIcon name="notifications" size={17} />
-        <span>提醒</span>
-        {unreadCount > 0 && <span className={styles.reminderCount}>{unreadCount}</span>}
-      </button>
-
-      {open && (
-        <section className={styles.reminderPopover} role="dialog" aria-label="近期提醒">
-          <div className={styles.reminderHeader}>
-            <div>
-              <p className={styles.eyebrow}>近期事項</p>
-              <h2>提醒</h2>
-            </div>
-            <span>{unreadCount > 0 ? `${unreadCount} 則未讀` : "全部已讀"}</span>
-          </div>
-
-          <div className={styles.reminderList}>
-            {reminders.length === 0 && (
-              <div className={styles.reminderEmpty}>
-                <MIcon name="notifications_none" size={25} />
-                <strong>目前沒有新提醒</strong>
-                <span>機器期限、審核結果與任務到期資訊會出現在這裡。</span>
-              </div>
-            )}
-            {reminders.map((reminder) => {
-              const unread = !readIds.includes(reminder.id);
-              return (
-                <button
-                  type="button"
-                  key={reminder.id}
-                  className={`${styles.reminderItem} ${unread ? styles.reminderItemUnread : ""}`}
-                  onClick={() => openReminder(reminder)}
-                >
-                  <span className={`${styles.reminderIcon} ${styles[reminder.tone]}`}>
-                    <MIcon name={reminder.icon} size={19} />
-                  </span>
-                  <span className={styles.reminderContent}>
-                    <strong>{reminder.title}</strong>
-                    <small>{reminder.description}</small>
-                    <time>{reminder.time}</time>
-                  </span>
-                  {unread && <span className={styles.unreadDot} aria-label="未讀" />}
-                  <MIcon name="chevron_right" size={18} />
-                </button>
-              );
-            })}
-          </div>
-
-          <button
-            type="button"
-            className={styles.reminderFooter}
-            onClick={() => setReadIds(reminders.map((item) => item.id))}
-            disabled={unreadCount === 0}
-          >
-            全部標為已讀
-            <MIcon name="done_all" size={17} />
-          </button>
-        </section>
-      )}
-    </div>
-  );
-}
-
 export default function StudentHomeNewPage({ courseView = false }) {
   const navigate = useNavigate();
   const { pathId } = useParams();
-  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
-  const guideDemoActive = useGuideDemo("student-home");
-  const demoMode = searchParams.get("demo") === "class";
   const [view, setView] = useState({
     loading: true,
     hasError: false,
@@ -675,9 +346,16 @@ export default function StudentHomeNewPage({ courseView = false }) {
     pathDetail: null,
     roomDetail: null,
     aiAssignments: [],
+    practiceMachines: [],
   });
   const [quickTemplates, setQuickTemplates] = useState([]);
   const [templatesLoading, setTemplatesLoading] = useState(!courseView);
+  const [expandedAssignmentId, setExpandedAssignmentId] = useState(null);
+  const [assignmentChecks, setAssignmentChecks] = useState({});
+  const [checkingAssignmentId, setCheckingAssignmentId] = useState(null);
+  const [machinePickerOpen, setMachinePickerOpen] = useState(false);
+  const [activePracticeResource, setActivePracticeResource] = useState(null);
+  const [openingMachineId, setOpeningMachineId] = useState(null);
 
   const firstName = user?.full_name?.trim()?.split(/\s+/)[0]
     ?? user?.email?.split("@")[0]
@@ -696,31 +374,6 @@ export default function StudentHomeNewPage({ courseView = false }) {
     let cancelled = false;
 
     async function loadStudentHome() {
-      if (demoMode) {
-        const demoPaths = createDemoPaths();
-        const selectedPath = courseView
-          ? demoPaths.find((path) => path.id === pathId) ?? demoPaths[0]
-          : demoPaths[0];
-        const cloudCourse = selectedPath.id === "demo-cloud-path";
-        setView({
-          loading: false,
-          hasError: false,
-          paths: demoPaths,
-          resources: cloudCourse ? [...DEMO_RESOURCES, DEMO_CLOUD_RESOURCE] : DEMO_RESOURCES,
-          activePath: selectedPath,
-          pathDetail: cloudCourse ? DEMO_CLOUD_PATH_DETAIL : DEMO_PATH_DETAIL,
-          roomDetail: {
-            ...(cloudCourse ? DEMO_CLOUD_ROOM_DETAIL : DEMO_ROOM_DETAIL),
-            my_deployment: {
-              ...(cloudCourse ? DEMO_CLOUD_ROOM_DETAIL.my_deployment : DEMO_ROOM_DETAIL.my_deployment),
-              expires_at: new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString(),
-            },
-          },
-          aiAssignments: courseView && !cloudCourse ? DEMO_AI_ASSIGNMENTS : [],
-        });
-        return;
-      }
-
       const [pathsResult, resourcesResult] = await Promise.allSettled([
         CoursesService.listPaths(),
         ResourcesService.list(),
@@ -740,11 +393,13 @@ export default function StudentHomeNewPage({ courseView = false }) {
       let pathDetail = null;
       let roomDetail = null;
       let aiAssignments = [];
+      let practiceMachines = [];
 
       if (activePath) {
-        const [pathDetailResult, aiAssignmentsResult] = await Promise.allSettled([
+        const [pathDetailResult, aiAssignmentsResult, practiceMachinesResult] = await Promise.allSettled([
           CoursesService.getPath(activePath.id),
           courseView ? CoursesService.getAiAssignments(activePath.id) : Promise.resolve([]),
+          CoursesService.getPracticeMachines(activePath.id),
         ]);
         if (pathDetailResult.status === "fulfilled") {
           pathDetail = pathDetailResult.value;
@@ -761,6 +416,10 @@ export default function StudentHomeNewPage({ courseView = false }) {
           && Array.isArray(aiAssignmentsResult.value)
           ? aiAssignmentsResult.value
           : [];
+        practiceMachines = practiceMachinesResult.status === "fulfilled"
+          && Array.isArray(practiceMachinesResult.value)
+          ? practiceMachinesResult.value
+          : [];
       }
 
       if (!cancelled) {
@@ -773,6 +432,7 @@ export default function StudentHomeNewPage({ courseView = false }) {
           pathDetail,
           roomDetail,
           aiAssignments,
+          practiceMachines,
         });
       }
     }
@@ -781,7 +441,7 @@ export default function StudentHomeNewPage({ courseView = false }) {
     return () => {
       cancelled = true;
     };
-  }, [courseView, demoMode, pathId]);
+  }, [courseView, pathId]);
 
   useEffect(() => {
     if (courseView) return undefined;
@@ -805,37 +465,61 @@ export default function StudentHomeNewPage({ courseView = false }) {
     return () => controller.abort();
   }, [courseView]);
 
+  useEffect(() => {
+    if (!courseView || !view.activePath?.id) return undefined;
+    const activeChecks = assignmentsUntilToday(view.aiAssignments)
+      .map((assignment) => [
+        String(assignment.id),
+        assignmentChecks[assignment.id] ?? assignment.latest_check,
+      ])
+      .filter(([, check]) => check?.status === "pending" || check?.status === "running");
+    if (activeChecks.length === 0) return undefined;
+
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      const updates = await Promise.all(activeChecks.map(async ([assignmentId, check]) => {
+        try {
+          const nextCheck = await CoursesService.getAiCheck(
+            view.activePath.id,
+            assignmentId,
+            check.run_id,
+          );
+          return [assignmentId, nextCheck];
+        } catch {
+          return null;
+        }
+      }));
+      if (cancelled) return;
+      setAssignmentChecks((current) => {
+        const next = { ...current };
+        updates.filter(Boolean).forEach(([assignmentId, check]) => {
+          next[assignmentId] = check;
+        });
+        return next;
+      });
+    }, 2500);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [assignmentChecks, courseView, view.activePath?.id, view.aiAssignments]);
+
   const nextRoom = chooseNextRoom(view.pathDetail?.rooms ?? []);
   const roomProgress = toPercent(nextRoom?.progress_percent);
   const deployment = view.roomDetail?.my_deployment;
-  const matchedResource = view.resources.find(
-    (resource) => deployment?.vmid && resource.vmid === deployment.vmid,
-  ) ?? view.resources.find(
-    (resource) => isClassResource(resource) && resource.status === "running",
-  ) ?? view.resources.find(isClassResource) ?? null;
-
-  let environmentStatus = deployment?.status;
-  if (!environmentStatus && view.roomDetail && !view.roomDetail.has_lab) {
-    environmentStatus = "no_lab";
-  } else if (!environmentStatus && matchedResource?.status === "running") {
-    environmentStatus = "running";
-  } else if (!environmentStatus && matchedResource?.status === "stopped") {
-    environmentStatus = "stopped";
-  } else if (!environmentStatus && nextRoom) {
-    environmentStatus = nextRoom.has_lab ? "not_started" : "no_lab";
-  } else if (!environmentStatus) {
-    environmentStatus = "empty";
-  }
-  const statusMeta = STATUS_META[environmentStatus] ?? STATUS_META.not_started;
-
-  const roomTasks = view.roomDetail?.tasks ?? [];
-  const aiAssignments = view.aiAssignments ?? [];
+  const practiceMachines = buildPracticeMachines(
+    view.practiceMachines,
+    view.resources,
+    deployment,
+    view.roomDetail?.title,
+  );
+  const aiAssignments = assignmentsUntilToday(view.aiAssignments);
   const aiRequirementCount = aiAssignments.reduce(
     (count, assignment) => count + (assignment.items?.length ?? 0),
     0,
   );
   const displayedQuickTemplates = quickTemplates;
-  const firstIncompleteTask = roomTasks.findIndex((task) => !taskIsComplete(task));
   const primaryTarget = nextRoom ? `/courses/rooms/${nextRoom.id}` : "/courses";
   const primaryLabel = nextRoom ? "開始練習" : "查看可用課程";
   const currentSchedule = view.activePath?.schedule;
@@ -845,27 +529,40 @@ export default function StudentHomeNewPage({ courseView = false }) {
       : { label: "可以開始", tone: "success", icon: "play_circle" }
     : STATUS_META.empty;
 
-  const toggleDemoMode = () => {
-    const nextParams = new URLSearchParams(searchParams);
-    if (demoMode) nextParams.delete("demo");
-    else nextParams.set("demo", "class");
-    setSearchParams(nextParams, { replace: true });
+  const openPracticeMachine = async (machine) => {
+    if (!machine?.vmid) {
+      toast.error("這台課堂機器尚未建立完成");
+      return;
+    }
+    setOpeningMachineId(machine.vmid);
+    let resource = machine;
+    try {
+      if (resource.status !== "running") {
+        resource = await ResourcesService.get(resource.vmid);
+      }
+      if (resource.status !== "running") {
+        toast.info("課堂機器會依上課時間自動開機，目前尚未就緒");
+        return;
+      }
+      setActivePracticeResource({ ...machine, ...resource });
+      setMachinePickerOpen(false);
+    } catch (error) {
+      toast.error(error?.message ?? "無法開啟課堂機器");
+    } finally {
+      setOpeningMachineId(null);
+    }
   };
 
   const openPrimaryTarget = () => {
-    if (demoMode) {
-      toast.info(`Demo：開始「${nextRoom?.title ?? view.activePath?.title ?? "課堂任務"}」練習`);
+    if (practiceMachines.length === 1) {
+      openPracticeMachine(practiceMachines[0]);
+      return;
+    }
+    if (practiceMachines.length > 1) {
+      setMachinePickerOpen((current) => !current);
       return;
     }
     navigate(primaryTarget);
-  };
-
-  const openDemoAwarePage = (target, message) => {
-    if (demoMode) {
-      toast.info(message);
-      return;
-    }
-    navigate(target);
   };
 
   const openCourseOverview = (path = view.activePath) => {
@@ -873,15 +570,29 @@ export default function StudentHomeNewPage({ courseView = false }) {
       navigate("/courses");
       return;
     }
-    navigate(`/dashboard-new/course/${path.id}${demoMode ? "?demo=class" : ""}`);
+    navigate(`/dashboard-new/course/${path.id}`);
   };
 
-  const openReminderTarget = (target) => {
-    if (target === "course") {
-      openCourseOverview(view.activePath);
-      return;
+  const toggleAssignment = (assignmentId) => {
+    setExpandedAssignmentId((current) => current === assignmentId ? null : assignmentId);
+  };
+
+  const submitAiCheck = async (assignment) => {
+    if (checkingAssignmentId) return;
+    setCheckingAssignmentId(assignment.id);
+    setExpandedAssignmentId(assignment.id);
+    try {
+      const check = await CoursesService.startAiCheck(
+        view.activePath.id,
+        assignment.id,
+      );
+      setAssignmentChecks((current) => ({ ...current, [assignment.id]: check }));
+      toast.success(check.status === "completed" ? "AI Check 已完成" : "已送出，AI 正在檢查你的課堂環境");
+    } catch (error) {
+      toast.error(error?.message ?? "目前無法送出 AI Check");
+    } finally {
+      setCheckingAssignmentId(null);
     }
-    navigate(target);
   };
 
   if (view.loading) {
@@ -899,7 +610,7 @@ export default function StudentHomeNewPage({ courseView = false }) {
           <button
             type="button"
             className={styles.courseBackButton}
-            onClick={() => navigate(`/dashboard-new${demoMode ? "?demo=class" : ""}`)}
+            onClick={() => navigate("/dashboard-new")}
           >
             <MIcon name="arrow_back" size={18} />
             返回今日課表
@@ -909,7 +620,6 @@ export default function StudentHomeNewPage({ courseView = false }) {
             <h1>{view.activePath?.title ?? "課程"}</h1>
             <p>{view.activePath?.description ?? "查看今天的環境與任務。"}</p>
           </div>
-          {demoMode && <span className={styles.previewBadge}><MIcon name="science" size={16} />模擬課程</span>}
         </header>
       )}
 
@@ -935,7 +645,6 @@ export default function StudentHomeNewPage({ courseView = false }) {
               </div>
               <div className={styles.scheduleActions}>
                 {view.paths.some((path) => path.schedule?.state === "now") && <span>有一堂正在進行</span>}
-                <ReminderCenter reminders={guideDemoActive ? HOME_REMINDERS : []} onNavigate={openReminderTarget} />
               </div>
             </div>
             {view.paths.length > 0 ? (
@@ -1028,7 +737,7 @@ export default function StudentHomeNewPage({ courseView = false }) {
               <div className={styles.simpleCourseHint}>
                 <MIcon name="check_circle" size={18} />
                 <span>
-                  {environmentStatus === "running" || environmentStatus === "no_lab"
+                  {deployment?.status === "running" || !nextRoom?.has_lab
                     ? "練習內容已可使用，直接開始即可。"
                     : "開始後系統會自動準備需要的內容。"}
                 </span>
@@ -1046,104 +755,168 @@ export default function StudentHomeNewPage({ courseView = false }) {
 
           <div className={styles.primaryActions}>
             <button type="button" className={styles.primaryButton} onClick={openPrimaryTarget} data-guide="home-start">
-              {primaryLabel}
+              {practiceMachines.length > 1 ? `開始練習 · ${practiceMachines.length} 台機器` : primaryLabel}
               <MIcon name="arrow_forward" size={18} />
             </button>
-            <button
-              type="button"
-              className={styles.textButton}
-              onClick={() => openDemoAwarePage("/courses", "Demo：將顯示學生可使用的所有課程")}
-            >
-              查看全部課程
-            </button>
           </div>
+
+          {machinePickerOpen && practiceMachines.length > 1 && (
+            <section className={styles.machinePicker} aria-label="選擇練習機器">
+              <header>
+                <div><strong>這個課程需要操作多台機器</strong><span>依照任務步驟選擇要開啟的角色，完成後可隨時切換。</span></div>
+                <button type="button" onClick={() => setMachinePickerOpen(false)} aria-label="關閉機器選擇">
+                  <MIcon name="close" size={18} />
+                </button>
+              </header>
+              <div className={styles.machineGrid}>
+                {practiceMachines.map((machine) => (
+                  <button
+                    type="button"
+                    key={machine.machine_node_id ?? `${machine.teaching_class_id ?? "course"}-${machine.vmid}`}
+                    className={styles.machineOption}
+                    onClick={() => openPracticeMachine(machine)}
+                    disabled={openingMachineId !== null || machine.vmid == null}
+                  >
+                    <span className={styles.machineIcon}><MIcon name={machine.type === "lxc" ? "terminal" : "desktop_windows"} size={22} /></span>
+                    <span className={styles.machineCopy}>
+                      <strong>{machine.classMachineName ?? machine.name}</strong>
+                      <small>
+                        {machine.classMachineRole ?? "課堂練習機"}
+                        {machine.vmid != null ? ` · VMID ${machine.vmid}` : " · 尚未配置"}
+                      </small>
+                    </span>
+                    <span className={`${styles.machineState} ${machine.status === "running" ? styles.machineStateReady : ""}`}>
+                      {practiceMachineActionLabel(machine, openingMachineId)}
+                    </span>
+                    <MIcon name="arrow_forward" size={18} />
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
         </section>
 
-        <aside className={styles.environmentCard} aria-labelledby="environment-title" data-student-tour="environment" data-guide="home-environment">
-          <div className={styles.cardHeading}>
-            <span className={styles.iconBox}><MIcon name="computer" size={22} /></span>
-            <div>
-              <p className={styles.eyebrow}>今天的上課環境</p>
-              <h2 id="environment-title">{matchedResource?.name ?? "等待課堂環境"}</h2>
-            </div>
-          </div>
-
-          <dl className={styles.environmentDetails}>
-            <div>
-              <dt>狀態</dt>
-              <dd><span className={`${styles.statusDot} ${styles[statusMeta.tone]}`} />{statusMeta.label}</dd>
-            </div>
-            <div>
-              <dt>作業系統</dt>
-              <dd>{matchedResource?.os_info ?? (nextRoom?.has_lab ? "依課程模板" : "不需要")}</dd>
-            </div>
-            <div>
-              <dt>IP 位址</dt>
-              <dd>{matchedResource?.ip_address ?? "進入課堂後顯示"}</dd>
-            </div>
-            <div>
-              <dt>可使用至</dt>
-              <dd>{formatExpiry(deployment?.expires_at ?? matchedResource?.expiry_date)}</dd>
-            </div>
-          </dl>
-
-          <div className={styles.teacherNote}>
-            <MIcon name="info" size={18} />
-            <p>
-              {nextRoom?.has_lab
-                ? "課堂環境由老師與課程設定準備，不需要另外填申請單。"
-                : "這個章節可直接開始，不需要啟動實驗機。"}
-            </p>
-          </div>
-
-          <button
-            type="button"
-            className={styles.secondaryButton}
-            onClick={() => openDemoAwarePage("/my-resources", "Demo：將開啟老師分發的課堂機器")}
-          >
-            查看我的所有資源
-            <MIcon name="chevron_right" size={18} />
-          </button>
-        </aside>
       </main>
 
       <section className={styles.taskSection} aria-labelledby="task-title" data-student-tour="tasks" data-guide="home-tasks">
         <div className={styles.sectionHeading}>
           <div>
-            <p className={styles.eyebrow}>進入課堂後照順序完成</p>
-            <h2 id="task-title">今天的任務</h2>
+            <p className={styles.eyebrow}>老師已發布 · 完成後可直接送檢</p>
+            <h2 id="task-title">截至今天的所有任務</h2>
           </div>
-          {roomTasks.length > 0 && <span>{roomTasks.filter(taskIsComplete).length} / {roomTasks.length} 已完成</span>}
+          {aiRequirementCount > 0 && <span>{aiAssignments.length} 個任務 · {aiRequirementCount} 個檢查項目</span>}
         </div>
 
-        {roomTasks.length > 0 ? (
-          <div className={styles.taskList}>
-            {roomTasks.slice(0, 4).map((task, index) => {
-              const complete = taskIsComplete(task);
-              const current = !complete && index === firstIncompleteTask;
+        {aiAssignments.length > 0 ? (
+          <div className={styles.assignmentList}>
+            {aiAssignments.map((assignment, index) => {
+              const expanded = expandedAssignmentId === assignment.id;
+              const check = assignmentChecks[assignment.id] ?? assignment.latest_check;
+              const checkMeta = check ? AI_CHECK_STATUS_META[check.status] : null;
+              const checkRunning = check?.status === "pending" || check?.status === "running";
               return (
-                <button
-                  type="button"
-                  className={`${styles.taskItem} ${complete ? styles.taskDone : ""} ${current ? styles.taskCurrent : ""}`}
-                  key={task.id}
-                  onClick={openPrimaryTarget}
-                >
-                  <span className={styles.taskNumber}>
-                    {complete ? <MIcon name="check" size={17} /> : index + 1}
-                  </span>
-                  <div>
-                    <strong>{task.title}</strong>
-                    <small>
-                      {complete
-                        ? "已完成"
-                        : current
-                          ? "建議從這裡繼續"
-                          : `${task.questions?.length ?? 0} 個檢查項目`}
-                    </small>
-                  </div>
-                  {current && <span className={styles.currentLabel}>下一步</span>}
-                  <MIcon name="chevron_right" size={20} />
-                </button>
+                <article className={`${styles.assignmentRow} ${expanded ? styles.assignmentRowOpen : ""}`} key={assignment.id}>
+                  <button
+                    type="button"
+                    className={styles.assignmentToggle}
+                    onClick={() => toggleAssignment(assignment.id)}
+                    aria-expanded={expanded}
+                    aria-controls={`assignment-detail-${assignment.id}`}
+                  >
+                    <span className={styles.taskNumber}>{index + 1}</span>
+                    <span className={styles.assignmentTitle}>
+                      <strong>{assignment.title}</strong>
+                      <small>{formatAssignmentDate(assignment.approved_at)} · {assignment.teaching_class_name} · {assignment.items?.length ?? 0} 個檢查項目</small>
+                    </span>
+                    {checkMeta ? (
+                      <span className={`${styles.assignmentStatus} ${styles[`assignmentStatus_${checkMeta.tone}`]}`}>
+                        <MIcon name={checkMeta.icon} size={16} />{checkMeta.label}
+                      </span>
+                    ) : (
+                      <span className={`${styles.assignmentStatus} ${styles.assignmentStatus_ready}`}>
+                        <MIcon name="radio_button_unchecked" size={16} />尚未送檢
+                      </span>
+                    )}
+                    <MIcon name={expanded ? "expand_less" : "expand_more"} size={21} />
+                  </button>
+
+                  {expanded && (
+                    <div className={styles.assignmentDetail} id={`assignment-detail-${assignment.id}`}>
+                      <div className={styles.aiBrief}>
+                        <span><MIcon name="auto_awesome" size={19} /></span>
+                        <div>
+                          <strong>AI 整理的任務重點</strong>
+                          <p>{assignment.summary || "依照下面的項目完成操作，完成後再送出 AI Check。"}</p>
+                        </div>
+                      </div>
+
+                      <ol className={styles.aiRequirementList}>
+                        {(assignment.items ?? []).map((item, itemIndex) => {
+                          const detectableMeta = AI_DETECTABLE_META[item.detectable]
+                            ?? AI_DETECTABLE_META.manual;
+                          return (
+                            <li className={styles.aiRequirementItem} key={item.id}>
+                              <span className={styles.aiRequirementNumber}>{itemIndex + 1}</span>
+                              <div className={styles.aiRequirementContent}>
+                                <strong>{item.title}</strong>
+                                {item.description && <p>{item.description}</p>}
+                              </div>
+                              <span className={`${styles.aiCheckBadge} ${styles[detectableMeta.tone]}`}>
+                                <MIcon name={detectableMeta.icon} size={15} />
+                                {detectableMeta.label}
+                              </span>
+                            </li>
+                          );
+                        })}
+                      </ol>
+
+                      {check && (
+                        <section className={`${styles.aiReply} ${styles[`aiReply_${check.status}`]}`} aria-label="AI Check 回覆">
+                          <header>
+                            <span><MIcon name={checkRunning ? "sync" : check.status === "completed" ? "smart_toy" : "error_outline"} size={20} /></span>
+                            <div>
+                              <strong>{checkRunning ? "AI 正在檢查你的課堂環境" : "AI Check 回覆"}</strong>
+                              <small>
+                                {typeof check.score === "number" ? `評分 ${check.score}/${check.max_score ?? 5}` : checkMeta?.label}
+                              </small>
+                            </div>
+                          </header>
+                          {(check.summary || check.error) && <p>{check.error || check.summary}</p>}
+                          {(check.items ?? []).length > 0 && (
+                            <div className={styles.aiReplyItems}>
+                              {check.items.map((item, itemIndex) => (
+                                <div key={`${item.item_id}-${itemIndex}`}>
+                                  <MIcon name={item.status === "passed" ? "check_circle" : "tips_and_updates"} size={17} />
+                                  <span><strong>{item.title || "評分項目"}</strong>{item.comment && <small>{item.comment}</small>}</span>
+                                  {typeof item.score === "number" && <em>{item.score}/{item.max_score ?? 1}</em>}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </section>
+                      )}
+
+                      <footer className={styles.assignmentActions}>
+                        <span><MIcon name="info" size={16} />送出前請先啟動課堂機器，AI 只會檢查你自己的環境。</span>
+                        <button
+                          type="button"
+                          className={styles.aiCheckButton}
+                          onClick={() => submitAiCheck(assignment)}
+                          disabled={checkingAssignmentId !== null || checkRunning}
+                        >
+                          <MIcon name={checkRunning ? "sync" : "fact_check"} size={18} />
+                          {checkRunning
+                            ? "AI 檢查中…"
+                            : checkingAssignmentId === assignment.id
+                              ? "正在送出…"
+                              : check?.status === "completed"
+                                ? "完成修正，再次 AI Check"
+                                : "我完成了，送出 AI Check"}
+                        </button>
+                      </footer>
+                    </div>
+                  )}
+                </article>
               );
             })}
           </div>
@@ -1151,85 +924,8 @@ export default function StudentHomeNewPage({ courseView = false }) {
           <div className={styles.taskEmpty}>
             <MIcon name="checklist" size={24} />
             <div>
-              <strong>{nextRoom ? "進入課堂查看完整任務" : "目前沒有課堂任務"}</strong>
-              <p>{nextRoom ? "教材與作答內容會集中在課堂頁面，不需要到處尋找。" : "老師發布後會自動出現在這裡。"}</p>
-            </div>
-            {nextRoom && (
-              <button type="button" className={styles.textButton} onClick={openPrimaryTarget}>
-                查看任務
-              </button>
-            )}
-          </div>
-        )}
-      </section>
-
-      <section
-        className={styles.aiAssignmentSection}
-        aria-labelledby="ai-assignment-title"
-        data-guide="course-ai-assignments"
-      >
-        <div className={styles.sectionHeading}>
-          <div>
-            <p className={styles.eyebrow}>老師已核准 · AI 協助檢查</p>
-            <h2 id="ai-assignment-title">AI 評分任務</h2>
-          </div>
-          {aiRequirementCount > 0 && <span>共 {aiRequirementCount} 個評分項目</span>}
-        </div>
-
-        {aiAssignments.length > 0 ? (
-          <div className={styles.aiAssignmentList}>
-            {aiAssignments.map((assignment) => (
-              <article className={styles.aiAssignmentCard} key={assignment.id}>
-                <header className={styles.aiAssignmentHeader}>
-                  <span className={styles.aiAssignmentIcon}>
-                    <MIcon name="fact_check" size={22} />
-                  </span>
-                  <div>
-                    <h3>{assignment.title}</h3>
-                    <p>{assignment.teaching_class_name} · 第 {assignment.version} 版</p>
-                  </div>
-                  <span className={styles.approvedBadge}>
-                    <MIcon name="verified" size={15} />已核准
-                  </span>
-                </header>
-
-                {assignment.summary && (
-                  <p className={styles.aiAssignmentSummary}>{assignment.summary}</p>
-                )}
-
-                <ol className={styles.aiRequirementList}>
-                  {(assignment.items ?? []).map((item, index) => {
-                    const detectableMeta = AI_DETECTABLE_META[item.detectable]
-                      ?? AI_DETECTABLE_META.manual;
-                    return (
-                      <li className={styles.aiRequirementItem} key={item.id}>
-                        <span className={styles.aiRequirementNumber}>{index + 1}</span>
-                        <div className={styles.aiRequirementContent}>
-                          <strong>{item.title}</strong>
-                          {item.description && <p>{item.description}</p>}
-                        </div>
-                        <span className={`${styles.aiCheckBadge} ${styles[detectableMeta.tone]}`}>
-                          <MIcon name={detectableMeta.icon} size={15} />
-                          {detectableMeta.label}
-                        </span>
-                      </li>
-                    );
-                  })}
-                </ol>
-
-                <footer className={styles.aiAssignmentFoot}>
-                  <MIcon name="info" size={16} />
-                  完成課堂操作後，老師執行檢查時會依這些項目評分。
-                </footer>
-              </article>
-            ))}
-          </div>
-        ) : (
-          <div className={styles.aiAssignmentEmpty}>
-            <span><MIcon name="fact_check" size={24} /></span>
-            <div>
-              <strong>老師尚未發布 AI 評分任務</strong>
-              <p>老師核准評分內容後，檢查項目會自動出現在這裡。</p>
+              <strong>截至今天沒有需要送檢的任務</strong>
+              <p>老師發布並核准 AI 任務後，會依發布日期完整列在這裡。</p>
             </div>
           </div>
         )}
@@ -1295,18 +991,12 @@ export default function StudentHomeNewPage({ courseView = false }) {
                   key={template.id}
                   className={dashboardStyles.templateCard}
                   style={{ "--accent-color": "#5471bf" }}
-                  onClick={() => {
-                    if (template._demo) {
-                      toast.info(`展示模板「${template.name}」：正式模板發布後可直接建立容器`);
-                      return;
-                    }
-                    navigate(`/quick-template/${template.id}`, { state: { from: "/dashboard-new" } });
-                  }}
+                  onClick={() => navigate(`/quick-template/${template.id}`, { state: { from: "/dashboard-new" } })}
                 >
                   <div className={dashboardStyles.templateHeader}>
                     <span className={dashboardStyles.templateLogo}><MIcon name="layers" size={22} /></span>
                     <span className={dashboardStyles.templateCategoryChip}>
-                      {template._demo ? "展示模板" : "免人工審核"}
+                      免人工審核
                     </span>
                   </div>
                   <div className={dashboardStyles.templateBody}>
@@ -1335,6 +1025,13 @@ export default function StudentHomeNewPage({ courseView = false }) {
           )}
         </section>
       </section>
+      )}
+
+      {activePracticeResource?.type === "lxc" && (
+        <TerminalDialog resource={activePracticeResource} onClose={() => setActivePracticeResource(null)} />
+      )}
+      {activePracticeResource && activePracticeResource.type !== "lxc" && (
+        <VncDialog resource={activePracticeResource} onClose={() => setActivePracticeResource(null)} />
       )}
 
     </div>

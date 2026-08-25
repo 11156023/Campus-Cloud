@@ -22,6 +22,21 @@ export const CoursesService = {
     return apiGet(`/api/v1/courses/paths/${pathId}/ai-assignments`);
   },
 
+  /** 取得學生在此課程由班級流程分配的所有練習機器。 */
+  getPracticeMachines(pathId) {
+    return apiGet(`/api/v1/courses/paths/${pathId}/practice-machines`);
+  },
+
+  /** 學生完成操作後，對自己的班級機器送出 AI Check。 */
+  startAiCheck(pathId, assignmentId) {
+    return apiPost(`/api/v1/courses/paths/${pathId}/ai-assignments/${assignmentId}/checks`, {});
+  },
+
+  /** 查詢自己送出的 AI Check 進度與回饋。 */
+  getAiCheck(pathId, assignmentId, runId) {
+    return apiGet(`/api/v1/courses/paths/${pathId}/ai-assignments/${assignmentId}/checks/${runId}`);
+  },
+
   /** 房間詳情：任務 + 題目（不含答案）+ 我的部署狀態 */
   getRoom(roomId) {
     return apiGet(`/api/v1/courses/rooms/${roomId}`);
