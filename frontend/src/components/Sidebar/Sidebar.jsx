@@ -66,8 +66,9 @@ const navGroups = [
     label: "教學",
     icon: "school",
     items: [
-      { key: "class-management", label: "班級管理", icon: "groups_2" },
-      { key: "course-template-management", label: "課程環境", icon: "view_quilt" },
+      { key: "class-setup", label: "一鍵建立班級", icon: "add_circle", instructorOnly: true },
+      { key: "class-management", label: "班級管理", icon: "groups_2", instructorOnly: true },
+      { key: "course-template-management", label: "課程環境", icon: "view_quilt", instructorOnly: true },
       { key: "courses",    label: "課程學習（非正式）", icon: "flag" },
     ],
   },
@@ -273,10 +274,18 @@ export default function Sidebar({ collapsed, mobileOpen, onToggle, onClose }) {
   const userBtnRef = useRef(null);
   const { user, logout } = useAuth();
   const isAdmin = Boolean(user?.is_superuser || user?.role === "admin");
+  const canTeach = isAdmin || user?.role === "teacher";
+  const visibleTopItems = isAdmin
+    ? [{ key: "dashboard", label: "管理首頁", icon: "dashboard" }]
+    : user?.role === "teacher"
+      ? [{ key: "dashboard", label: "教師首頁", icon: "dashboard" }]
+      : topItems;
   const visibleNavGroups = navGroups
     .map((group) => ({
       ...group,
-      items: group.items.filter((item) => !item.adminOnly || isAdmin),
+      items: group.items.filter((item) =>
+        (!item.adminOnly || isAdmin) && (!item.instructorOnly || canTeach)
+      ),
     }))
     .filter((group) => group.items.length > 0);
 
@@ -311,7 +320,7 @@ export default function Sidebar({ collapsed, mobileOpen, onToggle, onClose }) {
 
       {/* ===== Main nav ===== */}
       <nav className={styles.nav}>
-        {topItems.map((item) => (
+        {visibleTopItems.map((item) => (
           <button
             key={item.key}
             type="button"
