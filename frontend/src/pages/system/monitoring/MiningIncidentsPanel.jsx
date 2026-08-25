@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import styles from "./MonitoringPage.module.scss";
 import MIcon from "../../../components/MIcon";
+import EmptyState from "../../../components/EmptyState/EmptyState";
 import { MiningIncidentsService } from "../../../services/miningIncidents";
 import { useToast } from "../../../hooks/useToast";
 
@@ -101,10 +102,7 @@ export default function MiningIncidentsPanel() {
       {incidents === null ? (
         <p className={styles.cardEmpty}>載入中…</p>
       ) : incidents.length === 0 ? (
-        <div className={styles.cardEmpty}>
-          <MIcon name="verified_user" size={24} />
-          <p>目前沒有挖礦事件</p>
-        </div>
+        <EmptyState icon="verified_user" title="目前沒有挖礦事件" />
       ) : (
         <table className={styles.table}>
           <thead>

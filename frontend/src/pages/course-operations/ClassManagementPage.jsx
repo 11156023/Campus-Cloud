@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import MIcon from "../../components/MIcon";
+import EmptyState from "../../components/EmptyState/EmptyState";
 import { TeachingClassesService } from "../../services/teachingClasses";
 import ClassCreateDialog from "./ClassCreatePage";
 import styles from "./CourseOperations.module.scss";
@@ -109,7 +110,7 @@ export default function ClassManagementPage({ openCreate = false }) {
           <div className={styles.classCardAction}><span>{item.status === "active" ? "環境已準備完成" : action}</span><button type="button" onClick={() => navigate(target === "overview" ? `/class-management/${item.id}` : `/class-management/${item.id}/${target}`)}>{action}<MIcon name="arrow_forward" size={17} /></button></div>
         </article>;
       })}
-    </section> : <div className={styles.emptyState}><MIcon name="school" size={32} /><p>目前沒有符合條件的班級。</p></div>}
+    </section> : <EmptyState icon="school" title="目前沒有符合條件的班級。" />}
     {createOpen && <ClassCreateDialog onClose={() => { setCreateOpen(false); if (openCreate) navigate("/class-management", { replace: true }); }} onCreated={(created) => navigate(`/class-management/${created.id}/students`)} />}
   </div>;
 }

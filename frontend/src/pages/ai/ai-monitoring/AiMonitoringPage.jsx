@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import styles from "./AiMonitoringPage.module.scss";
 import MIcon from "../../../components/MIcon";
+import SharedEmptyState from "../../../components/EmptyState/EmptyState";
 import { AiMonitoringService } from "../../../services/aiMonitoring";
 import { useToast } from "../../../hooks/useToast";
 import useAutoRefresh from "../../../hooks/useAutoRefresh";
@@ -84,13 +85,7 @@ function isOkStatus(status) {
 
 function EmptyState({ icon, title, desc }) {
   return (
-    <div className={styles.empty}>
-      <div className={styles.emptyIcon}>
-        <MIcon name={icon} size={40} />
-      </div>
-      <h2 className={styles.emptyTitle}>{title}</h2>
-      <p className={styles.emptyDesc}>{desc}</p>
-    </div>
+    <SharedEmptyState icon={icon} title={title} description={desc} />
   );
 }
 

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import MIcon from "../../components/MIcon";
 import { CourseEnvironmentsService } from "../../services/courseEnvironments";
+import EmptyState from "../../components/EmptyState/EmptyState";
 import styles from "./CourseOperations.module.scss";
 
 const STATUS_LABEL = { published: "已發布", draft: "草稿", retired: "已停用" };
@@ -48,7 +49,7 @@ export default function CourseTemplateManagementPage() {
         <td><span className={`${styles.statusBadge} ${styles[`status_${template.status}`]}`}>{STATUS_LABEL[template.status]}</span></td>
         <td><button type="button" className={styles.iconBtn} aria-label="開啟模板"><MIcon name="chevron_right" size={19} /></button></td>
       </tr>)}</tbody></table></div>
-      {!rows.length && <div className={styles.emptyState}><MIcon name="view_quilt" size={32} /><p>沒有符合條件的課程環境。</p></div>}
+      {!rows.length && <EmptyState icon="view_quilt" title="沒有符合條件的課程環境。" />}
     </section>
   </div>;
 }
