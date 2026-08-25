@@ -28,10 +28,14 @@ function flattenMappings(mappings) {
       pci: pciPaths.join(", ") || "—",
       mapEntries,
       device_count: m.device_count,
+      capacity_count: m.capacity_count || m.device_count,
       used_count: m.used_count,
       available_count: m.available_count,
       total_vram_mb: m.total_vram_mb,
       used_vram_mb: m.used_vram_mb,
+      used_vram_known: m.used_vram_known ?? true,
+      per_instance_vram_mb: m.per_instance_vram_mb,
+      mdev_profile: m.mdev_profile,
       is_sriov: m.is_sriov,
       vms: (m.used_by ?? []).map((u) => ({
         vmid: u.vmid,
@@ -40,6 +44,14 @@ function flattenMappings(mappings) {
       })),
     };
   });
+}
+
+/* MB → 人類可讀（512 MB / 4 GB / 1.5 GB） */
+function formatVram(mb) {
+  if (!mb || mb <= 0) return "";
+  if (mb < 1024) return `${mb} MB`;
+  const gb = mb / 1024;
+  return `${Number.isInteger(gb) ? gb : gb.toFixed(1)} GB`;
 }
 
 function EmptyState() {
@@ -133,7 +145,7 @@ export default function GpuMgmtPage() {
   };
 
   const stats = useMemo(() => {
-    const total = rows.reduce((s, n) => s + (n.device_count ?? 0), 0);
+    const total = rows.reduce((s, n) => s + (n.capacity_count ?? n.device_count ?? 0), 0);
     const used = rows.reduce((s, n) => s + (n.used_count ?? 0), 0);
     const avail = Math.max(0, total - used);
     return { total, used, avail };
@@ -233,6 +245,10 @@ export default function GpuMgmtPage() {
                           <div className={styles.namePrimary}>{n.mapping}</div>
                           <div className={styles.nameSub}>
                             {n.is_sriov ? "SR-IOV" : "Passthrough"}
+                            {n.mdev_profile ? ` · ${n.mdev_profile}` : ""}
+                            {n.per_instance_vram_mb > 0
+                              ? ` (${formatVram(n.per_instance_vram_mb)}/顆)`
+                              : ""}
                           </div>
                         </div>
                       </div>
@@ -253,13 +269,23 @@ export default function GpuMgmtPage() {
                       )}
                     </td>
                     <td className={styles.td}>
-                      {n.available_count} / {n.device_count}
+                      <div>{n.available_count} / {n.capacity_count}</div>
+                      {n.is_sriov && n.capacity_count !== n.device_count && (
+                        <div className={styles.cellSub}>{n.device_count} VF</div>
+                      )}
+                      {n.total_vram_mb > 0 && (
+                        <div className={styles.cellSub}>
+                          {n.used_vram_known
+                            ? `VRAM 使用中 ${formatVram(n.used_vram_mb) || "0"} / ${formatVram(n.total_vram_mb)}`
+                            : `VRAM 共 ${formatVram(n.total_vram_mb)} · 已用量未知`}
+                        </div>
+                      )}
                     </td>
                     <td className={styles.td}>
                       <VmChips vms={n.vms} />
                     </td>
                     <td className={styles.td}>
-                      <StatusBadge used={n.used_count} total={n.device_count} />
+                      <StatusBadge used={n.used_count} total={n.capacity_count} />
                     </td>
                     <td className={styles.td}>
                       <div className={styles.actions}>

@@ -201,7 +201,9 @@ def _resolve_chat_gpu_options(request: ChatRequest, session: SessionDep) -> list
     for option in options:
         mapping_id = str(option.get("mapping_id") or "")
         reserved = int(reserved_counts.get(mapping_id, 0))
-        device_count = int(option.get("device_count") or 0)
+        capacity_count = int(
+            option.get("capacity_count") or option.get("device_count") or 0
+        )
         used_count = int(option.get("used_count") or 0)
         available_count = int(option.get("available_count") or 0)
         if reserved <= 0:
@@ -209,7 +211,7 @@ def _resolve_chat_gpu_options(request: ChatRequest, session: SessionDep) -> list
             continue
 
         updated = dict(option)
-        updated["used_count"] = min(device_count, used_count + reserved)
+        updated["used_count"] = min(capacity_count, used_count + reserved)
         updated["available_count"] = max(0, available_count - reserved)
         adjusted.append(updated)
 

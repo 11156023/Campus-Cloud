@@ -115,6 +115,8 @@ class VMRequest(SQLModel, table=True):
     disk_size: int | None = Field(default=None)
     username: str | None = Field(default=None)
     gpu_mapping_id: str | None = Field(default=None)
+    # vGPU 規格（mdev type，如 'nvidia-1436'）；None = 不指定（passthrough 或整卡）
+    gpu_mdev_profile: str | None = Field(default=None)
 
     # VM vs LXC 自動判斷（模組C）：manual = 使用者自選；auto = 規則引擎決定
     requested_mode: str = Field(default="manual")

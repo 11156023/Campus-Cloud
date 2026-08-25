@@ -87,11 +87,16 @@ const fromDateInputValue = (value, endOfDay = false) => {
   return date.toISOString();
 };
 const GPU_OPTIONS_DEBOUNCE_MS = 300;
+const formatVramMb = (mb) => (mb >= 1024 ? `${Number.isInteger(mb / 1024) ? mb / 1024 : (mb / 1024).toFixed(1)} GB` : `${mb} MB`);
 const gpuLabel = (gpu) => {
-  const vram = gpu.total_vram_mb > 0
-    ? ` (${gpu.total_vram_mb >= 1024 ? `${(gpu.total_vram_mb / 1024).toFixed(0)} GB` : `${gpu.total_vram_mb} MB`})`
-    : gpu.vram ? ` (${gpu.vram})` : "";
-  return `${gpu.description || gpu.mapping_id}${vram} [${gpu.available_count}/${gpu.device_count} 可用]${gpu.available_count <= 0 ? " — 已滿" : ""}`;
+  /* SR-IOV vGPU 以 framebuffer 可切數為上限（capacity_count），非 VF 插槽數 */
+  const capacity = gpu.capacity_count || gpu.device_count;
+  const parts = [];
+  if (gpu.per_instance_vram_mb > 0) parts.push(`${formatVramMb(gpu.per_instance_vram_mb)}/顆`);
+  if (gpu.total_vram_mb > 0) parts.push(`共 ${formatVramMb(gpu.total_vram_mb)}`);
+  else if (gpu.vram) parts.push(gpu.vram);
+  const vram = parts.length ? ` (${parts.join(", ")})` : "";
+  return `${gpu.description || gpu.mapping_id}${vram} [${gpu.available_count}/${capacity} 可用]${gpu.available_count <= 0 ? " — 已滿" : ""}`;
 };
 
 function buildAiScheduleOptions(availability) {
@@ -181,6 +186,7 @@ export default function RequestFormPage({ onBack, className }) {
     rootfs_size:      8,
     disk_size:        20,
     gpu_mapping_id:   "",
+    gpu_mdev_profile: "",
     start_at:         "",
     end_at:           "",
     immediate_no_end: true,
@@ -251,13 +257,25 @@ export default function RequestFormPage({ onBack, className }) {
 
   const canLoadGpu = resourceType === "vm";
   const gpuWindowReady = Boolean(mode === "scheduled" && form.start_at && form.end_at);
+  const selectedGpuProfiles = useMemo(() => {
+    if (!form.gpu_mapping_id) return [];
+    const gpu = gpuOptions.find((g) => g.mapping_id === form.gpu_mapping_id);
+    return gpu?.profiles ?? [];
+  }, [gpuOptions, form.gpu_mapping_id]);
+
+  const smallestCreatableProfile = useMemo(() => {
+    const creatable = selectedGpuProfiles.filter((p) => p.creatable && p.vram_mb > 0);
+    if (creatable.length === 0) return null;
+    return creatable.reduce((min, p) => (p.vram_mb < min.vram_mb ? p : min));
+  }, [selectedGpuProfiles]);
+
   const gpuOptionsRequestKey = canLoadGpu
     ? `${mode}|${gpuWindowReady ? form.start_at : ""}|${gpuWindowReady ? form.end_at : ""}`
     : "";
 
   useEffect(() => {
     if (resourceType !== "vm" && form.gpu_mapping_id) {
-      setForm((prev) => ({ ...prev, gpu_mapping_id: "" }));
+      setForm((prev) => ({ ...prev, gpu_mapping_id: "", gpu_mdev_profile: "" }));
     }
   }, [resourceType, form.gpu_mapping_id]);
 
@@ -307,7 +325,7 @@ export default function RequestFormPage({ onBack, className }) {
     if (gpuOptionsKey !== gpuOptionsRequestKey) return;
     const selected = gpuOptions.find((gpu) => gpu.mapping_id === form.gpu_mapping_id);
     if (!selected || selected.available_count <= 0) {
-      setForm((prev) => ({ ...prev, gpu_mapping_id: "" }));
+      setForm((prev) => ({ ...prev, gpu_mapping_id: "", gpu_mdev_profile: "" }));
     }
   }, [
     canLoadGpu,
@@ -535,6 +553,9 @@ export default function RequestFormPage({ onBack, className }) {
                 null,
             }),
         ...(selectedGpuId ? { gpu_mapping_id: selectedGpuId } : {}),
+        ...(selectedGpuId && form.gpu_mdev_profile
+          ? { gpu_mdev_profile: form.gpu_mdev_profile }
+          : {}),
         ...(mode === "scheduled"
           ? { start_at: form.start_at, end_at: form.end_at }
           : (!form.immediate_no_end && form.end_at ? { end_at: form.end_at } : {})),
@@ -877,7 +898,11 @@ export default function RequestFormPage({ onBack, className }) {
                 >
                   <SelectField
                     value={form.gpu_mapping_id || "__none__"}
-                    onChange={(v) => set("gpu_mapping_id", v === "__none__" ? "" : v)}
+                    onChange={(v) => setForm((prev) => ({
+                      ...prev,
+                      gpu_mapping_id: v === "__none__" ? "" : v,
+                      gpu_mdev_profile: "",
+                    }))}
                     disabled={gpuLoading || gpuOptions.length === 0}
                     placeholder={!canLoadGpu ? "請先選擇時段" : undefined}
                   >
@@ -889,6 +914,28 @@ export default function RequestFormPage({ onBack, className }) {
                     ))}
                   </SelectField>
                 </FieldGroup>
+
+                {selectedGpuProfiles.length > 0 && (
+                  <FieldGroup
+                    label="vGPU 規格"
+                    hint="依需要的 GPU 記憶體選擇；不選擇時系統會自動配最小可用規格"
+                  >
+                    <SelectField
+                      value={form.gpu_mdev_profile || "__none__"}
+                      onChange={(v) => set("gpu_mdev_profile", v === "__none__" ? "" : v)}
+                    >
+                      <option value="__none__">
+                        {`自動 — 最小可用規格${smallestCreatableProfile ? `（${formatVramMb(smallestCreatableProfile.vram_mb)}）` : ""}`}
+                      </option>
+                      {selectedGpuProfiles.map((p) => (
+                        <option key={p.mdev_type} value={p.mdev_type} disabled={!p.creatable}>
+                          {`${p.name || p.mdev_type} — ${formatVramMb(p.vram_mb)}`}
+                          {p.creatable ? "" : "（記憶體不足）"}
+                        </option>
+                      ))}
+                    </SelectField>
+                  </FieldGroup>
+                )}
               </div>
             )}
 

@@ -66,6 +66,8 @@ class VMRequestCreate(BaseModel):
     disk_size: int | None = None
     username: str | None = None
     gpu_mapping_id: str | None = None
+    # vGPU 規格（mdev type，如 'nvidia-1436'）；僅對 has_mdev 的 GPU 有意義
+    gpu_mdev_profile: str | None = Field(default=None, max_length=64)
 
     # manual = 使用者自選 resource_type；auto = 前端依 advise API 帶入，
     # 後端建立時重跑規則引擎記錄判斷理由。
@@ -119,6 +121,7 @@ class VMRequestPublic(BaseModel):
     disk_size: int | None = None
     username: str | None = None
     gpu_mapping_id: str | None = None
+    gpu_mdev_profile: str | None = None
 
     requested_mode: str = "manual"
     auto_decision_reason: str | None = None

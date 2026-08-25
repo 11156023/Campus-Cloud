@@ -123,6 +123,63 @@ def cleanup_provisioned_resource(vmid: int) -> None:
     _cleanup_failed_resource(resource["node"], vmid, resource["type"])
 
 
+def _build_gpu_hostpci(mapping_id: str, mdev_profile: str | None) -> str:
+    """驗證 GPU 可用額度與 vGPU 規格，回傳 hostpci 設定字串。
+
+    profile 的 creatable 是即時的（NVIDIA 只回報還放得下的規格），
+    克隆前這裡是最後一道防線。
+
+    vGPU 卡（profiles 非空）未指定規格時，自動配「最小可建規格」——
+    不帶 mdev 的裸 VF 對 NVIDIA vGPU 是不可用的，不能落回 raw passthrough。
+    """
+    from app.services.proxmox import gpu_service  # noqa: PLC0415
+
+    try:
+        gpu_detail = gpu_service.get_gpu_mapping(mapping_id)
+        if gpu_detail.available_count <= 0:
+            raise ProxmoxError(
+                f"GPU {mapping_id} 已無可用額度 "
+                f"(used={gpu_detail.used_count}/{gpu_detail.capacity_count})"
+            )
+        if mdev_profile:
+            match = next(
+                (p for p in gpu_detail.profiles if p.mdev_type == mdev_profile),
+                None,
+            )
+            if gpu_detail.profiles and match is None:
+                raise ProxmoxError(
+                    f"GPU {mapping_id} 沒有 vGPU 規格 '{mdev_profile}'"
+                )
+            if match is not None and not match.creatable:
+                raise ProxmoxError(
+                    f"vGPU 規格 '{match.name or mdev_profile}' "
+                    "目前 GPU 記憶體不足，無法建立"
+                )
+        elif gpu_detail.profiles:
+            creatable = [
+                p for p in gpu_detail.profiles if p.creatable and p.vram_mb > 0
+            ]
+            if not creatable:
+                raise ProxmoxError(
+                    f"GPU {mapping_id} 記憶體已滿，目前無法建立任何 vGPU"
+                )
+            auto = min(creatable, key=lambda p: p.vram_mb)
+            logger.info(
+                "GPU %s 未指定 vGPU 規格，自動配最小可用規格 %s (%s)",
+                mapping_id, auto.name or auto.mdev_type, auto.mdev_type,
+            )
+            mdev_profile = auto.mdev_type
+    except ProxmoxError:
+        raise
+    except Exception as e:
+        logger.error("GPU 可用性檢查失敗 (%s): %s", mapping_id, e)
+        raise ProxmoxError(f"無法驗證 GPU '{mapping_id}'：{e}")
+
+    if mdev_profile:
+        return f"mapping={mapping_id},mdev={mdev_profile}"
+    return f"mapping={mapping_id}"
+
+
 def _gpu_mapping_nodes(mapping_id: str | None) -> set[str]:
     if not mapping_id:
         return set()
@@ -480,21 +537,9 @@ def create_vm(
             config_updates["nameserver"] = net_cfg["dns_servers"]
         gpu_mapping_id = getattr(vm_data, "gpu_mapping_id", None)
         if gpu_mapping_id:
-            from app.services.proxmox import gpu_service
-
-            try:
-                gpu_detail = gpu_service.get_gpu_mapping(gpu_mapping_id)
-                if gpu_detail.available_count <= 0:
-                    raise ProxmoxError(
-                        f"GPU {gpu_mapping_id} 已無可用插槽 "
-                        f"(used={gpu_detail.used_count}/{gpu_detail.device_count})"
-                    )
-            except ProxmoxError:
-                raise
-            except Exception as e:
-                logger.error("GPU 可用性檢查失敗 (%s): %s", gpu_mapping_id, e)
-                raise ProxmoxError(f"無法驗證 GPU '{gpu_mapping_id}'：{e}")
-            config_updates["hostpci0"] = f"mapping={gpu_mapping_id}"
+            config_updates["hostpci0"] = _build_gpu_hostpci(
+                gpu_mapping_id, getattr(vm_data, "gpu_mdev_profile", None)
+            )
         _ensure_resource_stopped(target_node, new_vmid, "qemu")
         proxmox_service.update_config(target_node, new_vmid, "qemu", **config_updates)
 
@@ -697,6 +742,8 @@ def plan_provision(*, session: Session, db_request) -> dict:
         plan["username"] = db_request.username
         if db_request.gpu_mapping_id:
             plan["gpu_mapping_id"] = db_request.gpu_mapping_id
+            if getattr(db_request, "gpu_mdev_profile", None):
+                plan["gpu_mdev_profile"] = db_request.gpu_mdev_profile
         plan["target_storage"] = _resolve_managed_storage(
             session=session,
             node=target_node,
@@ -879,24 +926,9 @@ def execute_provision(plan: dict) -> tuple[int, str]:
                     "請確認 IP 管理子網設定。"
                 )
             if plan.get("gpu_mapping_id"):
-                # Validate GPU availability before assigning
-                from app.services.proxmox import gpu_service
-
-                try:
-                    gpu_detail = gpu_service.get_gpu_mapping(plan["gpu_mapping_id"])
-                    if gpu_detail.available_count <= 0:
-                        raise ProxmoxError(
-                            f"GPU {plan['gpu_mapping_id']} 已無可用插槽 "
-                            f"(used={gpu_detail.used_count}/{gpu_detail.device_count})"
-                        )
-                except ProxmoxError:
-                    raise
-                except Exception as e:
-                    logger.error(
-                        "GPU 可用性檢查失敗 (%s): %s", plan["gpu_mapping_id"], e
-                    )
-                    raise ProxmoxError(f"無法驗證 GPU '{plan['gpu_mapping_id']}'：{e}")
-                config_updates["hostpci0"] = f"mapping={plan['gpu_mapping_id']}"
+                config_updates["hostpci0"] = _build_gpu_hostpci(
+                    plan["gpu_mapping_id"], plan.get("gpu_mdev_profile")
+                )
             _ensure_resource_stopped(actual_node, new_vmid, "qemu")
             proxmox_service.update_config(
                 actual_node, new_vmid, "qemu", **config_updates

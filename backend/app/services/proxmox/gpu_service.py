@@ -8,6 +8,7 @@ import logging
 import re
 import threading
 import time
+from typing import Any, NamedTuple
 
 from sqlmodel import Session, select
 
@@ -19,6 +20,7 @@ from app.models import Resource
 from app.schemas.gpu import (
     GPUDeviceMap,
     GPUMappingDetail,
+    GPUProfileOption,
     GPUSummary,
     GPUUsageInfo,
 )
@@ -27,6 +29,12 @@ logger = logging.getLogger(__name__)
 _GPU_NODE_COUNTS_CACHE_TTL_SECONDS = 20
 _gpu_node_counts_cache: dict[str, tuple[float, dict[str, int]]] = {}
 _gpu_node_counts_cache_lock = threading.Lock()
+
+# 累積式 vGPU profile 目錄（type → 規格）。NVIDIA 驅動只回報「目前還建立得
+# 起來」的 profile：記憶體吃緊時大 profile 會從清單消失，但已佔用 VM 的
+# used VRAM 仍需要它們的規格。規格對同一驅動版本是靜態的，process 存活期間
+# 看過一次就永久記住。
+_mdev_profile_catalog: dict[str, "MdevProfile"] = {}
 
 
 def _get_managed_vmids() -> set[int]:
@@ -70,16 +78,18 @@ def _extract_gpu_info(description: str, mapping_id: str) -> tuple[str, str, int]
     vram = ""
     vram_mb = 0
 
-    # Try to find VRAM pattern like "24GB", "12 GB", "8192MB"
+    # Try to find VRAM pattern like "24GB", "12 GB", "8192MB", "8G"
     # 數字與空白都用有界量詞（而非 \d+、\s*）避免長輸入造成多項式回溯；
     # (?<!\d) 確保不會從長數字中間開始匹配
     vram_match = re.search(
-        r"(?<!\d)(\d{1,6})\s{0,8}(GB|MB|GiB|MiB)", text, re.IGNORECASE
+        r"(?<!\d)(\d{1,6})\s{0,8}(GiB|MiB|GB|MB|G|M)(?![A-Za-z])",
+        text,
+        re.IGNORECASE,
     )
     if vram_match:
         amount = int(vram_match.group(1))
         unit = vram_match.group(2).upper()
-        if unit in ("MB", "MIB"):
+        if unit in ("MB", "MIB", "M"):
             vram_mb = amount
             if amount < 1024:
                 vram = f"{amount} MB"
@@ -122,8 +132,16 @@ def _count_physical_gpus(maps: list[GPUDeviceMap]) -> tuple[int, bool]:
     return physical, is_sriov
 
 
-def _parse_vram_from_mdev_description(description: str) -> int:
-    """Extract VRAM in MB from an mdev type description.
+class MdevProfile(NamedTuple):
+    """A vGPU (mdev) profile exposed by PVE for a PCI device."""
+
+    name: str            # e.g. "NVIDIA H200-4C"
+    vram_mb: int         # framebuffer per instance
+    max_instances: int   # max instances per physical GPU (0 = unknown)
+
+
+def _parse_vram_from_profile_text(text: str) -> int:
+    """Extract VRAM in MB from a profile name or free-form description.
 
     Examples:
       "GRID H200 NVL-16Q" → 16384 (16 GB)
@@ -131,87 +149,235 @@ def _parse_vram_from_mdev_description(description: str) -> int:
       "NVIDIA A100-1-5C"  → 5120  (5 GB)
     """
     # Match the last number before a Q/C/A/B suffix at end-of-string
-    match = re.search(r"[\-](\d+)[QCAB]\s*$", description.strip(), re.IGNORECASE)
+    match = re.search(r"[\-](\d+)[QCAB]\s*$", text.strip(), re.IGNORECASE)
     if match:
         return int(match.group(1)) * 1024
     # Fallback: generic "XX GB" pattern
-    match = re.search(r"(\d+)\s*(GB|GiB)", description, re.IGNORECASE)
+    match = re.search(r"(\d+)\s*(GB|GiB)", text, re.IGNORECASE)
     if match:
         return int(match.group(1)) * 1024
     return 0
 
 
-def _get_mdev_types(node: str, pci_path: str) -> dict[str, int]:
+def _parse_mdev_entry(mdev: dict) -> MdevProfile:
+    """Parse one entry of PVE's /nodes/{node}/hardware/pci/{path}/mdev.
+
+    Modern NVIDIA SR-IOV vGPU (Ampere/Hopper) returns a key=value description:
+      name: "NVIDIA H200-4C"
+      description: "class=Compute\\nmax-instances=32\\n...\\nframebuffer-size=4096MiB\\n..."
+    Legacy GRID drivers put the profile name in the description instead.
+    """
+    name = str(mdev.get("name", "") or "")
+    description = str(mdev.get("description", "") or "")
+
+    props: dict[str, str] = {}
+    for line in re.split(r"[\n,]", description):
+        key, _, val = line.partition("=")
+        if val:
+            props[key.strip().lower()] = val.strip()
+
+    vram_mb = 0
+    fb = props.get("framebuffer-size", "")
+    fb_match = re.match(r"(\d+)\s*(MiB|MB|GiB|GB)?", fb, re.IGNORECASE)
+    if fb_match and fb_match.group(1):
+        amount = int(fb_match.group(1))
+        unit = (fb_match.group(2) or "MiB").upper()
+        vram_mb = amount * 1024 if unit in ("GB", "GIB") else amount
+    if vram_mb <= 0:
+        vram_mb = _parse_vram_from_profile_text(name) or _parse_vram_from_profile_text(
+            description
+        )
+
+    try:
+        max_instances = int(props.get("max-instances", "0"))
+    except ValueError:
+        max_instances = 0
+
+    return MdevProfile(name=name, vram_mb=vram_mb, max_instances=max_instances)
+
+
+def _get_mdev_types(node: str, pci_path: str) -> dict[str, MdevProfile] | None:
     """Query available mdev types for a PCI device from PVE.
 
-    Returns dict of mdev_type_name → vram_mb.
+    Returns dict of mdev_type (e.g. "nvidia-1436") → MdevProfile.
+    注意語意：NVIDIA 驅動只回報「目前還建立得起來」的 profile——
+    空 dict 代表查詢成功但已無法再建立任何 vGPU（記憶體已滿或非 vGPU 裝置）；
+    None 代表查詢失敗（無法連線等），呼叫端應退回保守估計。
     """
     try:
         proxmox = get_proxmox_api_for_node(node)
         mdev_list = proxmox.nodes(node).hardware.pci(pci_path).mdev.get()
     except Exception as e:
         logger.debug("Cannot get mdev types for %s on %s: %s", pci_path, node, e)
-        return {}
+        return None
 
-    result: dict[str, int] = {}
+    result: dict[str, MdevProfile] = {}
     for mdev in mdev_list:
         mdev_type = mdev.get("type", "")
-        description = mdev.get("description", "")
-        vram_mb = _parse_vram_from_mdev_description(description)
         if mdev_type:
-            result[mdev_type] = vram_mb
+            result[mdev_type] = _parse_mdev_entry(mdev)
+    _mdev_profile_catalog.update(result)
     return result
+
+
+class MappingVramInfo(NamedTuple):
+    """VRAM / capacity accounting for a PCI resource mapping."""
+
+    total_vram_mb: int
+    used_vram_mb: int
+    used_vram_known: bool       # False 表示部分 running profile 規格未知，used 為低估
+    instance_capacity: int      # max assignable vGPU instances (0 = unknown / N/A)
+    per_instance_vram_mb: int   # framebuffer per vGPU instance (0 = unknown / 混合)
+    mdev_profile: str           # 顯示用 profile 名稱；混合 profile 時為空字串
+    has_mdev: bool              # True if this mapping operates in vGPU/mdev mode
+    available_override: int | None  # 混合 profile 時以剩餘 VRAM 推得的可用數
+    profiles: list[GPUProfileOption]  # 可選 profile 清單（creatable 標記即時性）
 
 
 def _resolve_vram_for_mapping(
     maps: list[GPUDeviceMap],
-    has_mdev: bool,
     physical_gpu_count: int,
     description: str,
     mapping_id: str,
     used_by: list[GPUUsageInfo],
-) -> tuple[int, int]:
-    """Calculate total_vram_mb and used_vram_mb for a mapping.
+) -> MappingVramInfo:
+    """Calculate VRAM totals and vGPU instance capacity for a mapping.
 
     For passthrough: total = physical_count × per_card_vram, used = used_count × per_card_vram
-    For vGPU/mdev:   total = max mdev profile VRAM × physical_count,
-                     used  = sum of each VM's mdev profile VRAM
+    For vGPU/mdev:   capacity 以 framebuffer 為準——
+                     total = 參考 profile 的 framebuffer × max-instances × physical_count,
+                     used  = sum of each VM's mdev profile VRAM。
+                     參考 profile 優先取「已掛載 VM 正在用的 profile」（NVIDIA 同一張
+                     實體卡上 profile 必須一致），沒有已掛載 VM 時取 framebuffer 最大者。
     Also sets allocated_vram_mb on each used_by entry.
 
-    Returns (total_vram_mb, used_vram_mb).
+    mdev 模式判定：PVE 的 map entry 通常**不帶** mdev 旗標，必須實際查詢
+    mdev endpoint（回非空清單即為 vGPU 裝置），或看已掛載 VM 是否帶 mdev type。
     """
     _, _, per_card_vram_mb = _extract_gpu_info(description, mapping_id)
 
-    if has_mdev and maps:
-        # Query mdev types from the first available device on the first node
+    # Query mdev types from the first available device on the first node
+    probed: dict[str, MdevProfile] | None = None
+    if maps:
         first_map = maps[0]
-        mdev_type_vram = _get_mdev_types(first_map.node, first_map.path)
+        probed = _get_mdev_types(first_map.node, first_map.path)
+    profiles = probed or {}
 
-        # Total VRAM = largest mdev profile (full-card profile) × physical GPUs
-        positive_profile_vram = [v for v in mdev_type_vram.values() if v > 0]
-        if positive_profile_vram:
-            max_profile_vram = max(positive_profile_vram)
-            total_vram_mb = max_profile_vram * physical_gpu_count
+    has_mdev = (
+        bool(profiles)
+        or any(m.is_mdev for m in maps)
+        or any(u.mdev_type for u in used_by)
+    )
+
+    if has_mdev and maps:
+        # 累積目錄補足規格：creatable 清單可能已隱藏被佔滿的大 profile
+        catalog = {**_mdev_profile_catalog, **profiles}
+
+        # 逐 VM 標記配置量；used VRAM 只累計 running（關機設定不佔 framebuffer）
+        used_vram_mb = 0
+        used_vram_known = True
+        for u in used_by:
+            profile = catalog.get(u.mdev_type) if u.mdev_type else None
+            if profile and profile.vram_mb > 0:
+                u.allocated_vram_mb = profile.vram_mb
+            if u.status == "running":
+                if u.mdev_type and u.allocated_vram_mb <= 0:
+                    used_vram_known = False
+                used_vram_mb += u.allocated_vram_mb
+
+        # 顯示用 profile：所有已掛載 VM 同一種 → 用它；沒掛載且目錄唯一 → 用它；
+        # 混合 profile → 不顯示單一規格
+        used_types = {u.mdev_type for u in used_by if u.mdev_type}
+        display: MdevProfile | None = None
+        if len(used_types) == 1:
+            display = catalog.get(next(iter(used_types)))
+            if display is not None and display.vram_mb <= 0:
+                display = None
+        elif not used_types and len(catalog) == 1:
+            display = next(iter(catalog.values()))
+
+        # 總可切 VRAM：目錄中最大的 framebuffer × max-instances（≈ 卡的可用量，
+        # 例如 H200 141GB 標稱 → 140GB 可切）
+        sized = [p for p in catalog.values() if p.vram_mb > 0 and p.max_instances > 0]
+        if sized:
+            total_vram_mb = (
+                max(p.vram_mb * p.max_instances for p in sized) * physical_gpu_count
+            )
+        elif display and display.vram_mb > 0:
+            total_vram_mb = display.vram_mb * physical_gpu_count
         elif per_card_vram_mb:
             total_vram_mb = per_card_vram_mb * physical_gpu_count
         else:
             total_vram_mb = 0
 
-        # Used VRAM = sum of each assigned VM's mdev profile VRAM
-        used_vram_mb = 0
-        for u in used_by:
-            if u.mdev_type and mdev_type_vram.get(u.mdev_type):
-                u.allocated_vram_mb = mdev_type_vram[u.mdev_type]
-            used_vram_mb += u.allocated_vram_mb
+        # 實例數上限：同 profile 情境用該 profile 的 max-instances；
+        # 未掛載時用目錄中最寬鬆者（最小 profile）當樂觀上限
+        capacity_profile = display if display and display.max_instances > 0 else None
+        if capacity_profile is None and sized:
+            capacity_profile = max(sized, key=lambda p: p.max_instances)
 
-        return total_vram_mb, used_vram_mb
+        if probed is not None and not probed:
+            # 查詢成功但驅動回報無任何可建立的 profile：
+            # 記憶體已滿（NVIDIA 只列出「還放得下」的 profile），不可再指派
+            instance_capacity = max(len(used_by), 1)
+        elif capacity_profile is not None:
+            instance_capacity = capacity_profile.max_instances * physical_gpu_count
+        else:
+            instance_capacity = 0
+
+        # 混合 profile：實例上限無單一答案，改以剩餘 VRAM ÷ 最小可建 profile 估可用數
+        available_override: int | None = None
+        if len(used_types) > 1 and used_vram_known and total_vram_mb > 0:
+            creatable_sizes = [p.vram_mb for p in profiles.values() if p.vram_mb > 0]
+            if creatable_sizes:
+                smallest = min(creatable_sizes)
+                remaining = max(0, total_vram_mb - used_vram_mb)
+                free_vf = max(0, len(maps) - len(used_by))
+                available_override = min(free_vf, remaining // smallest)
+
+        # 可選 profile 清單：目錄全集，creatable 以本次探測結果即時標記
+        profile_options = sorted(
+            (
+                GPUProfileOption(
+                    mdev_type=t,
+                    name=p.name,
+                    vram_mb=p.vram_mb,
+                    max_instances=p.max_instances,
+                    creatable=t in profiles,
+                )
+                for t, p in catalog.items()
+            ),
+            key=lambda o: (o.vram_mb, o.mdev_type),
+        )
+
+        return MappingVramInfo(
+            total_vram_mb=total_vram_mb,
+            used_vram_mb=used_vram_mb,
+            used_vram_known=used_vram_known,
+            instance_capacity=instance_capacity,
+            per_instance_vram_mb=display.vram_mb if display else 0,
+            mdev_profile=display.name if display else "",
+            has_mdev=True,
+            available_override=available_override,
+            profiles=profile_options,
+        )
 
     # Passthrough: each used device consumes the full card VRAM
     total_vram_mb = per_card_vram_mb * physical_gpu_count
     used_vram_mb = per_card_vram_mb * len(used_by)
     for u in used_by:
         u.allocated_vram_mb = per_card_vram_mb
-    return total_vram_mb, used_vram_mb
+    return MappingVramInfo(
+        total_vram_mb=total_vram_mb,
+        used_vram_mb=used_vram_mb,
+        used_vram_known=True,
+        instance_capacity=0,
+        per_instance_vram_mb=0,
+        mdev_profile="",
+        has_mdev=False,
+        available_override=None,
+        profiles=[],
+    )
 
 
 def list_gpu_mappings() -> list[GPUMappingDetail]:
@@ -247,14 +413,19 @@ def list_gpu_mappings() -> list[GPUMappingDetail]:
         physical_gpu_count, is_sriov = _count_physical_gpus(maps)
         device_count = len(maps)
         used_count = len(used_by)
-        available_count = max(0, device_count - used_count)
-        has_mdev = any(m.is_mdev for m in maps)
 
         # Compute VRAM totals based on the FULL usage list (so counts stay correct
         # regardless of whether VMs are SkyLab-managed or external).
-        total_vram_mb, used_vram_mb = _resolve_vram_for_mapping(
-            maps, has_mdev, physical_gpu_count, description, mapping_id, used_by,
+        vram_info = _resolve_vram_for_mapping(
+            maps, physical_gpu_count, description, mapping_id, used_by,
         )
+        has_mdev = vram_info.has_mdev
+        if vram_info.available_override is not None:
+            available_count = vram_info.available_override
+            capacity_count = used_count + available_count
+        else:
+            capacity_count = _effective_capacity(device_count, vram_info)
+            available_count = max(0, capacity_count - used_count)
 
         # Only expose SkyLab-managed VMs in the UI list.
         visible_used_by = [u for u in used_by if u.vmid in managed_vmids]
@@ -266,17 +437,34 @@ def list_gpu_mappings() -> list[GPUMappingDetail]:
                 maps=maps,
                 physical_gpu_count=physical_gpu_count,
                 device_count=device_count,
+                capacity_count=capacity_count,
                 used_count=used_count,
                 available_count=available_count,
                 is_sriov=is_sriov,
                 has_mdev=has_mdev,
-                total_vram_mb=total_vram_mb,
-                used_vram_mb=used_vram_mb,
+                total_vram_mb=vram_info.total_vram_mb,
+                used_vram_mb=vram_info.used_vram_mb,
+                used_vram_known=vram_info.used_vram_known,
+                per_instance_vram_mb=vram_info.per_instance_vram_mb,
+                mdev_profile=vram_info.mdev_profile,
+                profiles=vram_info.profiles,
                 used_by=visible_used_by,
             )
         )
 
     return results
+
+
+def _effective_capacity(device_count: int, vram_info: MappingVramInfo) -> int:
+    """實際可指派上限：SR-IOV vGPU 受 framebuffer（max-instances）限制。
+
+    VF 插槽數只是掛載點上限；vGPU 實例數同時受 profile 的 max-instances
+    （= 卡上 framebuffer ÷ profile 大小）限制，取兩者較小值。
+    查不到 profile 資訊時退回 VF 數。
+    """
+    if vram_info.has_mdev and vram_info.instance_capacity > 0:
+        return min(device_count, vram_info.instance_capacity)
+    return device_count
 
 
 def get_gpu_node_counts(mapping_id: str | None = None) -> dict[str, int]:
@@ -313,14 +501,44 @@ def get_gpu_node_counts(mapping_id: str | None = None) -> dict[str, int]:
         if isinstance(raw_maps, str):
             raw_maps = [raw_maps]
 
-        for raw_map in raw_maps:
-            if not isinstance(raw_map, str):
-                continue
-            parsed = _parse_map_entry(raw_map)
+        parsed_maps = [
+            _parse_map_entry(raw_map)
+            for raw_map in raw_maps
+            if isinstance(raw_map, str)
+        ]
+
+        # 各節點的 VF/裝置插槽數與實體卡數（同 bus = 同一張卡）
+        node_slots: dict[str, int] = {}
+        node_buses: dict[str, set[str]] = {}
+        for parsed in parsed_maps:
             node = str(parsed.node or "").strip()
             if not node:
                 continue
-            counts[node] = counts.get(node, 0) + 1
+            node_slots[node] = node_slots.get(node, 0) + 1
+            path_parts = parsed.path.split(":")
+            bus_key = (
+                f"{path_parts[0]}:{path_parts[1]}"
+                if len(path_parts) >= 2
+                else parsed.path
+            )
+            node_buses.setdefault(node, set()).add(bus_key)
+
+        # SR-IOV vGPU：插槽數再受 profile max-instances × 實體卡數限制。
+        # map entry 不帶 mdev 旗標，一律探測 mdev endpoint（非 vGPU 裝置回空清單）
+        max_instances = 0
+        if parsed_maps:
+            first = parsed_maps[0]
+            profiles = _get_mdev_types(first.node, first.path) or {}
+            usable = [p for p in profiles.values() if p.max_instances > 0]
+            if usable:
+                # 樂觀上限：取實例數最多（最小）的 profile
+                max_instances = max(p.max_instances for p in usable)
+
+        for node, slots in node_slots.items():
+            capacity = slots
+            if max_instances > 0:
+                capacity = min(slots, max_instances * len(node_buses[node]))
+            counts[node] = counts.get(node, 0) + capacity
 
     with _gpu_node_counts_cache_lock:
         _gpu_node_counts_cache[cache_key] = (now, dict(counts))
@@ -354,11 +572,17 @@ def get_gpu_mapping(mapping_id: str) -> GPUMappingDetail:
     physical_gpu_count, is_sriov = _count_physical_gpus(maps)
     device_count = len(maps)
     used_count = len(used_by)
-    has_mdev = any(m.is_mdev for m in maps)
 
-    total_vram_mb, used_vram_mb = _resolve_vram_for_mapping(
-        maps, has_mdev, physical_gpu_count, description, mapping_id, used_by,
+    vram_info = _resolve_vram_for_mapping(
+        maps, physical_gpu_count, description, mapping_id, used_by,
     )
+    has_mdev = vram_info.has_mdev
+    if vram_info.available_override is not None:
+        available_count = vram_info.available_override
+        capacity_count = used_count + available_count
+    else:
+        capacity_count = _effective_capacity(device_count, vram_info)
+        available_count = max(0, capacity_count - used_count)
 
     managed_vmids = _get_managed_vmids()
     visible_used_by = [u for u in used_by if u.vmid in managed_vmids]
@@ -369,12 +593,17 @@ def get_gpu_mapping(mapping_id: str) -> GPUMappingDetail:
         maps=maps,
         physical_gpu_count=physical_gpu_count,
         device_count=device_count,
+        capacity_count=capacity_count,
         used_count=used_count,
-        available_count=max(0, device_count - used_count),
+        available_count=available_count,
         is_sriov=is_sriov,
         has_mdev=has_mdev,
-        total_vram_mb=total_vram_mb,
-        used_vram_mb=used_vram_mb,
+        total_vram_mb=vram_info.total_vram_mb,
+        used_vram_mb=vram_info.used_vram_mb,
+        used_vram_known=vram_info.used_vram_known,
+        per_instance_vram_mb=vram_info.per_instance_vram_mb,
+        mdev_profile=vram_info.mdev_profile,
+        profiles=vram_info.profiles,
         used_by=visible_used_by,
     )
 
@@ -452,12 +681,17 @@ def list_gpu_options() -> list[GPUSummary]:
                 node=node_str,
                 physical_gpu_count=mapping.physical_gpu_count,
                 device_count=mapping.device_count,
+                capacity_count=mapping.capacity_count,
                 used_count=mapping.used_count,
                 available_count=mapping.available_count,
                 is_sriov=mapping.is_sriov,
                 has_mdev=mapping.has_mdev,
                 total_vram_mb=mapping.total_vram_mb,
                 used_vram_mb=mapping.used_vram_mb,
+                used_vram_known=mapping.used_vram_known,
+                per_instance_vram_mb=mapping.per_instance_vram_mb,
+                mdev_profile=mapping.mdev_profile,
+                profiles=mapping.profiles,
             )
         )
 
@@ -471,10 +705,14 @@ def _build_usage_map() -> dict[str, list[GPUUsageInfo]]:
     """
     usage: dict[str, list[GPUUsageInfo]] = {}
 
-    all_resources: list[dict] = []
+    # (resource, 所屬連線 client)：VM 設定必須用資源所在連線查詢，
+    # 不能沿用迴圈跑完後殘留的最後一個 client
+    all_resources: list[tuple[dict[str, Any], Any]] = []
     for _key, proxmox in iter_connection_clients():
         try:
-            all_resources.extend(proxmox.cluster.resources.get(type="vm"))
+            all_resources.extend(
+                (r, proxmox) for r in proxmox.cluster.resources.get(type="vm")
+            )
         except Exception as e:
             logger.warning(
                 "Failed to scan VM resources for GPU usage on connection %s: %s",
@@ -483,7 +721,7 @@ def _build_usage_map() -> dict[str, list[GPUUsageInfo]]:
     if not all_resources:
         return usage
 
-    for resource in all_resources:
+    for resource, proxmox in all_resources:
         if resource.get("type") != "qemu":
             continue
 
