@@ -6,14 +6,21 @@ import { UsersService } from "../../../services/users";
 import { useConfirm } from "../../../components/ConfirmDialog/ConfirmProvider";
 import { useToast } from "../../../hooks/useToast";
 
+// fallback：取消「無限制」勾選時回填的預設值；0 = 無限制
 const NUMBER_FIELDS = [
-  { key: "max_cpu_cores", label: "CPU cores", min: 1, max: 256 },
-  { key: "max_memory_mb", label: "記憶體 (MB)", min: 256, max: 1048576 },
-  { key: "max_disk_gb", label: "磁碟 (GB)", min: 1, max: 65536 },
-  { key: "max_instances", label: "實例數", min: 1, max: 100 },
+  { key: "max_cpu_cores", label: "CPU cores", min: 1, max: 256, fallback: 8 },
+  { key: "max_memory_mb", label: "記憶體 (MB)", min: 256, max: 1048576, fallback: 16384 },
+  { key: "max_disk_gb", label: "磁碟 (GB)", min: 1, max: 65536, fallback: 100 },
+  { key: "max_instances", label: "實例數", min: 1, max: 100, fallback: 5 },
 ];
 
 const PICKER_MAX_ROWS = 50;
+
+/** 上限顯示：0 = 無限制。 */
+function fmtLimit(value, unit = "") {
+  if (Number(value) === 0) return "無限制";
+  return unit ? `${value} ${unit}` : String(value);
+}
 
 /** 只取出與基準值不同的欄位，配合後端 partial 更新。 */
 function changedFields(form, baseline) {
@@ -28,6 +35,46 @@ function pickNumbers(source) {
     acc[key] = Number(source?.[key] ?? 0);
     return acc;
   }, {});
+}
+
+/** 表單值正規化：清空的輸入框回退基準值，其餘轉數字。 */
+function normNumbers(form, baseline) {
+  return NUMBER_FIELDS.reduce((acc, { key }) => {
+    const v = form[key];
+    acc[key] = v === "" || Number.isNaN(Number(v)) ? Number(baseline[key]) : Number(v);
+    return acc;
+  }, {});
+}
+
+/** 上限輸入欄：數字輸入 + 無限制勾選（對應 0）。 */
+function LimitField({ idPrefix, field, value, onChange }) {
+  const { key, label, min, max, fallback } = field;
+  const unlimited = value === 0;
+  return (
+    <div className={styles.field}>
+      <label htmlFor={`${idPrefix}-${key}`}>{label}</label>
+      <input
+        id={`${idPrefix}-${key}`}
+        type="number"
+        min={min}
+        max={max}
+        value={unlimited ? "" : value}
+        placeholder={unlimited ? "無限制" : undefined}
+        disabled={unlimited}
+        onChange={(e) =>
+          onChange(e.target.value === "" ? "" : Number(e.target.value))
+        }
+      />
+      <label className={styles.unlimitedToggle}>
+        <input
+          type="checkbox"
+          checked={unlimited}
+          onChange={(e) => onChange(e.target.checked ? 0 : fallback)}
+        />
+        無限制
+      </label>
+    </div>
+  );
 }
 
 function formatUser(user) {
@@ -131,7 +178,7 @@ function QuotaDialog({ mode, quota, candidates, loadingUsers, defaults, onClose,
     setSaving(true);
     try {
       if (isEdit) {
-        const patch = changedFields(form, baseline);
+        const patch = changedFields(normNumbers(form, baseline), baseline);
         if (Object.keys(patch).length === 0) {
           onClose();
           return;
@@ -139,7 +186,11 @@ function QuotaDialog({ mode, quota, candidates, loadingUsers, defaults, onClose,
         await QuotasService.update(quota.id, patch);
         toast.success("配額已更新");
       } else {
-        await QuotasService.create({ scope: "user", user_id: userId, ...pickNumbers(form) });
+        await QuotasService.create({
+          scope: "user",
+          user_id: userId,
+          ...normNumbers(form, baseline),
+        });
         toast.success("配額已建立");
       }
       onSaved();
@@ -173,24 +224,20 @@ function QuotaDialog({ mode, quota, candidates, loadingUsers, defaults, onClose,
         )}
 
         <div className={styles.formGrid}>
-          {NUMBER_FIELDS.map(({ key, label, min, max }) => (
-            <div key={key} className={styles.field}>
-              <label htmlFor={`quota-${key}`}>{label}</label>
-              <input
-                id={`quota-${key}`}
-                type="number"
-                min={min}
-                max={max}
-                value={form[key]}
-                onChange={(e) => setField(key, Number(e.target.value))}
-              />
-            </div>
+          {NUMBER_FIELDS.map((field) => (
+            <LimitField
+              key={field.key}
+              idPrefix="quota"
+              field={field}
+              value={form[field.key]}
+              onChange={(value) => setField(field.key, value)}
+            />
           ))}
         </div>
 
         {!isEdit && (
           <p className={styles.hint}>
-            欄位已帶入目前的全域預設值，改成這位使用者專屬的上限即可。
+            欄位已帶入目前的全域預設值，改成這位使用者專屬的上限即可。勾選「無限制」代表該項目不設上限。
           </p>
         )}
 
@@ -221,7 +268,7 @@ function GlobalQuotaCard({ config, onSaved }) {
 
   useEffect(() => setForm(baseline), [baseline]);
 
-  const patch = changedFields(form, baseline);
+  const patch = changedFields(normNumbers(form, baseline), baseline);
   const dirty = Object.keys(patch).length > 0;
 
   const handleSave = async () => {
@@ -258,20 +305,16 @@ function GlobalQuotaCard({ config, onSaved }) {
 
       <div className={styles.cardBody}>
         <div className={styles.formGrid}>
-          {NUMBER_FIELDS.map(({ key, label, min, max }) => (
-            <div key={key} className={styles.field}>
-              <label htmlFor={`global-${key}`}>{label}</label>
-              <input
-                id={`global-${key}`}
-                type="number"
-                min={min}
-                max={max}
-                value={form[key]}
-                onChange={(e) =>
-                  setForm((prev) => ({ ...prev, [key]: Number(e.target.value) }))
-                }
-              />
-            </div>
+          {NUMBER_FIELDS.map((field) => (
+            <LimitField
+              key={field.key}
+              idPrefix="global"
+              field={field}
+              value={form[field.key]}
+              onChange={(value) =>
+                setForm((prev) => ({ ...prev, [field.key]: value }))
+              }
+            />
           ))}
         </div>
 
@@ -399,7 +442,7 @@ export default function QuotasPage() {
             <p>
               尚未設定任何個人覆寫，所有使用者都套用上方的全域預設值
               {globalQuota &&
-                `（${globalQuota.max_cpu_cores} cores / ${globalQuota.max_memory_mb} MB / ${globalQuota.max_disk_gb} GB / ${globalQuota.max_instances} 台）`}
+                `（${fmtLimit(globalQuota.max_cpu_cores, "cores")} / ${fmtLimit(globalQuota.max_memory_mb, "MB")} / ${fmtLimit(globalQuota.max_disk_gb, "GB")} / ${fmtLimit(globalQuota.max_instances, "台")}）`}
               。
             </p>
           </div>
@@ -423,10 +466,10 @@ export default function QuotasPage() {
                     <span className={`${styles.badge} ${styles.badge_user}`}>個人覆寫</span>
                   </td>
                   <td>{q.user_email ?? "—"}</td>
-                  <td>{q.max_cpu_cores}</td>
-                  <td>{q.max_memory_mb}</td>
-                  <td>{q.max_disk_gb}</td>
-                  <td>{q.max_instances}</td>
+                  <td>{fmtLimit(q.max_cpu_cores)}</td>
+                  <td>{fmtLimit(q.max_memory_mb)}</td>
+                  <td>{fmtLimit(q.max_disk_gb)}</td>
+                  <td>{fmtLimit(q.max_instances)}</td>
                   <td className={styles.tdRight}>
                     <div className={styles.rowActions}>
                       <button

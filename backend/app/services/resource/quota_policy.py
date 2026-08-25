@@ -1,6 +1,7 @@
 """配額解析與執法純函式（無 I/O，可單測）。
 
 解析順序：user 覆寫（整列全勝）→ 全域預設（quota_config singleton）→ 內建預設。
+上限值 0 = 無限制（UNLIMITED），該欄位不做執法。
 """
 
 from __future__ import annotations
@@ -24,6 +25,8 @@ class QuotaUsage:
     disk_gb: int
     instances: int
 
+
+UNLIMITED = 0
 
 DEFAULT_QUOTA = EffectiveQuota(
     max_cpu_cores=8, max_memory_mb=16384, max_disk_gb=100, max_instances=5
@@ -54,7 +57,10 @@ def check_quota_delta(
     delta_disk_gb: int = 0,
     delta_instances: int = 0,
 ) -> list[str]:
-    """回傳超限訊息清單；空 list 表示通過。負增量（縮減）永遠通過該欄位。"""
+    """回傳超限訊息清單；空 list 表示通過。負增量（縮減）永遠通過該欄位。
+
+    上限為 UNLIMITED（0）的欄位不檢查。
+    """
     violations: list[str] = []
     checks = [
         ("CPU", usage.cpu_cores, delta_cores, quota.max_cpu_cores, "cores"),
@@ -63,6 +69,8 @@ def check_quota_delta(
         ("實例數", usage.instances, delta_instances, quota.max_instances, "台"),
     ]
     for label, used, delta, limit, unit in checks:
+        if limit == UNLIMITED:
+            continue
         if delta > 0 and used + delta > limit:
             violations.append(
                 f"{label}超出配額（目前 {used} + 新增 {delta} > 上限 {limit} {unit}）"

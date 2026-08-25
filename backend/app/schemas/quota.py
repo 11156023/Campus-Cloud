@@ -1,4 +1,4 @@
-"""配額 API schemas。"""
+"""配額 API schemas。各上限欄位 0 = 無限制（該欄位不執法）。"""
 
 import uuid
 from datetime import datetime
@@ -11,10 +11,10 @@ from app.models import QuotaScope
 class ResourceQuotaCreate(BaseModel):
     scope: QuotaScope = QuotaScope.user
     user_id: uuid.UUID
-    max_cpu_cores: int = Field(default=8, ge=1, le=256)
-    max_memory_mb: int = Field(default=16384, ge=256, le=1048576)
-    max_disk_gb: int = Field(default=100, ge=1, le=65536)
-    max_instances: int = Field(default=5, ge=1, le=100)
+    max_cpu_cores: int = Field(default=8, ge=0, le=256)
+    max_memory_mb: int = Field(default=16384, ge=0, le=1048576)
+    max_disk_gb: int = Field(default=100, ge=0, le=65536)
+    max_instances: int = Field(default=5, ge=0, le=100)
 
     @model_validator(mode="after")
     def _validate_target(self) -> "ResourceQuotaCreate":
@@ -24,10 +24,10 @@ class ResourceQuotaCreate(BaseModel):
 
 
 class ResourceQuotaUpdate(BaseModel):
-    max_cpu_cores: int | None = Field(default=None, ge=1, le=256)
-    max_memory_mb: int | None = Field(default=None, ge=256, le=1048576)
-    max_disk_gb: int | None = Field(default=None, ge=1, le=65536)
-    max_instances: int | None = Field(default=None, ge=1, le=100)
+    max_cpu_cores: int | None = Field(default=None, ge=0, le=256)
+    max_memory_mb: int | None = Field(default=None, ge=0, le=1048576)
+    max_disk_gb: int | None = Field(default=None, ge=0, le=65536)
+    max_instances: int | None = Field(default=None, ge=0, le=100)
 
 
 class ResourceQuotaPublic(BaseModel):
@@ -55,10 +55,10 @@ class GlobalQuotaPublic(BaseModel):
 class GlobalQuotaUpdate(BaseModel):
     """全域預設配額更新（partial；範圍約束與 model 一致）。"""
 
-    max_cpu_cores: int | None = Field(default=None, ge=1, le=256)
-    max_memory_mb: int | None = Field(default=None, ge=256, le=1048576)
-    max_disk_gb: int | None = Field(default=None, ge=1, le=65536)
-    max_instances: int | None = Field(default=None, ge=1, le=100)
+    max_cpu_cores: int | None = Field(default=None, ge=0, le=256)
+    max_memory_mb: int | None = Field(default=None, ge=0, le=1048576)
+    max_disk_gb: int | None = Field(default=None, ge=0, le=65536)
+    max_instances: int | None = Field(default=None, ge=0, le=100)
 
 
 class EffectiveQuotaPublic(BaseModel):
