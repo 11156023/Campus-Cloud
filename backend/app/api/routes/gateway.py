@@ -132,6 +132,19 @@ def test_connection(session: SessionDep, _: AdminUser):
     return GatewayConnectionTestResult(success=success, message=message)
 
 
+@router.post("/reset-host-key", response_model=Message)
+def reset_host_key(session: SessionDep, current_user: AdminUser) -> Message:
+    """清除 Gateway VM 的 pinned SSH host key（VM 重灌後 host key 變更時使用）"""
+    host = gateway_service.reset_host_key(session=session)
+    audit_service.log_action(
+        session=session,
+        user_id=current_user.id,
+        action=AuditAction.gateway_config_update,
+        details=f"Reset pinned SSH host key for gateway host {host}",
+    )
+    return Message(message=f"已重設 {host} 的 host key，下次連線將重新記錄")
+
+
 # ─── 安裝腳本下載 ──────────────────────────────────────────────────────────────
 
 

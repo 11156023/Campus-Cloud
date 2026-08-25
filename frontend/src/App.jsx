@@ -3,6 +3,9 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { useAuth } from "./contexts/AuthContext";
 import DashboardLayout from "./layout/DashboardLayout";
 import LoginPage from "./pages/login/LoginPage";
+import MIcon from "./components/MIcon";
+import { AuthSessionStatus } from "./services/authSession";
+import styles from "./App.module.scss";
 
 // 個人
 const DashboardPage = lazy(() => import("./pages/personal/dashboard/DashboardPage"));
@@ -40,22 +43,67 @@ const AdminPage = lazy(() => import("./pages/system/admin/AdminPage"));
 const SettingsPage = lazy(() => import("./pages/system/settings/SettingsPage"));
 const MonitoringPage = lazy(() => import("./pages/system/monitoring/MonitoringPage"));
 const QuotasPage = lazy(() => import("./pages/system/quotas/QuotasPage"));
+const IpManagementPage = lazy(() => import("./pages/system/ip-management/IpManagementPage"));
 const AuditPage = lazy(() => import("./pages/system/audit/AuditPage"));
 const JobsPage = lazy(() => import("./pages/system/jobs/JobsPage"));
-const DeployLogsPage = lazy(() => import("./pages/system/deploy-logs/DeployLogsPage"));
 
 // 網路
 const FirewallPage = lazy(() => import("./pages/network/firewall/FirewallPage"));
-const DomainPage = lazy(() => import("./pages/network/domain/DomainPage"));
-const GatewayPage = lazy(() => import("./pages/network/gateway/GatewayPage"));
+const DomainPage = lazy(() => import("./pages/system/domain/DomainPage"));
+const GatewayPage = lazy(() => import("./pages/system/gateway/GatewayPage"));
 const ReverseProxyPage = lazy(() => import("./pages/network/reverse-proxy/ReverseProxyPage"));
-const IpManagementPage = lazy(() => import("./pages/network/ip-management/IpManagementPage"));
+
+function AuthBootstrapState({ unavailable = false, retrying = false, onRetry }) {
+  return (
+    <main className={styles.authStatePage}>
+      <section className={styles.authStateCard} role={unavailable ? "alert" : "status"}>
+        {unavailable ? (
+          <span className={styles.authStateIcon} aria-hidden="true">
+            <MIcon name="cloud_off" size={42} />
+          </span>
+        ) : (
+          <span className={styles.spinner} aria-hidden="true" />
+        )}
+        <h1 className={styles.authStateTitle}>
+          {unavailable ? "暫時無法連線" : "正在驗證登入狀態"}
+        </h1>
+        <p className={styles.authStateDescription}>
+          {unavailable
+            ? "如果問題持續發生請聯繫系統管理員。"
+            : "請稍候，系統正在確認你的登入資訊。"}
+        </p>
+        {unavailable && (
+          <button
+            type="button"
+            className={styles.retryButton}
+            disabled={retrying}
+            onClick={onRetry}
+          >
+            <span aria-hidden="true">
+              <MIcon name="refresh" size={18} />
+            </span>
+            {retrying ? "重試中…" : "重新連線"}
+          </button>
+        )}
+      </section>
+    </main>
+  );
+}
 
 function App() {
-  const { user, loading } = useAuth();
+  const { user, loading, authStatus, retrySession } = useAuth();
   const isAdmin = Boolean(user?.is_superuser || user?.role === "admin");
 
-  if (loading) return null;
+  if (authStatus === AuthSessionStatus.UNAVAILABLE && !user) {
+    return (
+      <AuthBootstrapState
+        unavailable
+        retrying={loading}
+        onRetry={retrySession}
+      />
+    );
+  }
+  if (loading && !user) return <AuthBootstrapState />;
 
   return (
     <Routes>
@@ -117,17 +165,16 @@ function App() {
           <Route path="/admin"     element={<AdminPage />} />
           <Route path="/settings"  element={<SettingsPage />} />
           <Route path="/quotas"    element={<QuotasPage />} />
+          <Route path="/ip-management" element={<IpManagementPage />} />
           <Route path="/monitoring" element={<MonitoringPage />} />
           <Route path="/audit"     element={<AuditPage />} />
           <Route path="/jobs"      element={<JobsPage />} />
-          <Route path="/deploy-logs" element={<DeployLogsPage />} />
 
           {/* 網路 */}
           <Route path="/firewall"       element={<FirewallPage />} />
           <Route path="/domain"         element={<DomainPage />} />
           <Route path="/gateway"        element={<GatewayPage />} />
           <Route path="/reverse-proxy"  element={<ReverseProxyPage />} />
-          <Route path="/ip-management"  element={<IpManagementPage />} />
 
           {/* fallback */}
           <Route path="*" element={<Navigate to="/dashboard" replace />} />

@@ -35,10 +35,10 @@ export default function TemplateCloneDialog({ template, canBatch, onClose, onClo
       });
       toast.success(
         (res?.tasks?.length ?? 0) > 1
-          ? `已送出 ${res.tasks.length} 台克隆任務，可在下方任務清單追蹤進度`
+          ? `已送出 ${res.tasks.length} 台克隆任務，進度請見側欄「背景任務」`
           : "克隆任務已送出，完成後會出現在你的資源列表",
       );
-      onCloned();
+      onCloned?.();
       onClose();
     } catch (e) {
       toast.error(e?.message ?? "克隆失敗");

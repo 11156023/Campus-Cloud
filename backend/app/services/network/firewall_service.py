@@ -15,7 +15,7 @@ from sqlmodel import Session
 
 from app.core.authorizers import can_bypass_resource_ownership
 from app.exceptions import BadRequestError, NotFoundError, ProxmoxError
-from app.infrastructure.proxmox import get_proxmox_api
+from app.infrastructure.proxmox import get_proxmox_api_for_node
 from app.infrastructure.proxmox.operations import ResourceType
 from app.models.user import User
 from app.repositories import firewall_layout as layout_repo
@@ -61,7 +61,7 @@ def _from_punycode_hostname(hostname: str) -> str:
 
 def _firewall_api(node: str, vmid: int, resource_type: ResourceType):
     """回傳 VM/LXC 的 proxmoxer 防火牆端點"""
-    proxmox = get_proxmox_api()
+    proxmox = get_proxmox_api_for_node(node)
     if resource_type == "qemu":
         return proxmox.nodes(node).qemu(vmid).firewall
     return proxmox.nodes(node).lxc(vmid).firewall

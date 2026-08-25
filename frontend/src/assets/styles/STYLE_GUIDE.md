@@ -111,6 +111,8 @@ src/pages/personal/resources/
 | —（灰色） | `--color-hover` / `--color-text-muted` | ⚫ 未啟用 | 已停止、已暫停、disabled |
 
 > **例外**：可用名額不足的日曆格（AvailabilityPanel `calendarDayLimited`）保留黃色 `#f59e0b`，因其屬視覺漸層語意，非 UI 警示色。
+>
+> **例外**：Gateway 頁的類 VSCode 設定檔編輯器（`ConfigCodeEditor.module.scss`）整組寫死 vs-dark 色票（`#1e1e1e`、`#252526`、`#007acc` 等）與 13px/12px 字級，刻意不隨主題切換——外框需與 Monaco `theme="vs-dark"` 一致，模擬 VSCode 視窗本身即為獨立配色的容器。
 
 #### 狀態 Badge 的標準寫法
 
@@ -397,9 +399,12 @@ function closeMenu() {
 | 層級 | 值 | 用途 |
 |------|-----|------|
 | 基礎卡片 | 1 | 一般卡片 |
-| 卡片 hover / 選單 | 50 | Dropdown 選單 |
+| 卡片 hover / 選單 | 50 | 容器內的 Dropdown 選單 |
 | Sticky Header | 100 | 頁面頂部導覽列 |
+| Portal 浮層選單 | 150 | portal 到 body 的 Dropdown（如 `components/PowerMenu`） |
 | Dialog / Modal | 300 | 全頁覆蓋 Dialog |
 | Toast / Tooltip | 400 | 通知、提示 |
 
 > ⚠️ 注意：使用 `backdrop-filter` 或 `transform` 的元素會建立新的 stacking context，子元素的 `z-index` 無法穿透至外層。若發現 Dropdown 被其他卡片遮住，請確認父元素是否有這類屬性。
+>
+> 玻璃表面（`glass-surface`）搭配 `overflow: hidden` 的容器還會**裁掉**溢出的 absolute 選單。浮層若可能超出容器範圍，改用 `createPortal` 掛到 `document.body` 並以 `position: fixed` 定位（範例：`components/PowerMenu`），且背景要用不透明的 `var(--color-surface)`，否則會透出底下的列表內容。

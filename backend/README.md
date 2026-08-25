@@ -70,8 +70,7 @@ backend/
 | `ai_proxy.py` | OpenAI 相容文字 API allowlist（`/models`、`/chat/completions`、`/completions`、`/responses`）代理至受限 LiteLLM service key |
 | `spec_change_requests.py` | VM 規格變更申請與審核 |
 | `audit_logs.py` | 操作稽核紀錄查詢 |
-| `script_deploy.py` | 從 GitHub 自動化部署服務模板 |
-| `ai_template_recommendation` | 內嵌 AI 模板推薦 |
+| `ai_template_recommendation` | 內嵌 AI 規格建議 |
 
 WebSocket 端點（`app/main.py`）：
 

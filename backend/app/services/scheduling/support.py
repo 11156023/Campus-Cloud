@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from sqlmodel import Session, select
 
-from app.infrastructure.proxmox import get_proxmox_settings
 from app.models import VMProvisioningStatus, VMRequest, VMRequestStatus
 from app.repositories import vm_request as vm_request_repo
 from app.services.proxmox import proxmox_service
@@ -16,7 +15,6 @@ def find_existing_resource_for_request(
 ) -> dict | None:
     """Find an unclaimed Proxmox guest matching an approved request."""
     expected_type = scheduling_policy.resource_type_for_request(request)
-    pool_name = get_proxmox_settings().pool_name
     claimed_vmids = {
         int(item.vmid)
         for item in session.exec(
@@ -37,9 +35,7 @@ def find_existing_resource_for_request(
         vmid = int(resource.get("vmid"))
         if vmid in claimed_vmids:
             continue
-        pool = str(resource.get("pool") or "")
-        if pool and pool != pool_name:
-            continue
+        # list_all_resources() 已依各連線自己的 pool 過濾，這裡不需再比對
         return resource
     return None
 

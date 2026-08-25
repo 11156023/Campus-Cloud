@@ -11,14 +11,7 @@ from app.infrastructure.proxmox import client as proxmox_client
 
 @pytest.fixture(autouse=True)
 def _reset_client_state():
-    with proxmox_client._proxmox_lock:
-        proxmox_client._state.client = None
-        proxmox_client._state.created_at = 0.0
-        proxmox_client._state.active_host = None
-        proxmox_client._state.failure_until = 0.0
-        proxmox_client._state.last_error = None
-        proxmox_client._state.connecting = False
-        proxmox_client._state.connection_event = None
+    proxmox_client.invalidate_proxmox_client()
     yield
     proxmox_client.invalidate_proxmox_client()
 
@@ -76,8 +69,8 @@ class _FakeProxmox:
 def test_basic_blocking_task_status_includes_task_log_tail(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         proxmox_client,
-        "get_proxmox_api",
-        lambda: _FakeProxmox(
+        "get_proxmox_api_for_node",
+        lambda _node: _FakeProxmox(
             {"status": "stopped", "exitstatus": "terminated"},
             [
                 {"t": "migration start"},
@@ -104,8 +97,14 @@ def test_failed_probe_is_cached(monkeypatch: pytest.MonkeyPatch) -> None:
         SimpleNamespace(id=2, name="pve-b", host="10.0.0.2", port=8006),
     ]
     pinged: list[str] = []
-    monkeypatch.setattr(proxmox_client, "get_proxmox_settings", lambda: object())
-    monkeypatch.setattr(proxmox_client, "get_nodes_for_ha", lambda: nodes)
+    monkeypatch.setattr(
+        proxmox_client,
+        "get_proxmox_settings",
+        lambda _connection_id=None: SimpleNamespace(
+            connection_id=None, connection_name=None, host="10.0.0.1"
+        ),
+    )
+    monkeypatch.setattr(proxmox_client, "get_nodes_for_ha", lambda _cid=None: nodes)
     monkeypatch.setattr(
         proxmox_client,
         "_tcp_ping",
@@ -125,7 +124,7 @@ def test_concurrent_callers_share_one_probe(monkeypatch: pytest.MonkeyPatch) -> 
     fake_client = object()
     probes = 0
 
-    def connect():
+    def connect(_connection_id=None):
         nonlocal probes
         probes += 1
         return fake_client, "pve-a"

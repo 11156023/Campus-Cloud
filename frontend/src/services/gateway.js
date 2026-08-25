@@ -21,6 +21,11 @@ export const GatewayService = {
     return apiPost("/api/v1/gateway/test-connection");
   },
 
+  /** 重設 pinned SSH host key（Gateway VM 重灌後 host key 變更時使用） */
+  resetHostKey() {
+    return apiPost("/api/v1/gateway/reset-host-key");
+  },
+
   /** 套用 Cloudflare DNS Challenge 到 Traefik */
   syncTraefikDnsChallenge() {
     return apiPost("/api/v1/gateway/traefik/dns-challenge/sync");

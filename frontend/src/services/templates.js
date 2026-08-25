@@ -1,15 +1,5 @@
 import { apiDelete, apiGet, apiPatch, apiPost } from "./api";
 
-/** 背景任務類型的顯示名稱 */
-export const TEMPLATE_TASK_LABEL = {
-  "template.convert": "轉換範本",
-  "template.delete": "刪除範本",
-  "template.update_clone": "更新循環：建立暫存母機",
-  "template.update_convert": "更新循環：轉換新版",
-  "template.update_cancel": "更新循環：取消",
-  "template.clone": "克隆開通",
-};
-
 export const TemplatesService = {
   /** 列出可見範本（admin 全部；teacher 自有+可見；student 僅 ready 且可見） */
   list(options) {
@@ -55,15 +45,5 @@ export const TemplatesService = {
   },
   cancelUpdateCycle(templateId) {
     return apiPost(`/api/v1/templates/${templateId}/update-cycle/cancel`, {});
-  },
-
-  /** 自己的背景任務（新到舊） */
-  listTasks(limit = 50) {
-    return apiGet(`/api/v1/templates/tasks?limit=${limit}`);
-  },
-
-  /** 單一任務狀態 */
-  getTask(taskId) {
-    return apiGet(`/api/v1/templates/tasks/${taskId}`);
   },
 };

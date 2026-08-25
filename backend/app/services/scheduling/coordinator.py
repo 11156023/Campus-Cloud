@@ -91,7 +91,6 @@ def _adopt_existing_resource(
             os_info=request.os_info,
             expiry_date=request.expiry_date,
             template_id=request.template_id,
-            service_template_slug=getattr(request, "service_template_slug", None),
             request_id=request.id,
             commit=False,
         )
@@ -144,13 +143,7 @@ def _provision_new_resource(
     5. execute_provision (clone VM) with no open transaction
     6. Open new session, record vmid and provisioning_status, commit
     """
-    resource_type = _resource_type_for_request(request)
     desired_node = str(request.desired_node or request.assigned_node or "")
-
-    # Service template deployment path: community-scripts creates the LXC
-    # itself, so skip normal clone-based provisioning.
-    if resource_type == "lxc" and request.service_template_slug:
-        return _provision_via_service_template(session=session, request=request)
 
     # --- Phase 1: mark provisioning running + plan (short transaction) ----
     request.provisioning_status = VMProvisioningStatus.running
@@ -186,7 +179,6 @@ def _provision_new_resource(
     request_expiry_date = request.expiry_date
     request_template_id = request.template_id
     request_resource_type = request.resource_type
-    request_service_template_slug = getattr(request, "service_template_slug", None)
 
     # Close session so clone runs outside any transaction.
     session.commit()
@@ -234,7 +226,6 @@ def _provision_new_resource(
             template_id=request_template_id,
             ssh_private_key_encrypted=plan.get("ssh_private_key_encrypted"),
             ssh_public_key=plan.get("ssh_public_key"),
-            service_template_slug=request_service_template_slug,
             request_id=req.id,
             commit=False,
         )
@@ -272,289 +263,6 @@ def _provision_new_resource(
         request_id, new_vmid, actual_node,
     )
     return new_vmid, actual_node, plan["placement_strategy"]
-
-
-def _provision_via_service_template(
-    *,
-    session: Session,
-    request: VMRequest,
-) -> tuple[int, str, str | None] | None:
-    """Provision LXC by running a community-scripts template (e.g. docker/nginx).
-
-    The community script creates the container itself; we just trigger it
-    synchronously via SSH then record the resulting vmid/node in our DB.
-    """
-    from app.core.security import decrypt_value
-    from app.models import IpAllocation
-    from app.services.network import script_deploy_service
-
-    request_id = request.id
-    request_user_id = request.user_id
-    request_env_type = request.environment_type
-    request_os_info = request.os_info
-    request_expiry_date = request.expiry_date
-    template_slug = str(request.service_template_slug or "")
-    script_path = request.service_template_script_path or f"ct/{template_slug}.sh"
-    hostname = request.hostname
-    cores = int(request.cores or 2)
-    memory = int(request.memory or 2048)
-    disk = int(request.rootfs_size or 8)
-
-    # Generate SSH key pair so the platform can manage the container after deploy
-    from app.core.security import encrypt_value
-    from app.infrastructure.ssh.client import generate_ed25519_keypair
-    private_key_pem, public_key = generate_ed25519_keypair()
-    encrypted_private_key = encrypt_value(private_key_pem)
-
-    try:
-        password_plain = decrypt_value(request.password)
-    except Exception as exc:
-        logger.error("Failed to decrypt password for request %s: %s", request_id, exc)
-        raise
-
-    # Mark provisioning and close txn before the long-running SSH deploy.
-    request.provisioning_status = VMProvisioningStatus.running
-    request.provisioning_error = None
-    session.add(request)
-    session.commit()
-    logger.info(
-        "Marked request %s as provisioning (service template %s)",
-        request_id, template_slug,
-    )
-
-    active_task_id = script_deploy_service.get_active_task_id_for_request(str(request_id))
-    if active_task_id is not None:
-        logger.info(
-            "Request %s already has active service-template deploy task %s; skipping duplicate provisioning",
-            request_id,
-            active_task_id,
-        )
-        return None
-
-    # ── 預先分配 IP（必要：服務模板需要靜態 IP，不允許 silent fallback 到 DHCP）──
-    # 使用 proxmox_service.next_vmid() 取得候選 CTID，分配 IP 後傳給 community-scripts。
-    # 若部署後實際建立的 VMID 與候選不同，稍後會更新 IpAllocation.vmid 對應。
-    from app.services.network import ip_management_service
-    candidate_vmid: int | None = None
-    allocated_ip: str | None = None
-    with Session(engine) as prep_session:
-        try:
-            net_cfg = ip_management_service.get_network_config_for_vm(prep_session)
-        except Exception as exc:
-            logger.error(
-                "子網未設定或讀取失敗，服務模板部署中止（不使用 DHCP fallback）: %s",
-                exc,
-            )
-            with Session(engine) as rb:
-                req = vm_request_repo.get_vm_request_by_id(
-                    session=rb, request_id=request_id, for_update=True,
-                )
-                if req and req.vmid is None:
-                    req.provisioning_status = VMProvisioningStatus.failed
-                    req.provisioning_error = "Failed to allocate candidate VMID"
-                    rb.add(req)
-                    rb.commit()
-            raise RuntimeError(
-                f"無法取得 IP 管理子網設定，請先到「網路 → IP 管理」設定子網：{exc}"
-            ) from exc
-
-        candidate_vmid = proxmox_service.next_vmid()
-        try:
-            allocated_ip = ip_management_service.allocate_ip(
-                prep_session, candidate_vmid, "lxc",
-            )
-            prep_session.commit()
-        except Exception as exc:
-            prep_session.rollback()
-            logger.error(
-                "為候選 VMID %s 預留 IP 失敗（不使用 DHCP fallback）: %s",
-                candidate_vmid, exc,
-            )
-            with Session(engine) as rb:
-                req = vm_request_repo.get_vm_request_by_id(
-                    session=rb, request_id=request_id, for_update=True,
-                )
-                if req and req.vmid is None:
-                    req.provisioning_status = VMProvisioningStatus.failed
-                    req.provisioning_error = "Failed to allocate static IP"
-                    rb.add(req)
-                    rb.commit()
-            raise RuntimeError(f"無法分配靜態 IP：{exc}") from exc
-
-        logger.info(
-            "已為候選 VMID %s 預留 IP %s (服務模板 %s)",
-            candidate_vmid, allocated_ip, template_slug,
-        )
-        deploy_net = {
-            "ip_cidr": f"{allocated_ip}/{net_cfg['prefix_len']}",
-            "gateway": net_cfg.get("gateway"),
-            "bridge": net_cfg.get("bridge_name"),
-            "nameserver": net_cfg.get("dns_servers"),
-        }
-
-    try:
-        new_vmid, _task = script_deploy_service.deploy_for_vm_request_sync(
-            user_id=str(request_user_id),
-            template_slug=template_slug,
-            script_path=script_path,
-            hostname=hostname,
-            password=password_plain,
-            cpu=cores,
-            ram=memory,
-            disk=disk,
-            unprivileged=True,
-            ssh=True,
-            environment_type=request_env_type,
-            os_info=request_os_info,
-            net_config=deploy_net,
-            ssh_public_key=public_key,
-            request_id=str(request.id),
-            candidate_vmid=candidate_vmid,
-        )
-    except script_deploy_service.DuplicateDeploymentError as exc:
-        logger.info(
-            "Request %s already has an active service-template deploy; leaving provisioning in progress: %s",
-            request_id,
-            exc,
-        )
-        if allocated_ip is not None:
-            try:
-                with Session(engine) as rb_ip:
-                    ip_management_service.release_ip_by_address(rb_ip, allocated_ip)
-                    rb_ip.commit()
-                logger.info(
-                    "Released duplicate provisioning candidate IP %s for VMID %s",
-                    allocated_ip,
-                    candidate_vmid,
-                )
-            except Exception as release_exc:
-                logger.warning(
-                    "Failed to release duplicate provisioning candidate IP %s for VMID %s: %s",
-                    allocated_ip,
-                    candidate_vmid,
-                    release_exc,
-                )
-        return None
-    except Exception as exc:
-        logger.error(
-            "Script deploy failed for request %s (%s): %s",
-            request_id, template_slug, exc,
-        )
-        # 回收已預留的 IP
-        if allocated_ip is not None:
-            try:
-                from app.services.network import ip_management_service
-                with Session(engine) as rb_ip:
-                    ip_management_service.release_ip_by_address(rb_ip, allocated_ip)
-                    rb_ip.commit()
-                logger.info("已釋放部署失敗的預留 IP（候選 VMID %s）", candidate_vmid)
-            except Exception as release_exc:
-                logger.warning("釋放預留 IP 失敗: %s", release_exc)
-        with Session(engine) as rb:
-            req = vm_request_repo.get_vm_request_by_id(
-                session=rb, request_id=request_id, for_update=True,
-            )
-            if req and req.vmid is None:
-                req.provisioning_status = VMProvisioningStatus.failed
-                req.provisioning_error = "Script deploy failed"
-                rb.add(req)
-                rb.commit()
-        raise
-
-    try:
-        info = proxmox_service.find_resource(new_vmid)
-        actual_node = str(info.get("node") or "")
-    except Exception:
-        actual_node = ""
-
-    # 若實際建立的 VMID 與候選不同，更新 IpAllocation 讓 vmid 指向真實容器
-    if candidate_vmid is not None and new_vmid != candidate_vmid:
-        update_ok = False
-        try:
-            # 先驗證 new_vmid 在 PVE 確實存在再重新指派
-            proxmox_service.find_resource(new_vmid)
-            with Session(engine) as fix_session:
-                alloc = fix_session.exec(
-                    select(IpAllocation).where(IpAllocation.vmid == candidate_vmid)
-                ).first()
-                if alloc is not None:
-                    alloc.vmid = new_vmid
-                    alloc.description = f"VMID {new_vmid}"
-                    fix_session.add(alloc)
-                    fix_session.commit()
-                    update_ok = True
-                    logger.info(
-                        "已將 IpAllocation 從候選 VMID %s 更新為實際 VMID %s",
-                        candidate_vmid, new_vmid,
-                    )
-                else:
-                    update_ok = True  # 沒有可遷的紀錄，視為已完成
-        except Exception as exc:
-            logger.warning("更新 IpAllocation.vmid 失敗: %s", exc)
-
-        if not update_ok:
-            # 為避免 IP 洩漏，強制把候選 VMID 上的 IP 釋放
-            try:
-                from app.services.network import ip_management_service
-                with Session(engine) as orphan_rb:
-                    ip_management_service.release_ip(orphan_rb, candidate_vmid)
-                    orphan_rb.commit()
-                logger.info("已強制釋放孤立 IP（候選 VMID %s）", candidate_vmid)
-            except Exception as release_exc:
-                logger.error("孤立 IP 釋放失敗（候選 VMID %s）: %s", candidate_vmid, release_exc)
-
-    with Session(engine) as finish_session:
-        req = vm_request_repo.get_vm_request_by_id(
-            session=finish_session, request_id=request_id, for_update=True,
-        )
-        if req is None:
-            raise NotFoundError(f"Request {request_id} no longer exists")
-
-        resource_repo.create_resource(
-            session=finish_session,
-            vmid=new_vmid,
-            user_id=request_user_id,
-            environment_type=request_env_type,
-            os_info=request_os_info,
-            expiry_date=request_expiry_date,
-            ssh_private_key_encrypted=encrypted_private_key,
-            ssh_public_key=public_key,
-            service_template_slug=template_slug or None,
-            request_id=req.id,
-            commit=False,
-        )
-        vm_request_repo.update_vm_request_provisioning(
-            session=finish_session,
-            db_request=req,
-            vmid=new_vmid,
-            assigned_node=actual_node or None,
-            desired_node=actual_node or None,
-            actual_node=actual_node or None,
-            placement_strategy_used="service_template",
-            provisioning_status=VMProvisioningStatus.completed,
-            provisioning_error=None,
-            commit=False,
-        )
-        finish_session.add(req)
-
-        audit_service.log_action(
-            session=finish_session,
-            user_id=None,
-            vmid=new_vmid,
-            action="script_deploy",
-            details=(
-                f"Deployed service template {template_slug} for request "
-                f"{request_id} on {actual_node or 'unknown'}"
-            ),
-            commit=False,
-        )
-        finish_session.commit()
-
-    logger.info(
-        "Service template deployed: request %s → VMID %s (%s) on %s",
-        request_id, new_vmid, template_slug, actual_node,
-    )
-    return new_vmid, actual_node, "service_template"
 
 
 def _mark_request_runtime_error(
@@ -958,6 +666,10 @@ async def run_scheduler(stop_event: asyncio.Event) -> None:
         tasks=[
             ScheduledTask(name="process_due_request_starts", handler=process_due_request_starts),
             ScheduledTask(name="process_due_request_stops", handler=process_due_request_stops),
+            ScheduledTask(
+                name="process_expired_requests",
+                handler=process_expired_requests_task,
+            ),
             ScheduledTask(name="process_pending_deletions", handler=process_pending_deletions_task),
             ScheduledTask(
                 name="process_recurrence_windows",
@@ -994,6 +706,15 @@ async def run_scheduler(stop_event: asyncio.Event) -> None:
         ],
     )
     logger.info("VM request scheduler stopped")
+
+
+def process_expired_requests_task() -> int:
+    """Scheduler tick：已過使用時段仍未審核的申請自動過期。"""
+    from app.services.vm import (
+        vm_request_expiry_service,  # noqa: PLC0415 — 避免 import cycle
+    )
+
+    return vm_request_expiry_service.process_expired_requests()
 
 
 def process_resource_alerts_task() -> int:

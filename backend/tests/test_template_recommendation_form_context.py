@@ -1,6 +1,5 @@
 from datetime import UTC, datetime, timedelta
 
-from app.ai.template_recommendation.catalog_service import TemplateCatalog
 from app.ai.template_recommendation.recommendation_service import normalize_ai_result
 from app.ai.template_recommendation.schemas import (
     RecommendationFormContext,
@@ -64,7 +63,6 @@ def test_normalizer_selects_only_available_gpu_and_valid_schedule() -> None:
         },
         request,
         [],
-        TemplateCatalog(items=[], categories={}),
         resource_options={
             "lxc_os_images": [],
             "vm_operating_systems": [],

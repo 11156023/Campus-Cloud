@@ -1,28 +1,14 @@
 import { useEffect, useState } from "react";
-import rawData from "virtual:templates";
 import styles from "./ResourceDetailPage.module.scss";
 import MIcon from "../../../../components/MIcon";
 import { ResourcesService } from "../../../../services/resources";
 import { useToast } from "../../../../hooks/useToast";
-
-const TEMPLATES = Object.entries(rawData)
-  .filter(([key]) => !["metadata.json", "versions.json", "github-versions.json"].includes(key))
-  .map(([, value]) => value)
-  .filter(Boolean);
-
-const getTemplateBySlug = (slug) =>
-  slug ? TEMPLATES.find((t) => t.slug === slug) : undefined;
 
 const STATUS_BADGE = {
   running: { label: "執行中", cls: "badge_ok" },
   stopped: { label: "已關機", cls: "badge_muted" },
   paused:  { label: "已暫停", cls: "badge_muted" },
 };
-
-function templateNote(note) {
-  if (typeof note === "string") return note;
-  return note?.text_zh || note?.text || "";
-}
 
 export default function OverviewTab({ vmid }) {
   const toast = useToast();
@@ -67,113 +53,9 @@ export default function OverviewTab({ vmid }) {
     label: resource.status,
     cls: "badge_muted",
   };
-  const template = getTemplateBySlug(resource.service_template_slug);
-  const tplDescription = template?.description_zh || template?.description || "";
-  const credentials = template?.default_credentials;
-  const notes = Array.isArray(template?.notes)
-    ? template.notes.map(templateNote).filter(Boolean)
-    : [];
 
   return (
     <div className={styles.tabStack}>
-      {/* 服務模板資訊 */}
-      {template && (
-        <div className={`${styles.card} ${styles.cardAccent}`}>
-          <div className={styles.cardHeader}>
-            <div className={styles.tplHead}>
-              {template.logo ? (
-                <img
-                  src={template.logo}
-                  alt={template.name ?? ""}
-                  className={styles.tplLogo}
-                  onError={(e) => {
-                    e.currentTarget.style.display = "none";
-                  }}
-                />
-              ) : (
-                <span className={styles.tplLogoFallback}>
-                  <MIcon name="deployed_code" size={28} />
-                </span>
-              )}
-              <div>
-                <h2 className={styles.cardTitle}>
-                  {template.name || resource.service_template_slug}
-                  {template.interface_port ? (
-                    <span className={styles.portChip}>:{template.interface_port}</span>
-                  ) : null}
-                </h2>
-                {tplDescription && <p className={styles.cardDesc}>{tplDescription}</p>}
-              </div>
-            </div>
-          </div>
-          <div className={styles.cardBody}>
-            {(template.documentation || template.website) && (
-              <div className={styles.linkRow}>
-                {template.documentation && (
-                  <a
-                    className={styles.linkBtn}
-                    href={template.documentation}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    <MIcon name="menu_book" size={14} />
-                    Documentation
-                    <MIcon name="open_in_new" size={12} />
-                  </a>
-                )}
-                {template.website && (
-                  <a
-                    className={styles.linkBtn}
-                    href={template.website}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    <MIcon name="public" size={14} />
-                    Website
-                    <MIcon name="open_in_new" size={12} />
-                  </a>
-                )}
-              </div>
-            )}
-
-            {credentials && (credentials.username || credentials.password) && (
-              <div className={styles.noteBox}>
-                <div className={styles.noteBoxTitle}>
-                  <MIcon name="key" size={12} />
-                  預設帳密
-                </div>
-                {credentials.username && (
-                  <p className={styles.noteBoxLine}>
-                    <span className={styles.mutedText}>Username: </span>
-                    <code>{credentials.username}</code>
-                  </p>
-                )}
-                {credentials.password && (
-                  <p className={styles.noteBoxLine}>
-                    <span className={styles.mutedText}>Password: </span>
-                    <code>{credentials.password}</code>
-                  </p>
-                )}
-              </div>
-            )}
-
-            {notes.length > 0 && (
-              <div>
-                <div className={styles.noteBoxTitle}>
-                  <MIcon name="info" size={12} />
-                  注意事項
-                </div>
-                <ul className={styles.noteList}>
-                  {notes.map((n) => (
-                    <li key={n}>{n}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* 基本資訊 */}
       <div className={styles.card}>
         <div className={styles.cardHeader}>

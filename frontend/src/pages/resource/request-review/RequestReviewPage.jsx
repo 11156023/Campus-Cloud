@@ -12,6 +12,7 @@ const TABS = [
   { key: "pending", label: "待審核", icon: "pending_actions" },
   { key: "approved", label: "已通過", icon: "task_alt" },
   { key: "rejected", label: "已拒絕", icon: "block" },
+  { key: "expired", label: "已過期", icon: "hourglass_empty" },
   { key: "all", label: "全部", icon: "view_list" },
 ];
 
@@ -22,6 +23,7 @@ const STATUS_META = {
   approved: { label: "已通過", tone: "success" },
   rejected: { label: "已拒絕", tone: "danger" },
   cancelled: { label: "已取消", tone: "muted" },
+  expired: { label: "已過期", tone: "muted" },
   running: { label: "處理中", tone: "info" },
   completed: { label: "已完成", tone: "muted" },
   failed: { label: "失敗", tone: "danger" },
@@ -32,6 +34,7 @@ const EMPTY_TEXT = {
   pending: "目前沒有待審核的申請",
   approved: "目前沒有已通過的申請",
   rejected: "目前沒有已拒絕的申請",
+  expired: "目前沒有已過期的申請",
   all: "目前沒有申請紀錄",
 };
 
@@ -111,7 +114,7 @@ function normalizeVmRequest(request) {
   const deletedApproved = isDeletedApprovedVm(request);
   const reviewStatus = deletedApproved
     ? "approved"
-    : ["pending", "approved", "rejected"].includes(request.status)
+    : ["pending", "approved", "rejected", "expired"].includes(request.status)
       ? request.status
       : "other";
 
@@ -132,7 +135,6 @@ function normalizeVmRequest(request) {
     paramText:
       request.os_info ||
       request.ostemplate ||
-      request.service_template_slug ||
       (request.template_id ? `Template #${request.template_id}` : "未設定"),
     gpuText: request.gpu_mapping_id || "未申請",
     nodeText: request.assigned_node || request.desired_node || "尚未評估",

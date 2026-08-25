@@ -4,10 +4,10 @@ import MIcon from "../../../components/MIcon";
 import { useAuth } from "../../../contexts/AuthContext";
 import { TemplatesService } from "../../../services/templates";
 import { useToast } from "../../../hooks/useToast";
+import { useConfirm } from "../../../components/ConfirmDialog/ConfirmProvider";
 import { TemplateStatusBadge } from "./TemplateBadges";
 import TemplateCloneDialog from "./TemplateCloneDialog";
 import TemplateFormDialog from "./TemplateFormDialog";
-import TemplateTasksCard from "./TemplateTasksCard";
 
 function visibilityLabel(template) {
   return template.visibility === "global"
@@ -216,6 +216,7 @@ function StudentCatalog({ templates, onClone }) {
 
 export default function TemplatesPage() {
   const toast = useToast();
+  const confirm = useConfirm();
   const { user } = useAuth();
   const canManage =
     user?.role === "admin" || user?.role === "teacher" || user?.is_superuser === true;
@@ -228,7 +229,6 @@ export default function TemplatesPage() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [cycleBusy, setCycleBusy] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [tasksKey, setTasksKey] = useState(0);
   const timerRef = useRef(null);
 
   const load = useCallback(async () => {
@@ -264,11 +264,20 @@ export default function TemplatesPage() {
   const refresh = async () => {
     setRefreshing(true);
     await load();
-    setTasksKey((k) => k + 1);
     setRefreshing(false);
   };
 
   const handleCycle = async (templateId, action) => {
+    if (action === "finish") {
+      const ok = await confirm({
+        title: "完成更新並轉為新版範本？",
+        message:
+          "暫存母機會被關機，且其所有快照（備份點）會被移除，接著轉為新版唯讀範本並汰換舊版。此動作無法復原。",
+        confirmText: "關機並轉換",
+        danger: true,
+      });
+      if (!ok) return;
+    }
     setCycleBusy(true);
     try {
       if (action === "start") await TemplatesService.startUpdateCycle(templateId);
@@ -282,7 +291,6 @@ export default function TemplatesPage() {
             : "已取消更新循環，暫存母機將被回收",
       );
       await load();
-      setTasksKey((k) => k + 1);
     } catch (e) {
       toast.error(e?.message ?? "操作失敗");
     } finally {
@@ -291,12 +299,19 @@ export default function TemplatesPage() {
   };
 
   const handleRetry = async (templateId) => {
+    const ok = await confirm({
+      title: "重新轉換為範本？",
+      message:
+        "母機會被關機，且其所有快照（備份點）會被移除，再轉為唯讀範本。此動作無法復原。",
+      confirmText: "關機並轉換",
+      danger: true,
+    });
+    if (!ok) return;
     setCycleBusy(true);
     try {
       await TemplatesService.retry(templateId);
-      toast.success("已重新送出轉換；母機會先安全關機，再轉為唯讀範本");
+      toast.success("已重新送出轉換；母機會先安全關機、移除所有快照，再轉為唯讀範本");
       await load();
-      setTasksKey((k) => k + 1);
     } catch (e) {
       toast.error(e?.message ?? "重新轉換失敗");
     } finally {
@@ -308,10 +323,9 @@ export default function TemplatesPage() {
     setDeleting(true);
     try {
       await TemplatesService.remove(deleteTarget.id);
-      toast.success("刪除任務已送出");
+      toast.success("刪除任務已送出，進度請見側欄「背景任務」");
       setDeleteTarget(null);
       await load();
-      setTasksKey((k) => k + 1);
     } catch (e) {
       toast.error(e?.message ?? "刪除範本失敗");
       setDeleteTarget(null);
@@ -403,15 +417,10 @@ export default function TemplatesPage() {
         <StudentCatalog templates={readyTemplates} onClone={setCloneTarget} />
       )}
 
-      <TemplateTasksCard key={tasksKey} />
-
       {createOpen && (
         <TemplateFormDialog
           onClose={() => setCreateOpen(false)}
-          onSaved={() => {
-            load();
-            setTasksKey((k) => k + 1);
-          }}
+          onSaved={() => load()}
         />
       )}
       {editTarget && (
@@ -426,7 +435,6 @@ export default function TemplatesPage() {
           template={cloneTarget}
           canBatch={canManage}
           onClose={() => setCloneTarget(null)}
-          onCloned={() => setTasksKey((k) => k + 1)}
         />
       )}
 

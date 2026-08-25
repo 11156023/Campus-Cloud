@@ -29,7 +29,7 @@ async def get_vm_console(vmid: int, vm_info: VmInfoDep):
             raise BadRequestError(f"Resource {vmid} is not a QEMU VM")
 
         node = vm_info["node"]
-        pve_auth_cookie, csrf_token = await proxmox_service.get_session_ticket()
+        pve_auth_cookie, csrf_token = await proxmox_service.get_session_ticket(node)
         console_data = await proxmox_service.get_vnc_ticket_with_session(
             node,
             vmid,

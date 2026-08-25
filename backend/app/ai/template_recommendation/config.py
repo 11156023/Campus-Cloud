@@ -1,10 +1,6 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 from app.ai.system_config import (
-    BACKEND_ROOT,
-    PROJECT_ROOT,
     system_ai_config,
     system_ai_env,
 )
@@ -14,18 +10,6 @@ class TemplateRecommendationSettings:
     @property
     def section(self):
         return system_ai_config.template_recommendation
-
-    @property
-    def resolved_templates_dir(self) -> Path:
-        path = Path(self.section.templates_dir)
-        if path.is_absolute():
-            return path
-
-        backend_relative = (BACKEND_ROOT / path).resolve()
-        if backend_relative.exists():
-            return backend_relative
-
-        return (PROJECT_ROOT / path).resolve()
 
     @property
     def parsed_backend_node_gpu_map(self) -> dict[str, int]:
