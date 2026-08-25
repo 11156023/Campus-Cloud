@@ -362,8 +362,9 @@ def _process_task(*, job_id: uuid.UUID, task_id: uuid.UUID) -> None:
 
         logger.info("Batch task %s done: vmid=%d user=%s", task_id, vmid, user_id)
 
-    except Exception as exc:
-        error_msg = str(exc)[:500]
+    except Exception:
+        logger.exception("Batch task failed task=%s user=%s", task_id, user_id)
+        error_msg = "Provisioning failed. Retry or contact an administrator."
         with Session(engine) as session:
             bp_repo.update_task_failed(
                 session=session, task_id=task_id, error=error_msg
@@ -378,7 +379,6 @@ def _process_task(*, job_id: uuid.UUID, task_id: uuid.UUID) -> None:
                 error=error_msg,
             )
             bp_repo.increment_job_failed(session=session, job_id=job_id)
-        logger.error("Batch task %s failed user=%s: %s", task_id, user_id, error_msg)
 
 
 def _sync_class_machine_mapping(

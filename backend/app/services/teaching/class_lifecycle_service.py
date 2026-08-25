@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import uuid
 
 from sqlmodel import Session, select
@@ -21,6 +22,8 @@ from app.repositories import resource as resource_repo
 from app.services.proxmox import proxmox_service
 from app.services.resource import deletion_service, resource_service
 from app.services.teaching import class_capacity_service
+
+logger = logging.getLogger(__name__)
 
 
 def clear_schedule_windows(session: Session, class_id: uuid.UUID) -> None:
@@ -110,8 +113,18 @@ def queue_reclaim(
             session.commit()
             cleaned.append(resource.vmid)
             continue
-        except Exception as exc:
-            failed.append({"vmid": resource.vmid, "error": str(exc)[:500]})
+        except Exception:
+            logger.exception(
+                "Failed to inspect class resource before reclaim class_id=%s vmid=%s",
+                item.id,
+                resource.vmid,
+            )
+            failed.append(
+                {
+                    "vmid": resource.vmid,
+                    "error": "Resource reclaim could not be queued; retry later.",
+                }
+            )
             continue
 
         request = deletion_service.create_deletion_request(

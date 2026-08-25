@@ -2,6 +2,7 @@
 
 import csv
 import io
+import logging
 import uuid
 from datetime import UTC, date, datetime, time, timedelta
 from pathlib import Path
@@ -48,10 +49,14 @@ from app.services.teaching import (
 from app.services.vm import batch_provision_service
 
 router = APIRouter(prefix="/teaching-classes", tags=["teaching-classes"])
+logger = logging.getLogger(__name__)
 
 DAY_CODE = ["MO", "TU", "WE", "TH", "FR", "SA", "SU"]
 TASK_FILE_ROOT = Path(__file__).resolve().parents[3] / "data" / "teaching-class-tasks"
 MAX_TASK_FILE_BYTES = 100 * 1024 * 1024
+PUBLIC_PROVISION_ERROR = (
+    "Machine provisioning failed. Retry or contact an administrator."
+)
 
 
 class ClassCreate(BaseModel):
@@ -148,6 +153,14 @@ def _students(session: SessionDep, class_id: uuid.UUID) -> list[TeachingClassStu
     )
 
 
+def _public_machine_dump(row: TeachingClassStudentMachine) -> dict:
+    """Serialize a class machine without exposing stored infrastructure errors."""
+    data = row.model_dump()
+    if data.get("error"):
+        data["error"] = PUBLIC_PROVISION_ERROR
+    return data
+
+
 def _serialize(session: SessionDep, item: TeachingClass) -> dict:
     nodes = list(
         session.exec(
@@ -199,7 +212,7 @@ def _serialize(session: SessionDep, item: TeachingClass) -> dict:
     machines_by_student: dict[uuid.UUID, list[dict]] = {}
     for row in machine_rows:
         machines_by_student.setdefault(row.class_student_id, []).append(
-            row.model_dump()
+            _public_machine_dump(row)
         )
     student_rows = []
     for enrollment in enrollments:
@@ -1031,10 +1044,13 @@ def _recover_existing_task_resource(
         )
         session.commit()
         return False
-    except Exception as exc:
-        raise BadRequestError(
-            f"Cannot verify existing resource {resource.vmid}; retry later: {exc}"
+    except Exception:
+        logger.exception(
+            "Failed to verify existing class resource class_id=%s vmid=%s",
+            item.id,
+            resource.vmid,
         )
+        raise BadRequestError("Cannot verify existing resource; retry later") from None
 
     resource_repo.assign_to_teaching_class(
         session=session,

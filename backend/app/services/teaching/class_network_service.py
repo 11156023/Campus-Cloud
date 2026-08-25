@@ -1,5 +1,6 @@
 """Materialize a course's logical per-student topology as PVE firewall rules."""
 
+import logging
 import uuid
 from typing import Any, cast
 
@@ -18,6 +19,7 @@ from app.services.network import firewall_service
 from app.services.proxmox import proxmox_service
 
 COMMENT_PREFIX = "SkyLab:class-net:"
+logger = logging.getLogger(__name__)
 
 
 def _segments(value: str | None) -> set[str]:
@@ -173,10 +175,16 @@ def apply_class_topology(session: Session, *, class_id: uuid.UUID) -> list[str]:
                             protocol=edge.protocol,
                             port=edge.port,
                         )
-                    except Exception as exc:
+                    except Exception:
+                        logger.exception(
+                            "Failed to apply class firewall rule class_id=%s source_vmid=%s target_vmid=%s",
+                            class_id,
+                            direction_source.vmid,
+                            direction_target.vmid,
+                        )
                         errors.append(
                             f"{direction_source.vmid} → "
-                            f"{direction_target.vmid}: {str(exc)[:200]}"
+                            f"{direction_target.vmid}: firewall configuration failed"
                         )
             continue
         for source in machines:
@@ -202,6 +210,14 @@ def apply_class_topology(session: Session, *, class_id: uuid.UUID) -> list[str]:
                         source_vmid=source_vmid,
                         target_vmid=target_vmid,
                     )
-                except Exception as exc:
-                    errors.append(f"{source.vmid} → {target.vmid}: {str(exc)[:200]}")
+                except Exception:
+                    logger.exception(
+                        "Failed to remove class firewall rule class_id=%s source_vmid=%s target_vmid=%s",
+                        class_id,
+                        source.vmid,
+                        target.vmid,
+                    )
+                    errors.append(
+                        f"{source.vmid} → {target.vmid}: firewall cleanup failed"
+                    )
     return errors

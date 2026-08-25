@@ -68,6 +68,22 @@ def _user(role: UserRole, user_id: uuid.UUID | None = None):
     )
 
 
+def test_class_machine_serialization_hides_internal_error_details():
+    internal_error = "psycopg traceback at D:\\secret\\service.py password=hidden"
+    machine = SimpleNamespace(
+        model_dump=lambda: {
+            "vmid": None,
+            "status": "failed",
+            "error": internal_error,
+        }
+    )
+
+    result = teaching_classes._public_machine_dump(machine)
+
+    assert result["error"] == teaching_classes.PUBLIC_PROVISION_ERROR
+    assert internal_error not in result["error"]
+
+
 def test_class_member_cannot_manage_class_resource(monkeypatch):
     teacher_id = uuid.uuid4()
     student = _user(UserRole.student)
@@ -301,6 +317,49 @@ def test_class_reclaim_queues_idempotent_deletion_with_retries(monkeypatch):
 
     assert result["queued_vmids"] == [801]
     assert submitted[0][1]["max_retries"] == 2
+
+
+def test_class_reclaim_hides_infrastructure_exception(monkeypatch):
+    internal_error = "PVE token secret-token rejected at internal-host"
+    item = SimpleNamespace(
+        id=uuid.uuid4(),
+        reclaim_requested_at=None,
+        resources_reclaimed_at=None,
+    )
+    monkeypatch.setattr(
+        class_lifecycle_service.resource_repo,
+        "get_resources_by_teaching_class",
+        lambda **_kwargs: [SimpleNamespace(vmid=802)],
+    )
+    monkeypatch.setattr(
+        class_lifecycle_service.deletion_service,
+        "list_active_for_vmids",
+        lambda **_kwargs: {},
+    )
+
+    def fail_lookup(_vmid):
+        raise RuntimeError(internal_error)
+
+    monkeypatch.setattr(
+        class_lifecycle_service.proxmox_service,
+        "find_resource",
+        fail_lookup,
+    )
+
+    result = class_lifecycle_service.queue_reclaim(
+        session=_Session(),
+        item=item,
+        requested_by=uuid.uuid4(),
+        force=True,
+    )
+
+    assert result["failed"] == [
+        {
+            "vmid": 802,
+            "error": "Resource reclaim could not be queued; retry later.",
+        }
+    ]
+    assert internal_error not in result["failed"][0]["error"]
 
 
 def test_retry_recovers_existing_resource_instead_of_cloning(monkeypatch):

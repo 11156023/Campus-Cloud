@@ -1,6 +1,7 @@
 """Whole-class capacity calculation and hard IP reservation."""
 
 import json
+import logging
 import uuid
 from collections import defaultdict
 
@@ -19,6 +20,7 @@ from app.services.proxmox import provisioning_service
 from app.services.vm import placement_service
 
 GIB = 1024**3
+logger = logging.getLogger(__name__)
 
 
 def calculate(
@@ -188,10 +190,14 @@ def _check_cluster_capacity(
                         int(node.custom_image_ref or "0")
                     )
                 )
-            except Exception as exc:
-                raise BadRequestError(
-                    f"無法確認自訂機器「{node.name}」的建機節點：{exc}"
+            except Exception:
+                logger.exception(
+                    "Failed to resolve placement for custom class machine node_id=%s",
+                    node.id,
                 )
+                raise BadRequestError(
+                    f"無法確認自訂機器「{node.name}」的建機節點，請稍後再試"
+                ) from None
         target = demand[target_node]
         target["cpu_cores"] += node.cpu * student_count
         target["memory_bytes"] += node.memory_mb * 1024**2 * student_count
@@ -210,8 +216,9 @@ def _check_cluster_capacity(
                 disk_overcommit_ratio=disk_ratio,
             )
         }
-    except Exception as exc:
-        raise BadRequestError(f"無法取得 Proxmox 容量，暫時不能鎖定班級：{exc}")
+    except Exception:
+        logger.exception("Failed to fetch Proxmox capacity for class reservation")
+        raise BadRequestError("無法取得 Proxmox 容量，暫時不能鎖定班級") from None
 
     # Pending reviewed classes are not necessarily visible as PVE guests yet.
     for reservation in session.exec(
