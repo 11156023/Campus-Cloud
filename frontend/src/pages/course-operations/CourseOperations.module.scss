@@ -384,6 +384,14 @@
 .classFacts > div:nth-last-child(-n + 2) { border-bottom: 0; }
 .classFacts span { color: var(--color-text-muted); font-size: 10px; }
 .classFacts strong { overflow: hidden; font-size: 12px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.lifecycleCard { grid-column: 1 / -1; }
+.lifecycleBody { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; padding: 16px 18px; }
+.lifecycleBody > div:first-child strong { font-size: 13px; }
+.lifecycleBody p { margin: 4px 0 0; color: var(--color-text-muted); font-size: 12px; }
+.lifecycleDate { display: flex; min-width: 230px; flex-direction: column; gap: 6px; color: var(--color-text-muted); font-size: 11px; }
+.lifecycleDate input { min-height: 36px; padding: 6px 10px; border: 1px solid var(--color-border); border-radius: 8px; color: var(--color-text); background: var(--color-surface); font: inherit; }
+.lifecycleActions { display: flex; align-items: center; gap: 8px; }
+.lifecycleActions .inspectorDanger { margin-top: 0; }
 .currentWeekSummary { display: flex; min-height: 130px; align-items: center; justify-content: space-between; gap: 18px; padding: 18px; }
 .currentWeekSummary > div { display: flex; min-width: 0; flex-direction: column; gap: 5px; }
 .currentWeekSummary > div > span { color: var(--color-primary); font-size: 11px; font-weight: 650; }
@@ -551,6 +559,9 @@
   .classFacts { grid-template-columns: 1fr; }
   .classFacts > div, .classFacts > div:nth-child(odd), .classFacts > div:nth-last-child(-n + 2) { border-right: 0; border-bottom: 1px solid var(--color-divider); }
   .classFacts > div:last-child { border-bottom: 0; }
+  .lifecycleBody { align-items: stretch; flex-direction: column; }
+  .lifecycleDate { min-width: 0; }
+  .lifecycleActions { flex-wrap: wrap; }
   .currentWeekSummary { align-items: flex-start; flex-direction: column; }
   .createFormGrid { grid-template-columns: 1fr; }
   .createNameField { grid-column: auto; }
