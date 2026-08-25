@@ -72,8 +72,10 @@ def preview(
                 nodes=nodes,
                 student_count=len(students),
             )
-        except BadRequestError as exc:
-            issues.append(str(exc))
+        except BadRequestError:
+            issues.append(
+                "Unable to verify class capacity. Review capacity or retry later."
+            )
     return {
         **totals,
         "available_ips": ip_stats["available"],

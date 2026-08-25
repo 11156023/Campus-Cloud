@@ -22,7 +22,7 @@ from app.services.scheduling.recurrence_scheduler import (
     _class_reclaim_retry_due,
     _class_schedule_enabled,
 )
-from app.services.teaching import class_lifecycle_service
+from app.services.teaching import class_capacity_service, class_lifecycle_service
 from app.services.vm import batch_provision_service
 
 
@@ -82,6 +82,42 @@ def test_class_machine_serialization_hides_internal_error_details():
 
     assert result["error"] == teaching_classes.PUBLIC_PROVISION_ERROR
     assert internal_error not in result["error"]
+
+
+def test_class_capacity_preview_hides_caught_exception_details(monkeypatch):
+    internal_error = "database traceback password=hidden"
+    monkeypatch.setattr(
+        class_capacity_service.ip_management_service,
+        "get_ip_stats",
+        lambda _session: {"available": 10},
+    )
+
+    def fail_capacity(*_args, **_kwargs):
+        raise BadRequestError(internal_error)
+
+    monkeypatch.setattr(
+        class_capacity_service,
+        "_check_cluster_capacity",
+        fail_capacity,
+    )
+    result = class_capacity_service.preview(
+        _Session(),
+        nodes=[
+            SimpleNamespace(
+                network="lab-net",
+                cpu=1,
+                memory_mb=512,
+                disk_gb=10,
+            )
+        ],
+        students=[SimpleNamespace(id=uuid.uuid4())],
+        check_cluster=True,
+    )
+
+    assert result["issues"] == [
+        "Unable to verify class capacity. Review capacity or retry later."
+    ]
+    assert internal_error not in result["issues"]
 
 
 def test_class_member_cannot_manage_class_resource(monkeypatch):
