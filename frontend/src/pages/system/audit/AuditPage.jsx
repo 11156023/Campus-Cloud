@@ -258,7 +258,7 @@ export default function AuditPage() {
                       <td className={`${styles.td} ${styles.tdNowrap}`}>{formatTime(log.created_at)}</td>
                       <td className={styles.td}>
                         <div className={styles.userCell}>
-                          <span>{log.user_full_name ?? "—"}</span>
+                          <span>{log.user_full_name ?? (log.user_email ? "—" : "系統")}</span>
                           <span className={styles.userEmail}>{log.user_email ?? ""}</span>
                         </div>
                       </td>

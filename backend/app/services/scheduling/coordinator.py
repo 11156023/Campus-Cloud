@@ -245,7 +245,7 @@ def _provision_new_resource(
 
         audit_service.log_action(
             session=finish_session,
-            user_id=None,
+            user_id=request_user_id,
             vmid=new_vmid,
             action="lxc_create" if request_resource_type == "lxc" else "vm_create",
             details=f"Provisioned {request_resource_type} for request {request_id} on {actual_node}",

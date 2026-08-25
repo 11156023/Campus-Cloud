@@ -56,7 +56,7 @@ export default function AuditLogsTab({ vmid }) {
                   <td className={styles.td}>
                     <div className={styles.userCell}>
                       <span className={styles.userName}>
-                        {log.user_full_name || "Unknown"}
+                        {log.user_full_name || log.user_email || "系統"}
                       </span>
                       <span className={styles.userEmail}>{log.user_email}</span>
                     </div>

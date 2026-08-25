@@ -111,6 +111,8 @@ function NavGroup({ group, active, onSelect, collapsed, onExpand }) {
         className={`${styles.groupHeader} ${hasActive ? styles.groupHeaderActive : ""}`}
         onClick={handleHeaderClick}
         title={collapsed ? group.label : undefined}
+        aria-label={group.label}
+        aria-expanded={!collapsed && open}
       >
         <MIcon name={group.icon} size={20} />
         {!collapsed && (
@@ -133,6 +135,7 @@ function NavGroup({ group, active, onSelect, collapsed, onExpand }) {
               type="button"
               className={`${styles.navItem} ${active === item.key ? styles.active : ""}`}
               onClick={() => onSelect(item.key)}
+              aria-label={item.label}
             >
               <span className={styles.navLabel}>{item.label}</span>
             </button>
@@ -310,6 +313,7 @@ export default function Sidebar({ collapsed, mobileOpen, onToggle, onClose }) {
             className={`${styles.navItem} ${active === item.key ? styles.active : ""}`}
             onClick={() => handleNav(item.key)}
             title={collapsed ? item.label : undefined}
+            aria-label={item.label}
           >
             <MIcon name={item.icon} size={20} />
             {!collapsed && <span className={styles.navLabel}>{item.label}</span>}
@@ -350,6 +354,8 @@ export default function Sidebar({ collapsed, mobileOpen, onToggle, onClose }) {
             className={`${styles.navItem} ${langPopup.open && !langPopup.closing ? styles.active : ""}`}
             onClick={langPopup.toggle}
             title={collapsed ? "語言" : undefined}
+            aria-label="語言 / Language"
+            aria-expanded={langPopup.open}
           >
             <MIcon name="language" size={20} />
             {!collapsed && <span className={styles.navLabel}>語言 / Language</span>}
@@ -375,6 +381,8 @@ export default function Sidebar({ collapsed, mobileOpen, onToggle, onClose }) {
             className={`${styles.user} ${userPopup.open && !userPopup.closing ? styles.userActive : ""}`}
             onClick={userPopup.toggle}
             title={collapsed ? (user?.full_name ?? user?.email) : undefined}
+            aria-label={`使用者選單：${user?.full_name ?? user?.email ?? ""}`}
+            aria-expanded={userPopup.open}
           >
             <Avatar user={user} size={32} className={styles.avatar} />
             {!collapsed && (
