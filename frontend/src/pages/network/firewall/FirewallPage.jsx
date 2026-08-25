@@ -30,7 +30,6 @@ import ConnectionEdge   from "./edges/ConnectionEdge";
 import { buildFlow, portLabel } from "./utils/buildFlow";
 import { useTheme } from "../../../contexts/ThemeContext";
 import useAutoRefresh from "../../../hooks/useAutoRefresh";
-import useGuideDemo from "../../../hooks/useGuideDemo";
 import styles from "./FirewallPage.module.scss";
 import MIcon from "../../../components/MIcon";
 
@@ -41,72 +40,12 @@ const VM_COL_X      = 160;
 const ROW_H         = 160;
 const GATEWAY_X     = VM_COL_X + 520;
 
-const EXAMPLE_TOPOLOGY = {
-  nodes: [
-    {
-      node_type: "gateway",
-      position_x: 720,
-      position_y: 220,
-      name: "網際網路",
-    },
-    {
-      node_type: "vm",
-      vmid: 218,
-      name: "course-web-lab",
-      ip_address: "10.20.31.18",
-      status: "running",
-      firewall_enabled: true,
-      position_x: 180,
-      position_y: 80,
-    },
-    {
-      node_type: "vm",
-      vmid: 219,
-      name: "research-api",
-      ip_address: "10.20.31.19",
-      status: "running",
-      firewall_enabled: true,
-      position_x: 180,
-      position_y: 240,
-    },
-    {
-      node_type: "vm",
-      vmid: 220,
-      name: "private-database",
-      ip_address: "10.20.31.20",
-      status: "stopped",
-      firewall_enabled: true,
-      position_x: 180,
-      position_y: 400,
-    },
-  ],
-  edges: [
-    {
-      source_vmid: null,
-      target_vmid: 218,
-      ports: [{ external_port: 443, port: 3000, protocol: "tcp" }],
-    },
-    {
-      source_vmid: 218,
-      target_vmid: 219,
-      ports: [{ port: 8000, protocol: "tcp" }],
-    },
-    {
-      source_vmid: 219,
-      target_vmid: 220,
-      ports: [{ port: 5432, protocol: "tcp" }],
-    },
-  ],
-};
-
-/* ─── 類型映射（必須在元件外定義） ─────────────────────── */
 const NODE_TYPES = { gateway: GatewayNode, vm: VMNode };
 const EDGE_TYPES = { connection: ConnectionEdge };
 
 /* ─── 主頁面 ─────────────────────────────────────────────── */
 export default function FirewallPage() {
   const { theme } = useTheme();
-  const guideDemoActive = useGuideDemo("firewall");
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [topology,     setTopology]     = useState(null);
@@ -117,7 +56,6 @@ export default function FirewallPage() {
   const [deleteEdge,   setDeleteEdge]   = useState(null);
   const [showLabels,   setShowLabels]   = useState(false);
   const [showMiniMap,  setShowMiniMap]  = useState(true);
-  const [isExample,    setIsExample]    = useState(false);
   const rfInstance = useRef(null);
   const saveTimer  = useRef(null);
 
@@ -149,21 +87,17 @@ export default function FirewallPage() {
 
   useEffect(() => {
     if (!topology) return;
-    const hasVm = (topology.nodes ?? []).some((node) => node.node_type !== "gateway");
-    const shouldShowExample = guideDemoActive && !hasVm;
-    const flowTopology = shouldShowExample ? EXAMPLE_TOPOLOGY : topology;
     const { nodes: nextNodes, edges: nextEdges } = buildFlow(
-      flowTopology,
-      shouldShowExample ? () => {} : handleDeleteEdge,
+      topology,
+      handleDeleteEdge,
       showLabels
     );
-    setIsExample(shouldShowExample);
     setSelectedNode(null);
     setDeleteEdge(null);
     setNodes(nextNodes);
     setEdges(nextEdges);
     window.requestAnimationFrame(() => rfInstance.current?.fitView({ padding: 0.2, duration: 250 }));
-  }, [guideDemoActive, handleDeleteEdge, setEdges, setNodes, showLabels, topology]);
+  }, [handleDeleteEdge, setEdges, setNodes, showLabels, topology]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -193,10 +127,6 @@ export default function FirewallPage() {
       }
 
       setTimeout(() => {
-        if (isExample) {
-          rfInstance.current?.fitView({ padding: 0.2, duration: 400 });
-          return;
-        }
         const layoutNodes = arranged.map((n) => ({
           vmid:       n.id === GATEWAY_KEY ? null : Number(n.id),
           node_type:  n.id === GATEWAY_KEY ? "gateway" : "vm",
@@ -209,11 +139,10 @@ export default function FirewallPage() {
 
       return arranged;
     });
-  }, [isExample, setNodes]);
+  }, [setNodes]);
 
   /* ── 節點拖曳結束 → debounce 儲存佈局 ── */
   const onNodeDragStop = useCallback((_, __, draggedNodes) => {
-    if (isExample) return;
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
       const layoutNodes = draggedNodes.map((n) => ({
@@ -224,14 +153,13 @@ export default function FirewallPage() {
       }));
       saveLayout(layoutNodes).catch(() => {});
     }, SAVE_DEBOUNCE);
-  }, [isExample]);
+  }, []);
 
   /* ── 點擊節點：開啟規則面板 ── */
   const onNodeClick = useCallback((_, node) => {
-    if (isExample) return;
     if (node.type === "gateway") { setSelectedNode(null); return; }
     setSelectedNode((prev) => prev?.id === node.id ? null : node);
-  }, [isExample]);
+  }, []);
 
   /* ── 點擊空白處：取消選取 ── */
   const onPaneClick = useCallback(() => setSelectedNode(null), []);
@@ -331,19 +259,7 @@ export default function FirewallPage() {
               <Controls />
               {showMiniMap && <MiniMap zoomable pannable />}
 
-              {isExample && (
-                <Panel position="top-center">
-                  <div className={styles.exampleBanner} role="note">
-                    <MIcon name="lightbulb" size={18} />
-                    <div>
-                      <strong>這是防火牆連線範例</strong>
-                      <span>線條代表允許的連線；開啟「連線標籤」可查看通訊 Port。範例不會儲存變更。</span>
-                    </div>
-                  </div>
-                </Panel>
-              )}
-
-              {!isExample && nodes.length === 0 && (
+              {nodes.length === 0 && (
                 <Panel position="top-center">
                   <div className={styles.emptyTopology}>
                     <MIcon name="security" size={23} />

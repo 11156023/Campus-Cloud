@@ -4,7 +4,6 @@ import styles from "./RequestsPage.module.scss";
 import { VmRequestsService } from "../../../services/vmRequests";
 import { useToast } from "../../../hooks/useToast";
 import useAutoRefresh from "../../../hooks/useAutoRefresh";
-import useGuideDemo from "../../../hooks/useGuideDemo";
 import RequestFormPage from "./RequestFormPage";
 import MIcon from "../../../components/MIcon";
 import SharedEmptyState from "../../../components/EmptyState/EmptyState";
@@ -27,7 +26,6 @@ const RESOURCE_TYPE_MAP = {
    所以「重試／撤銷」必須同時看 vmid：vmid 已存在代表機器已開出來，
    重試會把使用者關機的 VM 重新開機、撤銷會讓 request 與活著的資源脫鉤。 */
 function canRetry(req) {
-  if (req._example) return false;
   return (
     req.status === "approved" &&
     req.vmid == null &&
@@ -36,7 +34,6 @@ function canRetry(req) {
 }
 
 function canCancel(req) {
-  if (req._example) return false;
   return (
     req.status === "pending" ||
     (req.status === "approved" && req.vmid == null)
@@ -58,50 +55,6 @@ const VIEW_LIST   = "list";
 const VIEW_CREATE = "create";
 
 const LIST_COLUMNS = ["資源", "系統", "規格", "申請時間", "狀態", "操作"];
-
-const EXAMPLE_REQUESTS = [
-  {
-    id: "example-pending",
-    _example: true,
-    hostname: "research-ubuntu",
-    resource_type: "vm",
-    ostemplate: "ubuntu-24.04",
-    cores: 4,
-    memory: 8192,
-    storage: "80 GB",
-    created_at: "2026-08-02T09:20:00+08:00",
-    status: "pending",
-    reason: "專題研究與模型測試環境",
-  },
-  {
-    id: "example-approved",
-    _example: true,
-    hostname: "course-web-lab",
-    resource_type: "lxc",
-    ostemplate: "debian-12",
-    cores: 2,
-    memory: 4096,
-    storage: "40 GB",
-    created_at: "2026-07-28T14:10:00+08:00",
-    status: "approved",
-    vmid: 218,
-    reason: "課堂網站部署練習",
-  },
-  {
-    id: "example-rejected",
-    _example: true,
-    hostname: "gpu-experiment",
-    resource_type: "vm",
-    ostemplate: "ubuntu-22.04",
-    cores: 8,
-    memory: 16384,
-    storage: "120 GB",
-    created_at: "2026-07-21T11:40:00+08:00",
-    status: "rejected",
-    reason: "大型模型訓練測試",
-    review_comment: "請補充預計使用期間與 GPU 型號需求。",
-  },
-];
 
 /* ── Helpers ── */
 function formatDatetime(isoStr) {
@@ -427,7 +380,6 @@ export default function RequestsPage() {
   const [error, setError]       = useState(false);
   const [view, setView]         = useState(location.state?.create ? VIEW_CREATE : VIEW_LIST);
   const [returning, setReturning] = useState(false);
-  const guideDemoActive = useGuideDemo("my-requests");
 
   /** silent = true 時不觸發 loading / error state，供背景自動刷新使用 */
   const fetchRequests = useCallback(async (silent = false) => {
@@ -461,9 +413,6 @@ export default function RequestsPage() {
     setRequests((prev) => prev.map((r) => r.id === updated.id ? updated : r));
   }
 
-  const showExamples = guideDemoActive && !loading && !error && requests.length === 0;
-  const displayedRequests = showExamples ? EXAMPLE_REQUESTS : requests;
-
   if (view === VIEW_CREATE) {
     return (
       <RequestFormPage
@@ -493,23 +442,10 @@ export default function RequestsPage() {
       <div className={styles.content} data-guide="request-list">
         {error ? (
           <ErrorState onRetry={fetchRequests} />
-        ) : !loading && requests.length === 0 && !showExamples ? (
+        ) : !loading && requests.length === 0 ? (
           <EmptyState onCreateClick={() => setView(VIEW_CREATE)} />
         ) : (
           <>
-            {showExamples && (
-              <div className={styles.exampleBanner} role="note">
-                <MIcon name="lightbulb" size={19} />
-                <div>
-                  <strong>以下是畫面範例</strong>
-                  <span>你還沒有送出申請；先用範例了解「審核中、已開通、已拒絕」分別代表什麼。</span>
-                </div>
-                <button type="button" className={styles.btnPrimary} onClick={() => setView(VIEW_CREATE)}>
-                  <MIcon name="add" size={16} />
-                  建立第一筆申請
-                </button>
-              </div>
-            )}
             <div className={styles.tableWrap}>
               <table className={styles.table}>
                 <thead>
@@ -522,7 +458,7 @@ export default function RequestsPage() {
                 <tbody>
                   {loading
                     ? [0, 1, 2, 3].map((i) => <SkeletonRow key={i} />)
-                    : displayedRequests.map((r) => (
+                    : requests.map((r) => (
                         <RequestRow key={r.id} req={r} onUpdated={handleUpdated} />
                       ))}
                 </tbody>

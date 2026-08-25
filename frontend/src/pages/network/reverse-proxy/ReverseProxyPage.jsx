@@ -6,7 +6,6 @@ import { useAuth } from "../../../contexts/AuthContext";
 import { useToast } from "../../../hooks/useToast";
 import { ReverseProxyService } from "../../../services/reverseProxy";
 import { ResourcesService } from "../../../services/resources";
-import useGuideDemo from "../../../hooks/useGuideDemo";
 
 const COMMON_PORTS = [
   { value: "80", label: "80 — Nginx / Apache（網頁伺服器）" },
@@ -16,27 +15,6 @@ const COMMON_PORTS = [
   { value: "8000", label: "8000 — FastAPI / Django" },
   { value: "8080", label: "8080 — 常見替代 Port" },
   { value: "8888", label: "8888 — Jupyter Notebook" },
-];
-
-const EXAMPLE_RULES = [
-  {
-    id: "example-web",
-    _example: true,
-    domain: "app.student.example.edu.tw",
-    vmid: 218,
-    vm_ip: "10.20.31.18",
-    internal_port: 3000,
-    enable_https: true,
-  },
-  {
-    id: "example-api",
-    _example: true,
-    domain: "api.student.example.edu.tw",
-    vmid: 219,
-    vm_ip: "10.20.31.19",
-    internal_port: 8000,
-    enable_https: true,
-  },
 ];
 
 function isAdminUser(user) {
@@ -435,7 +413,6 @@ export default function ReverseProxyPage() {
   const { user } = useAuth();
   const toast = useToast();
   const isAdmin = isAdminUser(user);
-  const guideDemoActive = useGuideDemo("reverse-proxy");
 
   const [rules, setRules] = useState([]);
   const [setupContext, setSetupContext] = useState(null);
@@ -465,9 +442,6 @@ export default function ReverseProxyPage() {
   }, [fetchData]);
 
   const setupBlocked = setupContext?.enabled === false;
-  const showExamples = guideDemoActive && !loading && rules.length === 0;
-  const displayedRules = showExamples ? EXAMPLE_RULES : rules;
-
   async function handleSubmitRule(payload) {
     setSaving(true);
     try {
@@ -560,7 +534,7 @@ export default function ReverseProxyPage() {
       <div className={styles.content} data-guide="proxy-list">
         {loading ? (
           <div className={styles.loading}>載入網域規則...</div>
-        ) : rules.length === 0 && !showExamples ? (
+        ) : rules.length === 0 ? (
           <EmptyState
             icon="swap_horiz"
             title="尚無設定網域"
@@ -568,17 +542,8 @@ export default function ReverseProxyPage() {
           />
         ) : (
           <>
-            {showExamples && (
-              <div className={styles.exampleBanner} role="note">
-                <MIcon name="lightbulb" size={19} />
-                <div>
-                  <strong>以下是設定完成後的範例</strong>
-                  <span>網址會把外部訪客導向指定 VM 的服務 Port；範例資料不會真的連線或被修改。</span>
-                </div>
-              </div>
-            )}
             <div className={styles.list}>
-              {displayedRules.map((rule) => (
+              {rules.map((rule) => (
                 <div key={rule.id} className={styles.row}>
                 <div className={styles.rowIcon}>
                   <MIcon name="swap_horiz" size={20} />
@@ -594,28 +559,20 @@ export default function ReverseProxyPage() {
                     )}
                   </span>
                 </div>
-                {rule._example ? (
-                  <span className={styles.rowStatus}>
-                    <MIcon name="visibility" size={14} />
-                    畫面範例
-                  </span>
-                ) : (
-                  <a
-                    className={styles.rowStatus}
-                    href={`${rule.enable_https ? "https" : "http"}://${rule.domain}`}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    <MIcon name="open_in_new" size={14} />
-                    開啟
-                  </a>
-                )}
+                <a
+                  className={styles.rowStatus}
+                  href={`${rule.enable_https ? "https" : "http"}://${rule.domain}`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <MIcon name="open_in_new" size={14} />
+                  開啟
+                </a>
                 <div className={styles.rowActions}>
                   <button
                     type="button"
                     className={styles.actionBtn}
-                    title={rule._example ? "範例資料無法編輯" : "編輯"}
-                    disabled={rule._example}
+                    title="編輯"
                     onClick={() => setModal({ kind: "rule", rule })}
                   >
                     <MIcon name="edit" size={16} />
@@ -623,8 +580,7 @@ export default function ReverseProxyPage() {
                   <button
                     type="button"
                     className={`${styles.actionBtn} ${styles.actionBtnDanger}`}
-                    title={rule._example ? "範例資料無法刪除" : "刪除"}
-                    disabled={rule._example}
+                    title="刪除"
                     onClick={() => setModal({ kind: "delete", rule })}
                   >
                     <MIcon name="delete" size={16} />

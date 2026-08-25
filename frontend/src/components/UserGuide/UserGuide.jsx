@@ -2,7 +2,6 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import MIcon from "../MIcon";
-import { GUIDE_DEMO_EVENT } from "../../hooks/useGuideDemo";
 import styles from "./UserGuide.module.scss";
 
 const PAGE_GUIDES = {
@@ -301,13 +300,6 @@ const PAGE_GUIDES = {
   },
 };
 
-function setGuideDemo(guideId, active) {
-  if (!guideId || typeof window === "undefined") return;
-  window.dispatchEvent(new CustomEvent(GUIDE_DEMO_EVENT, {
-    detail: { guideId, active },
-  }));
-}
-
 const SPOTLIGHT_GAP = 8;
 const PANEL_WIDTH = 420;
 const PANEL_HEIGHT = 320;
@@ -352,7 +344,7 @@ function getPanelPosition(rect) {
 export default function UserGuide() {
   const location = useLocation();
   const { user } = useAuth();
-  const isAdmin = Boolean(user?.is_superuser || user?.role === "admin");
+  const isStudent = user?.role === "student" && !user?.is_superuser;
   const isStudentCoursePage = /^\/dashboard-new\/course\/[^/]+$/.test(location.pathname);
   const guide = isStudentCoursePage
     ? {
@@ -391,9 +383,24 @@ export default function UserGuide() {
     setOpen(false);
     setStep(0);
     setTargetRect(null);
-    setGuideDemo(guide?.id, false);
-    return () => setGuideDemo(guide?.id, false);
-  }, [guide?.id, isAdmin]);
+  }, [guide?.id]);
+
+  useEffect(() => {
+    if (!guide || !isStudent || !storageKey) return undefined;
+
+    try {
+      if (localStorage.getItem(storageKey) === "completed") return undefined;
+    } catch {
+      // 儲存空間不可用時，仍保留學生首次進入頁面的主動導覽。
+    }
+
+    const timer = window.setTimeout(() => {
+      setStep(0);
+      setOpen(true);
+    }, 500);
+
+    return () => window.clearTimeout(timer);
+  }, [guide?.id, isStudent, storageKey]);
 
   useLayoutEffect(() => {
     if (!open || !current) {
@@ -457,7 +464,7 @@ export default function UserGuide() {
     };
   }, [current, open]);
 
-  if (!guide || isAdmin) return null;
+  if (!guide) return null;
 
   const complete = () => {
     try {
@@ -465,7 +472,6 @@ export default function UserGuide() {
     } catch {
       // 儲存空間不可用時，只關閉本次導覽。
     }
-    setGuideDemo(guide.id, false);
     setOpen(false);
     setStep(0);
     if (guide.id === "ai-api" && originalAiTab.current) {
@@ -479,7 +485,6 @@ export default function UserGuide() {
       originalAiTab.current = document.querySelector('[data-guide-tab][aria-selected="true"]')?.dataset.guideTab ?? null;
     }
     setStep(0);
-    setGuideDemo(guide.id, true);
     window.setTimeout(() => setOpen(true), 80);
   };
 
