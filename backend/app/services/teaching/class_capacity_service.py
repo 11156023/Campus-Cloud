@@ -66,16 +66,12 @@ def preview(
     )
     placement_plan: dict[str, dict[str, int]] = {}
     if check_cluster and nodes and students:
-        try:
-            placement_plan = _check_cluster_capacity(
-                session,
-                nodes=nodes,
-                student_count=len(students),
-            )
-        except BadRequestError:
-            issues.append(
-                "Unable to verify class capacity. Review capacity or retry later."
-            )
+        placement_plan, cluster_issues = _evaluate_cluster_capacity(
+            session,
+            nodes=nodes,
+            student_count=len(students),
+        )
+        issues.extend(cluster_issues)
     return {
         **totals,
         "available_ips": ip_stats["available"],
@@ -167,13 +163,13 @@ def release(
     return released_ips
 
 
-def _check_cluster_capacity(
+def _evaluate_cluster_capacity(
     session: Session,
     *,
     nodes: list[TeachingClassMachineNode],
     student_count: int,
-) -> dict[str, dict[str, int]]:
-    """Validate the complete class against the PVE nodes that own its templates."""
+) -> tuple[dict[str, dict[str, int]], list[str]]:
+    """Return a placement plan and safe, user-facing capacity issues."""
     demand: dict[str, dict[str, int]] = defaultdict(
         lambda: {"cpu_cores": 0, "memory_bytes": 0, "disk_bytes": 0, "machines": 0}
     )
@@ -181,7 +177,7 @@ def _check_cluster_capacity(
         if node.source_type == "template":
             template = session.get(VMTemplate, node.source_template_id)
             if template is None:
-                raise BadRequestError(f"課程機器「{node.name}」的來源範本不存在")
+                return {}, [f"課程機器「{node.name}」的來源範本不存在"]
             target_node = template.node
         else:
             try:
@@ -197,9 +193,9 @@ def _check_cluster_capacity(
                     "Failed to resolve placement for custom class machine node_id=%s",
                     node.id,
                 )
-                raise BadRequestError(
+                return {}, [
                     f"無法確認自訂機器「{node.name}」的建機節點，請稍後再試"
-                ) from None
+                ]
         target = demand[target_node]
         target["cpu_cores"] += node.cpu * student_count
         target["memory_bytes"] += node.memory_mb * 1024**2 * student_count
@@ -220,7 +216,7 @@ def _check_cluster_capacity(
         }
     except Exception:
         logger.exception("Failed to fetch Proxmox capacity for class reservation")
-        raise BadRequestError("無法取得 Proxmox 容量，暫時不能鎖定班級") from None
+        return {}, ["Unable to verify class capacity. Review capacity or retry later."]
 
     # Pending reviewed classes are not necessarily visible as PVE guests yet.
     for reservation in session.exec(
@@ -273,6 +269,21 @@ def _check_cluster_capacity(
                 f"{values['disk_bytes'] // GIB} GB，可用 "
                 f"{capacity.allocatable_disk_bytes // GIB} GB"
             )
+    return dict(demand), issues
+
+
+def _check_cluster_capacity(
+    session: Session,
+    *,
+    nodes: list[TeachingClassMachineNode],
+    student_count: int,
+) -> dict[str, dict[str, int]]:
+    """Validate capacity for reservation while preview uses structured issues."""
+    placement_plan, issues = _evaluate_cluster_capacity(
+        session,
+        nodes=nodes,
+        student_count=student_count,
+    )
     if issues:
         raise BadRequestError("；".join(issues))
-    return dict(demand)
+    return placement_plan

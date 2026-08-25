@@ -92,13 +92,13 @@ def test_class_capacity_preview_hides_caught_exception_details(monkeypatch):
         lambda _session: {"available": 10},
     )
 
-    def fail_capacity(*_args, **_kwargs):
-        raise BadRequestError(internal_error)
+    def fail_placement():
+        raise RuntimeError(internal_error)
 
     monkeypatch.setattr(
-        class_capacity_service,
-        "_check_cluster_capacity",
-        fail_capacity,
+        class_capacity_service.provisioning_service,
+        "_get_lxc_target_node",
+        fail_placement,
     )
     result = class_capacity_service.preview(
         _Session(),
@@ -108,16 +108,20 @@ def test_class_capacity_preview_hides_caught_exception_details(monkeypatch):
                 cpu=1,
                 memory_mb=512,
                 disk_gb=10,
+                id=uuid.uuid4(),
+                name="custom-lab",
+                source_type="custom",
+                resource_type="lxc",
+                custom_image_ref=None,
             )
         ],
         students=[SimpleNamespace(id=uuid.uuid4())],
         check_cluster=True,
     )
 
-    assert result["issues"] == [
-        "Unable to verify class capacity. Review capacity or retry later."
-    ]
-    assert internal_error not in result["issues"]
+    assert len(result["issues"]) == 1
+    assert "custom-lab" in result["issues"][0]
+    assert all(internal_error not in issue for issue in result["issues"])
 
 
 def test_class_member_cannot_manage_class_resource(monkeypatch):
