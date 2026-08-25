@@ -3,7 +3,7 @@
 import csv
 import io
 import uuid
-from datetime import date, datetime, time, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 from pathlib import Path
 
 from fastapi import APIRouter, File, UploadFile
@@ -24,6 +24,7 @@ from app.models import (
     CourseEnvironmentNode,
     CourseEnvironmentVersion,
     CourseEnvironmentVersionStatus,
+    Resource,
     TeachingClass,
     TeachingClassMachineNode,
     TeachingClassStatus,
@@ -32,10 +33,18 @@ from app.models import (
     TeachingClassTaskFile,
     TeachingClassWeek,
     User,
+    UserRole,
 )
 from app.models.base import get_datetime_utc
+from app.repositories import resource as resource_repo
 from app.repositories.user import get_user_by_email
-from app.services.teaching import class_capacity_service, class_network_service
+from app.services.proxmox import proxmox_service
+from app.services.resource import resource_service
+from app.services.teaching import (
+    class_capacity_service,
+    class_lifecycle_service,
+    class_network_service,
+)
 from app.services.vm import batch_provision_service
 
 router = APIRouter(prefix="/teaching-classes", tags=["teaching-classes"])
@@ -69,6 +78,16 @@ class ClassPatch(BaseModel):
     end_time: time | None = None
     timezone: str | None = None
     boot_lead_minutes: int | None = Field(default=None, ge=0, le=120)
+    shutdown_grace_minutes: int | None = Field(default=None, ge=0, le=240)
+
+
+class ClassExtend(BaseModel):
+    end_date: date
+
+
+class ClassArchive(BaseModel):
+    reclaim_resources: bool = True
+    force: bool = False
 
 
 class StudentAdd(BaseModel):
@@ -309,6 +328,71 @@ def update_class(
     return _serialize(session, item)
 
 
+@router.post("/{class_id}/extend")
+def extend_class(
+    class_id: uuid.UUID,
+    body: ClassExtend,
+    session: SessionDep,
+    current_user: InstructorUser,
+):
+    item = _get_class(session, current_user, class_id)
+    if item.status == TeachingClassStatus.archived:
+        raise BadRequestError("Archived teaching classes cannot be extended")
+    if body.end_date <= item.end_date:
+        raise BadRequestError("The new end date must be later than the current end date")
+    item.end_date = body.end_date
+    item.updated_at = get_datetime_utc()
+    item.resources_reclaimed_at = None
+    for resource in resource_repo.get_resources_by_teaching_class(
+        session=session, teaching_class_id=class_id
+    ):
+        resource.expiry_date = body.end_date
+        resource.expiry_notified_at = None
+        resource.scheduled_deletion_at = None
+        session.add(resource)
+    class_lifecycle_service.clear_schedule_windows(session, class_id)
+    session.add(item)
+    session.commit()
+    _generate_weeks(session, item, preserve=True)
+    return _serialize(session, item)
+
+
+@router.post("/{class_id}/archive")
+def archive_class(
+    class_id: uuid.UUID,
+    body: ClassArchive,
+    session: SessionDep,
+    current_user: InstructorUser,
+):
+    item = _get_class(session, current_user, class_id)
+    reclaim = class_lifecycle_service.archive_and_reclaim(
+        session=session,
+        item=item,
+        requested_by=current_user.id,
+        force=body.force,
+        reclaim_resources=body.reclaim_resources,
+    )
+    return {"class": _serialize(session, item), "reclaim": reclaim}
+
+
+@router.post("/{class_id}/reclaim")
+def reclaim_class_resources(
+    class_id: uuid.UUID,
+    body: ClassArchive,
+    session: SessionDep,
+    current_user: InstructorUser,
+):
+    item = _get_class(session, current_user, class_id)
+    if item.status != TeachingClassStatus.archived:
+        raise BadRequestError("Teaching class must be archived before reclaim")
+    return class_lifecycle_service.queue_reclaim(
+        session=session,
+        item=item,
+        requested_by=current_user.id,
+        force=body.force,
+    )
+
+
 @router.post("/{class_id}/students")
 def add_students(
     class_id: uuid.UUID,
@@ -320,18 +404,25 @@ def add_students(
     if item.status != TeachingClassStatus.planning:
         raise BadRequestError("已送出建機後不可變更學生名單")
     existing = {row.user_id for row in _students(session, class_id)}
-    added, not_found = 0, []
+    added, not_found, invalid_role = 0, [], []
     for raw in body.emails:
         email = raw.strip().lower()
         user = get_user_by_email(session=session, email=email)
         if not user:
             not_found.append(email)
+        elif user.role != UserRole.student:
+            invalid_role.append(email)
         elif user.id not in existing:
             session.add(TeachingClassStudent(class_id=class_id, user_id=user.id))
             existing.add(user.id)
             added += 1
     session.commit()
-    return {"added": added, "not_found": not_found, "class": _serialize(session, item)}
+    return {
+        "added": added,
+        "not_found": not_found,
+        "invalid_role": invalid_role,
+        "class": _serialize(session, item),
+    }
 
 
 @router.delete("/{class_id}/students/{student_id}")
@@ -772,7 +863,10 @@ def retry_failed_class(
     current_user: InstructorUser,
 ):
     item = _get_class(session, current_user, class_id)
-    if item.status != TeachingClassStatus.partial_failed:
+    if item.status not in {
+        TeachingClassStatus.partial_failed,
+        TeachingClassStatus.provisioning,
+    }:
         raise BadRequestError("只有建立失敗的班級可以重試")
     nodes = list(
         session.exec(
@@ -782,6 +876,8 @@ def retry_failed_class(
         ).all()
     )
     submitted = 0
+    recovered = 0
+    stale_before = get_datetime_utc() - timedelta(minutes=30)
     for node in nodes:
         job = session.get(BatchProvisionJob, node.batch_job_id) if node.batch_job_id else None
         if not job:
@@ -791,22 +887,70 @@ def retry_failed_class(
                 select(BatchProvisionTask).where(BatchProvisionTask.job_id == job.id)
             ).all()
         )
-        retry_user_ids = [
-            task.user_id
-            for task in tasks
-            if task.status != BatchProvisionTaskStatus.completed
-            and (
-                task.status == BatchProvisionTaskStatus.failed
-                or job.status
-                in {
-                    BatchProvisionJobStatus.failed,
-                    BatchProvisionJobStatus.rejected,
-                    BatchProvisionJobStatus.cancelled,
-                }
+        retry_user_ids = []
+        for task in tasks:
+            started_at = task.started_at
+            if started_at and started_at.tzinfo is None:
+                started_at = started_at.replace(tzinfo=UTC)
+            stale = (
+                task.status == BatchProvisionTaskStatus.running
+                and started_at is not None
+                and started_at <= stale_before
             )
-        ]
+            terminal_job = job.status in {
+                BatchProvisionJobStatus.failed,
+                BatchProvisionJobStatus.rejected,
+                BatchProvisionJobStatus.cancelled,
+            }
+            retryable = (
+                task.status == BatchProvisionTaskStatus.failed
+                or stale
+                or (
+                    terminal_job
+                    and task.status != BatchProvisionTaskStatus.completed
+                )
+            )
+            if not retryable:
+                continue
+            if _recover_existing_task_resource(
+                session=session,
+                item=item,
+                node=node,
+                task=task,
+            ):
+                recovered += 1
+                continue
+            if stale or (
+                terminal_job
+                and task.status != BatchProvisionTaskStatus.failed
+            ):
+                task.status = BatchProvisionTaskStatus.failed
+                task.error = (
+                    "Stale provisioning task superseded by class retry"
+                    if stale
+                    else "Incomplete task superseded by class retry"
+                )
+                task.finished_at = get_datetime_utc()
+                session.add(task)
+            retry_user_ids.append(task.user_id)
+        job.done = sum(
+            task.status == BatchProvisionTaskStatus.completed for task in tasks
+        )
+        job.failed_count = sum(
+            task.status == BatchProvisionTaskStatus.failed for task in tasks
+        )
+        if job.done == job.total and job.failed_count == 0:
+            job.status = BatchProvisionJobStatus.completed
+            job.finished_at = get_datetime_utc()
+        session.add(job)
+        session.commit()
         if not retry_user_ids:
             continue
+        if job.status == BatchProvisionJobStatus.running:
+            job.status = BatchProvisionJobStatus.failed
+            job.finished_at = get_datetime_utc()
+            session.add(job)
+            session.commit()
         node.batch_job_id = _submit_node_job(
             session=session,
             item=item,
@@ -818,8 +962,28 @@ def retry_failed_class(
         session.commit()
         submitted += 1
 
+    current_jobs = [
+        session.get(BatchProvisionJob, node.batch_job_id)
+        for node in nodes
+        if node.batch_job_id
+    ]
+    all_jobs_ready = (
+        len(current_jobs) == len(nodes)
+        and bool(nodes)
+        and all(
+            job is not None
+            and job.status == BatchProvisionJobStatus.completed
+            and job.done == job.total
+            and job.failed_count == 0
+            for job in current_jobs
+        )
+    )
     if submitted:
         item.status = TeachingClassStatus.pending_review
+    elif item.status == TeachingClassStatus.provisioning and not recovered:
+        raise BadRequestError("No failed or stale provisioning tasks to retry")
+    elif not all_jobs_ready:
+        item.status = TeachingClassStatus.provisioning
     else:
         topology_errors = class_network_service.apply_class_topology(
             session, class_id=class_id
@@ -839,6 +1003,77 @@ def retry_failed_class(
     session.add(item)
     session.commit()
     return _serialize(session, item)
+
+
+def _recover_existing_task_resource(
+    *,
+    session: SessionDep,
+    item: TeachingClass,
+    node: TeachingClassMachineNode,
+    task: BatchProvisionTask,
+) -> bool:
+    """Recover a VM created before a worker crash instead of cloning twice."""
+    resource = session.exec(
+        select(Resource).where(
+            Resource.batch_job_id == task.job_id,
+            Resource.user_id == task.user_id,
+        )
+    ).first()
+    if resource is None:
+        return False
+    try:
+        proxmox_service.find_resource(resource.vmid)
+    except NotFoundError:
+        resource_service.delete_orphan_db_record(
+            session=session,
+            vmid=resource.vmid,
+            user_id=item.owner_id,
+        )
+        session.commit()
+        return False
+    except Exception as exc:
+        raise BadRequestError(
+            f"Cannot verify existing resource {resource.vmid}; retry later: {exc}"
+        )
+
+    resource_repo.assign_to_teaching_class(
+        session=session,
+        vmid=resource.vmid,
+        teaching_class_id=item.id,
+        commit=False,
+    )
+    enrollment = session.exec(
+        select(TeachingClassStudent).where(
+            TeachingClassStudent.class_id == item.id,
+            TeachingClassStudent.user_id == task.user_id,
+        )
+    ).first()
+    if enrollment is None:
+        raise BadRequestError("Provisioned resource user is no longer in the class")
+    mapping = session.exec(
+        select(TeachingClassStudentMachine).where(
+            TeachingClassStudentMachine.class_student_id == enrollment.id,
+            TeachingClassStudentMachine.machine_node_id == node.id,
+        )
+    ).first()
+    if mapping is None:
+        mapping = TeachingClassStudentMachine(
+            class_student_id=enrollment.id,
+            machine_node_id=node.id,
+        )
+    mapping.batch_task_id = task.id
+    mapping.vmid = resource.vmid
+    mapping.status = "completed"
+    mapping.error = None
+    task.status = BatchProvisionTaskStatus.completed
+    task.vmid = resource.vmid
+    task.resource_vmid = resource.vmid
+    task.error = None
+    task.finished_at = get_datetime_utc()
+    session.add(mapping)
+    session.add(task)
+    session.flush()
+    return True
 
 
 @router.post("/{class_id}/reset-failed")
@@ -888,6 +1123,8 @@ def provision_status(
     class_id: uuid.UUID, session: SessionDep, current_user: InstructorUser
 ):
     item = _get_class(session, current_user, class_id)
+    if item.status == TeachingClassStatus.archived:
+        return _serialize(session, item)
     nodes = list(
         session.exec(
             select(TeachingClassMachineNode).where(

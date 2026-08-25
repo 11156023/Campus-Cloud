@@ -106,6 +106,32 @@ def compute_next_window(
     return start_utc, end_utc
 
 
+def compute_active_or_next_window(
+    rule: str,
+    duration_minutes: int,
+    timezone: str | None,
+    now: datetime,
+) -> tuple[datetime, datetime] | None:
+    """Return the occurrence containing ``now``, or the next occurrence."""
+    if not rule or duration_minutes <= 0:
+        return None
+    now_utc = _ensure_utc(now)
+    candidate = compute_next_window(
+        rule=rule,
+        duration_minutes=duration_minutes,
+        timezone=timezone,
+        after=now_utc - timedelta(minutes=duration_minutes),
+    )
+    if candidate and candidate[1] > now_utc:
+        return candidate
+    return compute_next_window(
+        rule=rule,
+        duration_minutes=duration_minutes,
+        timezone=timezone,
+        after=now_utc,
+    )
+
+
 def is_in_window(
     window_start: datetime | None,
     window_end: datetime | None,
@@ -151,6 +177,7 @@ __all__ = [
     "build_daily_rule",
     "build_weekly_rule",
     "compute_next_window",
+    "compute_active_or_next_window",
     "get_schedule_policy",
     "is_in_window",
 ]

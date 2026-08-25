@@ -26,6 +26,15 @@ class DeletionRequestStatus(str, enum.Enum):
 
 class DeletionRequest(SQLModel, table=True):
     __tablename__ = "deletion_requests"
+    __table_args__ = (
+        sa.Index(
+            "uq_deletion_requests_active_vmid",
+            "vmid",
+            unique=True,
+            postgresql_where=sa.text("status IN ('pending', 'running')"),
+            sqlite_where=sa.text("status IN ('pending', 'running')"),
+        ),
+    )
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     user_id: uuid.UUID = Field(foreign_key="user.id", index=True)

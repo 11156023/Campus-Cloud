@@ -25,7 +25,7 @@ class TeachingClass(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     owner_id: uuid.UUID = Field(
         sa_column=Column(
-            sa.ForeignKey("user.id", ondelete="CASCADE"),
+            sa.ForeignKey("user.id", ondelete="RESTRICT"),
             nullable=False,
             index=True,
         )
@@ -65,6 +65,18 @@ class TeachingClass(SQLModel, table=True):
     updated_at: datetime = Field(
         default_factory=get_datetime_utc,
         sa_column=Column(DateTime(timezone=True), nullable=False),
+    )
+    archived_at: datetime | None = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True), nullable=True),
+    )
+    reclaim_requested_at: datetime | None = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True), nullable=True),
+    )
+    resources_reclaimed_at: datetime | None = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True), nullable=True),
     )
 
 

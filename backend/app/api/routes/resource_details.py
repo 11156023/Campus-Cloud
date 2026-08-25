@@ -22,6 +22,7 @@ from app.schemas import (
 )
 from app.services.network import snapshot_service
 from app.services.resource import reset_service, resource_service
+from app.services.resource.access import require_resource_management
 
 logger = logging.getLogger(__name__)
 
@@ -74,6 +75,7 @@ def create_snapshot(
     session: SessionDep,
     current_user: CurrentUser,
 ):
+    require_resource_management(session=session, user=current_user, vmid=vmid)
     return snapshot_service.create_snapshot(
         session=session,
         vmid=vmid,
@@ -94,6 +96,7 @@ def delete_snapshot(
     session: SessionDep,
     current_user: CurrentUser,
 ):
+    require_resource_management(session=session, user=current_user, vmid=vmid)
     return snapshot_service.delete_snapshot(
         session=session,
         vmid=vmid,
@@ -114,6 +117,7 @@ def rollback_snapshot(
     session: SessionDep,
     current_user: CurrentUser,
 ):
+    require_resource_management(session=session, user=current_user, vmid=vmid)
     return snapshot_service.rollback_snapshot(
         session=session,
         vmid=vmid,

@@ -92,7 +92,10 @@ def fake_env(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
     monkeypatch.setattr(
         resource_service,
         "resource_repo",
-        SimpleNamespace(delete_resource=lambda **kw: None),
+        SimpleNamespace(
+            get_resource_by_vmid=lambda **kw: None,
+            delete_resource=lambda **kw: None,
+        ),
     )
     monkeypatch.setattr(
         resource_service,

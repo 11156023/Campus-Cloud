@@ -88,6 +88,8 @@ class BatchProvisionJobPublic(BaseModel):
     recurrence_rule: str | None = None
     recurrence_duration_minutes: int | None = None
     schedule_timezone: str | None = None
+    next_window_start: datetime | None = None
+    next_window_end: datetime | None = None
     spec: BatchProvisionJobSpec
     tasks: list[BatchProvisionTaskPublic]
 
@@ -173,6 +175,8 @@ def _build_job_public(session: SessionDep, job) -> BatchProvisionJobPublic:
         recurrence_rule=job.recurrence_rule,
         recurrence_duration_minutes=job.recurrence_duration_minutes,
         schedule_timezone=job.schedule_timezone,
+        next_window_start=job.next_window_start,
+        next_window_end=job.next_window_end,
         spec=spec,
         tasks=task_publics,
     )

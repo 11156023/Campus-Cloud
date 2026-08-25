@@ -1,7 +1,8 @@
 """配額計算與執法 I/O 層（純函式在 quota_policy）。
 
-用量來源：DB resources 表決定擁有的 vmid 與台數；specs 取自 PVE
-cluster/resources（maxcpu / maxmem / maxdisk，單次呼叫）。
+用量來源：DB resources 表中的個人資源決定 vmid 與台數；班級持有的
+教學資源不計入學生個人配額。specs 取自 PVE cluster/resources
+（maxcpu / maxmem / maxdisk，單次呼叫）。
 PVE 不可用時 fail-open（記 warning、放行），不阻斷 provisioning。
 """
 
@@ -78,7 +79,10 @@ def _owned_vmids(session: Session, user_id: uuid.UUID) -> list[int]:
     return [
         int(v)
         for v in session.exec(
-            select(Resource.vmid).where(Resource.user_id == user_id)
+            select(Resource.vmid).where(
+                Resource.user_id == user_id,
+                Resource.allocation_scope == "personal",
+            )
         ).all()
     ]
 

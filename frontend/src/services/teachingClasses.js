@@ -26,5 +26,18 @@ export const TeachingClassesService = {
   provision(classId) { return apiPost(`/api/v1/teaching-classes/${classId}/provision`, {}); },
   retryFailed(classId) { return apiPost(`/api/v1/teaching-classes/${classId}/retry-failed`, {}); },
   resetFailed(classId) { return apiPost(`/api/v1/teaching-classes/${classId}/reset-failed`, {}); },
+  extend(classId, endDate) { return apiPost(`/api/v1/teaching-classes/${classId}/extend`, { end_date: endDate }); },
+  archive(classId, options = {}) {
+    return apiPost(`/api/v1/teaching-classes/${classId}/archive`, {
+      reclaim_resources: options.reclaimResources ?? true,
+      force: options.force ?? false,
+    });
+  },
+  reclaim(classId, options = {}) {
+    return apiPost(`/api/v1/teaching-classes/${classId}/reclaim`, {
+      reclaim_resources: true,
+      force: options.force ?? false,
+    });
+  },
   provisionStatus(classId) { return apiGet(`/api/v1/teaching-classes/${classId}/provision-status`); },
 };

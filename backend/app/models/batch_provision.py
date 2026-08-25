@@ -85,6 +85,14 @@ class BatchProvisionJob(SQLModel, table=True):
     recurrence_rule: str | None = Field(default=None)
     recurrence_duration_minutes: int | None = Field(default=None)
     schedule_timezone: str | None = Field(default=None)
+    next_window_start: datetime | None = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True), nullable=True, index=True),
+    )
+    next_window_end: datetime | None = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True), nullable=True),
+    )
 
 
 class BatchProvisionTask(SQLModel, table=True):
