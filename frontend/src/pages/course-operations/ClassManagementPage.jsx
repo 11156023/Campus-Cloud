@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import MIcon from "../../components/MIcon";
 import EmptyState from "../../components/EmptyState/EmptyState";
 import { TeachingClassesService } from "../../services/teachingClasses";
-import ClassCreateDialog from "./ClassCreatePage";
 import styles from "./CourseOperations.module.scss";
 
 const STATUS = {
@@ -41,23 +40,32 @@ function normalizeClass(item) {
   };
 }
 
-function nextStep(item) {
-  if (!item.students) return ["加入學生", "students"];
-  if (!item.nodes.length) return ["設定上課環境", "machines"];
-  if (item.status === "planning") return ["確認並送出建機", "overview"];
-  if (item.status === "partial_failed") return ["查看失敗項目", "overview"];
-  if (item.status === "active") return ["進入班級", "overview"];
-  return ["查看建機進度", "overview"];
+export function classSetupResumeStep(item) {
+  if (!item.students) return 2;
+  if (!item.nodes?.length) return 3;
+  if (!(item.weeks ?? []).some((week) => String(week.title ?? "").trim())) return 4;
+  return 5;
 }
 
-export default function ClassManagementPage({ openCreate = false }) {
+function nextAction(item) {
+  if (item.status === "planning") {
+    const step = classSetupResumeStep(item);
+    const labels = { 2: "繼續加入學生", 3: "繼續設定上課環境", 4: "繼續安排任務", 5: "確認並送出建機" };
+    return [labels[step], `/class-setup?classId=${item.id}&step=${step}`];
+  }
+  if (item.status === "partial_failed") return ["查看失敗項目", `/class-management/${item.id}`];
+  if (item.status === "active") return ["進入班級", `/class-management/${item.id}`];
+  return ["查看建機進度", `/class-management/${item.id}`];
+}
+
+export default function ClassManagementPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [classes, setClasses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
-  const [createOpen, setCreateOpen] = useState(openCreate);
 
   useEffect(() => {
     let active = true;
@@ -80,12 +88,13 @@ export default function ClassManagementPage({ openCreate = false }) {
         <h1 className={styles.pageTitle}>我的班級</h1>
         <p className={styles.pageSubtitle}>從尚未完成的班級繼續準備，或進入已就緒的班級開始上課。</p>
       </div>
-      <button type="button" className={styles.btnPrimary} onClick={() => setCreateOpen(true)}>
-        <MIcon name="add" size={17} />建立班級
+      <button type="button" className={styles.btnPrimary} onClick={() => navigate("/class-setup")}>
+        <MIcon name="add" size={17} />一鍵建立班級
       </button>
     </header>
 
     {error && <p className={styles.errorMessage}>{error}</p>}
+    {location.state?.message && <p className={styles.persistentFeedback}><MIcon name="cloud_done" size={17} />{location.state.message}</p>}
 
     <div className={styles.classToolbar}>
       <label className={styles.searchInput}><MIcon name="search" size={18} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜尋班級" /></label>
@@ -96,7 +105,7 @@ export default function ClassManagementPage({ openCreate = false }) {
       {rows.map((item) => {
         const setupReady = [item.students > 0, item.nodes.length > 0].filter(Boolean).length;
         const progress = item.status === "planning" ? setupReady / 2 * 100 : item.totalMachines ? item.readyMachines / item.totalMachines * 100 : 0;
-        const [action, target] = nextStep(item);
+        const [action, target] = nextAction(item);
         return <article className={styles.classCard} key={item.id}>
           <button type="button" className={styles.classCardMain} onClick={() => navigate(`/class-management/${item.id}`)}>
             <div className={styles.classCardTop}>
@@ -107,10 +116,9 @@ export default function ClassManagementPage({ openCreate = false }) {
             <div className={styles.classProgress}><div><span>{item.status === "planning" ? "建機準備" : "機器建立"}</span><strong>{item.status === "planning" ? `${setupReady}/2` : `${item.readyMachines}/${item.totalMachines}`}</strong></div><i><b style={{ width: `${progress}%` }} /></i></div>
           </button>
           <div className={styles.classInfoLine}><span>{item.students} 位學生</span><span>{item.weeks.length} 個課次</span><span>每位 {item.nodes.length} 台機器</span></div>
-          <div className={styles.classCardAction}><span>{item.status === "active" ? "環境已準備完成" : action}</span><button type="button" onClick={() => navigate(target === "overview" ? `/class-management/${item.id}` : `/class-management/${item.id}/${target}`)}>{action}<MIcon name="arrow_forward" size={17} /></button></div>
+          <div className={styles.classCardAction}><span>{item.status === "active" ? "環境已準備完成" : action}</span><button type="button" onClick={() => navigate(target)}>{action}<MIcon name="arrow_forward" size={17} /></button></div>
         </article>;
       })}
     </section> : <EmptyState icon="school" title="目前沒有符合條件的班級。" />}
-    {createOpen && <ClassCreateDialog onClose={() => { setCreateOpen(false); if (openCreate) navigate("/class-management", { replace: true }); }} onCreated={(created) => navigate(`/class-management/${created.id}/students`)} />}
   </div>;
 }
