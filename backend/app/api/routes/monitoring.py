@@ -14,9 +14,9 @@ router = APIRouter(prefix="/monitoring", tags=["monitoring"])
 
 
 @router.get("/overview", response_model=MonitoringOverview)
-def get_overview(_: AdminUser) -> MonitoringOverview:
+def get_overview(session: SessionDep, _: AdminUser) -> MonitoringOverview:
     """全域監控匯總（叢集容量/用量、節點與 VM 統計）。"""
-    return monitoring_service.get_overview()
+    return monitoring_service.get_overview(session=session)
 
 
 @router.get("/nodes/{node}/rrd")

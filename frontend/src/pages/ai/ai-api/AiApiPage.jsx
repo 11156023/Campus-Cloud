@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import styles from "./AiApiPage.module.scss";
 import MIcon from "../../../components/MIcon";
 import { AiApiService } from "../../../services/aiApi";
+import { useConfirm } from "../../../components/ConfirmDialog/ConfirmProvider";
 import { useToast } from "../../../hooks/useToast";
 
 /* ── helpers ── */
@@ -96,6 +97,7 @@ function StatCard({ label, value, icon, iconCls }) {
 /* ── Credential card ── */
 function CredentialCard({ item, onRefresh }) {
   const toast = useToast();
+  const confirm = useConfirm();
   const [showKey, setShowKey] = useState(false);
   const [editing, setEditing] = useState(false);
   const [nameInput, setNameInput] = useState(item.api_key_name);
@@ -114,7 +116,13 @@ function CredentialCard({ item, onRefresh }) {
   };
 
   const doRotate = async () => {
-    if (!window.confirm("刷新後舊金鑰會失效，確定繼續？")) return;
+    const ok = await confirm({
+      title: "刷新 API Key",
+      message: "刷新後舊金鑰會失效，確定繼續？",
+      confirmText: "刷新",
+      danger: true,
+    });
+    if (!ok) return;
     setBusy(true);
     try {
       await AiApiService.rotateCredential(item.id);
@@ -128,7 +136,13 @@ function CredentialCard({ item, onRefresh }) {
   };
 
   const doDelete = async () => {
-    if (!window.confirm("確定刪除此金鑰？此操作無法復原。")) return;
+    const ok = await confirm({
+      title: "刪除 API Key",
+      message: "確定刪除此金鑰？此操作無法復原。",
+      confirmText: "刪除",
+      danger: true,
+    });
+    if (!ok) return;
     setBusy(true);
     try {
       await AiApiService.revokeCredential(item.id);

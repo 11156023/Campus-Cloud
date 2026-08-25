@@ -7,12 +7,6 @@ from typing import Any
 
 from fastapi import HTTPException
 
-from app.ai.template_recommendation.capability_catalog import SUPPORTED_TEMPLATE_SLUGS
-from app.ai.template_recommendation.catalog_service import (
-    TemplateCatalog,
-    build_catalog_prompt_bundle,
-    catalog_lookup,
-)
 from app.ai.template_recommendation.config import settings
 from app.ai.template_recommendation.node_service import summarize_device_nodes
 from app.ai.template_recommendation.prompt import (
@@ -272,7 +266,6 @@ async def extract_intent_from_chat(request: ChatRequest) -> ExtractedIntent:
 
 async def generate_ai_plan(
     request: RecommendationRequest,
-    template_catalog: TemplateCatalog,
     chat_history: list[ChatMessage],
     *,
     resource_options: dict[str, Any] | None = None,
@@ -284,13 +277,6 @@ async def generate_ai_plan(
             detail="AI model binding is missing in config/system-ai.json.",
         )
 
-    prompt_bundle = build_catalog_prompt_bundle(
-        template_catalog,
-        request.goal,
-        request.top_k,
-        needs_public_web=request.needs_public_web,
-        needs_database=request.needs_database,
-    )
     user_context = {
         "goal": request.goal,
         "role": request.role,
@@ -328,7 +314,6 @@ async def generate_ai_plan(
         "summary": "Traditional Chinese summary",
         "application_target": {
             "service_name": "string",
-            "service_slug": "template-slug-or-empty",
             "execution_environment": "lxc|vm",
             "environment_reason": "Traditional Chinese short reason",
         },
@@ -336,7 +321,6 @@ async def generate_ai_plan(
             "resource_type": "lxc|vm",
             "mode": "immediate|scheduled",
             "hostname": "string",
-            "service_template_slug": "lxc-service-template-slug-or-empty",
             "lxc_os_image": "real-lxc-os-image-or-empty",
             "vm_template_id": "integer-or-0",
             "gpu_mapping_id": "gpu-mapping-id-or-empty",
@@ -356,7 +340,6 @@ async def generate_ai_plan(
                     "role": "user",
                     "content": build_fast_ai_plan_prompt(
                         user_context=user_context,
-                        prompt_bundle=prompt_bundle,
                         resource_options={
                             **resource_options,
                             "gpu_options": gpu_options,
@@ -404,11 +387,9 @@ def normalize_ai_result(
     ai_result: dict[str, Any],
     request: RecommendationRequest,
     nodes: list[DeviceNode],
-    template_catalog: TemplateCatalog,
     *,
     resource_options: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    lookup = catalog_lookup(template_catalog)
     resource_options = resource_options or {
         "lxc_os_images": [],
         "vm_operating_systems": [],
@@ -420,83 +401,8 @@ def normalize_ai_result(
     form_context = request.form_context
     raw_prefill = dict(ai_result.get("form_prefill") or {})
 
-    recommended_templates: list[dict[str, Any]] = []
-    for item in list(ai_result.get("recommended_templates") or []):
-        slug = str(item.get("slug") or "").strip().lower()
-        if slug not in SUPPORTED_TEMPLATE_SLUGS:
-            continue
-        template = lookup.get(slug)
-        if not template:
-            continue
-        recommended_templates.append(
-            {
-                "slug": template.slug,
-                "name": template.name,
-                "why": str(item.get("why") or "AI 依需求推薦此模板。").strip(),
-            }
-        )
-
-    possible_needed_templates: list[dict[str, Any]] = []
-    for item in list(ai_result.get("possible_needed_templates") or []):
-        slug = str(item.get("slug") or "").strip().lower()
-        if slug not in SUPPORTED_TEMPLATE_SLUGS:
-            continue
-        template = lookup.get(slug)
-        if not template or any(existing["slug"] == template.slug for existing in recommended_templates):
-            continue
-        possible_needed_templates.append(
-            {
-                "slug": template.slug,
-                "name": template.name,
-                "why": str(item.get("why") or "AI 判斷可能需要此輔助模板。").strip(),
-            }
-        )
-
-    machines: list[dict[str, Any]] = []
-    for machine in list(ai_result.get("machines") or []):
-        slug = str(machine.get("template_slug") or "").strip().lower()
-        if slug not in SUPPORTED_TEMPLATE_SLUGS:
-            continue
-        template = lookup.get(slug)
-        if not template:
-            continue
-
-        install_methods = template.raw.get("install_methods") or []
-        default_resources = dict(install_methods[0].get("resources") or {}) if install_methods else {}
-        cpu = safe_int(machine.get("cpu"), int(default_resources.get("cpu") or 2), minimum=1, extract_digits=True)
-        memory_mb = safe_int(machine.get("memory_mb"), int(default_resources.get("ram") or 2048), minimum=256, extract_digits=True)
-        gpu = safe_int(machine.get("gpu"), 1 if request.requires_gpu else 0, minimum=0, extract_digits=True)
-        deployment_type = str(machine.get("deployment_type") or "").strip().lower()
-        if deployment_type not in {"lxc", "vm"}:
-            deployment_type = "vm" if (request.needs_windows or gpu > 0) else "lxc"
-        default_disk_gb = int(default_resources.get("hdd") or _minimum_disk_gb(deployment_type))
-        disk_gb = safe_int(
-            machine.get("disk_gb"),
-            default_disk_gb,
-            minimum=_minimum_disk_gb(deployment_type),
-            extract_digits=True,
-        )
-
-        machines.append(
-            {
-                "name": str(machine.get("name") or f"{template.slug}-node").strip(),
-                "purpose": str(machine.get("purpose") or "主要服務").strip(),
-                "template_slug": template.slug,
-                "deployment_type": deployment_type,
-                "cpu": cpu,
-                "memory_mb": memory_mb,
-                "disk_gb": disk_gb,
-                "gpu": gpu,
-                "assigned_node": machine.get("assigned_node"),
-                "why": str(machine.get("why") or "AI 依需求與目前節點容量安排此部署單位。").strip(),
-            }
-        )
-
-    primary_machine = machines[0] if machines else {}
-    primary_template = recommended_templates[0] if recommended_templates else {}
     resource_type = str(
         raw_prefill.get("resource_type")
-        or primary_machine.get("deployment_type")
         or ("vm" if request.needs_windows else "lxc")
     ).lower()
     if resource_type not in {"lxc", "vm"}:
@@ -505,23 +411,11 @@ def normalize_ai_result(
     hostname_seed = str(
         raw_prefill.get("hostname")
         or (form_context.hostname if form_context else "")
-        or primary_machine.get("name")
-        or primary_template.get("slug")
         or "ai-generated-host"
     ).lower()
     hostname = "".join(char if (char.isalnum() or char == "-") else "-" for char in hostname_seed.replace("_", "-")).strip("-")[:63]
     if not hostname:
         hostname = "ai-generated-host"
-
-    service_template_slug = str(
-        raw_prefill.get("service_template_slug")
-        or (form_context.service_template_slug if form_context else "")
-        or primary_template.get("slug")
-        or primary_machine.get("template_slug")
-        or ""
-    ).strip().lower()
-    if service_template_slug not in lookup:
-        service_template_slug = ""
 
     selected_lxc_image = ""
     if resource_type == "lxc" and lxc_os_images:
@@ -586,10 +480,10 @@ def normalize_ai_result(
         selected_gpu_mapping_id = str(selected_gpu.get("mapping_id") or "").strip()
         selected_gpu_label = _gpu_option_label(selected_gpu)
 
-    cores = safe_int(raw_prefill.get("cores") or (form_context.cores if form_context else None) or primary_machine.get("cpu"), 2, minimum=1, extract_digits=True)
-    memory_mb = safe_int(raw_prefill.get("memory_mb") or (form_context.memory_mb if form_context else None) or primary_machine.get("memory_mb"), 2048, minimum=512, extract_digits=True)
+    cores = safe_int(raw_prefill.get("cores") or (form_context.cores if form_context else None), 2, minimum=1, extract_digits=True)
+    memory_mb = safe_int(raw_prefill.get("memory_mb") or (form_context.memory_mb if form_context else None), 2048, minimum=512, extract_digits=True)
     disk_gb = safe_int(
-        raw_prefill.get("disk_gb") or (form_context.disk_gb if form_context else None) or primary_machine.get("disk_gb"),
+        raw_prefill.get("disk_gb") or (form_context.disk_gb if form_context else None),
         _minimum_disk_gb(resource_type),
         minimum=_minimum_disk_gb(resource_type),
         extract_digits=True,
@@ -638,7 +532,6 @@ def normalize_ai_result(
 
     service_name = str(
         ai_result.get("application_target", {}).get("service_name")
-        or primary_template.get("name")
         or request.goal[:40]
     ).strip()
 
@@ -646,7 +539,6 @@ def normalize_ai_result(
         "resource_type": resource_type,
         "mode": mode,
         "hostname": hostname,
-        "service_template_slug": service_template_slug if resource_type == "lxc" else "",
         "lxc_os_image": selected_lxc_image if resource_type == "lxc" else "",
         "vm_os_choice": selected_vm_os if resource_type == "vm" else "",
         "vm_template_id": selected_vm_template_id if resource_type == "vm" else 0,
@@ -683,25 +575,16 @@ def normalize_ai_result(
         "workload_profile": str(ai_result.get("workload_profile") or "ai-planned").strip(),
         "rule_basis": {
             "reasons": [str(item).strip() for item in list(ai_result.get("decision_factors") or []) if str(item).strip()],
-            "capacity_checks": [
-                {
-                    "machine": machine.get("name"),
-                    "assigned_node": machine.get("assigned_node"),
-                    "status": "ai-assigned",
-                }
-                for machine in machines
-            ],
         },
         "recommended_path": {
             "fit": "ai-generated plan",
-            "why": [item["why"] for item in recommended_templates] or ["AI 依需求與可用設備規劃推薦路徑。"],
+            "why": ["AI 依需求與可用設備規劃推薦路徑。"],
             "upgrade_when": str(ai_result.get("upgrade_when") or "").strip(),
         },
         "final_plan": {
             "summary": str(ai_result.get("summary") or "").strip(),
             "application_target": {
                 "service_name": service_name,
-                "service_slug": service_template_slug,
                 "execution_environment": resource_type,
                 "environment_reason": str(
                     ai_result.get("application_target", {}).get("environment_reason")
@@ -715,16 +598,6 @@ def normalize_ai_result(
                 "selected_gpu_label": selected_gpu_label,
                 "reason": gpu_reason,
                 "candidates": gpu_candidates,
-            },
-            "machines": machines,
-            "recommended_templates": recommended_templates,
-            "possible_needed_templates": possible_needed_templates[:3],
-            "overall_config": {
-                "deployment_strategy": str(ai_result.get("overall_config", {}).get("deployment_strategy") or "AI 依需求、模板與目前節點容量整理部署策略。").strip(),
-                "machine_count": len(machines),
-                "total_cpu": sum(int(machine.get("cpu") or 0) for machine in machines),
-                "total_memory_mb": sum(int(machine.get("memory_mb") or 0) for machine in machines),
-                "total_disk_gb": sum(int(machine.get("disk_gb") or 0) for machine in machines),
             },
         },
     }

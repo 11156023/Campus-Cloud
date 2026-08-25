@@ -29,7 +29,6 @@ from app.api.routes import (
     resources,
     reverse_proxy,
     rubric,
-    script_deploy,
     spec_change_requests,
     teacher_judge_files,
     teacher_judge_scripts,
@@ -75,7 +74,6 @@ api_router.include_router(reverse_proxy.router)
 api_router.include_router(gateway.router)
 api_router.include_router(gpu.router)
 api_router.include_router(ip_management.router)
-api_router.include_router(script_deploy.router)
 api_router.include_router(jobs.router)
 api_router.include_router(rubric.router)
 api_router.include_router(teacher_judge_files.router)

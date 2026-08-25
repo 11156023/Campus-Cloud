@@ -105,6 +105,8 @@ from .proxmox_config import (
 )
 from .quota import (
     EffectiveQuotaPublic,
+    GlobalQuotaPublic,
+    GlobalQuotaUpdate,
     QuotaUsagePublic,
     ResourceQuotaCreate,
     ResourceQuotaPublic,
@@ -136,11 +138,6 @@ from .resource import (
     VMSchema,
     VMTemplateSchema,
     VNCInfoSchema,
-)
-from .script_deploy import (
-    ScriptDeployRequest,
-    ScriptDeployResponse,
-    ScriptDeployStatus,
 )
 from .spec_change_request import (
     SpecChangeRequestCreate,
@@ -324,12 +321,10 @@ __all__ = [
     "ProxmoxConnectionTestResult",
     # Quota (module E)
     "EffectiveQuotaPublic",
+    "GlobalQuotaPublic",
+    "GlobalQuotaUpdate",
     "QuotaUsagePublic",
     "ResourceQuotaCreate",
     "ResourceQuotaPublic",
     "ResourceQuotaUpdate",
-    # Script Deploy
-    "ScriptDeployRequest",
-    "ScriptDeployResponse",
-    "ScriptDeployStatus",
 ]

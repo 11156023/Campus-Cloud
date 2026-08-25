@@ -13,6 +13,7 @@ const STATUS_MAP = {
   approved:  { label: "已核准", color: "success" },
   rejected:  { label: "已拒絕", color: "danger"  },
   cancelled: { label: "已取消", color: "muted"   },
+  expired:   { label: "已過期", color: "muted"   },
 };
 
 const RESOURCE_TYPE_MAP = {
@@ -83,7 +84,6 @@ function getFormInfoItems(req) {
   const items = [];
   if (req.username)             items.push({ label: "帳號",   value: req.username });
   if (req.gpu_mapping_id)       items.push({ label: "GPU",    value: req.gpu_mapping_id });
-  if (req.service_template_slug) items.push({ label: "服務模板", value: req.service_template_slug });
   return items;
 }
 

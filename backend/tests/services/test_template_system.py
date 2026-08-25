@@ -47,8 +47,8 @@ def make_template(
 def fake_pool(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         clone_service,
-        "get_proxmox_settings",
-        lambda: SimpleNamespace(pool_name="testpool"),
+        "get_proxmox_settings_for_node",
+        lambda node: SimpleNamespace(pool_name="testpool"),
     )
 
 
@@ -403,3 +403,33 @@ async def test_request_clone_rejects_not_ready_template(
             template_id=template.id,
             data=TemplateCloneRequest(count=1),
         )
+
+
+# ---------------------------------------------------------------------------
+# convert 前清快照（PVE 拒絕帶快照的 CT 轉範本；qemu 也一併清）
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("resource_type", ["lxc", "qemu"])
+def test_remove_snapshots_for_convert_deletes_snapshots_newest_first(
+    monkeypatch: pytest.MonkeyPatch, resource_type: str
+) -> None:
+    deleted: list[str] = []
+    monkeypatch.setattr(
+        template_service.proxmox_ops,
+        "list_snapshots",
+        lambda node, vmid, rt: [
+            {"name": "old", "snaptime": 100},
+            {"name": "current"},  # PVE 的偽快照，不可刪
+            {"name": "new", "snaptime": 200},
+        ],
+    )
+    monkeypatch.setattr(
+        template_service.proxmox_ops,
+        "delete_snapshot",
+        lambda node, vmid, rt, snapname: deleted.append(snapname),
+    )
+
+    template_service._remove_snapshots_for_convert("pve1", 9001, resource_type)
+
+    assert deleted == ["new", "old"]

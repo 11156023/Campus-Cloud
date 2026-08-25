@@ -101,39 +101,6 @@ class SecurityHeadersMiddleware:
         await self.app(scope, receive, send_with_headers)
 
 
-def _recover_orphan_running_deploys() -> None:
-    """將上次重啟前未完成的部署任務標記為 failed，避免永久卡在「執行中」。"""
-    import logging
-
-    from sqlmodel import Session, select
-
-    from app.core.db import engine
-    from app.models.base import get_datetime_utc
-    from app.models.script_deploy_log import ScriptDeployLog
-
-    _log = logging.getLogger(__name__)
-    try:
-        with Session(engine) as session:
-            orphans = session.exec(
-                select(ScriptDeployLog).where(ScriptDeployLog.status == "running")
-            ).all()
-            if not orphans:
-                return
-            for log in orphans:
-                log.status = "failed"
-                log.error = (log.error or "") + "\n[系統] 伺服器重啟，部署中斷"
-                log.progress = "已中斷（伺服器重啟）"
-                log.updated_at = get_datetime_utc()
-                log.completed_at = get_datetime_utc()
-                session.add(log)
-            session.commit()
-            _log.warning(
-                "啟動清理：將 %d 筆殘留 running 部署任務標記為 failed", len(orphans)
-            )
-    except Exception:
-        _log.exception("啟動清理孤兒部署任務失敗（非致命）")
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     configure_logging(
@@ -144,7 +111,6 @@ async def lifespan(app: FastAPI):
     )
     await init_redis()
     await init_arq_pool()
-    _recover_orphan_running_deploys()
     init_background_runner()
     stop_event = asyncio.Event()
     scheduler_task: asyncio.Task[None] | None = None

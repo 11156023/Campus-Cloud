@@ -21,7 +21,7 @@ from app.exceptions import (
     NotFoundError,
     PermissionDeniedError,
 )
-from app.infrastructure.proxmox import get_proxmox_settings
+from app.infrastructure.proxmox import get_proxmox_settings_for_node
 from app.infrastructure.proxmox import operations as proxmox_ops
 from app.infrastructure.queue import enqueue_task, report_progress
 from app.models import (
@@ -168,12 +168,12 @@ async def create_template(
 
     require_template_manage(user)
 
-    if (
-        template_repo.get_template_by_pve_vmid(
-            session=session, pve_vmid=data.source_vmid
-        )
-        is not None
-    ):
+    # 含軟刪除一起查：活躍紀錄擋重複，deleted 紀錄稍後復用
+    # （pve_vmid 有 unique 約束，PVE 回收 VMID 後不能另建新列）
+    existing = template_repo.get_template_by_pve_vmid(
+        session=session, pve_vmid=data.source_vmid, include_deleted=True
+    )
+    if existing is not None and existing.status != VMTemplateStatus.deleted:
         raise ConflictError(
             f"VMID {data.source_vmid} is already registered as a template"
         )
@@ -198,20 +198,36 @@ async def create_template(
             f"VM {data.source_vmid} belongs to another user"
         )
 
-    template = template_repo.create_template(
-        session=session,
-        pve_vmid=data.source_vmid,
-        name=data.name,
-        description=data.description,
-        owner_id=user.id,
-        node=node,
-        resource_type=resource_type,
-        visibility=data.visibility,
-        default_cores=data.default_cores,
-        default_memory=data.default_memory,
-        default_disk=data.default_disk,
-        source_vmid=data.source_vmid,
-    )
+    if existing is not None:
+        template = template_repo.revive_deleted_template(
+            session=session,
+            template=existing,
+            name=data.name,
+            description=data.description,
+            owner_id=user.id,
+            node=node,
+            resource_type=resource_type,
+            visibility=data.visibility,
+            default_cores=data.default_cores,
+            default_memory=data.default_memory,
+            default_disk=data.default_disk,
+            source_vmid=data.source_vmid,
+        )
+    else:
+        template = template_repo.create_template(
+            session=session,
+            pve_vmid=data.source_vmid,
+            name=data.name,
+            description=data.description,
+            owner_id=user.id,
+            node=node,
+            resource_type=resource_type,
+            visibility=data.visibility,
+            default_cores=data.default_cores,
+            default_memory=data.default_memory,
+            default_disk=data.default_disk,
+            source_vmid=data.source_vmid,
+        )
     try:
         record = await enqueue_task(
             session=session,
@@ -491,6 +507,20 @@ def _ensure_stopped(
         raise RuntimeError(f"VM {vmid} 無法停止")
 
 
+def _remove_snapshots_for_convert(
+    node: str, vmid: int, resource_type: proxmox_ops.ResourceType
+) -> None:
+    """轉範本前清掉所有快照（PVE 拒絕帶快照的 CT 轉範本）。
+
+    qemu 雖允許帶快照轉換，但範本化後快照不可回滾、只佔空間，一併清掉。
+    由新到舊刪，避免鏈中間節點的合併順序問題。
+    """
+    snapshots = proxmox_ops.list_snapshots(node, vmid, resource_type)
+    real = [s for s in snapshots if s.get("name") and s["name"] != "current"]
+    for snap in sorted(real, key=lambda s: s.get("snaptime") or 0, reverse=True):
+        proxmox_ops.delete_snapshot(node, vmid, resource_type, snap["name"])
+
+
 def _set_template_error(
     template_id: uuid.UUID,
     error: str,
@@ -517,7 +547,9 @@ def run_convert_task(task_id: uuid.UUID, payload: dict[str, Any]) -> dict[str, A
     try:
         report_progress(task_id, 10)
         _ensure_stopped(node, pve_vmid, resource_type)
-        report_progress(task_id, 50)
+        report_progress(task_id, 40)
+        _remove_snapshots_for_convert(node, pve_vmid, resource_type)
+        report_progress(task_id, 60)
         proxmox_ops.convert_to_template(node, pve_vmid, resource_type)
         report_progress(task_id, 90)
     except Exception as exc:
@@ -580,7 +612,7 @@ def run_update_clone_task(
         new_vmid = proxmox_ops.next_vmid()
         report_progress(task_id, 10)
         clone_name = f"tpl-{pve_vmid}-edit"
-        pool = get_proxmox_settings().pool_name
+        pool = get_proxmox_settings_for_node(node).pool_name
         # 範本更新需要可獨立寫入的完整副本，一律 full clone
         if resource_type == "lxc":
             proxmox_ops.clone_lxc(
@@ -632,6 +664,8 @@ def run_update_convert_task(
         report_progress(task_id, 10)
         _ensure_stopped(node, temp_vmid, resource_type)
         report_progress(task_id, 40)
+        _remove_snapshots_for_convert(node, temp_vmid, resource_type)
+        report_progress(task_id, 55)
         proxmox_ops.convert_to_template(node, temp_vmid, resource_type)
         report_progress(task_id, 70)
     except Exception as exc:

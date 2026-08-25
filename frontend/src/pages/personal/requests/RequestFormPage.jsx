@@ -180,7 +180,6 @@ export default function RequestFormPage({ onBack, className }) {
     memory:           2048,
     rootfs_size:      8,
     disk_size:        20,
-    service_template_slug: "",
     gpu_mapping_id:   "",
     start_at:         "",
     end_at:           "",
@@ -327,7 +326,6 @@ export default function RequestFormPage({ onBack, className }) {
     mode,
     hostname: form.hostname || null,
     reason: form.reason || null,
-    service_template_slug: form.service_template_slug || null,
     lxc_os_image: resourceType === "lxc" ? form.ostemplate || null : null,
     vm_template_id: resourceType === "vm" && form.template_id ? Number(form.template_id) : null,
     cores: Number(form.cores) || null,
@@ -369,9 +367,6 @@ export default function RequestFormPage({ onBack, className }) {
       return {
         ...prev,
         hostname: prefill.hostname ? normalizeHostname(prefill.hostname) : prev.hostname,
-        service_template_slug: nextResourceType === "lxc"
-          ? (prefill.service_template_slug || "")
-          : "",
         ostemplate: nextResourceType === "lxc"
           ? (prefill.lxc_os_image || prev.ostemplate)
           : prev.ostemplate,
@@ -535,9 +530,6 @@ export default function RequestFormPage({ onBack, className }) {
                 null,
             }),
         ...(selectedGpuId ? { gpu_mapping_id: selectedGpuId } : {}),
-        ...(resourceType === "lxc" && form.service_template_slug
-          ? { service_template_slug: form.service_template_slug }
-          : {}),
         ...(mode === "scheduled"
           ? { start_at: form.start_at, end_at: form.end_at }
           : (!form.immediate_no_end && form.end_at ? { end_at: form.end_at } : {})),

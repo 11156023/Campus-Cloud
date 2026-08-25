@@ -14,6 +14,7 @@ from app.infrastructure.ssh import (
     SSHAuthenticationError,
     create_key_client,
     exec_command,
+    forget_host_key,
 )
 from app.infrastructure.ssh import (
     generate_ed25519_keypair as _generate_ed25519_keypair,
@@ -45,6 +46,21 @@ _SERVICE_VERSION_COMMANDS: dict[str, str] = {
 
 def generate_ed25519_keypair() -> tuple[str, str]:
     return _generate_ed25519_keypair()
+
+
+def reset_host_key(session: object) -> str:
+    """清除 Gateway VM 的 pinned SSH host key，回傳被清除的 host。
+
+    Gateway VM 重灌或更換機器後 host key 會改變，導致 TOFU 釘選拒絕連線；
+    管理員確認變更為預期後呼叫此函式，下次連線會重新記錄新的 host key。
+    """
+    from app.repositories import gateway_config as gw_repo  # noqa: PLC0415
+
+    config = gw_repo.get_gateway_config(session)  # type: ignore[arg-type]
+    if config is None or not config.host:
+        raise BadRequestError("Gateway VM 尚未設定 IP")
+    forget_host_key(config.host)
+    return config.host
 
 
 def _make_client(host: str, ssh_port: int, ssh_user: str, private_key_pem: str):

@@ -20,6 +20,8 @@ class NodeMetrics(BaseModel):
     disk: int
     maxdisk: int
     uptime: int
+    vm_count: int = 0
+    connection_name: str | None = None  # 所屬 PVE 連線；None = 尚未歸屬（舊資料）
 
 
 class VMTopEntry(BaseModel):

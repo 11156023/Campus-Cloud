@@ -13,6 +13,7 @@ from sqlmodel import Session
 from app.core.authorizers import require_resource_access
 from app.exceptions import BadRequestError, NotFoundError
 from app.models import User
+from app.repositories import proxmox_node as proxmox_node_repo
 from app.repositories import resource as resource_repo
 from app.schemas.monitoring import MonitoringOverview, NodeMetrics, VMTopEntry
 from app.services.proxmox import proxmox_service
@@ -30,9 +31,14 @@ def _validate_timeframe(timeframe: str) -> str:
     return timeframe
 
 
-def _node_metrics(raw: dict[str, Any]) -> NodeMetrics:
+def _node_metrics(
+    raw: dict[str, Any],
+    vm_counts: dict[str, int],
+    connection_names: dict[str, str],
+) -> NodeMetrics:
+    name = str(raw.get("node") or "")
     return NodeMetrics(
-        node=str(raw.get("node") or ""),
+        node=name,
         status=str(raw.get("status") or "unknown"),
         cpu=float(raw.get("cpu") or 0.0),
         maxcpu=int(raw.get("maxcpu") or 0),
@@ -41,7 +47,22 @@ def _node_metrics(raw: dict[str, Any]) -> NodeMetrics:
         disk=int(raw.get("disk") or 0),
         maxdisk=int(raw.get("maxdisk") or 0),
         uptime=int(raw.get("uptime") or 0),
+        vm_count=vm_counts.get(name, 0),
+        connection_name=connection_names.get(name),
     )
+
+
+def _vm_counts_by_node(resources: list[dict[str, Any]]) -> dict[str, int]:
+    """每個節點上的 VM/LXC 台數（含已停止，排除範本）。"""
+    counts: dict[str, int] = {}
+    for r in resources:
+        if r.get("template") == 1:
+            continue
+        if str(r.get("type") or "") not in {"lxc", "qemu"}:
+            continue
+        node = str(r.get("node") or "")
+        counts[node] = counts.get(node, 0) + 1
+    return counts
 
 
 def _vm_entry(raw: dict[str, Any]) -> VMTopEntry:
@@ -58,10 +79,19 @@ def _vm_entry(raw: dict[str, Any]) -> VMTopEntry:
 
 
 def build_overview(
-    nodes: list[dict[str, Any]], resources: list[dict[str, Any]]
+    nodes: list[dict[str, Any]],
+    resources: list[dict[str, Any]],
+    connection_names: dict[str, str] | None = None,
 ) -> MonitoringOverview:
-    """純函式：由 PVE 原始回應聚合全域監控視圖。"""
-    node_metrics = [_node_metrics(n) for n in nodes]
+    """純函式：由 PVE 原始回應聚合全域監控視圖。
+
+    ``connection_names`` 為「節點名稱 → 所屬 PVE 連線名稱」的對應（多連線架構）；
+    省略時節點不標示連線來源。
+    """
+    vm_counts = _vm_counts_by_node(resources)
+    node_metrics = [
+        _node_metrics(n, vm_counts, connection_names or {}) for n in nodes
+    ]
 
     running = [r for r in resources if str(r.get("status") or "") == "running"]
     stopped = [r for r in resources if str(r.get("status") or "") != "running"]
@@ -89,10 +119,18 @@ def build_overview(
     )
 
 
-def get_overview() -> MonitoringOverview:
+def get_overview(*, session: Session) -> MonitoringOverview:
     nodes = proxmox_service.list_nodes()
     resources = proxmox_service.list_all_resources()
-    return build_overview(nodes, resources)
+    return build_overview(nodes, resources, _connection_names(session))
+
+
+def _connection_names(session: Session) -> dict[str, str]:
+    """節點所屬連線名稱；查詢失敗時退回空對應（不影響監控主體）。"""
+    try:
+        return proxmox_node_repo.get_node_connection_names(session)
+    except Exception:
+        return {}
 
 
 def get_node_rrd(node: str, timeframe: str) -> list[dict[str, Any]]:

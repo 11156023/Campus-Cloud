@@ -10,8 +10,12 @@ from app.infrastructure.proxmox.tls import _verify_server_with_ca
 logger = logging.getLogger(__name__)
 
 
-def get_nodes_for_ha() -> list:
-    """Fetch candidate HA nodes from DB ordered by configured priority."""
+def get_nodes_for_ha(connection_id: int | None = None) -> list:
+    """Fetch candidate HA nodes from DB ordered by configured priority.
+
+    ``connection_id`` 有值時只回傳該連線的節點（HA 容錯移轉不可跨連線）；
+    None 表示舊版單連線行為，回傳全部節點。
+    """
     try:
         from sqlmodel import Session
 
@@ -19,7 +23,7 @@ def get_nodes_for_ha() -> list:
         from app.repositories.proxmox_node import get_all_nodes
 
         with Session(engine) as session:
-            return get_all_nodes(session)
+            return get_all_nodes(session, connection_id=connection_id)
     except Exception as exc:
         logger.warning("Unable to read Proxmox HA nodes from database: %s", exc)
         return []
@@ -49,6 +53,7 @@ def try_connect(host: str, cfg: ProxmoxSettings) -> ProxmoxAPI:
 
     client = ProxmoxAPI(
         host,
+        port=cfg.port,
         user=cfg.user,
         password=cfg.password,
         verify_ssl=verify_ssl,

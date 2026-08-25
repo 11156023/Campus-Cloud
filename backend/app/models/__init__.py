@@ -56,13 +56,14 @@ from .proxmox_config import (
     ProxmoxPlacementConfig,
     ProxmoxSchedulerConfig,
 )
+from .proxmox_connection import ProxmoxConnection
 from .proxmox_node import ProxmoxNode
 from .proxmox_storage import ProxmoxStorage
+from .quota_config import QuotaConfig
 from .resource import Resource
 from .resource_network import ResourceNetwork
 from .resource_quota import QuotaScope, ResourceQuota
 from .reverse_proxy_rule import ReverseProxyRule
-from .script_deploy_log import ScriptDeployLog
 from .spec_change_request import (
     SpecChangeRequest,
     SpecChangeRequestStatus,
@@ -135,6 +136,7 @@ __all__ = [
     "Resource",
     "ResourceNetwork",
     "ResourceQuota",
+    "QuotaConfig",
     "QuotaScope",
     # VM Request
     "VMProvisioningStatus",
@@ -161,6 +163,7 @@ __all__ = [
     "SpecChangeType",
     # Proxmox Config
     "ProxmoxConfig",
+    "ProxmoxConnection",
     "ProxmoxConnectionConfig",
     "ProxmoxPlacementConfig",
     "ProxmoxSchedulerConfig",
@@ -194,7 +197,6 @@ __all__ = [
     # Subnet & IP Management
     "SubnetConfig",
     "IpAllocation",
-    "ScriptDeployLog",
     "TeacherJudgeFile",
     "TeacherJudgeFileStatus",
     "TeacherJudgeMessageRole",

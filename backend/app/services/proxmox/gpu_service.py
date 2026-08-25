@@ -13,7 +13,8 @@ from sqlmodel import Session, select
 
 from app.core.db import engine
 from app.exceptions import NotFoundError, ProxmoxError
-from app.infrastructure.proxmox import get_proxmox_api
+from app.infrastructure.proxmox import get_proxmox_api_for_node
+from app.infrastructure.proxmox.operations import iter_connection_clients
 from app.models import Resource
 from app.schemas.gpu import (
     GPUDeviceMap,
@@ -146,7 +147,7 @@ def _get_mdev_types(node: str, pci_path: str) -> dict[str, int]:
     Returns dict of mdev_type_name → vram_mb.
     """
     try:
-        proxmox = get_proxmox_api()
+        proxmox = get_proxmox_api_for_node(node)
         mdev_list = proxmox.nodes(node).hardware.pci(pci_path).mdev.get()
     except Exception as e:
         logger.debug("Cannot get mdev types for %s on %s: %s", pci_path, node, e)
@@ -214,12 +215,17 @@ def _resolve_vram_for_mapping(
 
 
 def list_gpu_mappings() -> list[GPUMappingDetail]:
-    """List all PCI hardware mappings from PVE cluster."""
-    try:
-        proxmox = get_proxmox_api()
-        raw_mappings = proxmox.cluster.mapping.pci.get()
-    except Exception as e:
-        logger.error("Failed to list PCI mappings: %s", e)
+    """List all PCI hardware mappings across all Proxmox connections."""
+    raw_mappings: list[dict] = []
+    reached_any = False
+    for _key, proxmox in iter_connection_clients():
+        try:
+            raw_mappings.extend(proxmox.cluster.mapping.pci.get())
+            reached_any = True
+        except Exception as e:
+            logger.warning("Failed to list PCI mappings on connection %s: %s", _key, e)
+    if not reached_any:
+        logger.error("Failed to list PCI mappings: no reachable connection")
         raise ProxmoxError("Failed to list GPU mappings from Proxmox")
 
     # Get all VM configs to find GPU usage
@@ -286,14 +292,19 @@ def get_gpu_node_counts(mapping_id: str | None = None) -> dict[str, int]:
         if cached and now - cached[0] <= _GPU_NODE_COUNTS_CACHE_TTL_SECONDS:
             return dict(cached[1])
 
-    try:
-        proxmox = get_proxmox_api()
-        if mapping_id:
-            raw_mappings = [proxmox.cluster.mapping.pci(str(mapping_id)).get()]
-        else:
-            raw_mappings = proxmox.cluster.mapping.pci.get()
-    except Exception as e:
-        logger.warning("Failed to load GPU mapping node counts: %s", e)
+    raw_mappings = []
+    for _key, proxmox in iter_connection_clients():
+        try:
+            if mapping_id:
+                raw_mappings.append(proxmox.cluster.mapping.pci(str(mapping_id)).get())
+            else:
+                raw_mappings.extend(proxmox.cluster.mapping.pci.get())
+        except Exception as e:
+            logger.debug(
+                "GPU mapping node counts unavailable on connection %s: %s", _key, e
+            )
+    if not raw_mappings:
+        logger.warning("Failed to load GPU mapping node counts: no data")
         return {}
 
     counts: dict[str, int] = {}
@@ -318,12 +329,18 @@ def get_gpu_node_counts(mapping_id: str | None = None) -> dict[str, int]:
 
 
 def get_gpu_mapping(mapping_id: str) -> GPUMappingDetail:
-    """Get a single PCI mapping by ID."""
-    try:
-        proxmox = get_proxmox_api()
-        mapping = proxmox.cluster.mapping.pci(mapping_id).get()
-    except Exception as e:
-        logger.error("Failed to get PCI mapping '%s': %s", mapping_id, e)
+    """Get a single PCI mapping by ID (searched across all connections)."""
+    mapping = None
+    for _key, proxmox in iter_connection_clients():
+        try:
+            mapping = proxmox.cluster.mapping.pci(mapping_id).get()
+            break
+        except Exception as e:
+            logger.debug(
+                "PCI mapping '%s' not found on connection %s: %s", mapping_id, _key, e
+            )
+    if mapping is None:
+        logger.error("Failed to get PCI mapping '%s'", mapping_id)
         raise NotFoundError(f"GPU mapping '{mapping_id}' not found")
 
     description = mapping.get("description", "")
@@ -362,12 +379,27 @@ def get_gpu_mapping(mapping_id: str) -> GPUMappingDetail:
     )
 
 
+def _mapping_target_node(map_entries: list[str]) -> str | None:
+    """從 map entry（``node=pve1,path=...``）解析出目標節點名稱。"""
+    for entry in map_entries:
+        for part in str(entry).split(","):
+            key, _, value = part.partition("=")
+            if key.strip() == "node" and value.strip():
+                return value.strip()
+    return None
+
+
 def create_gpu_mapping(
     *, mapping_id: str, description: str = "", map_entries: list[str]
 ) -> None:
-    """Create a new PCI resource mapping."""
+    """Create a new PCI resource mapping（在 map entry 指定節點所屬的連線上建立）。"""
     try:
-        proxmox = get_proxmox_api()
+        node = _mapping_target_node(map_entries)
+        proxmox = (
+            get_proxmox_api_for_node(node) if node else next(
+                client for _key, client in iter_connection_clients()
+            )
+        )
         proxmox.cluster.mapping.pci.post(
             id=mapping_id, description=description, **{"map": map_entries}
         )
@@ -377,13 +409,22 @@ def create_gpu_mapping(
 
 
 def delete_gpu_mapping(mapping_id: str) -> None:
-    """Delete a PCI resource mapping."""
-    try:
-        proxmox = get_proxmox_api()
-        proxmox.cluster.mapping.pci(mapping_id).delete()
-    except Exception as e:
-        logger.error("Failed to delete PCI mapping '%s': %s", mapping_id, e)
-        raise ProxmoxError(f"Failed to delete GPU mapping: {e}")
+    """Delete a PCI resource mapping（逐一連線尋找並刪除）。"""
+    deleted = False
+    last_error: Exception | None = None
+    for _key, proxmox in iter_connection_clients():
+        try:
+            proxmox.cluster.mapping.pci(mapping_id).delete()
+            deleted = True
+        except Exception as e:
+            last_error = e
+            logger.debug(
+                "PCI mapping '%s' delete skipped on connection %s: %s",
+                mapping_id, _key, e,
+            )
+    if not deleted:
+        logger.error("Failed to delete PCI mapping '%s': %s", mapping_id, last_error)
+        raise ProxmoxError(f"Failed to delete GPU mapping: {last_error}")
 
 
 def list_gpu_options() -> list[GPUSummary]:
@@ -430,11 +471,16 @@ def _build_usage_map() -> dict[str, list[GPUUsageInfo]]:
     """
     usage: dict[str, list[GPUUsageInfo]] = {}
 
-    try:
-        proxmox = get_proxmox_api()
-        all_resources = proxmox.cluster.resources.get(type="vm")
-    except Exception as e:
-        logger.warning("Failed to scan VM resources for GPU usage: %s", e)
+    all_resources: list[dict] = []
+    for _key, proxmox in iter_connection_clients():
+        try:
+            all_resources.extend(proxmox.cluster.resources.get(type="vm"))
+        except Exception as e:
+            logger.warning(
+                "Failed to scan VM resources for GPU usage on connection %s: %s",
+                _key, e,
+            )
+    if not all_resources:
         return usage
 
     for resource in all_resources:

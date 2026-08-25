@@ -33,7 +33,7 @@ def list_unified_jobs(
     current_user: CurrentUser,
     kinds: str | None = Query(
         default=None,
-        description="逗號分隔，可選: script_deploy, vm_request, spec_change, deletion",
+        description="逗號分隔，可選: vm_request, spec_change, deletion, template",
     ),
     statuses: str | None = Query(
         default=None,
@@ -91,7 +91,7 @@ def get_job(
     session: SessionDep,
     current_user: CurrentUser,
 ) -> JobDetail:
-    """job_id 為複合 ID：<kind>:<source_id>，例如 `script_deploy:<task_id>`。"""
+    """job_id 為複合 ID：<kind>:<source_id>，例如 `vm_request:<id>`。"""
     try:
         return jobs_service.get_job_detail(
             session=session, user=current_user, job_id=job_id

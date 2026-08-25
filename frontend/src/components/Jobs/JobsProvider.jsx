@@ -48,7 +48,7 @@ export function useJobs() {
  * 全站任務狀態來源（無 UI）：
  * - /ws/jobs WebSocket 即時推送為主，REST 每 15 秒輪詢為 fallback
  * - 任務進入終態（完成／失敗／受阻／取消）時彈 toast，不論當前頁面
- * - 掛載共用的 JobDetailDialog；顯示用的按鈕（JobsButton）由頁面自行放置
+ * - 掛載共用的 JobDetailDialog；顯示用的按鈕（JobsButton）放在 Sidebar 底部
  */
 export default function JobsProvider({ children }) {
   const { user } = useAuth();

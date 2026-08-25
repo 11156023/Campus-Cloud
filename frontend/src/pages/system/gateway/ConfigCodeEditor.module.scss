@@ -1,0 +1,206 @@
+@use "../../../assets/styles/variables" as *;
+
+/* 類 VSCode 視窗外框：固定 vs-dark 配色（不隨主題切換，與編輯器一致） */
+
+.window {
+  display: flex;
+  flex-direction: column;
+  border-radius: $radius-12;
+  overflow: hidden;
+  background: #1e1e1e;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ── 檔案分頁列 ── */
+.tabbar {
+  display: flex;
+  align-items: stretch;
+  background: #252526;
+  min-height: 38px;
+}
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  background: #1e1e1e;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 13px;
+  border-right: 1px solid #252526;
+  max-width: 60%;
+}
+
+.tabName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tabIcon_haproxy { color: #6d8086; }
+.tabIcon_yaml    { color: #a074c4; }
+.tabIcon_toml    { color: #cc6d2e; }
+
+.dirtyDot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #c5c5c5;
+}
+
+.tabbarActions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+}
+
+.ghostBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  color: #cccccc;
+  background: transparent;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+}
+
+.saveBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 4px;
+  background: #0e639c;
+  color: #ffffff;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+
+  &:hover:not(:disabled) {
+    background: #1177bb;
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+/* ── 麵包屑路徑 ── */
+.breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 14px;
+  font-size: 12px;
+  color: #a0a0a0;
+  background: #1e1e1e;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.crumbSep {
+  display: flex;
+  color: #6e6e6e;
+}
+
+.crumbFile {
+  color: #e0e0e0;
+}
+
+/* ── 編輯器主體 ── */
+.body {
+  position: relative;
+  height: clamp(420px, calc(100vh - 400px), 800px);
+  background: #1e1e1e;
+}
+
+.editorLoading {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #858585;
+  font-size: 13px;
+}
+
+/* 讀取失敗：停用編輯，避免把空白內容誤當遠端檔案覆寫回去 */
+.loadError {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 0 $spacing-32;
+  color: #a0a0a0;
+  text-align: center;
+}
+
+.loadErrorTitle {
+  font-size: 15px;
+  font-weight: $font-weight-700;
+  color: #e0e0e0;
+}
+
+.loadErrorHint {
+  font-size: 12px;
+  line-height: $line-height-base;
+  max-width: 360px;
+}
+
+.statusAlert {
+  background: #a1260d;
+  font-weight: $font-weight-500;
+}
+
+/* ── 狀態列（VSCode 藍）── */
+.statusbar {
+  display: flex;
+  align-items: center;
+  height: 24px;
+  background: #007acc;
+  color: #ffffff;
+  font-size: 12px;
+}
+
+.statusRemote {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.statusItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+  height: 100%;
+  white-space: nowrap;
+}
+
+.statusRight {
+  margin-left: auto;
+  display: flex;
+  height: 100%;
+  overflow: hidden;
+}

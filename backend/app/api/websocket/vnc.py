@@ -12,7 +12,8 @@ from app.api.websocket.utils import safe_close_websocket as _safe_close_websocke
 from app.exceptions import NotFoundError, ProxmoxError
 from app.infrastructure.proxmox import (
     build_ws_ssl_context,
-    get_active_host,
+    get_connection_id_for_node,
+    get_host_for_node,
     get_proxmox_settings,
 )
 from app.infrastructure.vnc.messages import (
@@ -78,16 +79,8 @@ async def vnc_proxy(
     pve_websocket = None
 
     try:
-        pve_auth_cookie = _get_cached_vnc_session_cookie(vmid, vnc_ticket) if vnc_ticket else None
-        if pve_auth_cookie is None:
-            try:
-                pve_auth_cookie, _ = await proxmox_service.get_session_ticket()
-            except ProxmoxError:
-                logger.error("Proxmox session authentication failed")
-                await _safe_close_websocket(websocket, code=1008, reason="Authentication failed")
-                return
-
-        # Find VM in cluster resources
+        # Find VM in cluster resources（先取得 node，後續認證與連線都要跟著
+        # 該節點所屬的連線走）
         try:
             vm_info = await asyncio.to_thread(proxmox_service.find_resource, vmid)
         except NotFoundError:
@@ -97,12 +90,21 @@ async def vnc_proxy(
 
         node = vm_info["node"]
 
+        pve_auth_cookie = _get_cached_vnc_session_cookie(vmid, vnc_ticket) if vnc_ticket else None
+        if pve_auth_cookie is None:
+            try:
+                pve_auth_cookie, _ = await proxmox_service.get_session_ticket(node)
+            except ProxmoxError:
+                logger.error("Proxmox session authentication failed")
+                await _safe_close_websocket(websocket, code=1008, reason="Authentication failed")
+                return
+
         # Re-use the ticket/port from the REST endpoint when available,
         # so the noVNC client authenticates with the same ticket.
         if not (vnc_ticket and vnc_port):
             csrf_token = ""
             try:
-                pve_auth_cookie, csrf_token = await proxmox_service.get_session_ticket()
+                pve_auth_cookie, csrf_token = await proxmox_service.get_session_ticket(node)
             except ProxmoxError:
                 logger.error("Proxmox session authentication failed")
                 await _safe_close_websocket(websocket, code=1008, reason="Authentication failed")
@@ -118,11 +120,12 @@ async def vnc_proxy(
 
         encoded_vnc_ticket = quote(vnc_ticket, safe="")
 
-        # WebSocket URL for VNC — 使用 get_active_host() 確保 HA 切換後跟著用正確的節點
-        _cfg = get_proxmox_settings()
-        active_host = get_active_host()
+        # WebSocket URL for VNC — 使用節點所屬連線的 active host，
+        # 確保多連線與 HA 切換後都連到正確的入口
+        _cfg = get_proxmox_settings(get_connection_id_for_node(node))
+        active_host = get_host_for_node(node)
         pve_ws_url = (
-            f"wss://{active_host}:8006"
+            f"wss://{active_host}:{_cfg.port}"
             f"/api2/json/nodes/{node}/qemu/{vmid}/vncwebsocket"
             f"?port={vnc_port}&vncticket={encoded_vnc_ticket}"
         )

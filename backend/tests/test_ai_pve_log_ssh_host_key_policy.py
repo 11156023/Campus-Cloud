@@ -100,3 +100,24 @@ def test_trust_on_first_use_persists_and_forgets_host_key(
     # forget_host_key 移除紀錄（IP 回收情境）
     forget_host_key("10.10.0.6")
     assert paramiko.HostKeys(str(known_hosts)).lookup("10.10.0.6") is None
+
+
+def test_configure_does_not_load_system_known_hosts(tmp_path, monkeypatch) -> None:
+    """驗證不載入系統 ~/.ssh/known_hosts。
+
+    系統檔在 paramiko 比對時優先，但 forget_host_key 清不到它，
+    載入會使「重設 host key」失效（舊 key 殘留於系統檔時仍拒連）。
+    """
+    known_hosts = tmp_path / "known_hosts"
+    monkeypatch.setenv("SSH_KNOWN_HOSTS_FILE", str(known_hosts))
+
+    client = paramiko.SSHClient()
+    called = {"system": False}
+    monkeypatch.setattr(
+        client,
+        "load_system_host_keys",
+        lambda *a, **k: called.update(system=True),
+    )
+    ssh_client_module._configure_host_key_verification(client)
+
+    assert called["system"] is False

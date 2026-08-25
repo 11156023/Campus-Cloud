@@ -8,6 +8,7 @@ import {
 import "@xyflow/react/dist/style.css";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import MIcon from "../../components/MIcon";
+import { useConfirm } from "../../components/ConfirmDialog/ConfirmProvider";
 import { CourseEnvironmentsService } from "../../services/courseEnvironments";
 import { apiGet } from "../../services/api";
 import { TemplatesService } from "../../services/templates";
@@ -225,6 +226,7 @@ function MachineEditor({ value, edges, onChange, onEdgesChange, pveTemplates, vm
 }
 
 export default function CourseTemplateEditorPage() {
+  const confirm = useConfirm();
   const { templateId } = useParams();
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
@@ -316,7 +318,12 @@ export default function CourseTemplateEditorPage() {
     finally { setSaving(false); }
   }
   async function publish() {
-    if (!window.confirm("發布後這個版本將永久鎖定，確定要儲存目前設定並發布嗎？")) return;
+    const ok = await confirm({
+      title: "發布並鎖定",
+      message: "發布後這個版本將永久鎖定，確定要儲存目前設定並發布嗎？",
+      confirmText: "發布",
+    });
+    if (!ok) return;
     setSaving(true); setMessage("");
     try {
       await CourseEnvironmentsService.update(template.id, template);
