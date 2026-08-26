@@ -19,7 +19,7 @@ const TABS = [
   ["machines", "account_tree", "上課環境", "套用課程環境"],
   ["weekly", "calendar_view_week", "每週內容", "可隨時補充"],
   ["classroom", "cast_for_education", "上課監看", "觀看與直播"],
-  ["progress", "checklist", "學生機器", "逐人多機狀態"],
+  ["progress", "grid_view", "資源熱力圖", "CPU／RAM 使用量"],
   ["ai", "auto_awesome", "AI 檢查", "機器與上課情況"],
 ];
 
@@ -455,9 +455,121 @@ function ClassMonitor({ item }) {
   </div>;
 }
 
-function StudentMachines({ item, ai = false }) {
-  const issues = item.students.flatMap((student) => student.machines.filter((machine) => machine.status === "failed").map((machine) => ({ student, machine })));
-  return <div className={styles.stack}>{ai && <div className={styles.integrationStrip}><MIcon name="auto_awesome" size={19} /><div><strong>AI 上課檢查</strong><span>集中查看機器異常與學生環境完整度，協助老師快速找到需要處理的學生。</span></div><span className={styles.devBadge}>判讀功能準備中</span></div>}<section className={styles.card}><div className={styles.cardHeader}><div><h2>{ai ? "需要注意的環境" : "學生機器狀態"}</h2><p>{ai ? (issues.length ? `有 ${issues.length} 個機器項目需要處理。` : "目前沒有發現建立失敗的機器。") : "逐一確認每位學生的上課環境。"}</p></div></div><div className={styles.tableWrap}><table className={styles.table}><thead><tr><th>學生</th>{item.nodes.map((node) => <th key={node.id}>{node.name}</th>)}<th>結果</th></tr></thead><tbody>{item.students.map((student) => { const byNode = Object.fromEntries(student.machines.map((machine) => [String(machine.machine_node_id), machine])); const ready = student.machines.filter((machine) => machine.status === "completed").length; return <tr key={student.id}><td><strong>{student.full_name || student.email}</strong><small>{student.email}</small></td>{item.nodes.map((node) => { const machine = byNode[String(node.id)]; return <td key={node.id}><strong>{machine?.vmid ?? "—"}</strong><small>{machine ? JOB_STATUS[machine.status] ?? machine.status : "尚未建立"}</small></td>; })}<td><span className={`${styles.statusBadge} ${ready === item.nodes.length ? styles.status_active : styles.status_partial_failed}`}>{ready}/{item.nodes.length} 就緒</span></td></tr>; })}</tbody></table></div></section></div>;
+const RESOURCE_METRICS = {
+  cpu: {
+    label: "CPU",
+    icon: "memory",
+    fields: ["vm_cpu_usage_pct", "cpu_usage_pct", "cpu_usage", "cpu"],
+  },
+  ram: {
+    label: "RAM",
+    icon: "storage",
+    fields: ["vm_ram_usage_pct", "ram_usage_pct", "memory_usage_pct", "mem_used_pct"],
+  },
+};
+
+function stableNumber(value) {
+  return [...String(value)].reduce((total, character) => ((total * 31) + character.charCodeAt(0)) >>> 0, 7);
+}
+
+function readUsage(machine, metric, fallbackKey) {
+  const raw = RESOURCE_METRICS[metric].fields.map((field) => machine?.[field]).find((value) => value !== null && value !== undefined && value !== "" && Number.isFinite(Number(value)));
+  if (raw !== undefined) {
+    const numeric = Number(raw);
+    return Math.round(Math.max(0, Math.min(100, numeric <= 1 ? numeric * 100 : numeric)));
+  }
+  return 6 + (stableNumber(fallbackKey) % 91);
+}
+
+function machineIsOn(machine, fallbackKey) {
+  if (!machine?.vmid || !["completed", "running"].includes(machine.status)) return false;
+  const powerState = String(machine.power_status ?? machine.runtime_status ?? "").toLowerCase();
+  if (["stopped", "offline", "shutdown", "off"].includes(powerState)) return false;
+  if (["running", "online", "started", "on"].includes(powerState)) return true;
+  return stableNumber(fallbackKey) % 11 !== 0;
+}
+
+function heatLevel(usage) {
+  if (usage >= 80) return 5;
+  if (usage >= 60) return 4;
+  if (usage >= 40) return 3;
+  if (usage >= 20) return 2;
+  return 1;
+}
+
+function StudentMachines({ item }) {
+  const [selectedNodeId, setSelectedNodeId] = useState(() => String(item.nodes[0]?.id ?? ""));
+  const [metric, setMetric] = useState("cpu");
+
+  useEffect(() => {
+    if (!item.nodes.some((node) => String(node.id) === selectedNodeId)) {
+      setSelectedNodeId(String(item.nodes[0]?.id ?? ""));
+    }
+  }, [item.nodes, selectedNodeId]);
+
+  const selectedNode = item.nodes.find((node) => String(node.id) === selectedNodeId) ?? item.nodes[0];
+  const cells = useMemo(() => item.students.map((student, index) => {
+    const machine = student.machines.find((candidate) => String(candidate.machine_node_id) === String(selectedNode?.id));
+    const key = `${student.id}:${selectedNode?.id}`;
+    const on = machineIsOn(machine, `${key}:power`);
+    return {
+      student,
+      machine,
+      index,
+      on,
+      usage: on ? readUsage(machine, metric, `${key}:${metric}`) : null,
+    };
+  }), [item.students, metric, selectedNode?.id]);
+
+  const activeCells = cells.filter((cell) => cell.on);
+  const average = activeCells.length ? Math.round(activeCells.reduce((total, cell) => total + cell.usage, 0) / activeCells.length) : 0;
+  const highUsage = activeCells.filter((cell) => cell.usage >= 80).length;
+  const metricInfo = RESOURCE_METRICS[metric];
+
+  return <div className={styles.stack}>
+    <section className={`${styles.card} ${styles.heatmapCard}`}>
+      <div className={styles.heatmapHeader}>
+        <div><span className={styles.heatmapEyebrow}>即時資源概覽</span><h2>學生使用率熱力圖</h2><p>每格代表一位學生；沒有顏色表示關機，顏色越深表示使用量越高。</p></div>
+        <span className={styles.prototypeBadge}><MIcon name="science" size={15} />模擬資料</span>
+      </div>
+
+      <div className={styles.heatmapToolbar}>
+        <div className={styles.machineTabs} role="tablist" aria-label="選擇課堂機器">
+          {item.nodes.map((node, index) => {
+            const selected = String(node.id) === String(selectedNode?.id);
+            return <button key={node.id} type="button" role="tab" aria-selected={selected} className={selected ? styles.machineTabActive : ""} onClick={() => setSelectedNodeId(String(node.id))}>
+              <span><MIcon name={node.resource_type === "lxc" ? "deployed_code" : "dns"} size={17} /></span>
+              <span><small>機器 {String(index + 1).padStart(2, "0")}</small><strong>{node.name}</strong></span>
+            </button>;
+          })}
+        </div>
+        <div className={styles.metricTabs} role="tablist" aria-label="選擇資源指標">
+          {Object.entries(RESOURCE_METRICS).map(([key, info]) => <button key={key} type="button" role="tab" aria-selected={metric === key} className={metric === key ? styles.metricTabActive : ""} onClick={() => setMetric(key)}><MIcon name={info.icon} size={16} />{info.label}</button>)}
+        </div>
+      </div>
+
+      {selectedNode && item.students.length ? <>
+        <div className={styles.heatmapSummary}>
+          <div><span className={styles.selectedMachineIcon}><MIcon name={selectedNode.resource_type === "lxc" ? "deployed_code" : "dns"} size={20} /></span><div><strong>{selectedNode.name}</strong><small>{selectedNode.role || "課堂機器"} · {metricInfo.label} 使用量</small></div></div>
+          <dl><div><dt>開機</dt><dd>{activeCells.length}<small>/{cells.length}</small></dd></div><div><dt>平均</dt><dd>{average}<small>%</small></dd></div><div><dt>高負載</dt><dd>{highUsage}<small> 人</small></dd></div></dl>
+        </div>
+
+        <div className={styles.heatGrid} aria-label={`${selectedNode.name} ${metricInfo.label} 學生使用率`}>
+          {cells.map(({ student, machine, index, on, usage }) => {
+            const name = student.full_name || student.email || `學生 ${index + 1}`;
+            const detail = on ? `${metricInfo.label} ${usage}%` : "關機";
+            return <article key={student.id} className={`${styles.heatCell} ${on ? styles[`heat_${heatLevel(usage)}`] : styles.heatOff}`} title={`${name}\n${student.email ?? ""}\n${selectedNode.name} · VM ${machine?.vmid ?? "—"}\n${detail}`} aria-label={`${name}，${detail}`}>
+              <span className={styles.studentNumber}>{String(index + 1).padStart(2, "0")}</span>
+              <div><strong>{name}</strong><small>{machine?.vmid ? `VM ${machine.vmid}` : "尚未建立"}</small></div>
+              <b>{on ? `${usage}%` : "關機"}</b>
+            </article>;
+          })}
+        </div>
+
+        <div className={styles.heatLegend} aria-label="熱力圖圖例"><span><i className={styles.heatOff} />關機</span><span className={styles.legendScale}>低<i className={styles.heat_1} /><i className={styles.heat_2} /><i className={styles.heat_3} /><i className={styles.heat_4} /><i className={styles.heat_5} />高</span><span>使用率</span></div>
+      </> : <EmptyState icon="grid_view" title={selectedNode ? "班級目前沒有學生。" : "尚未設定課堂機器。"} />}
+    </section>
+  </div>;
 }
 
 function AiJudgeWorkspace({ item }) {

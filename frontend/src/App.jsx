@@ -8,7 +8,9 @@ import { AuthSessionStatus } from "./services/authSession";
 import styles from "./App.module.scss";
 
 // 個人
-const DashboardPage = lazy(() => import("./pages/personal/dashboard/DashboardPage"));
+const DashboardPage = lazy(() => import("./pages/personal/dashboard/RoleDashboardPage"));
+const StudentHomeNewPage = lazy(() => import("./pages/personal/dashboard/StudentHomeNewPage"));
+const StudentCoursePage = lazy(() => import("./pages/personal/dashboard/StudentCoursePage"));
 const QuickTemplateFormPage = lazy(() => import("./pages/personal/dashboard/QuickTemplateFormPage"));
 const ResourcesPage = lazy(() => import("./pages/personal/resources/ResourcesPage"));
 const ResourceDetailPage = lazy(() => import("./pages/personal/resources/detail/ResourceDetailPage"));
@@ -37,6 +39,7 @@ const CourseTemplateManagementPage = lazy(() => import("./pages/course-operation
 const CourseTemplateEditorPage = lazy(() => import("./pages/course-operations/CourseTemplateEditorPage"));
 const ClassManagementPage = lazy(() => import("./pages/course-operations/ClassManagementPage"));
 const ClassWorkspacePage = lazy(() => import("./pages/course-operations/ClassWorkspacePage"));
+const ClassSetupPage = lazy(() => import("./pages/course-operations/ClassSetupPage"));
 
 // 系統管理
 const AdminPage = lazy(() => import("./pages/system/admin/AdminPage"));
@@ -118,6 +121,8 @@ function App() {
 
           {/* 個人 */}
           <Route path="/dashboard"            element={<DashboardPage />} />
+          <Route path="/dashboard-new"        element={<StudentHomeNewPage />} />
+          <Route path="/dashboard-new/course/:pathId" element={<StudentCoursePage />} />
           <Route path="/quick-template/:id"   element={<QuickTemplateFormPage />} />
           <Route path="/my-resources"         element={<ResourcesPage />} />
           <Route path="/my-resources/:vmid"   element={<ResourceDetailPage backTo="/my-resources" />} />
@@ -157,7 +162,8 @@ function App() {
           <Route path="/course-template-management/new" element={<CourseTemplateEditorPage />} />
           <Route path="/course-template-management/:templateId" element={<CourseTemplateEditorPage />} />
           <Route path="/class-management" element={<ClassManagementPage />} />
-          <Route path="/class-management/new" element={<ClassManagementPage openCreate />} />
+          <Route path="/class-management/new" element={<Navigate to="/class-setup" replace />} />
+          <Route path="/class-setup" element={<ClassSetupPage />} />
           <Route path="/class-management/:classId" element={<ClassWorkspacePage />} />
           <Route path="/class-management/:classId/:section" element={<ClassWorkspacePage />} />
 

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import MIcon from "../../../components/MIcon";
 import { useAuth } from "../../../contexts/AuthContext";
 import { useConfirm } from "../../../components/ConfirmDialog/ConfirmProvider";
@@ -472,12 +473,16 @@ function TaskColumn({ roomId }) {
 }
 
 /* ══════════════ 進度監控 ══════════════ */
-function ProgressPanel({ paths }) {
-  const [pathId, setPathId] = useState("");
+function ProgressPanel({ paths, initialPathId = "" }) {
+  const [pathId, setPathId] = useState(initialPathId);
   const [report, setReport] = useState(null);
   const [live, setLive] = useState(false);
   const wsRef = useRef(null);
   const refetchTimer = useRef(null);
+
+  useEffect(() => {
+    if (initialPathId) setPathId(initialPathId);
+  }, [initialPathId]);
 
   const fetchReport = useCallback((id) => {
     CourseAdminService.getPathProgress(id).then(setReport).catch(() => {});
@@ -587,11 +592,12 @@ function ProgressPanel({ paths }) {
 /* ══════════════ 主頁 ══════════════ */
 export default function CourseCmsPage() {
   const { user } = useAuth();
-  const [tab, setTab] = useState("editor");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [tab, setTab] = useState(searchParams.get("tab") === "progress" ? "progress" : "editor");
   const [paths, setPaths] = useState([]);
   const [rooms, setRooms] = useState([]);
   const [templates, setTemplates] = useState([]);
-  const [selectedPathId, setSelectedPathId] = useState(null);
+  const [selectedPathId, setSelectedPathId] = useState(searchParams.get("pathId"));
   const [selectedRoomId, setSelectedRoomId] = useState(null);
 
   const canManage =
@@ -600,6 +606,14 @@ export default function CourseCmsPage() {
   const reloadPaths = useCallback(() => {
     CourseAdminService.listPaths().then(setPaths).catch(() => {});
   }, []);
+
+  function changeTab(nextTab) {
+    setTab(nextTab);
+    const next = new URLSearchParams(searchParams);
+    next.set("tab", nextTab);
+    if (nextTab !== "progress") next.delete("pathId");
+    setSearchParams(next, { replace: true });
+  }
 
   const reloadRooms = useCallback(() => {
     if (!selectedPathId) {
@@ -645,7 +659,7 @@ export default function CourseCmsPage() {
           <button
             type="button"
             className={`${styles.tabBtn} ${tab === "editor" ? styles.tabActive : ""}`}
-            onClick={() => setTab("editor")}
+            onClick={() => changeTab("editor")}
           >
             <MIcon name="edit_note" size={16} />
             內容編輯
@@ -653,7 +667,7 @@ export default function CourseCmsPage() {
           <button
             type="button"
             className={`${styles.tabBtn} ${tab === "progress" ? styles.tabActive : ""}`}
-            onClick={() => setTab("progress")}
+            onClick={() => changeTab("progress")}
           >
             <MIcon name="insights" size={16} />
             學生進度
@@ -688,7 +702,7 @@ export default function CourseCmsPage() {
           {selectedRoomId && <TaskColumn roomId={selectedRoomId} />}
         </div>
       ) : (
-        <ProgressPanel paths={paths} />
+        <ProgressPanel paths={paths} initialPathId={searchParams.get("pathId") ?? ""} />
       )}
     </div>
   );

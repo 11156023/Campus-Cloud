@@ -40,7 +40,6 @@ const VM_COL_X      = 160;
 const ROW_H         = 160;
 const GATEWAY_X     = VM_COL_X + 520;
 
-/* ─── 類型映射（必須在元件外定義） ─────────────────────── */
 const NODE_TYPES = { gateway: GatewayNode, vm: VMNode };
 const EDGE_TYPES = { connection: ConnectionEdge };
 
@@ -78,16 +77,27 @@ export default function FirewallPage() {
     }
     try {
       const data = await getTopology({ signal });
-      setTopology(data);
-      const { nodes: n, edges: e } = buildFlow(data, handleDeleteEdge, showLabels);
-      setNodes(n);
-      setEdges(e);
+      setTopology(data ?? { nodes: [], edges: [] });
     } catch (err) {
       if (!silent) setError(err?.message ?? "載入拓撲失敗");
     } finally {
       if (!silent && !signal?.aborted) setLoading(false);
     }
-  }, [handleDeleteEdge, showLabels, setNodes, setEdges]);
+  }, []);
+
+  useEffect(() => {
+    if (!topology) return;
+    const { nodes: nextNodes, edges: nextEdges } = buildFlow(
+      topology,
+      handleDeleteEdge,
+      showLabels
+    );
+    setSelectedNode(null);
+    setDeleteEdge(null);
+    setNodes(nextNodes);
+    setEdges(nextEdges);
+    window.requestAnimationFrame(() => rfInstance.current?.fitView({ padding: 0.2, duration: 250 }));
+  }, [handleDeleteEdge, setEdges, setNodes, showLabels, topology]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -195,6 +205,7 @@ export default function FirewallPage() {
             type="button"
             className={styles.btnPrimary}
             onClick={() => setShowDialog(true)}
+            data-guide="firewall-create"
           >
             <MIcon name="add" size={16} />
             新增連線
@@ -226,7 +237,7 @@ export default function FirewallPage() {
         )}
 
         {!loading && !error && topology && (
-          <div className={styles.flowWrap}>
+          <div className={styles.flowWrap} data-guide="firewall-map">
             <ReactFlow
               nodes={nodes}
               edges={edges}
@@ -248,8 +259,18 @@ export default function FirewallPage() {
               <Controls />
               {showMiniMap && <MiniMap zoomable pannable />}
 
+              {nodes.length === 0 && (
+                <Panel position="top-center">
+                  <div className={styles.emptyTopology}>
+                    <MIcon name="security" size={23} />
+                    <strong>目前沒有可顯示的防火牆資源</strong>
+                    <span>建立 VM 後，機器與連線規則會出現在這張圖上。</span>
+                  </div>
+                </Panel>
+              )}
+
               <Panel position="top-left">
-                <div className={styles.toolbar}>
+                <div className={styles.toolbar} data-guide="firewall-tools">
                   <button
                     type="button"
                     className={styles.toolbarBtn}

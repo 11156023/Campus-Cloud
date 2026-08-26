@@ -49,8 +49,8 @@ export function saveCourseTemplate(template) {
 
 export function getClassSettings(classId) {
   const saved = read(CLASS_KEY, {});
-  const demo = classCatalog.find((item) => String(item.id) === String(classId));
-  return saved[classId] ?? (demo ? { ...demo, weeks: classWeeks } : null);
+  const catalogClass = classCatalog.find((item) => String(item.id) === String(classId));
+  return saved[classId] ?? (catalogClass ? { ...catalogClass, weeks: classWeeks } : null);
 }
 
 export function saveClassSettings(classId, patch) {

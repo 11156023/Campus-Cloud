@@ -1,0 +1,72 @@
+@use "../../../assets/styles/variables" as *;
+@use "../../../assets/styles/mixins" as *;
+
+.page { display: flex; width: 100%; max-width: 1280px; margin: 0 auto; flex-direction: column; gap: $spacing-24; }
+.header { @include flex-between; gap: $spacing-32; }
+.header h1 { margin: $spacing-4 0 $spacing-8; color: var(--color-text-primary); font-size: $font-size-28; }
+.header p, .sectionHeading p { margin: 0; color: var(--color-text-secondary); font-size: $font-size-12; line-height: 1.6; }
+.eyebrow { color: var(--color-primary); font-size: 11px; font-weight: $font-weight-700; letter-spacing: .08em; }
+
+.assistantSection { overflow: hidden; border: 1px solid color-mix(in srgb, var(--color-primary) 30%, var(--color-border)); border-radius: $radius-16; background: color-mix(in srgb, var(--color-primary) 6%, var(--color-surface)); box-shadow: var(--shadow-md); }
+.assistantHero { display: grid; grid-template-columns: minmax(270px, .72fr) minmax(480px, 1.28fr); gap: $spacing-24; padding: $spacing-24; }
+.assistantSectionExpanded .assistantHero { grid-template-columns: 1fr; padding-bottom: $spacing-16; border-bottom: 1px solid var(--color-divider); }
+.assistantIntro { display: flex; align-items: flex-start; gap: $spacing-16; }
+.assistantIcon { display: grid; width: 54px; height: 54px; flex: 0 0 auto; place-items: center; border-radius: $radius-12; color: var(--color-text-on-primary); background: var(--color-primary); box-shadow: var(--shadow-sm); }
+.assistantIntro > div { min-width: 0; }
+.assistantLabel { color: var(--color-primary); font-size: 11px; font-weight: $font-weight-700; letter-spacing: .08em; }
+.assistantIntro h2 { margin: $spacing-4 0 $spacing-8; color: var(--color-text-primary); font-size: $font-size-24; line-height: 1.25; }
+.assistantIntro p { margin: 0; color: var(--color-text-secondary); font-size: $font-size-12; line-height: 1.65; }
+.assistantForm { display: flex; min-width: 0; flex-direction: column; gap: 10px; }
+.assistantInput { display: grid; min-height: 74px; padding: 10px 10px 10px $spacing-16; grid-template-columns: 22px minmax(0, 1fr) auto; align-items: center; gap: 10px; border: 1px solid var(--color-border); border-radius: $radius-12; color: var(--color-primary); background: var(--color-surface); box-shadow: var(--shadow-sm); }
+.assistantInput:focus-within { border-color: var(--color-primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 12%, transparent), var(--shadow-sm); }
+.assistantInput textarea { width: 100%; min-height: 48px; padding: 4px 0; border: 0; outline: 0; color: var(--color-text-primary); background: transparent; font: inherit; font-size: $font-size-14; line-height: 1.55; resize: none; }
+.assistantInput textarea::placeholder { color: var(--color-text-muted); }
+.assistantInput button { display: inline-flex; min-height: 48px; padding: 0 $spacing-16; align-items: center; justify-content: center; gap: $spacing-8; border: 1px solid var(--color-primary); border-radius: $radius-8; color: var(--color-text-on-primary); background: var(--color-primary); font-size: $font-size-12; font-weight: $font-weight-700; cursor: pointer; }
+.assistantInput button:hover:not(:disabled) { background: var(--color-primary-dark); }
+.assistantInput button:disabled { cursor: not-allowed; opacity: .4; }
+.assistantFooter { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; color: var(--color-text-muted); font-size: 10px; }
+.assistantFooter button { min-height: 28px; padding: 0 9px; border: 1px solid var(--color-border); border-radius: $radius-pill; color: var(--color-text-secondary); background: var(--color-surface); font-size: 10px; cursor: pointer; }
+.assistantFooter button:hover:not(:disabled) { color: var(--color-primary); border-color: var(--color-primary); background: var(--color-hover); }
+.assistantFooter button:disabled { cursor: not-allowed; opacity: .4; }
+
+.attention { overflow: hidden; border: 1px solid var(--color-border); border-radius: $radius-16; background: var(--color-surface); box-shadow: var(--shadow-sm); }
+.sectionHeading { @include flex-between; gap: $spacing-16; padding: $spacing-16 $spacing-24; border-bottom: 1px solid var(--color-divider); }
+.sectionHeading h2 { margin: 3px 0 2px; color: var(--color-text-primary); font-size: $font-size-18; }
+.sectionHeading > button { display: inline-flex; min-height: 34px; padding: 0 $spacing-8; align-items: center; gap: $spacing-8; border: 0; border-radius: $radius-8; color: var(--color-primary); background: transparent; font-size: $font-size-12; font-weight: $font-weight-700; cursor: pointer; }
+.sectionHeading > button:hover:not(:disabled) { background: var(--color-hover); }
+.sectionHeading > button:disabled { cursor: not-allowed; opacity: .4; }
+.checking { display: flex; min-height: 86px; padding: $spacing-24; align-items: center; justify-content: center; gap: $spacing-8; color: var(--color-text-muted); font-size: $font-size-12; }
+.checking > :first-child { animation: spin 1s linear infinite; }
+.issueList { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.issueList > button { display: grid; min-height: 82px; padding: 13px $spacing-24; grid-template-columns: 40px minmax(0, 1fr) auto 20px; align-items: center; gap: 12px; border: 0; border-right: 1px solid var(--color-divider); border-bottom: 1px solid var(--color-divider); background: transparent; text-align: left; cursor: pointer; }
+.issueList > button:nth-child(2n) { border-right: 0; }
+.issueList > button:hover:not(:disabled) { background: var(--color-hover); }
+.issueList > button:disabled { cursor: not-allowed; opacity: .4; }
+.issueIcon { display: grid; width: 40px; height: 40px; place-items: center; border-radius: 10px; }
+.issueList button > span:nth-child(2) { display: flex; min-width: 0; flex-direction: column; gap: 3px; }
+.issueList strong { color: var(--color-text-primary); font-size: $font-size-14; }
+.issueList small { @include text-truncate; color: var(--color-text-muted); font-size: 10px; }
+.issueList em { display: grid; min-width: 26px; height: 26px; padding: 0 7px; place-items: center; border-radius: $radius-pill; font-size: $font-size-12; font-style: normal; font-weight: $font-weight-700; }
+.issue_danger .issueIcon, .issue_danger em { color: var(--color-danger); background: color-mix(in srgb, var(--color-danger) 10%, var(--color-surface)); }
+.issue_info .issueIcon, .issue_info em { color: var(--color-info); background: color-mix(in srgb, var(--color-info) 10%, var(--color-surface)); }
+.issue_muted .issueIcon, .issue_muted em { color: var(--color-text-muted); background: var(--color-hover); }
+.allClear { display: flex; min-height: 88px; padding: $spacing-16 $spacing-24; align-items: center; gap: 12px; }
+.allClear > span { display: grid; width: 40px; height: 40px; flex: 0 0 auto; place-items: center; border-radius: 50%; color: var(--color-success); background: color-mix(in srgb, var(--color-success) 10%, var(--color-surface)); }
+.allClear div { display: flex; flex-direction: column; gap: 3px; }
+.allClear strong { color: var(--color-text-primary); font-size: $font-size-14; }
+.allClear p { margin: 0; color: var(--color-text-muted); font-size: $font-size-12; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@media (max-width: $breakpoint-xl) { .assistantHero { grid-template-columns: 1fr; } }
+@media (max-width: $breakpoint-md) {
+  .page { gap: $spacing-16; }
+  .header h1 { font-size: $font-size-24; }
+  .assistantHero { padding: $spacing-16; gap: $spacing-16; }
+  .assistantIntro h2 { font-size: $font-size-18; }
+  .assistantInput { padding: 10px; grid-template-columns: 20px minmax(0, 1fr); }
+  .assistantInput button { grid-column: 1 / -1; width: 100%; }
+  .sectionHeading { padding: $spacing-16; align-items: flex-start; }
+  .issueList { grid-template-columns: 1fr; }
+  .issueList > button { padding-inline: $spacing-16; border-right: 0; }
+}
