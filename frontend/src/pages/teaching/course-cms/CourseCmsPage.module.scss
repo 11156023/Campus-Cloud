@@ -210,6 +210,39 @@
   gap: $spacing-4;
   padding: $spacing-8;
   border-top: 1px solid var(--color-border);
+
+  select {
+    width: 100%;
+    padding: $spacing-8;
+    border: 1px solid var(--color-border);
+    border-radius: $radius-8;
+    background: var(--color-surface);
+    color: var(--color-text-primary);
+    font-size: $font-size-12;
+  }
+}
+
+.pathClassLink {
+  display: grid;
+  gap: $spacing-4;
+  padding: $spacing-8;
+  border-top: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  font-size: $font-size-12;
+
+  select {
+    min-width: 0;
+    padding: $spacing-8;
+    border: 1px solid var(--color-border);
+    border-radius: $radius-8;
+    background: var(--color-surface);
+    color: var(--color-text-primary);
+  }
+
+  small {
+    color: var(--color-text-muted);
+    line-height: 1.45;
+  }
 }
 
 .input {

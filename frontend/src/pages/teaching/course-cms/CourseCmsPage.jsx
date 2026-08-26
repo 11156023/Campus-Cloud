@@ -10,6 +10,7 @@ import {
   courseProgressWsUrl,
 } from "../../../services/courses";
 import { TemplatesService } from "../../../services/templates";
+import { TeachingClassesService } from "../../../services/teachingClasses";
 import styles from "./CourseCmsPage.module.scss";
 
 const DIFFICULTIES = [
@@ -19,21 +20,41 @@ const DIFFICULTIES = [
 ];
 
 /* ══════════════ 路徑欄 ══════════════ */
-function PathColumn({ paths, selectedId, onSelect, onReload }) {
+function PathColumn({ paths, teachingClasses, selectedId, onSelect, onReload }) {
   const toast = useToast();
   const confirm = useConfirm();
   const [title, setTitle] = useState("");
+  const [classId, setClassId] = useState("");
+  const selectedPath = paths.find((path) => path.id === selectedId);
+  const linkedClassIds = new Set(paths.map((path) => String(path.teaching_class_id ?? "")).filter(Boolean));
 
   async function handleCreate(e) {
     e.preventDefault();
-    if (!title.trim()) return;
+    if (!title.trim() || !classId) return;
     try {
-      await CourseAdminService.createPath({ title: title.trim() });
+      await CourseAdminService.createPath({
+        title: title.trim(),
+        teaching_class_id: classId,
+      });
       setTitle("");
+      setClassId("");
       onReload();
       toast.success("已建立路徑");
     } catch (err) {
       toast.error(err.message ?? "建立失敗");
+    }
+  }
+
+  async function handleClassLink(value) {
+    if (!selectedPath) return;
+    try {
+      await CourseAdminService.updatePath(selectedPath.id, {
+        teaching_class_id: value || null,
+      });
+      onReload();
+      toast.success(value ? "已連結正式班級" : "已解除班級連結");
+    } catch (err) {
+      toast.error(err.message ?? "連結失敗");
     }
   }
 
@@ -81,7 +102,7 @@ function PathColumn({ paths, selectedId, onSelect, onReload }) {
               title={path.status === "published" ? "已發布" : "草稿"}
             />
             <span className={styles.itemLabel}>{path.title}</span>
-            <span className={styles.itemMeta}>{path.room_count} 房</span>
+            <span className={styles.itemMeta}>{path.teaching_class_name ?? `${path.room_count} 房`}</span>
             <button
               type="button"
               className={styles.iconBtn}
@@ -102,14 +123,41 @@ function PathColumn({ paths, selectedId, onSelect, onReload }) {
         ))}
         {paths.length === 0 && <div className={styles.emptyHint}>尚無路徑</div>}
       </div>
+      {selectedPath && (
+        <label className={styles.pathClassLink}>
+          <span>這份內容屬於哪個班級</span>
+          <select
+            value={selectedPath.teaching_class_id ?? ""}
+            onChange={(event) => handleClassLink(event.target.value)}
+          >
+            <option value="">尚未連結</option>
+            {teachingClasses.map((item) => (
+              <option
+                key={item.id}
+                value={item.id}
+                disabled={linkedClassIds.has(String(item.id)) && String(item.id) !== String(selectedPath.teaching_class_id)}
+              >
+                {item.name} · {item.term}
+              </option>
+            ))}
+          </select>
+          <small>連結後，學生首頁、課堂機器與 AI 任務才會對應到同一班。</small>
+        </label>
+      )}
       <form className={styles.addForm} onSubmit={handleCreate}>
+        <select value={classId} onChange={(event) => setClassId(event.target.value)} aria-label="選擇正式班級">
+          <option value="">先選擇班級</option>
+          {teachingClasses.filter((item) => !linkedClassIds.has(String(item.id))).map((item) => (
+            <option key={item.id} value={item.id}>{item.name} · {item.term}</option>
+          ))}
+        </select>
         <input
           className={styles.input}
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="新路徑標題"
         />
-        <button type="submit" className={styles.addBtn} disabled={!title.trim()}>
+        <button type="submit" className={styles.addBtn} disabled={!title.trim() || !classId}>
           <MIcon name="add" size={16} />
         </button>
       </form>
@@ -597,6 +645,7 @@ export default function CourseCmsPage() {
   const [paths, setPaths] = useState([]);
   const [rooms, setRooms] = useState([]);
   const [templates, setTemplates] = useState([]);
+  const [teachingClasses, setTeachingClasses] = useState([]);
   const [selectedPathId, setSelectedPathId] = useState(searchParams.get("pathId"));
   const [selectedRoomId, setSelectedRoomId] = useState(null);
 
@@ -636,6 +685,7 @@ export default function CourseCmsPage() {
     TemplatesService.list()
       .then((rows) => setTemplates(rows.filter((t) => t.status === "ready")))
       .catch(() => {});
+    TeachingClassesService.list().then(setTeachingClasses).catch(() => {});
   }, [canManage, reloadPaths]);
 
   useEffect(() => {
@@ -679,6 +729,7 @@ export default function CourseCmsPage() {
         <div className={styles.editorLayout}>
           <PathColumn
             paths={paths}
+            teachingClasses={teachingClasses}
             selectedId={selectedPathId}
             onSelect={(id) => {
               setSelectedPathId(id);

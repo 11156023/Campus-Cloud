@@ -26,7 +26,7 @@ function defaultForm() {
   end.setMonth(end.getMonth() + 4);
   const rocYear = start.getFullYear() - 1911;
   return {
-    name: "", code: "", term: `${rocYear}-1`, startDate: localDate(start), endDate: localDate(end),
+    name: "", code: "", term: `${rocYear}-1`, location: "", startDate: localDate(start), endDate: localDate(end),
     weekday: (start.getDay() + 6) % 7, startTime: "13:10", endTime: "16:00", timezone: "Asia/Taipei", bootLeadMinutes: 10,
   };
 }
@@ -97,7 +97,7 @@ export default function ClassSetupPage() {
     setWeeks(normalized.weeks);
     if (normalized.course_version_id) setTemplateId(String(normalized.course_version_id));
     setForm({
-      name: normalized.name, code: normalized.code, term: normalized.term,
+      name: normalized.name, code: normalized.code, term: normalized.term, location: normalized.location ?? "",
       startDate: normalized.start_date, endDate: normalized.end_date, weekday: normalized.weekday,
       startTime: String(normalized.start_time).slice(0, 5), endTime: String(normalized.end_time).slice(0, 5),
       timezone: normalized.timezone, bootLeadMinutes: normalized.boot_lead_minutes,
@@ -153,7 +153,7 @@ export default function ClassSetupPage() {
   async function saveBasic() {
     if (!form.name.trim()) { setMessage("請輸入班級名稱。"); return false; }
     const payload = {
-      name: form.name.trim(), code: form.code.trim() || `CLASS-${Date.now().toString().slice(-8)}`, term: form.term.trim() || "未指定",
+      name: form.name.trim(), code: form.code.trim() || `CLASS-${Date.now().toString().slice(-8)}`, term: form.term.trim() || "未指定", location: form.location.trim() || null,
       start_date: form.startDate, end_date: form.endDate, weekday: Number(form.weekday), start_time: form.startTime,
       end_time: form.endTime, timezone: form.timezone, boot_lead_minutes: Number(form.bootLeadMinutes),
     };
@@ -223,6 +223,7 @@ export default function ClassSetupPage() {
     <main className={styles.content}>
       {step === 1 && <section className={styles.card}><div className={styles.sectionHeader}><span>1</span><div><h2>班級與固定課表</h2><p>先填老師每天會用到的資訊；代碼、時區與提前開機可維持預設。</p></div></div><div className={styles.formGrid}>
         <label className={styles.full}><span>班級名稱</span><input value={form.name} onChange={(event) => updateForm("name", event.target.value)} placeholder="例如：Linux Web 實務｜115-1" autoFocus /></label>
+        <label className={styles.full}><span>上課地點</span><input value={form.location} onChange={(event) => updateForm("location", event.target.value)} placeholder="例如：電腦教室 A（會顯示在學生今日課表）" /></label>
         <label><span>開始日期</span><input type="date" value={form.startDate} onChange={(event) => updateForm("startDate", event.target.value)} /></label>
         <label><span>結束日期</span><input type="date" value={form.endDate} onChange={(event) => updateForm("endDate", event.target.value)} /></label>
         <label><span>每週上課</span><select value={form.weekday} onChange={(event) => updateForm("weekday", Number(event.target.value))}>{["星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日"].map((label, index) => <option key={label} value={index}>{label}</option>)}</select></label>
