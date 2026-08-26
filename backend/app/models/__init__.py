@@ -111,6 +111,7 @@ from .vm_request import (
     VMRequestStatus,
 )
 from .vm_template import (
+    TemplateAttachment,
     VMTemplate,
     VMTemplateStatus,
     VMTemplateVisibility,
@@ -216,6 +217,7 @@ __all__ = [
     "DeletionRequest",
     "DeletionRequestStatus",
     # VM Template (範本系統 2.0)
+    "TemplateAttachment",
     "VMTemplate",
     "VMTemplateStatus",
     "VMTemplateVisibility",

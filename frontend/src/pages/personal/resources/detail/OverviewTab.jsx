@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import styles from "./ResourceDetailPage.module.scss";
 import MIcon from "../../../../components/MIcon";
+import LoadingState from "../../../../components/LoadingState/LoadingState";
 import { ResourcesService } from "../../../../services/resources";
+import { downloadBlob } from "../../../../services/api";
 import { useToast } from "../../../../hooks/useToast";
 
 const STATUS_BADGE = {
@@ -17,6 +19,8 @@ export default function OverviewTab({ vmid }) {
   const [showPrivateKey, setShowPrivateKey] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [copied, setCopied] = useState("");
+  const [manual, setManual] = useState(null);
+  const [downloadingId, setDownloadingId] = useState(null);
   const [error, setError] = useState(false);
 
   useEffect(() => {
@@ -32,10 +36,26 @@ export default function OverviewTab({ vmid }) {
         }
       })
       .catch(() => !cancelled && setError(true));
+    // 來源範本手冊（非克隆機或無附件時 count=0，不顯示區塊）
+    ResourcesService.getTemplateManual(vmid)
+      .then((m) => !cancelled && setManual(m))
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
   }, [vmid]);
+
+  const downloadManual = async (attachment) => {
+    setDownloadingId(attachment.id);
+    try {
+      const blob = await ResourcesService.downloadTemplateManual(vmid, attachment.id);
+      downloadBlob(blob, attachment.filename);
+    } catch (e) {
+      toast.error(e?.message ?? "下載失敗");
+    } finally {
+      setDownloadingId(null);
+    }
+  };
 
   const copy = async (text, label) => {
     try {
@@ -48,7 +68,7 @@ export default function OverviewTab({ vmid }) {
   };
 
   if (error) return <p className={styles.stateText}>無法載入資源資訊</p>;
-  if (!resource) return <p className={styles.stateText}>載入中…</p>;
+  if (!resource) return <LoadingState />;
 
   const badge = STATUS_BADGE[resource.status] ?? {
     label: resource.status,
@@ -57,6 +77,42 @@ export default function OverviewTab({ vmid }) {
 
   return (
     <div className={styles.tabStack}>
+      {/* 使用手冊（克隆機來源範本附件） */}
+      {(manual?.count ?? 0) > 0 && (
+        <div className={styles.card}>
+          <div className={styles.cardHeader}>
+            <div>
+              <h2 className={styles.cardTitle}>
+                <MIcon name="description" size={18} />
+                使用手冊
+              </h2>
+              <p className={styles.cardDesc}>
+                來自範本「{manual.template_name}」的說明文件
+              </p>
+            </div>
+          </div>
+          <div className={styles.cardBody}>
+            <div className={styles.manualList}>
+              {manual.data.map((a) => (
+                <div key={a.id} className={styles.manualItem}>
+                  <MIcon name="description" size={15} />
+                  <span className={styles.manualName}>{a.filename}</span>
+                  <button
+                    type="button"
+                    className={styles.manualBtn}
+                    disabled={downloadingId === a.id}
+                    onClick={() => downloadManual(a)}
+                  >
+                    <MIcon name="download" size={15} />
+                    {downloadingId === a.id ? "下載中…" : "下載"}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 基本資訊 */}
       <div className={styles.card}>
         <div className={styles.cardHeader}>
@@ -70,7 +126,7 @@ export default function OverviewTab({ vmid }) {
         </div>
         <div className={`${styles.cardBody} ${styles.factGrid}`}>
           <div className={styles.fact}>
-            <span className={styles.factLabel}>VMID</span>
+            <span className={styles.factLabel}>編號</span>
             <span className={styles.factValue}>{resource.vmid}</span>
           </div>
           <div className={styles.fact}>

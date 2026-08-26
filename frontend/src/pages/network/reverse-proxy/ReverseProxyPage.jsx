@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import styles from "./ReverseProxyPage.module.scss";
 import MIcon from "../../../components/MIcon";
+import LoadingState from "../../../components/LoadingState/LoadingState";
 import { useAuth } from "../../../contexts/AuthContext";
 import { useToast } from "../../../hooks/useToast";
 import { ReverseProxyService } from "../../../services/reverseProxy";
@@ -342,7 +343,7 @@ function TraefikPanel() {
       {open && (
         <div className={styles.adminBody}>
           {loading ? (
-            <div className={styles.loading}>載入 Traefik 狀態...</div>
+            <LoadingState text="載入 Traefik 狀態..." />
           ) : snapshot?.runtime_error ? (
             <div className={styles.adminMeta}>
               <span className={`${styles.statusPill} ${styles.unknown}`}>
@@ -532,7 +533,7 @@ export default function ReverseProxyPage() {
       {/* Route list / empty */}
       <div className={styles.content}>
         {loading ? (
-          <div className={styles.loading}>載入網域規則...</div>
+          <LoadingState text="載入網域規則..." />
         ) : rules.length === 0 ? (
           <div className={styles.empty}>
             <div className={styles.emptyIcon}>

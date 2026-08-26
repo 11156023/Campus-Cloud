@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import styles from "./SettingsPage.module.scss";
 import MIcon from "../../../components/MIcon";
+import LoadingState from "../../../components/LoadingState/LoadingState";
 import { useConfirm } from "../../../components/ConfirmDialog/ConfirmProvider";
 import { useToast } from "../../../hooks/useToast";
 import { ProxmoxConfigService } from "../../../services/proxmoxConfig";
@@ -338,7 +339,7 @@ function ConnectionsSection({ connections, loading, onRefresh }) {
           </button>
         </div>
         {loading ? (
-          <div className={styles.loading}>載入連線清單...</div>
+          <LoadingState text="載入連線清單..." />
         ) : connections.length === 0 ? (
           <p className={styles.cardDesc}>
             尚未建立連線。點「新增連線」完成第一組設定（將自動成為預設連線）。
@@ -564,7 +565,7 @@ function NodesTab() {
     }
   }
 
-  if (loading) return <div className={styles.loading}>載入節點...</div>;
+  if (loading) return <LoadingState text="載入節點..." />;
   if (nodes.length === 0) {
     return (
       <div className={styles.empty}>
@@ -684,7 +685,7 @@ function StorageTab() {
     }
   }
 
-  if (loading) return <div className={styles.loading}>載入 Storage...</div>;
+  if (loading) return <LoadingState text="載入 Storage..." />;
   if (storages.length === 0) {
     return (
       <div className={styles.empty}>
@@ -832,7 +833,7 @@ export default function SettingsPage() {
       {/* ── 內容 ── */}
       <div className={styles.content}>
         {loading ? (
-          <div className={styles.loading}>載入設定...</div>
+          <LoadingState fullPage text="載入設定..." />
         ) : (
           <>
             {activeTab === "pve" && (

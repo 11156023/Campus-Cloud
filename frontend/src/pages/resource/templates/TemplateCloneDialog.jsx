@@ -1,36 +1,116 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import styles from "./TemplatesPage.module.scss";
 import MIcon from "../../../components/MIcon";
 import { TemplatesService } from "../../../services/templates";
+import { GpuService } from "../../../services/gpu";
+import { downloadBlob } from "../../../services/api";
 import { useToast } from "../../../hooks/useToast";
+
+const CORE_MIN = 1;
+const MEMORY_MIN = 512;
+
+const formatVram = (mb) =>
+  mb >= 1024 ? `${Math.round(mb / 1024)}G` : `${mb}M`;
+
+const gpuLabel = (gpu) => {
+  const capacity = gpu.capacity_count || gpu.device_count;
+  const parts = [];
+  if (gpu.per_instance_vram_mb > 0) parts.push(`${formatVram(gpu.per_instance_vram_mb)}/顆`);
+  else if (gpu.vram) parts.push(gpu.vram);
+  const vram = parts.length ? `（${parts.join("，")}）` : "";
+  return `${gpu.description || gpu.mapping_id}${vram} [${gpu.available_count}/${capacity} 可用]${gpu.available_count <= 0 ? " — 已滿" : ""}`;
+};
+
+const formatBytes = (bytes) => {
+  if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  if (bytes >= 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${bytes} B`;
+};
 
 /** 從範本克隆開通（teacher/admin 可批量，student 固定單台） */
 export default function TemplateCloneDialog({ template, canBatch, onClose, onCloned }) {
   const toast = useToast();
   const [hostname, setHostname] = useState("");
   const [count, setCount] = useState("1");
-  const [cores, setCores] = useState(
-    template?.default_cores ? String(template.default_cores) : "",
-  );
-  const [memory, setMemory] = useState(
-    template?.default_memory ? String(template.default_memory) : "",
-  );
-  const [disk, setDisk] = useState(
-    template?.default_disk ? String(template.default_disk) : "",
-  );
+  const [cores, setCores] = useState(template?.default_cores || 2);
+  const [memory, setMemory] = useState(template?.default_memory || 2048);
+  const [password, setPassword] = useState("");
   const [start, setStart] = useState(true);
   const [busy, setBusy] = useState(false);
 
+  const needsGpu = Boolean(template?.requires_gpu) && template?.resource_type === "qemu";
+  const [gpuOptions, setGpuOptions] = useState([]);
+  const [gpuLoading, setGpuLoading] = useState(needsGpu);
+  const [gpuMappingId, setGpuMappingId] = useState("");
+  const [gpuProfile, setGpuProfile] = useState("");
+
+  const [attachments, setAttachments] = useState([]);
+  const [downloadingId, setDownloadingId] = useState(null);
+
+  const allowPassword = template?.allow_password_change !== false;
+  const coresMax = Math.max(8, template?.default_cores || 0);
+  const memoryMax = Math.max(32768, template?.default_memory || 0);
+  const coreTicks = [...new Set([1, 2, 4, 6, 8, coresMax])].sort((a, b) => a - b);
+  const memoryTicks = [
+    ...new Set([1024, 8192, 16384, 24576, 32768, memoryMax]),
+  ].sort((a, b) => a - b);
+
+  useEffect(() => {
+    if (!needsGpu) return undefined;
+    let cancelled = false;
+    GpuService.listOptions()
+      .then((res) => !cancelled && setGpuOptions(res ?? []))
+      .catch(() => !cancelled && toast.error("GPU 清單載入失敗"))
+      .finally(() => !cancelled && setGpuLoading(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [needsGpu, toast]);
+
+  useEffect(() => {
+    let cancelled = false;
+    TemplatesService.listAttachments(template.id)
+      .then((res) => !cancelled && setAttachments(res?.data ?? []))
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [template.id]);
+
+  const selectedGpu = gpuOptions.find((g) => g.mapping_id === gpuMappingId);
+  const gpuProfiles = selectedGpu?.profiles ?? [];
+
+  const handleDownload = async (attachment) => {
+    setDownloadingId(attachment.id);
+    try {
+      const blob = await TemplatesService.downloadAttachment(template.id, attachment.id);
+      downloadBlob(blob, attachment.filename);
+    } catch (e) {
+      toast.error(e?.message ?? "下載失敗");
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
   const handleSubmit = async () => {
-    const numOrNull = (v) => (String(v).trim() ? Number(v) : null);
+    if (allowPassword && password && password.length < 8) {
+      toast.error("自訂密碼至少需要 8 個字元");
+      return;
+    }
+    if (needsGpu && !gpuMappingId) {
+      toast.error("此範本需要 GPU，請先選擇要配置的 GPU");
+      return;
+    }
     setBusy(true);
     try {
       const res = await TemplatesService.clone(template.id, {
         hostname: hostname.trim() || null,
         count: canBatch ? Math.max(1, Number(count) || 1) : 1,
-        cores: numOrNull(cores),
-        memory: numOrNull(memory),
-        disk: numOrNull(disk),
+        cores: Number(cores),
+        memory: Number(memory),
+        login_password: allowPassword && password ? password : null,
+        gpu_mapping_id: needsGpu ? gpuMappingId : null,
+        gpu_mdev_profile: needsGpu && gpuProfile ? gpuProfile : null,
         start,
       });
       toast.success(
@@ -51,13 +131,40 @@ export default function TemplateCloneDialog({ template, canBatch, onClose, onClo
     <div className={styles.modalOverlay} onClick={onClose}>
       <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
         <span className={styles.modalTitle}>
-          <MIcon name="content_copy" size={20} />
+          {template.icon_url ? (
+            <img className={styles.iconThumbSmall} src={template.icon_url} alt="" />
+          ) : (
+            <MIcon name="content_copy" size={20} />
+          )}
           克隆「{template.name}」
         </span>
         <p className={styles.modalDesc}>
-          系統會以 linked clone 快速複製（必要時自動改用完整複製），並自動配置 IP
-          與防火牆。完成後可在資源頁操作。
+          系統會自動複製範本並完成必要設定（IP、防火牆），完成後可在資源頁操作使用。
         </p>
+
+        {attachments.length > 0 && (
+          <div className={styles.field}>
+            <label>使用手冊</label>
+            <div className={styles.attachList}>
+              {attachments.map((a) => (
+                <div key={a.id} className={styles.attachItem}>
+                  <MIcon name="description" size={15} />
+                  <span className={styles.attachName}>{a.filename}</span>
+                  <span className={styles.attachSize}>{formatBytes(a.size_bytes)}</span>
+                  <button
+                    type="button"
+                    className={styles.attachBtn}
+                    disabled={downloadingId === a.id}
+                    onClick={() => handleDownload(a)}
+                  >
+                    <MIcon name="download" size={15} />
+                    {downloadingId === a.id ? "下載中…" : "下載"}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className={styles.cloneGrid}>
           <div className={styles.field}>
@@ -86,43 +193,138 @@ export default function TemplateCloneDialog({ template, canBatch, onClose, onClo
           )}
         </div>
 
-        <div className={styles.tripleGrid}>
-          <div className={styles.field}>
-            <label htmlFor="clone-cores">CPU 核數</label>
-            <input
-              id="clone-cores"
-              type="number"
-              min={1}
-              max={64}
-              placeholder="沿用範本"
-              value={cores}
-              onChange={(e) => setCores(e.target.value)}
-            />
+        <div className={styles.field}>
+          <div className={styles.sliderLabelRow}>
+            <label htmlFor="clone-cores">CPU 核心數</label>
+            <span className={styles.sliderValue}>{cores} 核心</span>
           </div>
-          <div className={styles.field}>
-            <label htmlFor="clone-memory">記憶體 (MB)</label>
-            <input
-              id="clone-memory"
-              type="number"
-              min={128}
-              placeholder="沿用範本"
-              value={memory}
-              onChange={(e) => setMemory(e.target.value)}
-            />
-          </div>
-          <div className={styles.field}>
-            <label htmlFor="clone-disk">磁碟 (GB)</label>
-            <input
-              id="clone-disk"
-              type="number"
-              min={1}
-              placeholder="沿用範本"
-              value={disk}
-              onChange={(e) => setDisk(e.target.value)}
-              disabled={template.resource_type === "lxc"}
-            />
+          <input
+            id="clone-cores"
+            type="range"
+            min={CORE_MIN}
+            max={coresMax}
+            step={1}
+            className={styles.slider}
+            value={cores}
+            onChange={(e) => setCores(Number(e.target.value))}
+          />
+          <div className={styles.sliderTicks}>
+            {coreTicks.map((v) => (
+              <span key={v} style={{ left: `${((v - CORE_MIN) / (coresMax - CORE_MIN)) * 100}%` }}>
+                {v}
+              </span>
+            ))}
           </div>
         </div>
+
+        <div className={styles.field}>
+          <div className={styles.sliderLabelRow}>
+            <label htmlFor="clone-memory">記憶體 (RAM)</label>
+            <span className={styles.sliderValue}>{(memory / 1024).toFixed(1)} GB</span>
+          </div>
+          <input
+            id="clone-memory"
+            type="range"
+            min={MEMORY_MIN}
+            max={memoryMax}
+            step={512}
+            className={styles.slider}
+            value={memory}
+            onChange={(e) => setMemory(Number(e.target.value))}
+          />
+          <div className={styles.sliderTicks}>
+            {memoryTicks.map((v) => (
+              <span
+                key={v}
+                style={{ left: `${((v - MEMORY_MIN) / (memoryMax - MEMORY_MIN)) * 100}%` }}
+              >
+                {v >= 1024 ? `${Math.round(v / 1024)}GB` : `${v}MB`}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        <div className={styles.field}>
+          <label>硬碟空間</label>
+          <div className={styles.diskFixed}>
+            <MIcon name="lock" size={15} />
+            {template.default_disk
+              ? `固定 ${template.default_disk} GB（跟隨範本，不可調整）`
+              : "跟隨範本磁碟大小，不可調整"}
+          </div>
+        </div>
+
+        {allowPassword ? (
+          <div className={styles.field}>
+            <label htmlFor="clone-password">登入密碼（選填）</label>
+            <input
+              id="clone-password"
+              type="password"
+              maxLength={64}
+              placeholder="留空由系統產生隨機密碼"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </div>
+        ) : (
+          <div className={styles.policyNote}>
+            <MIcon name="lock" size={15} />
+            此範本已鎖定帳號密碼：克隆機沿用範本內建帳密，無法自訂或重設。
+          </div>
+        )}
+
+        {needsGpu && (
+          <>
+            <div className={styles.field}>
+              <label htmlFor="clone-gpu">GPU（此範本必須配置）</label>
+              <select
+                id="clone-gpu"
+                value={gpuMappingId}
+                disabled={gpuLoading}
+                onChange={(e) => {
+                  setGpuMappingId(e.target.value);
+                  setGpuProfile("");
+                }}
+              >
+                <option value="">
+                  {gpuLoading ? "載入 GPU 清單中…" : "選擇 GPU…"}
+                </option>
+                {gpuOptions.map((gpu) => (
+                  <option
+                    key={gpu.mapping_id}
+                    value={gpu.mapping_id}
+                    disabled={gpu.available_count <= 0}
+                  >
+                    {gpuLabel(gpu)}
+                  </option>
+                ))}
+              </select>
+              {!gpuLoading && gpuOptions.length === 0 && (
+                <span className={styles.fieldWarn}>
+                  目前沒有可用 GPU，請聯絡管理員或稍後再試。
+                </span>
+              )}
+            </div>
+            {gpuProfiles.length > 0 && (
+              <div className={styles.field}>
+                <label htmlFor="clone-gpu-profile">vGPU 規格</label>
+                <select
+                  id="clone-gpu-profile"
+                  value={gpuProfile}
+                  onChange={(e) => setGpuProfile(e.target.value)}
+                >
+                  <option value="">自動 — 最小可用規格</option>
+                  {gpuProfiles.map((p) => (
+                    <option key={p.mdev_type} value={p.mdev_type} disabled={!p.creatable}>
+                      {`${p.name || p.mdev_type} — ${formatVram(p.vram_mb)}`}
+                      {p.creatable ? "" : "（記憶體不足）"}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </>
+        )}
 
         <label className={styles.checkLine}>
           <input
@@ -140,7 +342,7 @@ export default function TemplateCloneDialog({ template, canBatch, onClose, onClo
           <button
             type="button"
             className={styles.btnPrimary}
-            disabled={busy}
+            disabled={busy || (needsGpu && !gpuMappingId)}
             onClick={handleSubmit}
           >
             <MIcon name="content_copy" size={14} />

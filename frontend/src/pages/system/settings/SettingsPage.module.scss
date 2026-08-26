@@ -111,12 +111,6 @@
   line-height: $line-height-base;
 }
 
-.loading {
-  padding: $spacing-32;
-  color: var(--color-text-secondary);
-  text-align: center;
-}
-
 /* 卡片之間 24、卡片內元素 16，維持外鬆內緊的層級 */
 .panelStack {
   @include flex-column;

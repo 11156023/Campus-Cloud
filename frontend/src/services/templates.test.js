@@ -41,6 +41,36 @@ describe("TemplatesService", () => {
     expect(JSON.parse(init.body)).toEqual({ hostname: "lab", count: 3, start: true });
   });
 
+  test("uploadIcon 以 multipart 上傳", async () => {
+    fetchMock.mockResolvedValueOnce(jsonRes(200, { icon_url: "/api/v1/templates/tpl-1/icon?v=1" }));
+
+    await TemplatesService.uploadIcon("tpl-1", new Blob(["png"]));
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toContain("/api/v1/templates/tpl-1/icon");
+    expect(init.method).toBe("POST");
+    expect(init.body).toBeInstanceOf(FormData);
+  });
+
+  test("listAttachments 打到 attachments 列表", async () => {
+    fetchMock.mockResolvedValueOnce(jsonRes(200, { data: [], count: 0 }));
+
+    await TemplatesService.listAttachments("tpl-1");
+
+    const [url] = fetchMock.mock.calls[0];
+    expect(url).toContain("/api/v1/templates/tpl-1/attachments");
+  });
+
+  test("removeAttachment 以 DELETE 刪除附件", async () => {
+    fetchMock.mockResolvedValueOnce(jsonRes(200, { message: "ok" }));
+
+    await TemplatesService.removeAttachment("tpl-1", "att-9");
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toContain("/api/v1/templates/tpl-1/attachments/att-9");
+    expect(init.method).toBe("DELETE");
+  });
+
   test("startUpdateCycle 打到 update-cycle/start", async () => {
     fetchMock.mockResolvedValueOnce(jsonRes(200, {}));
 

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import LoadingState from "../../../components/LoadingState/LoadingState";
 import MIcon from "../../../components/MIcon";
 import { useToast } from "../../../hooks/useToast";
 import { CoursesService } from "../../../services/courses";
@@ -62,7 +63,7 @@ function PathCard({ path, expanded, onToggle }) {
 
       {expanded && (
         <div className={styles.roomList}>
-          {loading && <div className={styles.stateText}>載入中…</div>}
+          {loading && <LoadingState />}
           {!loading &&
             detail?.rooms?.map((room) => {
               const diff = DIFFICULTY_META[room.difficulty] ?? DIFFICULTY_META.easy;
@@ -129,7 +130,7 @@ export default function CoursePathsPage() {
       </div>
 
       {error && <div className={styles.stateText}>{error}</div>}
-      {!error && paths === null && <div className={styles.stateText}>載入中…</div>}
+      {!error && paths === null && <LoadingState fullPage />}
       {!error && paths?.length === 0 && (
         <div className={styles.empty}>
           <MIcon name="school" size={32} />

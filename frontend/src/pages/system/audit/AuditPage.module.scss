@@ -150,12 +150,6 @@
   }
 }
 
-.loading {
-  padding: $spacing-32;
-  color: var(--color-text-secondary);
-  text-align: center;
-}
-
 .content {
   flex: 1;
   @include flex-column;

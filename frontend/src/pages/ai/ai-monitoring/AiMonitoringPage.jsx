@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import styles from "./AiMonitoringPage.module.scss";
 import MIcon from "../../../components/MIcon";
+import LoadingState from "../../../components/LoadingState/LoadingState";
 import { AiMonitoringService } from "../../../services/aiMonitoring";
 import { useToast } from "../../../hooks/useToast";
 import useAutoRefresh from "../../../hooks/useAutoRefresh";
@@ -292,7 +293,9 @@ export default function AiMonitoringPage() {
       </div>
 
       <div className={styles.content}>
-        {tab === "users" ? (
+        {loading ? (
+          <LoadingState fullPage />
+        ) : tab === "users" ? (
           visibleUsers.length === 0 ? (
             <EmptyState
               icon="groups"

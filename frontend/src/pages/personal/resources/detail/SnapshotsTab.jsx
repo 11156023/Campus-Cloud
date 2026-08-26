@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import styles from "./ResourceDetailPage.module.scss";
 import MIcon from "../../../../components/MIcon";
+import LoadingState from "../../../../components/LoadingState/LoadingState";
 import { ResourcesService } from "../../../../services/resources";
 import { useToast } from "../../../../hooks/useToast";
 
@@ -92,7 +93,7 @@ export default function SnapshotsTab({ vmid }) {
     );
   };
 
-  if (snapshots === null) return <p className={styles.stateText}>載入中…</p>;
+  if (snapshots === null) return <LoadingState />;
 
   return (
     <div className={styles.tabStack}>

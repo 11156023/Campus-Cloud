@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import styles from "./JobsPage.module.scss";
 import MIcon from "../../../components/MIcon";
+import LoadingState from "../../../components/LoadingState/LoadingState";
 import { JobsService } from "../../../services/jobs";
 import JobDetailDialog from "../../../components/Jobs/JobDetailDialog";
 import { useToast } from "../../../hooks/useToast";
@@ -180,7 +181,9 @@ export default function JobsPage() {
       </div>
 
       <div className={styles.content}>
-        {visible.length === 0 ? (
+        {loading ? (
+          <LoadingState fullPage text="載入背景任務..." />
+        ) : visible.length === 0 ? (
           <EmptyState />
         ) : (
           <div className={styles.tableWrap}>

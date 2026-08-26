@@ -1,4 +1,4 @@
-.page {
+﻿.page {
   @include flex-column;
   gap: $spacing-24;
   padding: $spacing-8 $spacing-16;
@@ -43,7 +43,7 @@
   flex-shrink: 0;
 }
 
-/* ── 卡片 ── */
+/* ?? ?∠? ?? */
 .card {
   @include flex-column;
   @include glass-surface($shadow: var(--shadow-sm));
@@ -58,7 +58,7 @@
   font-size: $font-size-14;
 }
 
-/* ── 表格 ── */
+/* ?? 銵冽 ?? */
 .table {
   width: 100%;
   border-collapse: collapse;
@@ -153,7 +153,7 @@
   color: var(--color-text-secondary);
 }
 
-/* ── Badge ── */
+/* ?? Badge ?? */
 .badge {
   display: inline-flex;
   align-items: center;
@@ -169,7 +169,7 @@
 .badge_info  { background: color-mix(in srgb, var(--color-info)    12%, transparent); color: var(--color-info); }
 .badge_muted { background: var(--color-hover); color: var(--color-text-muted); }
 
-/* ── 列操作選單 ── */
+/* ?? ??雿???? */
 .menuWrap {
   position: relative;
   display: inline-block;
@@ -236,7 +236,7 @@
   background: var(--color-divider);
 }
 
-/* ── 學生型錄 ── */
+/* ?? 摮貊??? ?? */
 .catalogGrid {
   display: grid;
   grid-template-columns: 1fr;
@@ -291,7 +291,7 @@
   justify-content: center;
 }
 
-/* ── 按鈕 ── */
+/* ?? ?? ?? */
 %btn-base {
   display: inline-flex;
   align-items: center;
@@ -342,7 +342,7 @@
   }
 }
 
-/* ── Modal ── */
+/* ?? Modal ?? */
 .modalOverlay {
   position: fixed;
   inset: 0;
@@ -390,7 +390,7 @@
   gap: $spacing-8;
 }
 
-/* ── 表單 ── */
+/* ?? 銵典 ?? */
 .field {
   @include flex-column;
   gap: $spacing-4;
@@ -515,4 +515,149 @@
   @include respond-to(sm) {
     grid-template-columns: minmax(0, 1fr) 120px;
   }
+}
+
+/* ?? ?▼嚗??唾?鞈????渡?璅??隤?嚗??? */
+.slider {
+  width: 100%;
+  accent-color: var(--color-primary);
+  cursor: pointer;
+}
+
+.sliderTicks {
+  position: relative;
+  height: 16px;
+  font-size: $font-size-12;
+  color: var(--color-text-muted, #888);
+  margin-top: -2px;
+
+  span {
+    position: absolute;
+    transform: translateX(-50%);
+    white-space: nowrap;
+
+    &:first-child { transform: translateX(0); }
+    &:last-child  { transform: translateX(-100%); }
+  }
+}
+
+.sliderValue {
+  font-size: 13px;
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.sliderLabelRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 4px;
+}
+
+/* ?? ?航?蝤?憿舐內 ?? */
+.diskFixed {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--color-hover);
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+/* ?? 蝭 icon ?? */
+.iconThumb {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--color-hover);
+}
+
+.iconThumbSmall {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--color-hover);
+}
+
+.iconUploadRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* ?? ?辣嚗蝙?冽??? ?? */
+.attachList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.attachItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.attachName {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attachSize {
+  color: var(--color-text-muted);
+  font-size: $font-size-12;
+  flex-shrink: 0;
+}
+
+.attachBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: none;
+  background: none;
+  color: var(--color-primary);
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 6px;
+  flex-shrink: 0;
+
+  &:hover { background: var(--color-hover); }
+  &:disabled { opacity: 0.5; cursor: default; }
+}
+
+.attachBtnDanger {
+  color: var(--color-danger);
+}
+
+/* ?? ???輻??內 ?? */
+.policyNote {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-info) 8%, transparent);
+  color: var(--color-text-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.catalogActions {
+  display: flex;
+  gap: 8px;
+  margin-top: auto;
+
+  > * { flex: 1; }
 }

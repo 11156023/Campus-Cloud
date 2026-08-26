@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import styles from "./ResourceDetailPage.module.scss";
+import LoadingState from "../../../../components/LoadingState/LoadingState";
 import { AuditLogsService } from "../../../../services/auditLogs";
 
 /** 依動作類型決定 badge 色系（僅使用四種語意色） */
@@ -24,7 +25,7 @@ export default function AuditLogsTab({ vmid }) {
   }, [vmid]);
 
   if (error) return <p className={styles.stateText}>無法載入操作紀錄</p>;
-  if (!logs) return <p className={styles.stateText}>載入中…</p>;
+  if (!logs) return <LoadingState />;
 
   return (
     <div className={styles.tabStack}>

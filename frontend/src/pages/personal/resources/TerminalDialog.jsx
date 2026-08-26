@@ -94,8 +94,8 @@ export default function TerminalDialog({ resource, onClose }) {
       }
     };
 
-    ws.onerror = () => { if (isAlive) { setStatus("error"); setError("無法連接到後端"); } };
-    ws.onclose = (e) => { if (isAlive) { setStatus("disconnected"); setError(e.code === 1000 ? "連接已關閉" : `連接中斷 (${e.reason || e.code})`); } };
+    ws.onerror = () => { if (isAlive) { setStatus("error"); setError("無法建立連線，請稍後再試"); } };
+    ws.onclose = (e) => { if (isAlive) { setStatus("disconnected"); setError(e.code === 1000 ? "連接已關閉" : "連接中斷，請重新整理後再試"); } };
 
     term.onData((d) => {
       if (ws.readyState === WebSocket.OPEN && isReady) {

@@ -25,7 +25,8 @@ def create_template(
     visibility: VMTemplateVisibility = VMTemplateVisibility.private,
     default_cores: int | None = None,
     default_memory: int | None = None,
-    default_disk: int | None = None,
+    allow_password_change: bool = True,
+    requires_gpu: bool = False,
     source_vmid: int | None = None,
     commit: bool = True,
 ) -> VMTemplate:
@@ -40,7 +41,8 @@ def create_template(
         visibility=visibility,
         default_cores=default_cores,
         default_memory=default_memory,
-        default_disk=default_disk,
+        allow_password_change=allow_password_change,
+        requires_gpu=requires_gpu,
         source_vmid=source_vmid,
     )
     session.add(template)
@@ -79,7 +81,8 @@ def revive_deleted_template(
     visibility: VMTemplateVisibility = VMTemplateVisibility.private,
     default_cores: int | None = None,
     default_memory: int | None = None,
-    default_disk: int | None = None,
+    allow_password_change: bool = True,
+    requires_gpu: bool = False,
     source_vmid: int | None = None,
     commit: bool = True,
 ) -> VMTemplate:
@@ -99,7 +102,10 @@ def revive_deleted_template(
     template.visibility = visibility
     template.default_cores = default_cores
     template.default_memory = default_memory
-    template.default_disk = default_disk
+    template.default_disk = None
+    template.allow_password_change = allow_password_change
+    template.requires_gpu = requires_gpu
+    template.icon_url = None
     template.source_vmid = source_vmid
     template.version = 1
     template.error_message = None

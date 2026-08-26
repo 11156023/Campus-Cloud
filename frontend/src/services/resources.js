@@ -1,6 +1,18 @@
-import { apiDelete, apiGet, apiPost, apiPut } from "./api";
+import { apiDelete, apiGet, apiGetBlob, apiPost, apiPut } from "./api";
 
 export const ResourcesService = {
+  /** 克隆機來源範本的使用手冊（資源擁有者即可，不受範本可見範圍影響） */
+  getTemplateManual(vmid) {
+    return apiGet(`/api/v1/resources/${vmid}/template-manual`);
+  },
+
+  /** 下載來源範本手冊（回傳 Blob，配 downloadBlob 使用） */
+  downloadTemplateManual(vmid, attachmentId) {
+    return apiGetBlob(
+      `/api/v1/resources/${vmid}/template-manual/${attachmentId}/download`,
+    );
+  },
+
   /** 取得我的資源列表 */
   list(options) {
     return apiGet("/api/v1/resources/my", options);

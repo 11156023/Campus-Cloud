@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Background, MarkerType, ReactFlow } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
+import LoadingState from "../../components/LoadingState/LoadingState";
 import MIcon from "../../components/MIcon";
 import ClassroomWatchDialog from "../../components/Classroom/ClassroomWatchDialog";
 import { useConfirm } from "../../components/ConfirmDialog/ConfirmProvider";
@@ -290,7 +291,7 @@ function TopologyPreview({ item }) {
     id: String(node.node_key),
     position: { x: 70 + index * 250, y: 95 + (index % 2) * 35 },
     data: {
-      label: <div className={styles.readonlyTopologyNode}><strong>{node.name}</strong><span>{node.source_type === "custom" ? "自訂規格" : "機器範本"} · {String(node.resource_type).toUpperCase()}</span><small>{node.cpu} CPU · {Math.round(node.memory_mb / 1024)} GB RAM · {node.disk_gb} GB</small></div>,
+      label: <div className={styles.readonlyTopologyNode}><strong>{node.name}</strong><span>{node.source_type === "custom" ? "自訂規格" : "機器範本"} · {node.resource_type === "lxc" ? "容器 (LXC)" : "虛擬機"}</span><small>{node.cpu} CPU · {Math.round(node.memory_mb / 1024)} GB RAM · {node.disk_gb} GB</small></div>,
     },
     style: { width: 205, padding: 0, borderRadius: 10, borderColor: "var(--color-border)", background: "var(--color-surface)" },
   }));
@@ -351,7 +352,7 @@ function Machines({ item, templates, template, onRefresh, onTemplate, createdTem
       {message && <p className={styles.inlineMessage}>{message}</p>}
     </section>
     {item.nodes.length > 0 && <section className={styles.card}>
-      <div className={styles.cardHeader}><div><h2>鎖定前確認：機器與真實網路拓撲</h2><p>{item.course_environment ? `${item.course_environment.name} v${item.course_environment.version} · ` : ""}每位學生 {item.nodes.length} 台，全班共需要 {item.students.length * item.nodes.length} 台機器。線條標示實際防火牆方向、協定與 Port。</p></div></div>
+      <div className={styles.cardHeader}><div><h2>鎖定前確認：機器與真實網路拓撲</h2><p>{item.course_environment ? `${item.course_environment.name} v${item.course_environment.version} · ` : ""}每位學生 {item.nodes.length} 台，全班共需要 {item.students.length * item.nodes.length} 台機器。線條標示實際防火牆方向、協定與連接埠。</p></div></div>
       <TopologyPreview item={item} />
       {!item.topologyEdges.length && <p className={styles.topologyEmptyNote}>目前沒有跨節點防火牆連線；各機器仍會依自己的網路設定建立。</p>}
     </section>}
@@ -417,7 +418,7 @@ function ClassMonitor({ item }) {
       <div className={styles.classroomHeader}><div><h2>上課監看</h2><p>未就緒與離線學生會優先顯示。</p></div><div className={styles.classroomStats}><span><strong>{onlineCount}</strong>/{students?.length ?? 0} 在線</span><span><strong>{runningCount}</strong>/{machineCount} 執行中</span></div></div>
       <div className={styles.broadcastTools}><MIcon name="sensors" size={18} /><strong>直播示範</strong>{broadcast ? <><span>直播進行中</span><button type="button" className={styles.btnSecondary} disabled={broadcasting} onClick={stopBroadcast}>結束直播</button></> : <><select disabled={broadcasting || !sources.length} defaultValue="" onChange={(event) => { startBroadcast(event.target.value); event.target.value = ""; }}><option value="">{sources.length ? "選擇教師的執行中 VM" : "目前沒有可直播的 VM"}</option>{sources.map((source) => <option key={source.vmid} value={source.vmid}>{source.name || `VM ${source.vmid}`}</option>)}</select></>}</div>
       {message && <p className={styles.inlineMessage}>{message}</p>}
-      {students === null ? <div className={styles.classroomLoading}>正在讀取學生狀態…</div> : orderedStudents.length ? <div className={styles.classroomList}>{orderedStudents.map((student) => <article className={styles.classroomStudentRow} key={student.user_id}><div className={styles.classroomStudentIdentity}><strong>{student.full_name || student.email}</strong><span>{student.email}</span></div><span className={`${styles.classroomPresence} ${student.online ? styles.classroomOnline : ""}`}><i />{student.online ? "在線" : "離線"}</span><div className={styles.classroomMachines}>{student.vms.map((vm) => { const canWatch = vm.vm_type !== "lxc" && vm.status === "running"; return <div className={styles.classroomMachine} key={vm.vmid}><span><strong>{vm.name || `VM ${vm.vmid}`}</strong><small>{vm.status === "running" ? "執行中" : vm.status === "completed" ? "尚未開機" : vm.status}</small></span><button type="button" disabled={!canWatch || watching} onClick={() => openWatch(student, vm)}>{vm.vm_type === "lxc" ? "LXC" : "觀看"}</button></div>; })}{!student.vms.length && <span className={styles.classroomNoMachine}>尚無班級機器</span>}</div></article>)}</div> : <div className={styles.emptyState}><MIcon name="groups" size={30} /><p>班級目前沒有學生機器。</p></div>}
+      {students === null ? <LoadingState text="正在讀取學生狀態…" /> : orderedStudents.length ? <div className={styles.classroomList}>{orderedStudents.map((student) => <article className={styles.classroomStudentRow} key={student.user_id}><div className={styles.classroomStudentIdentity}><strong>{student.full_name || student.email}</strong><span>{student.email}</span></div><span className={`${styles.classroomPresence} ${student.online ? styles.classroomOnline : ""}`}><i />{student.online ? "在線" : "離線"}</span><div className={styles.classroomMachines}>{student.vms.map((vm) => { const canWatch = vm.vm_type !== "lxc" && vm.status === "running"; return <div className={styles.classroomMachine} key={vm.vmid}><span><strong>{vm.name || `VM ${vm.vmid}`}</strong><small>{vm.status === "running" ? "執行中" : vm.status === "completed" ? "尚未開機" : vm.status}</small></span><button type="button" disabled={!canWatch || watching} onClick={() => openWatch(student, vm)}>{vm.vm_type === "lxc" ? "不支援觀看" : "觀看"}</button></div>; })}{!student.vms.length && <span className={styles.classroomNoMachine}>尚無班級機器</span>}</div></article>)}</div> : <div className={styles.emptyState}><MIcon name="groups" size={30} /><p>班級目前沒有學生機器。</p></div>}
     </section>
     {watch && <ClassroomWatchDialog sessionId={watch.sessionId} title={watch.title} canControl onClose={closeWatch} />}
   </div>;
@@ -461,7 +462,7 @@ function AiJudgeWorkspace({ item }) {
   }, [item.id]);
 
   if (loading) {
-    return <div className={styles.classroomLoading}>正在讀取班級機器…</div>;
+    return <LoadingState text="正在讀取班級機器…" />;
   }
   return <AiJudgePanel classId={item.id} members={members} />;
 }
@@ -550,7 +551,7 @@ export default function ClassWorkspacePage() {
     finally { setRecovering(false); }
   }
 
-  if (loading) return <div className={styles.emptyState}><p>正在讀取班級…</p></div>;
+  if (loading) return <LoadingState fullPage text="正在讀取班級…" />;
   if (!item) return <div className={styles.page}><button type="button" className={styles.backLink} onClick={() => navigate("/class-management")}><MIcon name="arrow_back" size={18} />返回班級清單</button><p className={styles.errorMessage}>{error || "找不到班級"}</p></div>;
   const postUnavailable = ["classroom", "progress", "ai"].includes(tab) && item.status !== "active";
   const completed = [item.students.length > 0, Boolean(item.course_environment) && item.nodes.length > 0].filter(Boolean).length;

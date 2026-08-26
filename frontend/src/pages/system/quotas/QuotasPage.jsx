@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import styles from "./QuotasPage.module.scss";
 import MIcon from "../../../components/MIcon";
+import LoadingState from "../../../components/LoadingState/LoadingState";
 import { QuotasService } from "../../../services/quotas";
 import { UsersService } from "../../../services/users";
 import { useConfirm } from "../../../components/ConfirmDialog/ConfirmProvider";
@@ -435,7 +436,7 @@ export default function QuotasPage() {
 
       <div className={styles.card}>
         {quotas === null ? (
-          <p className={styles.stateText}>載入中…</p>
+          <LoadingState />
         ) : quotas.length === 0 ? (
           <div className={styles.empty}>
             <MIcon name="data_usage" size={32} />

@@ -38,6 +38,11 @@ from app.schemas.jobs import (
     JobsListResponse,
     JobStatus,
 )
+from app.services.resource.resource_service import (
+    RESOURCE_CONVERTED_TO_TEMPLATE_MARKER,
+    RESOURCE_DELETED_BY_USER_MARKER,
+    RESOURCE_DELETED_ORPHAN_MARKER,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -105,12 +110,32 @@ def _coerce_aware(dt: datetime | None) -> datetime | None:
 # ─── 各來源 → JobItem ──────────────────────────────────────────────────────────
 
 
+# 申請單被「消耗」（資源刪除 / 轉範本）時 mark_linked_request_consumed 會把
+# marker 寫進 provisioning_error / review_comment 並標 failed（讓排程器停手）。
+# 對使用者而言這不是失敗——機器曾成功開通，只是後續生命週期把申請單結束掉，
+# 因此顯示層轉譯成「已結案」而非紅色錯誤。
+_CONSUMED_REQUEST_MESSAGES = {
+    RESOURCE_CONVERTED_TO_TEMPLATE_MARKER: "母機已轉為範本，申請單已結案",
+    RESOURCE_DELETED_BY_USER_MARKER: "資源已由使用者刪除，申請單已結案",
+    RESOURCE_DELETED_ORPHAN_MARKER: "資源紀錄已清理（PVE 端已不存在），申請單已結案",
+}
+
+
+def _consumed_request_message(req: VMRequest) -> str | None:
+    return _CONSUMED_REQUEST_MESSAGES.get(
+        req.provisioning_error or ""
+    ) or _CONSUMED_REQUEST_MESSAGES.get(req.review_comment or "")
+
+
 def _vm_request_to_job(req: VMRequest) -> JobItem:
     user_email = req.user.email if req.user else None
     title = f"開機申請：{req.hostname}（{req.cores} cores / {req.memory} MB）"
     status = _VM_REQUEST_STATUS_MAP.get(req.status, JobStatus.pending)
+    consumed_message = _consumed_request_message(req)
     if req.status == VMRequestStatus.approved:
-        if req.provisioning_status == VMProvisioningStatus.failed or req.provisioning_error:
+        if consumed_message:
+            status = JobStatus.completed
+        elif req.provisioning_status == VMProvisioningStatus.failed or req.provisioning_error:
             status = JobStatus.failed
         elif req.vmid is not None:
             status = JobStatus.completed
@@ -128,7 +153,8 @@ def _vm_request_to_job(req: VMRequest) -> JobItem:
     overdue = False
     overdue_minutes: int | None = None
     if (
-        req.status in (VMRequestStatus.pending, VMRequestStatus.approved)
+        consumed_message is None
+        and req.status in (VMRequestStatus.pending, VMRequestStatus.approved)
         and req.start_at is not None
     ):
         start_at_aware = _coerce_aware(req.start_at)
@@ -138,7 +164,9 @@ def _vm_request_to_job(req: VMRequest) -> JobItem:
                 overdue = True
                 overdue_minutes = int(delta // 60)
 
-    base_message = req.review_comment or req.provisioning_error
+    base_message = (
+        consumed_message or req.review_comment or req.provisioning_error
+    )
     if overdue:
         overdue_label = (
             f"{overdue_minutes // 60} 小時"
@@ -171,6 +199,7 @@ def _vm_request_to_job(req: VMRequest) -> JobItem:
             "start_at": _isoformat(req.start_at),
             "overdue": overdue,
             "overdue_minutes": overdue_minutes,
+            "consumed": consumed_message is not None,
         },
     )
 
@@ -538,7 +567,15 @@ def _detail_vm_request(session: Session, raw_id: str, user: User) -> JobDetail:
         "reason": req.reason,
         "review_comment": req.review_comment,
     }
-    return JobDetail(item=item, error=req.provisioning_error, extra=extra)
+    return JobDetail(
+        item=item,
+        error=(
+            None
+            if _consumed_request_message(req)
+            else req.provisioning_error
+        ),
+        extra=extra,
+    )
 
 
 def _detail_spec_change(session: Session, raw_id: str, user: User) -> JobDetail:
