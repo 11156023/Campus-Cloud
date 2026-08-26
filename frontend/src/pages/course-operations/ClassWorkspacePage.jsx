@@ -3,6 +3,7 @@ import { Background, MarkerType, ReactFlow } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import MIcon from "../../components/MIcon";
+import EmptyState from "../../components/EmptyState/EmptyState";
 import ClassroomWatchDialog from "../../components/Classroom/ClassroomWatchDialog";
 import { useConfirm } from "../../components/ConfirmDialog/ConfirmProvider";
 import { ClassroomService } from "../../services/classroom";
@@ -60,6 +61,9 @@ function normalizeClass(item) {
     topologyEdges: item.topology_edges ?? [],
     readyMachines: item.ready_machines ?? 0,
     totalMachines: item.total_machines ?? 0,
+    archivedAt: item.archived_at,
+    reclaimRequestedAt: item.reclaim_requested_at,
+    resourcesReclaimedAt: item.resources_reclaimed_at,
   };
 }
 
@@ -71,8 +75,12 @@ function Overview({
   onEditSchedule,
   onRetry,
   onReset,
+  onExtend,
+  onArchive,
+  onReclaim,
   provisioning,
   recovering,
+  lifecycleBusy,
   message,
 }) {
   const studentsReady = item.students.length > 0;
@@ -81,6 +89,7 @@ function Overview({
   const canProvision = completed === 2 && item.status === "planning";
   const [capacity, setCapacity] = useState(null);
   const [capacityLoading, setCapacityLoading] = useState(false);
+  const [extendedEndDate, setExtendedEndDate] = useState(item.endDate);
   useEffect(() => {
     let active = true;
     if (!canProvision) {
@@ -137,7 +146,11 @@ function Overview({
   } else if (item.status === "active") {
     title = "班級已就緒"; description = `${item.readyMachines}/${item.totalMachines} 台機器已完成，可以查看學生環境。`; actionLabel = "查看學生機器"; actionIcon = "checklist"; action = () => onNavigate("progress");
   } else if (item.status === "archived") {
-    title = "班級已結束"; description = "學生、機器與每週內容已保留為歷史紀錄。"; actionLabel = "";
+    title = "班級已結束";
+    description = item.resourcesReclaimedAt
+      ? "班級紀錄已封存，所有上課機器均已回收。"
+      : "班級紀錄已封存；若回收曾失敗，可重新送出剩餘資源。";
+    actionLabel = "";
   }
   return <div className={styles.stack}>
     <section className={styles.readinessPanel}>
@@ -161,7 +174,20 @@ function Overview({
       </section>
       <section className={styles.overviewInfoCard}>
         <div className={styles.overviewCardHeader}><h2>{weekLabel}</h2><button type="button" onClick={() => onNavigate("weekly")}>查看全部週次<MIcon name="arrow_forward" size={15} /></button></div>
-        {currentWeek ? <div className={styles.currentWeekSummary}><div><span>第 {currentWeek.week} 週</span><strong>{currentWeek.title || "尚未設定主題／任務"}</strong><small>{currentWeek.date} · {item.startTime}–{item.endTime}</small></div><span className={styles.weekFileCount}><MIcon name="attach_file" size={15} />{currentWeek.files.length} 個檔案</span></div> : <div className={styles.currentWeekEmpty}>目前沒有課程週次</div>}
+        {currentWeek ? <div className={styles.currentWeekSummary}><div><span>第 {currentWeek.week} 週</span><strong>{currentWeek.title || "尚未設定主題／任務"}</strong><small>{currentWeek.date} · {item.startTime}–{item.endTime}</small></div><span className={styles.weekFileCount}><MIcon name="attach_file" size={15} />{currentWeek.files.length} 個檔案</span></div> : <EmptyState icon="event" title="目前沒有課程週次" />}
+      </section>
+      <section className={`${styles.overviewInfoCard} ${styles.lifecycleCard}`}>
+        <div className={styles.overviewCardHeader}><h2>班級生命週期</h2></div>
+        {item.status === "archived" ? <div className={styles.lifecycleBody}>
+          <div><strong>{item.resourcesReclaimedAt ? "資源已全部回收" : item.reclaimRequestedAt ? "回收已送出，仍有資源待確認" : "尚未回收資源"}</strong><p>封存後排程停止，學生不能再操作班級機器。</p></div>
+          {!item.resourcesReclaimedAt && <button type="button" className={styles.btnSecondary} disabled={lifecycleBusy} onClick={onReclaim}><MIcon name="refresh" size={16} />{lifecycleBusy ? "處理中…" : "重試回收"}</button>}
+        </div> : <div className={styles.lifecycleBody}>
+          <label className={styles.lifecycleDate}><span>延長班級到期日</span><input type="date" min={item.endDate} value={extendedEndDate} onChange={(event) => setExtendedEndDate(event.target.value)} /></label>
+          <div className={styles.lifecycleActions}>
+            <button type="button" className={styles.btnSecondary} disabled={lifecycleBusy || extendedEndDate <= item.endDate} onClick={() => onExtend(extendedEndDate)}><MIcon name="event_repeat" size={16} />延長</button>
+            <button type="button" className={styles.inspectorDanger} disabled={lifecycleBusy} onClick={onArchive}><MIcon name="archive" size={16} />封存並回收</button>
+          </div>
+        </div>}
       </section>
     </div>
   </div>;
@@ -184,7 +210,10 @@ function Students({ item, onRefresh }) {
       const result = await TeachingClassesService.addStudents(item.id, values);
       setEmails("");
       setShowAdd(false);
-      setMessage(result.not_found?.length ? `已加入 ${result.added} 位；找不到：${result.not_found.join("、")}` : `已加入 ${result.added} 位學生。`);
+      const notices = [`已加入 ${result.added} 位學生`];
+      if (result.not_found?.length) notices.push(`找不到：${result.not_found.join("、")}`);
+      if (result.invalid_role?.length) notices.push(`不是學生帳號：${result.invalid_role.join("、")}`);
+      setMessage(`${notices.join("；")}。`);
       onRefresh(result.class);
     } catch (error) { setMessage(error?.message ?? "加入學生失敗"); }
     finally { setBusy(false); }
@@ -195,7 +224,10 @@ function Students({ item, onRefresh }) {
     setBusy(true);
     try {
       const result = await TeachingClassesService.importStudents(item.id, file);
-      setMessage(result.not_found?.length ? `匯入完成；${result.not_found.length} 個帳號不存在。` : "CSV 匯入完成。");
+      const notices = [`CSV 匯入完成，加入 ${result.added} 位學生`];
+      if (result.not_found?.length) notices.push(`${result.not_found.length} 個帳號不存在`);
+      if (result.invalid_role?.length) notices.push(`${result.invalid_role.length} 個帳號不是學生身分`);
+      setMessage(`${notices.join("；")}。`);
       onRefresh(result.class);
     } catch (error) { setMessage(error?.message ?? "CSV 匯入失敗"); }
     finally { if (fileRef.current) fileRef.current.value = ""; setBusy(false); }
@@ -234,7 +266,7 @@ function Students({ item, onRefresh }) {
           <span>{student.joined_at ? new Date(student.joined_at).toLocaleDateString("zh-TW") : "—"}</span>
           {!locked ? <button type="button" className={styles.memberRemove} aria-label="移除學生" onClick={() => remove(student.id)}><MIcon name="person_remove" size={17} /></button> : <span />}
         </article>;
-      })}</div> : <div className={styles.emptyState}><MIcon name="group_add" size={32} /><p>尚未加入學生。</p></div>}
+      })}</div> : <EmptyState icon="group_add" title="尚未加入學生。" />}
     </section>
 
     {showAdd && <div className={styles.createDialogOverlay} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) setShowAdd(false); }}><section className={`${styles.createDialog} ${styles.studentDialog}`} role="dialog" aria-modal="true" aria-labelledby="add-student-title"><header className={styles.createDialogHeader}><h2 id="add-student-title">加入學生</h2><button type="button" className={styles.iconBtn} aria-label="關閉" onClick={() => setShowAdd(false)}><MIcon name="close" size={19} /></button></header><form onSubmit={add}><div className={styles.studentDialogBody}><label className={styles.field}><span>Email，可使用逗號或換行分隔</span><textarea rows={6} value={emails} onChange={(event) => setEmails(event.target.value)} placeholder="student01@example.edu&#10;student02@example.edu" autoFocus /></label></div><footer className={styles.createDialogFooter}><button type="button" className={styles.btnSecondary} onClick={() => setShowAdd(false)}>取消</button><button type="submit" className={styles.btnPrimary} disabled={!emails.trim() || busy}>{busy ? "加入中…" : "加入學生"}</button></footer></form></section></div>}
@@ -417,7 +449,7 @@ function ClassMonitor({ item }) {
       <div className={styles.classroomHeader}><div><h2>上課監看</h2><p>未就緒與離線學生會優先顯示。</p></div><div className={styles.classroomStats}><span><strong>{onlineCount}</strong>/{students?.length ?? 0} 在線</span><span><strong>{runningCount}</strong>/{machineCount} 執行中</span></div></div>
       <div className={styles.broadcastTools}><MIcon name="sensors" size={18} /><strong>直播示範</strong>{broadcast ? <><span>直播進行中</span><button type="button" className={styles.btnSecondary} disabled={broadcasting} onClick={stopBroadcast}>結束直播</button></> : <><select disabled={broadcasting || !sources.length} defaultValue="" onChange={(event) => { startBroadcast(event.target.value); event.target.value = ""; }}><option value="">{sources.length ? "選擇教師的執行中 VM" : "目前沒有可直播的 VM"}</option>{sources.map((source) => <option key={source.vmid} value={source.vmid}>{source.name || `VM ${source.vmid}`}</option>)}</select></>}</div>
       {message && <p className={styles.inlineMessage}>{message}</p>}
-      {students === null ? <div className={styles.classroomLoading}>正在讀取學生狀態…</div> : orderedStudents.length ? <div className={styles.classroomList}>{orderedStudents.map((student) => <article className={styles.classroomStudentRow} key={student.user_id}><div className={styles.classroomStudentIdentity}><strong>{student.full_name || student.email}</strong><span>{student.email}</span></div><span className={`${styles.classroomPresence} ${student.online ? styles.classroomOnline : ""}`}><i />{student.online ? "在線" : "離線"}</span><div className={styles.classroomMachines}>{student.vms.map((vm) => { const canWatch = vm.vm_type !== "lxc" && vm.status === "running"; return <div className={styles.classroomMachine} key={vm.vmid}><span><strong>{vm.name || `VM ${vm.vmid}`}</strong><small>{vm.status === "running" ? "執行中" : vm.status === "completed" ? "尚未開機" : vm.status}</small></span><button type="button" disabled={!canWatch || watching} onClick={() => openWatch(student, vm)}>{vm.vm_type === "lxc" ? "LXC" : "觀看"}</button></div>; })}{!student.vms.length && <span className={styles.classroomNoMachine}>尚無班級機器</span>}</div></article>)}</div> : <div className={styles.emptyState}><MIcon name="groups" size={30} /><p>班級目前沒有學生機器。</p></div>}
+      {students === null ? <div className={styles.classroomLoading}>正在讀取學生狀態…</div> : orderedStudents.length ? <div className={styles.classroomList}>{orderedStudents.map((student) => <article className={styles.classroomStudentRow} key={student.user_id}><div className={styles.classroomStudentIdentity}><strong>{student.full_name || student.email}</strong><span>{student.email}</span></div><span className={`${styles.classroomPresence} ${student.online ? styles.classroomOnline : ""}`}><i />{student.online ? "在線" : "離線"}</span><div className={styles.classroomMachines}>{student.vms.map((vm) => { const canWatch = vm.vm_type !== "lxc" && vm.status === "running"; return <div className={styles.classroomMachine} key={vm.vmid}><span><strong>{vm.name || `VM ${vm.vmid}`}</strong><small>{vm.status === "running" ? "執行中" : vm.status === "completed" ? "尚未開機" : vm.status}</small></span><button type="button" disabled={!canWatch || watching} onClick={() => openWatch(student, vm)}>{vm.vm_type === "lxc" ? "LXC" : "觀看"}</button></div>; })}{!student.vms.length && <span className={styles.classroomNoMachine}>尚無班級機器</span>}</div></article>)}</div> : <EmptyState icon="groups" title="班級目前沒有學生機器。" />}
     </section>
     {watch && <ClassroomWatchDialog sessionId={watch.sessionId} title={watch.title} canControl onClose={closeWatch} />}
   </div>;
@@ -483,6 +515,7 @@ export default function ClassWorkspacePage() {
   const [message, setMessage] = useState("");
   const [provisioning, setProvisioning] = useState(false);
   const [recovering, setRecovering] = useState(false);
+  const [lifecycleBusy, setLifecycleBusy] = useState(false);
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [templateId, setTemplateId] = useState("");
   const [templates, setTemplates] = useState([]);
@@ -550,6 +583,44 @@ export default function ClassWorkspacePage() {
     finally { setRecovering(false); }
   }
 
+  async function extendClass(endDate) {
+    setLifecycleBusy(true); setMessage("");
+    try {
+      refresh(await TeachingClassesService.extend(classId, endDate));
+      setMessage(`班級已延長至 ${endDate}，課次與機器到期日已同步更新。`);
+    } catch (reason) { setMessage(reason?.message ?? "無法延長班級"); }
+    finally { setLifecycleBusy(false); }
+  }
+
+  async function archiveClass() {
+    const ok = await confirm({
+      title: "封存並回收班級",
+      message: "這會停止後續排程、取消未完成建機，並回收全班機器。班級與課程紀錄會保留。確定繼續嗎？",
+      confirmText: "封存並回收",
+      danger: true,
+    });
+    if (!ok) return;
+    setLifecycleBusy(true); setMessage("");
+    try {
+      const result = await TeachingClassesService.archive(classId);
+      refresh(result.class);
+      const failed = result.reclaim?.failed?.length ?? 0;
+      setMessage(failed ? `班級已封存，但有 ${failed} 台資源未成功送出回收，可按「重試回收」。` : "班級已封存，資源回收已送出。");
+    } catch (reason) { setMessage(reason?.message ?? "無法封存班級"); }
+    finally { setLifecycleBusy(false); }
+  }
+
+  async function reclaimClass() {
+    setLifecycleBusy(true); setMessage("");
+    try {
+      const result = await TeachingClassesService.reclaim(classId, { force: true });
+      refresh(await TeachingClassesService.get(classId));
+      const failed = result.failed?.length ?? 0;
+      setMessage(failed ? `仍有 ${failed} 台資源無法回收，請交由管理者檢查設備狀態。` : "剩餘資源已重新送出回收。");
+    } catch (reason) { setMessage(reason?.message ?? "無法重新回收資源"); }
+    finally { setLifecycleBusy(false); }
+  }
+
   if (loading) return <div className={styles.emptyState}><p>正在讀取班級…</p></div>;
   if (!item) return <div className={styles.page}><button type="button" className={styles.backLink} onClick={() => navigate("/class-management")}><MIcon name="arrow_back" size={18} />返回班級清單</button><p className={styles.errorMessage}>{error || "找不到班級"}</p></div>;
   const postUnavailable = ["classroom", "progress", "ai"].includes(tab) && item.status !== "active";
@@ -568,7 +639,7 @@ export default function ClassWorkspacePage() {
       <div className={styles.workflowProgress}><span>準備進度</span><strong>{item.status === "active" ? "全部就緒" : `${completed}/2 已完成`}</strong></div>
     </section>
     <main className={styles.workspaceContent}>
-      {tab === "overview" && <Overview item={item} template={template} onProvision={provision} onNavigate={(target) => navigate(`/class-management/${classId}/${target}`)} onEditSchedule={() => setScheduleOpen(true)} onRetry={retryFailed} onReset={resetFailed} provisioning={provisioning} recovering={recovering} message={message} />}
+      {tab === "overview" && <Overview item={item} template={template} onProvision={provision} onNavigate={(target) => navigate(`/class-management/${classId}/${target}`)} onEditSchedule={() => setScheduleOpen(true)} onRetry={retryFailed} onReset={resetFailed} onExtend={extendClass} onArchive={archiveClass} onReclaim={reclaimClass} provisioning={provisioning} recovering={recovering} lifecycleBusy={lifecycleBusy} message={message} />}
       {tab === "students" && <Students item={item} onRefresh={refresh} />}
       {tab === "weekly" && <WeeklyContent item={item} onRefresh={refresh} />}
       {tab === "machines" && <Machines item={item} templates={templates} template={template} onRefresh={refresh} onTemplate={setTemplateId} createdTemplateId={location.state?.createdTemplateId} />}

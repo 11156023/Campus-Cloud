@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import MIcon from "../../../components/MIcon";
+import EmptyState from "../../../components/EmptyState/EmptyState";
 import { useToast } from "../../../hooks/useToast";
 import { CoursesService } from "../../../services/courses";
 import styles from "./CoursePathsPage.module.scss";
@@ -131,10 +132,7 @@ export default function CoursePathsPage() {
       {error && <div className={styles.stateText}>{error}</div>}
       {!error && paths === null && <div className={styles.stateText}>載入中…</div>}
       {!error && paths?.length === 0 && (
-        <div className={styles.empty}>
-          <MIcon name="school" size={32} />
-          <span>目前沒有已發布的學習路徑</span>
-        </div>
+        <EmptyState icon="school" title="目前沒有已發布的學習路徑" />
       )}
 
       {paths?.map((path) => (

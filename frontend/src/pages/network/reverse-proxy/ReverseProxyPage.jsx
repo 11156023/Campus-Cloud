@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import styles from "./ReverseProxyPage.module.scss";
 import MIcon from "../../../components/MIcon";
+import EmptyState from "../../../components/EmptyState/EmptyState";
 import { useAuth } from "../../../contexts/AuthContext";
 import { useToast } from "../../../hooks/useToast";
 import { ReverseProxyService } from "../../../services/reverseProxy";
@@ -534,16 +535,7 @@ export default function ReverseProxyPage() {
         {loading ? (
           <div className={styles.loading}>載入網域規則...</div>
         ) : rules.length === 0 ? (
-          <div className={styles.empty}>
-            <div className={styles.emptyIcon}>
-              <MIcon name="swap_horiz" size={36} />
-            </div>
-            <h2 className={styles.emptyTitle}>尚無設定網域</h2>
-            <p className={styles.emptyDesc}>
-              網域設定可以讓別人透過一個好記的網址（例如 app.example.edu.tw）直接訪問你 VM
-              裡跑的網站或服務，不需要記 IP 和 Port。
-            </p>
-          </div>
+          <EmptyState icon="swap_horiz" title="尚無設定網域" />
         ) : (
           <div className={styles.list}>
             {rules.map((rule) => (

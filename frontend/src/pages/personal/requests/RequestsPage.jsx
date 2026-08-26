@@ -6,6 +6,7 @@ import { useToast } from "../../../hooks/useToast";
 import useAutoRefresh from "../../../hooks/useAutoRefresh";
 import RequestFormPage from "./RequestFormPage";
 import MIcon from "../../../components/MIcon";
+import SharedEmptyState from "../../../components/EmptyState/EmptyState";
 
 /* ── Constants ── */
 const STATUS_MAP = {
@@ -341,17 +342,16 @@ function SkeletonRow() {
 /* ── Empty / Error states ── */
 function EmptyState({ onCreateClick }) {
   return (
-    <div className={styles.empty}>
-      <div className={styles.emptyIcon}>
-        <MIcon name="description" size={40} />
-      </div>
-      <h2 className={styles.emptyTitle}>尚無申請紀錄</h2>
-      <p className={styles.emptyDesc}>你送出的虛擬機／容器申請將會顯示在這裡</p>
-      <button type="button" className={styles.btnPrimary} onClick={onCreateClick}>
-        <MIcon name="add" size={16} />
-        立即申請
-      </button>
-    </div>
+    <SharedEmptyState
+      icon="description"
+      title="尚無申請紀錄"
+      action={
+        <button type="button" className={styles.btnPrimary} onClick={onCreateClick}>
+          <MIcon name="add" size={16} />
+          立即申請
+        </button>
+      }
+    />
   );
 }
 

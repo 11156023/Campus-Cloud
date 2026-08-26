@@ -31,6 +31,7 @@ from app.schemas.firewall import (
     TopologyResponse,
 )
 from app.services.network import firewall_service, nat_service, reverse_proxy_service
+from app.services.resource.access import require_resource_management
 from app.services.user import audit_service
 
 logger = logging.getLogger(__name__)
@@ -257,6 +258,7 @@ def create_rule(
     resource_info: ResourceInfoDep,
 ):
     """在 VM 上建立防火牆規則"""
+    require_resource_management(session=session, user=current_user, vmid=vmid)
     try:
         rule_dict = {k: v for k, v in rule.model_dump().items() if v is not None}
         firewall_service.create_rule(resource_info["node"], vmid, resource_info["type"], rule_dict)
@@ -282,6 +284,7 @@ def update_rule(
     resource_info: ResourceInfoDep,
 ):
     """更新 VM 防火牆規則（不可修改 SkyLab 管理的規則）"""
+    require_resource_management(session=session, user=current_user, vmid=vmid)
     try:
         rules = firewall_service.get_vm_firewall_rules(
             resource_info["node"], vmid, resource_info["type"]
@@ -317,6 +320,7 @@ def delete_rule(
     resource_info: ResourceInfoDep,
 ):
     """刪除 VM 防火牆規則（不可刪除 SkyLab 管理的規則，請使用連線刪除 API）"""
+    require_resource_management(session=session, user=current_user, vmid=vmid)
     try:
         # 先取得規則確認不是 SkyLab 管理的規則
         rules = firewall_service.get_vm_firewall_rules(

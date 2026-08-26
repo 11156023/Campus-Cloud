@@ -8,6 +8,7 @@ from app.api.deps.database import SessionDep
 from app.core.authorizers import (
     can_bypass_resource_ownership,
     require_resource_access,
+    require_teaching_access,
 )
 from app.exceptions import PermissionDeniedError
 from app.repositories import resource as resource_repo
@@ -38,6 +39,29 @@ def check_resource_ownership(
         )
         raise PermissionDeniedError(
             "You don't have permission to access this resource"
+        )
+
+    if db_resource.teaching_class_id:
+        from app.models import TeachingClass, TeachingClassStatus
+
+        teaching_class = session.get(TeachingClass, db_resource.teaching_class_id)
+        if teaching_class is None:
+            raise PermissionDeniedError(
+                "This teaching-class resource is no longer assigned"
+            )
+        if db_resource.user_id == current_user.id:
+            if teaching_class.status != TeachingClassStatus.active:
+                raise PermissionDeniedError(
+                    "This teaching-class resource is not available to students"
+                )
+            return
+        require_teaching_access(current_user, teaching_class.owner_id)
+        return
+
+    if db_resource.allocation_scope == "teaching_class":
+        raise PermissionDeniedError(
+            "This teaching-class resource has lost its class assignment; "
+            "an administrator must reclaim it"
         )
 
     try:
@@ -94,7 +118,9 @@ def check_firewall_access(
     current_user: CurrentUser,
     session: SessionDep,
 ) -> None:
-    check_resource_ownership(vmid, current_user, session)
+    from app.services.resource.access import require_resource_management
+
+    require_resource_management(session=session, user=current_user, vmid=vmid)
 
 
 def get_resource_info_teaching(
