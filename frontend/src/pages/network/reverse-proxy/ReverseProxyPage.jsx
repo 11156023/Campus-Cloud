@@ -68,6 +68,7 @@ function HowItWorks() {
         className={styles.infoToggle}
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
+        data-guide="proxy-help"
       >
         <span className={styles.infoToggleLeft}>
           <MIcon name="help_outline" size={16} />
@@ -441,7 +442,6 @@ export default function ReverseProxyPage() {
   }, [fetchData]);
 
   const setupBlocked = setupContext?.enabled === false;
-
   async function handleSubmitRule(payload) {
     setSaving(true);
     try {
@@ -513,7 +513,7 @@ export default function ReverseProxyPage() {
               {syncing ? "同步中..." : "重新同步"}
             </button>
           )}
-          <button type="button" className={styles.btnPrimary} onClick={openCreate}>
+          <button type="button" className={styles.btnPrimary} onClick={openCreate} data-guide="proxy-create">
             <MIcon name="add" size={16} />
             新增網域
           </button>
@@ -531,15 +531,20 @@ export default function ReverseProxyPage() {
       <HowItWorks />
 
       {/* Route list / empty */}
-      <div className={styles.content}>
+      <div className={styles.content} data-guide="proxy-list">
         {loading ? (
           <div className={styles.loading}>載入網域規則...</div>
         ) : rules.length === 0 ? (
-          <EmptyState icon="swap_horiz" title="尚無設定網域" />
+          <EmptyState
+            icon="swap_horiz"
+            title="尚無設定網域"
+            description="網域設定可以讓別人透過好記的網址直接訪問 VM 裡的網站或服務，不需要記 IP 和 Port。"
+          />
         ) : (
-          <div className={styles.list}>
-            {rules.map((rule) => (
-              <div key={rule.id} className={styles.row}>
+          <>
+            <div className={styles.list}>
+              {rules.map((rule) => (
+                <div key={rule.id} className={styles.row}>
                 <div className={styles.rowIcon}>
                   <MIcon name="swap_horiz" size={20} />
                 </div>
@@ -581,9 +586,10 @@ export default function ReverseProxyPage() {
                     <MIcon name="delete" size={16} />
                   </button>
                 </div>
-              </div>
-            ))}
-          </div>
+                </div>
+              ))}
+            </div>
+          </>
         )}
       </div>
 

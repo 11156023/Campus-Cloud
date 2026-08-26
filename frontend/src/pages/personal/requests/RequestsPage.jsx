@@ -433,36 +433,38 @@ export default function RequestsPage() {
           <h1 className={styles.pageTitle}>我的申請</h1>
           <p className={styles.pageSubtitle}>管理你的虛擬機與容器申請</p>
         </div>
-        <button type="button" className={styles.btnPrimary} onClick={() => setView(VIEW_CREATE)}>
+        <button type="button" className={styles.btnPrimary} onClick={() => setView(VIEW_CREATE)} data-guide="request-create">
           <MIcon name="add" size={16} />
           申請資源
         </button>
       </div>
 
-      <div className={styles.content}>
+      <div className={styles.content} data-guide="request-list">
         {error ? (
           <ErrorState onRetry={fetchRequests} />
         ) : !loading && requests.length === 0 ? (
           <EmptyState onCreateClick={() => setView(VIEW_CREATE)} />
         ) : (
-          <div className={styles.tableWrap}>
-            <table className={styles.table}>
-              <thead>
-                <tr>
-                  {LIST_COLUMNS.map((column) => (
-                    <th key={column} className={styles.th}>{column}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {loading
-                  ? [0, 1, 2, 3].map((i) => <SkeletonRow key={i} />)
-                  : requests.map((r) => (
-                      <RequestRow key={r.id} req={r} onUpdated={handleUpdated} />
+          <>
+            <div className={styles.tableWrap}>
+              <table className={styles.table}>
+                <thead>
+                  <tr>
+                    {LIST_COLUMNS.map((column) => (
+                      <th key={column} className={styles.th}>{column}</th>
                     ))}
-              </tbody>
-            </table>
-          </div>
+                  </tr>
+                </thead>
+                <tbody>
+                  {loading
+                    ? [0, 1, 2, 3].map((i) => <SkeletonRow key={i} />)
+                    : requests.map((r) => (
+                        <RequestRow key={r.id} req={r} onUpdated={handleUpdated} />
+                      ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
     </div>

@@ -37,7 +37,7 @@ export default function QuotaUsageBar() {
   if (!data) return null;
 
   return (
-    <div className={styles.card}>
+    <div className={styles.card} data-guide="resource-quota">
       <div className={styles.meterGrid}>
         <Meter
           label="CPU"

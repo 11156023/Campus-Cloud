@@ -10,6 +10,7 @@ import SubnetBanner from "../components/SubnetBanner/SubnetBanner";
 import SessionWarningDialog from "../components/SessionWarning/SessionWarningDialog";
 import useSessionWarning from "../hooks/useSessionWarning";
 import ErrorBoundary from "../components/ErrorBoundary/ErrorBoundary";
+import UserGuide from "../components/UserGuide/UserGuide";
 import styles from "./DashboardLayout.module.scss";
 
 export const LayoutContext = createContext({ setCompactFooter: () => {} });
@@ -75,6 +76,7 @@ export default function DashboardLayout() {
                   <Outlet />
                 </Suspense>
               </ErrorBoundary>
+              <UserGuide />
               <div className={`${styles.footer} ${compactFooter ? styles.footerCompact : ""}`}>SkyLab · 2026</div>
             </div>
             <AiFloatingChat

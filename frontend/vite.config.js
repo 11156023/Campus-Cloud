@@ -12,6 +12,7 @@ export default defineConfig(({ mode }) => {
     },
     plugins: [react()],
     server: {
+      host: process.env.HOST || "127.0.0.1",
       port: Number(process.env.PORT) || 5173,
       // 前端開發埠與本機 CORS/代理設定固定對齊；占用時直接失敗，
       // 避免 Vite 靜默改用下一個埠造成前端與後端 origin 不一致。

@@ -284,7 +284,7 @@ function ResourceCard({ resource, onUpdated, onDeleted }) {
 
   return (
     <>
-      <div className={styles.card}>
+      <div className={styles.card} data-guide="resource-card">
 
         {/* ── Header ── */}
         <div className={styles.cardHeader}>
@@ -335,7 +335,7 @@ function ResourceCard({ resource, onUpdated, onDeleted }) {
         <div className={styles.cardFooter}>
           {isLive ? (
             <>
-              <button type="button" className={styles.terminalBtn} title={isLxc ? "終端機" : "控制台"} disabled={resource.status !== "running"} onClick={() => setConsoleOpen(true)}>
+              <button type="button" className={styles.terminalBtn} title={isLxc ? "終端機" : "控制台"} disabled={resource.status !== "running"} onClick={() => setConsoleOpen(true)} data-guide="resource-console">
                 <MIcon name={isLxc ? "terminal" : "desktop_windows"} size={14} />
                 {isLxc ? "終端機" : "控制台"}
               </button>

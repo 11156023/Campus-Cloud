@@ -1,214 +1,142 @@
+@use "../../../assets/styles/variables" as *;
+@use "../../../assets/styles/mixins" as *;
+
 .page {
   @include flex-column;
   gap: $spacing-16;
-  padding: $spacing-8 $spacing-16;
-  flex: 1;
+  width: 100%;
+  max-width: 1100px;
+  padding: $spacing-8 $spacing-16 $spacing-32;
+  margin-inline: auto;
 
-  @include respond-to(md) {
-    padding: 0;
-  }
+  @include respond-to(md) { padding: 0 0 $spacing-32; }
 }
 
 .pageHeader {
-  @include flex-between;
-  flex-wrap: wrap;
-  gap: $spacing-16;
+  @include glass-surface($shadow: none);
+  padding: $spacing-24;
+  border-radius: $radius-16;
 }
 
-.pageHeading {
-  @include flex-column;
-  gap: $spacing-4;
-}
+.pageHeading { @include flex-column; gap: $spacing-4; }
 
-.pageTitle {
-  font-size: $font-size-24;
+.eyebrow {
+  margin: 0;
+  color: var(--color-primary);
+  font-size: $font-size-12;
   font-weight: $font-weight-700;
-  color: var(--color-text-primary);
-
-  @include respond-to(sm) {
-    font-size: $font-size-28;
-  }
+  letter-spacing: .04em;
 }
+
+.pageTitle { margin: 0; color: var(--color-text-primary); font-size: $font-size-28; }
 
 .pageSubtitle {
-  font-size: $font-size-14;
   color: var(--color-text-secondary);
+  font-size: $font-size-14;
+  line-height: 1.6;
 }
 
-.stateText {
+.stateText,
+.empty {
   padding: $spacing-32 $spacing-16;
-  text-align: center;
+  border: 1px dashed var(--color-border);
+  border-radius: $radius-16;
   color: var(--color-text-muted);
-  font-size: $font-size-14;
+  text-align: center;
 }
+
+.stateText { font-size: $font-size-14; }
 
 .empty {
   @include flex-column;
   align-items: center;
   gap: $spacing-8;
-  padding: $spacing-32 $spacing-16;
-  color: var(--color-text-muted);
-  font-size: $font-size-14;
-  text-align: center;
+
+  strong { color: var(--color-text-primary); font-size: $font-size-14; }
+  span { font-size: $font-size-12; }
 }
 
-/* ── 路徑卡片 ── */
-.card {
-  @include flex-column;
-  @include glass-surface($shadow: var(--shadow-sm));
-  border-radius: $radius-16;
-  overflow: hidden;
-}
+.courseList { display: grid; gap: 12px; }
 
-.cardHeader {
-  display: flex;
-  align-items: center;
-  gap: $spacing-8;
+.courseCard {
+  display: grid;
+  width: 100%;
+  min-height: 118px;
   padding: $spacing-16;
-  background: none;
-  border: none;
-  cursor: pointer;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: $spacing-16;
+  border: 1px solid var(--color-border);
+  border-radius: $radius-16;
+  color: var(--color-text-muted);
+  background: var(--color-surface-glass);
+  box-shadow: var(--shadow-sm);
   text-align: left;
-  color: var(--color-text-primary);
+  cursor: pointer;
+  transition: border-color $transition-base, background $transition-base, transform $transition-base;
 
-  &:hover {
+  &:hover:not(:disabled) {
+    border-color: color-mix(in srgb, var(--color-primary) 35%, var(--color-border));
     background: var(--color-hover);
+    transform: translateY(-1px);
   }
+
+  &:disabled { cursor: not-allowed; opacity: .4; }
 }
 
 .cardIcon {
+  @include flex-center;
+  width: 48px;
+  height: 48px;
+  border-radius: $radius-12;
+  color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 11%, transparent);
+}
+
+.cardContent { @include flex-column; min-width: 0; gap: 5px; }
+
+.cardTopline {
   display: flex;
   align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: $radius-12;
-  background: color-mix(in srgb, var(--color-primary) 12%, transparent);
-  color: var(--color-primary);
-  flex-shrink: 0;
+  justify-content: space-between;
+  gap: 12px;
+
+  strong { @include text-truncate; color: var(--color-text-primary); font-size: $font-size-16; }
+  em { color: var(--color-primary); font-size: $font-size-14; font-style: normal; font-weight: $font-weight-700; }
 }
 
-.cardHeading {
-  @include flex-column;
-  gap: $spacing-4;
-  flex: 1;
-  min-width: 0;
-}
+.cardDesc { @include text-truncate; color: var(--color-text-secondary); font-size: $font-size-12; }
+.cardMeta { color: var(--color-text-muted); font-size: 11px; }
 
-.cardTitle {
-  font-size: $font-size-16;
-  font-weight: $font-weight-500;
-}
-
-.cardDesc {
-  font-size: $font-size-12;
-  color: var(--color-text-secondary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.cardMeta {
-  @include flex-column;
-  align-items: flex-end;
-  gap: $spacing-4;
-  flex-shrink: 0;
-}
-
-.metaText {
-  font-size: $font-size-12;
-  color: var(--color-text-muted);
-}
-
-.percentText {
-  font-size: $font-size-14;
-  font-weight: $font-weight-500;
-  color: var(--color-primary);
-}
-
-/* ── 進度條 ── */
 .progressBar {
-  height: 4px;
+  height: 5px;
+  overflow: hidden;
+  border-radius: $radius-pill;
   background: var(--color-border);
 }
 
 .progressFill {
+  display: block;
   height: 100%;
+  border-radius: inherit;
   background: var(--color-primary);
-  transition: width 0.4s ease;
+  transition: width .4s ease;
 }
 
-/* ── 房間列表 ── */
-.roomList {
-  @include flex-column;
-  border-top: 1px solid var(--color-border);
-}
-
-.roomRow {
-  display: flex;
+.cardAction {
+  display: inline-flex;
   align-items: center;
-  gap: $spacing-8;
-  padding: $spacing-8 $spacing-16;
-  background: none;
-  border: none;
-  border-bottom: 1px solid var(--color-border);
-  cursor: pointer;
-  text-align: left;
-  color: var(--color-text-primary);
-  font-size: $font-size-14;
-
-  &:last-child {
-    border-bottom: none;
-  }
-
-  &:hover {
-    background: var(--color-hover);
-  }
-}
-
-.roomTitle {
-  font-weight: $font-weight-500;
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  gap: 5px;
+  color: var(--color-primary);
+  font-size: $font-size-12;
+  font-weight: $font-weight-700;
   white-space: nowrap;
 }
 
-.roomCategory {
-  font-size: $font-size-12;
-  color: var(--color-text-muted);
-  padding: 2px $spacing-8;
-  border: 1px solid var(--color-border);
-  border-radius: $radius-8;
-  flex-shrink: 0;
-}
-
-.diffBadge {
-  font-size: $font-size-12;
-  font-weight: $font-weight-500;
-  padding: 2px $spacing-8;
-  border-radius: $radius-8;
-  flex-shrink: 0;
-}
-
-.diff_easy {
-  color: var(--color-success);
-  background: color-mix(in srgb, var(--color-success) 12%, transparent);
-}
-
-.diff_medium {
-  color: var(--color-warning);
-  background: color-mix(in srgb, var(--color-warning) 12%, transparent);
-}
-
-.diff_hard {
-  color: var(--color-danger);
-  background: color-mix(in srgb, var(--color-danger) 12%, transparent);
-}
-
-.roomProgress {
-  font-size: $font-size-12;
-  color: var(--color-text-muted);
-  flex-shrink: 0;
+@media (max-width: $breakpoint-sm) {
+  .pageHeader { padding: $spacing-16; }
+  .pageTitle { font-size: $font-size-24; }
+  .courseCard { grid-template-columns: 42px minmax(0, 1fr); gap: 12px; }
+  .cardIcon { width: 42px; height: 42px; }
+  .cardAction { grid-column: 2; justify-self: start; }
 }
