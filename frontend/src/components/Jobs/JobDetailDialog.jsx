@@ -31,29 +31,29 @@ const formatExtraValue = (v) => {
 
 const EXTRA_LABELS = {
   request_id: "請求 ID",
-  vmid: "VMID",
+  vmid: "VM 編號",
   source_node: "來源節點",
   target_node: "目標節點",
   attempt_count: "嘗試次數",
-  rebalance_epoch: "Rebalance epoch",
-  claimed_by: "Claimed by",
+  rebalance_epoch: "重新分配次數",
+  claimed_by: "處理節點",
   requested_at: "請求時間",
   available_at: "可開始時間",
-  claimed_at: "Claim 時間",
+  claimed_at: "接手時間",
   started_at: "開始時間",
   finished_at: "完成時間",
-  hostname: "Hostname",
-  task_id: "Task ID",
-  template_slug: "模板 slug",
+  hostname: "主機名稱",
+  task_id: "任務編號",
+  template_slug: "模板代碼",
   template_name: "模板名稱",
   raw_status: "原始狀態",
   progress_text: "進度文字",
   resource_type: "資源類型",
   cores: "CPU 核心數",
   memory: "記憶體 (MB)",
-  storage: "Storage",
+  storage: "儲存空間",
   disk_size: "磁碟 (GB)",
-  rootfs_size: "rootfs (GB)",
+  rootfs_size: "容器磁碟 (GB)",
   ostemplate: "OS 模板",
   template_id: "模板 ID",
   assigned_node: "指派節點",
@@ -104,7 +104,7 @@ export default function JobDetailDialog({ jobId, onClose }) {
           timer = setTimeout(() => load(true), 3000);
         }
       } catch (e) {
-        if (!cancelled) setError(e?.message ?? "Unknown error");
+        if (!cancelled) setError(e?.message ?? "發生未知錯誤");
       } finally {
         if (!cancelled && !silent) setLoading(false);
       }

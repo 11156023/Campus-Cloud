@@ -97,13 +97,6 @@
   color: var(--color-text-muted);
 }
 
-.stateText {
-  padding: $spacing-32 $spacing-16;
-  text-align: center;
-  color: var(--color-text-muted);
-  font-size: $font-size-14;
-}
-
 .empty {
   @include flex-column;
   align-items: center;

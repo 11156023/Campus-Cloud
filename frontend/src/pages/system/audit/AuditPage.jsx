@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import styles from "./AuditPage.module.scss";
 import MIcon from "../../../components/MIcon";
+import LoadingState from "../../../components/LoadingState/LoadingState";
 import { useToast } from "../../../hooks/useToast";
 import { downloadBlob } from "../../../services/api";
 import { AuditLogsService } from "../../../services/auditLogs";
@@ -238,7 +239,7 @@ export default function AuditPage() {
 
       <div className={styles.content}>
         {loading ? (
-          <div className={styles.loading}>載入稽核日誌...</div>
+          <LoadingState fullPage text="載入稽核日誌..." />
         ) : logs.length === 0 ? (
           <EmptyState hasFilter={hasFilter} />
         ) : (

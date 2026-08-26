@@ -645,7 +645,7 @@ export default function RequestFormPage({ onBack, className }) {
               <div className={styles.typeToggle}>
                 {[
                   { key: "lxc", label: "LXC 容器",      icon: "dashboard" },
-                  { key: "vm",  label: "QEMU 虛擬機", icon: "computer"  },
+                  { key: "vm",  label: "虛擬機", icon: "computer"  },
                 ].map((t) => (
                   <button
                     key={t.key}
@@ -1092,7 +1092,7 @@ export default function RequestFormPage({ onBack, className }) {
               <div className={styles.summaryChips}>
                 <span className={`${styles.summaryChip} ${resourceType === "lxc" ? styles.summaryChipLxc : styles.summaryChipVm}`}>
                   <MIcon name={resourceType === "lxc" ? "dashboard" : "computer"} size={12} />
-                  {resourceType === "lxc" ? "LXC 容器" : "QEMU 虛擬機"}
+                  {resourceType === "lxc" ? "LXC 容器" : "虛擬機"}
                 </span>
                 {isPrivileged && (
                   <span className={`${styles.summaryChip} ${mode === "scheduled" ? styles.summaryChipScheduled : styles.summaryChipImmediate}`}>

@@ -160,12 +160,6 @@
   @include flex-column;
 }
 
-.loading {
-  padding: $spacing-32;
-  color: var(--color-text-secondary);
-  text-align: center;
-}
-
 .empty {
   flex: 1;
   @include flex-column;

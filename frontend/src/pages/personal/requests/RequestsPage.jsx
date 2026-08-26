@@ -220,7 +220,7 @@ function RequestRow({ req, onUpdated }) {
               <span className={styles.namePrimary}>{req.hostname}</span>
               <span className={styles.nameSub}>
                 {type.label}
-                {req.vmid != null && ` · VMID ${req.vmid}`}
+                {req.vmid != null && ` · 編號 ${req.vmid}`}
               </span>
             </div>
           </div>

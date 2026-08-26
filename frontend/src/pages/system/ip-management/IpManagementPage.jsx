@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import styles from "./IpManagementPage.module.scss";
 import MIcon from "../../../components/MIcon";
+import LoadingState from "../../../components/LoadingState/LoadingState";
 import SubnetConfigForm from "./SubnetConfigForm";
 import { useAuth } from "../../../contexts/AuthContext";
 import { IpManagementService } from "../../../services/ipManagement";
@@ -255,7 +256,9 @@ export default function IpManagementPage() {
       </div>
 
       <div className={styles.content}>
-        {visible.length === 0 ? (
+        {loading ? (
+          <LoadingState fullPage text="載入 IP 分配..." />
+        ) : visible.length === 0 ? (
           <EmptyState
             variant={emptyVariant}
             canConfigure={isAdmin && !editing}

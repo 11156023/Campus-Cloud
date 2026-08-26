@@ -4,6 +4,7 @@ import { useAuth } from "./contexts/AuthContext";
 import DashboardLayout from "./layout/DashboardLayout";
 import LoginPage from "./pages/login/LoginPage";
 import MIcon from "./components/MIcon";
+import { LoadingSpinner } from "./components/LoadingState/LoadingState";
 import { AuthSessionStatus } from "./services/authSession";
 import styles from "./App.module.scss";
 
@@ -62,7 +63,7 @@ function AuthBootstrapState({ unavailable = false, retrying = false, onRetry }) 
             <MIcon name="cloud_off" size={42} />
           </span>
         ) : (
-          <span className={styles.spinner} aria-hidden="true" />
+          <LoadingSpinner size={42} />
         )}
         <h1 className={styles.authStateTitle}>
           {unavailable ? "暫時無法連線" : "正在驗證登入狀態"}

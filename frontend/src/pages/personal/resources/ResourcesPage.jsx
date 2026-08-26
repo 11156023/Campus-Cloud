@@ -306,7 +306,7 @@ function ResourceCard({ resource, onUpdated, onDeleted }) {
             )}
             <div className={styles.cardChips}>
               <span className={styles.typeChip}>{type.label}</span>
-              {resource.vmid > 0 && <span className={styles.vmidChip}>VMID {resource.vmid}</span>}
+              {resource.vmid > 0 && <span className={styles.vmidChip}>編號 {resource.vmid}</span>}
             </div>
           </div>
           <StatusBadge status={resource.status} />
@@ -377,7 +377,7 @@ function ResourceCard({ resource, onUpdated, onDeleted }) {
       {deleteConfirm && (
         <ConfirmModal
           title="確定刪除資源？"
-          desc={`「${resource.name}」(VMID ${resource.vmid}) 刪除後無法復原，所有資料將會消失。`}
+          desc={`「${resource.name}」(編號 ${resource.vmid}) 刪除後無法復原，所有資料將會消失。`}
           confirmLabel="刪除"
           danger
           loading={deleting}
