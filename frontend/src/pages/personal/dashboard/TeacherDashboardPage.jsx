@@ -21,20 +21,36 @@ function dateKey(date) {
   }).format(date);
 }
 
+function weekdayFromDateKey(value) {
+  const [year, month, day] = value.split("-").map(Number);
+  return (new Date(Date.UTC(year, month - 1, day)).getUTCDay() + 6) % 7;
+}
+
+function addDaysToDateKey(value, days) {
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day + days));
+  return date.toISOString().slice(0, 10);
+}
+
+function taipeiDateTime(date, time = "00:00") {
+  return new Date(`${date}T${time.slice(0, 5)}:00+08:00`);
+}
+
 export function nextClassSession(item, now = new Date()) {
   if (!item?.start_date || !item?.end_date) return null;
-  const start = new Date(`${item.start_date}T00:00:00+08:00`);
+  const start = taipeiDateTime(item.start_date);
   const end = new Date(`${item.end_date}T23:59:59+08:00`);
   if (now > end) return null;
   const targetWeekday = Number(item.weekday ?? 0);
-  const current = now < start ? new Date(start) : new Date(`${dateKey(now)}T00:00:00+08:00`);
-  const mondayBased = (current.getDay() + 6) % 7;
-  current.setDate(current.getDate() + ((targetWeekday - mondayBased + 7) % 7));
-  if (current < start) current.setDate(current.getDate() + 7);
-  const [hour, minute] = String(item.start_time ?? "00:00").slice(0, 5).split(":").map(Number);
-  current.setHours(hour, minute, 0, 0);
-  if (current < now) current.setDate(current.getDate() + 7);
-  return current <= end ? current : null;
+  const baseDate = now < start ? item.start_date : dateKey(now);
+  const daysUntilTarget = (targetWeekday - weekdayFromDateKey(baseDate) + 7) % 7;
+  let sessionDate = addDaysToDateKey(baseDate, daysUntilTarget);
+  let session = taipeiDateTime(sessionDate, String(item.start_time ?? "00:00"));
+  if (session < start || session < now) {
+    sessionDate = addDaysToDateKey(sessionDate, 7);
+    session = taipeiDateTime(sessionDate, String(item.start_time ?? "00:00"));
+  }
+  return session <= end ? session : null;
 }
 
 export function summarizeCheckpointReports(rows) {
