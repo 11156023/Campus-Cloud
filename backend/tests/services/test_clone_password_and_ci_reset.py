@@ -327,6 +327,14 @@ def test_run_convert_task_resets_cloud_init_before_shutdown(
         lambda node, vmid, rtype: order.append("stop"),
     )
     monkeypatch.setattr(
+        template_service,
+        "_strip_hostpci_for_convert",
+        lambda node, vmid, rtype: order.append("strip"),
+    )
+    monkeypatch.setattr(
+        template_service, "_detect_template_disk_gb", lambda *a: None
+    )
+    monkeypatch.setattr(
         template_service.proxmox_ops, "list_snapshots", lambda *a: []
     )
     monkeypatch.setattr(
@@ -335,10 +343,15 @@ def test_run_convert_task_resets_cloud_init_before_shutdown(
         lambda *a: order.append("convert"),
     )
 
+    from app.services.network import ip_management_service, nat_service
     from app.services.resource import resource_service
 
     monkeypatch.setattr(
         resource_service, "mark_linked_request_consumed", lambda **kw: None
+    )
+    monkeypatch.setattr(ip_management_service, "release_ip", lambda s, v: None)
+    monkeypatch.setattr(
+        nat_service, "remove_nat_rules_for_vmid", lambda s, v: None
     )
 
     result = template_service.run_convert_task(
@@ -351,6 +364,119 @@ def test_run_convert_task_resets_cloud_init_before_shutdown(
         },
     )
 
-    assert order == ["reset", "stop", "convert"]
+    assert order == ["reset", "stop", "strip", "convert"]
     assert result == {"vmid": 400, "cloud_init_reset": True}
     assert template.status == VMTemplateStatus.ready
+# ---------------------------------------------------------------------------
+# run_convert_task 收尾：釋放母機 IP 與 NAT 規則
+# ---------------------------------------------------------------------------
+
+
+def _convert_task_stubs(
+    monkeypatch: pytest.MonkeyPatch, fake_session: FakeSession
+) -> None:
+    """run_convert_task 的共用 stub：PVE 操作全 no-op、DB 換 FakeSession。"""
+    monkeypatch.setattr(template_service, "Session", lambda engine: fake_session)
+    monkeypatch.setattr(template_service, "report_progress", lambda *a: None)
+    monkeypatch.setattr(template_service.template_repo, "touch", lambda **kw: None)
+    monkeypatch.setattr(
+        template_service, "_reset_cloud_init_state", lambda *a: False
+    )
+    monkeypatch.setattr(template_service, "_ensure_stopped", lambda *a: None)
+    monkeypatch.setattr(
+        template_service, "_strip_hostpci_for_convert", lambda *a: None
+    )
+    monkeypatch.setattr(
+        template_service, "_detect_template_disk_gb", lambda *a: None
+    )
+    monkeypatch.setattr(
+        template_service.proxmox_ops, "list_snapshots", lambda *a: []
+    )
+    monkeypatch.setattr(
+        template_service.proxmox_ops, "convert_to_template", lambda *a: None
+    )
+
+    from app.services.resource import resource_service
+
+    monkeypatch.setattr(
+        resource_service, "mark_linked_request_consumed", lambda **kw: None
+    )
+
+
+def test_run_convert_task_releases_ip_and_nat_rules(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    template_id = uuid.uuid4()
+    template = SimpleNamespace(status=VMTemplateStatus.creating, error_message=None)
+    fake_session = FakeSession(
+        {(VMTemplate, template_id): template, (Resource, 400): None}
+    )
+    _convert_task_stubs(monkeypatch, fake_session)
+
+    from app.services.network import ip_management_service, nat_service
+
+    released: list[tuple[Any, int]] = []
+    nat_removed: list[tuple[Any, int]] = []
+    monkeypatch.setattr(
+        ip_management_service,
+        "release_ip",
+        lambda session, vmid: released.append((session, vmid)),
+    )
+    monkeypatch.setattr(
+        nat_service,
+        "remove_nat_rules_for_vmid",
+        lambda session, vmid: nat_removed.append((session, vmid)),
+    )
+
+    template_service.run_convert_task(
+        uuid.uuid4(),
+        {
+            "template_id": str(template_id),
+            "pve_vmid": 400,
+            "resource_type": "qemu",
+            "node": "pve1",
+        },
+    )
+
+    # 與刪 Resource 同一個 session、同一個 vmid
+    assert released == [(fake_session, 400)]
+    assert nat_removed == [(fake_session, 400)]
+
+
+def test_run_convert_task_network_cleanup_is_best_effort(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    template_id = uuid.uuid4()
+    template = SimpleNamespace(status=VMTemplateStatus.creating, error_message=None)
+    fake_session = FakeSession(
+        {(VMTemplate, template_id): template, (Resource, 401): None}
+    )
+    _convert_task_stubs(monkeypatch, fake_session)
+
+    from app.services.network import ip_management_service, nat_service
+
+    def boom(session: Any, vmid: int) -> None:
+        raise RuntimeError("gateway unreachable")
+
+    monkeypatch.setattr(ip_management_service, "release_ip", boom)
+    nat_removed: list[int] = []
+    monkeypatch.setattr(
+        nat_service,
+        "remove_nat_rules_for_vmid",
+        lambda session, vmid: nat_removed.append(vmid),
+    )
+
+    result = template_service.run_convert_task(
+        uuid.uuid4(),
+        {
+            "template_id": str(template_id),
+            "pve_vmid": 401,
+            "resource_type": "qemu",
+            "node": "pve1",
+        },
+    )
+
+    # IP 釋放失敗只記 warning：任務照樣完成、NAT 清理照跑
+    assert result["vmid"] == 401
+    assert template.status == VMTemplateStatus.ready
+    assert nat_removed == [401]

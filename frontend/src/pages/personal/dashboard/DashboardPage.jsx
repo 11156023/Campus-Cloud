@@ -4,6 +4,7 @@ import { useAuth } from "../../../contexts/AuthContext";
 import { useDragScroll } from "../../../hooks/useDragScroll";
 import { TemplatesService } from "../../../services/templates";
 import MIcon from "../../../components/MIcon";
+import LoadingState from "../../../components/LoadingState/LoadingState";
 import styles from "./DashboardPage.module.scss";
 import { COURSES } from "./dashboard.data";
 
@@ -143,7 +144,7 @@ export default function DashboardPage() {
     el?.scrollBy({ left: dir * el.clientWidth * 0.8, behavior: "smooth" });
   };
 
-  /* 快速入門：撈範本系統中可用（ready）的 LXC 範本 */
+  /* 快速入門：撈範本系統中可用（ready）的範本；LXC 走秒開流程，VM 導向範本克隆 */
   const [templates, setTemplates] = useState([]);
   const [tplLoading, setTplLoading] = useState(true);
   useEffect(() => {
@@ -151,7 +152,7 @@ export default function DashboardPage() {
     TemplatesService.list({ signal: controller.signal })
       .then((res) => setTemplates(
         (res?.data ?? []).filter(
-          (t) => t.resource_type === "lxc" && t.status === "ready" && t.pve_exists !== false,
+          (t) => t.status === "ready" && t.pve_exists !== false,
         ),
       ))
       .catch((err) => {
@@ -243,7 +244,7 @@ export default function DashboardPage() {
         />
 
         {tplLoading ? (
-          <p className={styles.sectionEmpty}>載入範本中…</p>
+          <LoadingState text="載入範本中…" />
         ) : templates.length === 0 ? (
           <p className={styles.sectionEmpty}>
             目前沒有可用的範本。範本由老師或管理員在「範本管理」建立後即會出現在這裡。
@@ -256,9 +257,16 @@ export default function DashboardPage() {
                 name={t.name}
                 desc={t.description || "由範本克隆建立，數秒內完成佈建。"}
                 icon="layers"
+                logo={t.icon_url || undefined}
                 accent={TEMPLATE_ACCENT}
-                categoryTitle={`v${t.version}`}
-                onSelect={() => navigate(`/quick-template/${t.id}`)}
+                categoryTitle={`${t.resource_type === "lxc" ? "LXC" : "VM"} · v${t.version}`}
+                onSelect={() =>
+                  navigate(
+                    t.resource_type === "lxc"
+                      ? `/quick-template/${t.id}`
+                      : `/templates?clone=${t.id}`,
+                  )
+                }
               />
             ))}
           </div>

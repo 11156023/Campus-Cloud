@@ -1,13 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import styles from "./TemplatesPage.module.scss";
 import MIcon from "../../../components/MIcon";
 import { useAuth } from "../../../contexts/AuthContext";
 import { TemplatesService } from "../../../services/templates";
+import { downloadBlob } from "../../../services/api";
 import { useToast } from "../../../hooks/useToast";
 import { useConfirm } from "../../../components/ConfirmDialog/ConfirmProvider";
 import { TemplateStatusBadge } from "./TemplateBadges";
 import TemplateCloneDialog from "./TemplateCloneDialog";
 import TemplateFormDialog from "./TemplateFormDialog";
+import LoadingState from "../../../components/LoadingState/LoadingState";
 
 function visibilityLabel(template) {
   return template.visibility === "global"
@@ -15,8 +18,88 @@ function visibilityLabel(template) {
     : "私人";
 }
 
+const formatBytes = (bytes) => {
+  if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  if (bytes >= 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${bytes} B`;
+};
+
+/** 使用手冊（附件）瀏覽與下載 */
+function ManualDialog({ template, onClose }) {
+  const toast = useToast();
+  const [attachments, setAttachments] = useState(null);
+  const [downloadingId, setDownloadingId] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    TemplatesService.listAttachments(template.id)
+      .then((res) => !cancelled && setAttachments(res?.data ?? []))
+      .catch((e) => {
+        if (!cancelled) {
+          toast.error(e?.message ?? "附件載入失敗");
+          setAttachments([]);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [template.id, toast]);
+
+  const handleDownload = async (attachment) => {
+    setDownloadingId(attachment.id);
+    try {
+      const blob = await TemplatesService.downloadAttachment(template.id, attachment.id);
+      downloadBlob(blob, attachment.filename);
+    } catch (e) {
+      toast.error(e?.message ?? "下載失敗");
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
+  return (
+    <div className={styles.modalOverlay} onClick={onClose}>
+      <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+        <span className={styles.modalTitle}>
+          <MIcon name="description" size={20} />
+          「{template.name}」使用手冊
+        </span>
+        {attachments === null ? (
+          <LoadingState text="載入附件中…" />
+        ) : attachments.length === 0 ? (
+          <p className={styles.stateText}>此範本目前沒有附件。</p>
+        ) : (
+          <div className={styles.attachList}>
+            {attachments.map((a) => (
+              <div key={a.id} className={styles.attachItem}>
+                <MIcon name="description" size={15} />
+                <span className={styles.attachName}>{a.filename}</span>
+                <span className={styles.attachSize}>{formatBytes(a.size_bytes)}</span>
+                <button
+                  type="button"
+                  className={styles.attachBtn}
+                  disabled={downloadingId === a.id}
+                  onClick={() => handleDownload(a)}
+                >
+                  <MIcon name="download" size={15} />
+                  {downloadingId === a.id ? "下載中…" : "下載"}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className={styles.modalActions}>
+          <button type="button" className={styles.btnSecondary} onClick={onClose}>
+            關閉
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** 單列的「⋯」操作選單 */
-function RowMenu({ template, cycleBusy, onClone, onEdit, onRetry, onCycle, onDelete, onClose, anchorRef }) {
+function RowMenu({ template, cycleBusy, onClone, onEdit, onManual, onRetry, onCycle, onDelete, onClose, anchorRef }) {
   const ref = useRef(null);
 
   useEffect(() => {
@@ -46,6 +129,16 @@ function RowMenu({ template, cycleBusy, onClone, onEdit, onRetry, onCycle, onDel
         <MIcon name="edit" size={15} />
         編輯 / 可見範圍
       </button>
+      {template.attachment_count > 0 && (
+        <button
+          type="button"
+          className={styles.rowMenuItem}
+          onClick={() => { onClose(); onManual(template); }}
+        >
+          <MIcon name="description" size={15} />
+          使用手冊（{template.attachment_count}）
+        </button>
+      )}
       <div className={styles.rowMenuDivider} />
       {template.status === "failed" && (
         <button
@@ -103,7 +196,7 @@ function RowMenu({ template, cycleBusy, onClone, onEdit, onRetry, onCycle, onDel
   );
 }
 
-function ManagementRow({ template, cycleBusy, onClone, onEdit, onRetry, onCycle, onDelete }) {
+function ManagementRow({ template, cycleBusy, onClone, onEdit, onManual, onRetry, onCycle, onDelete }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuBtnRef = useRef(null);
 
@@ -111,6 +204,9 @@ function ManagementRow({ template, cycleBusy, onClone, onEdit, onRetry, onCycle,
     <tr className={styles.tr}>
       <td className={styles.td}>
         <div className={styles.nameCell}>
+          {template.icon_url && (
+            <img className={styles.iconThumbSmall} src={template.icon_url} alt="" />
+          )}
           <span className={styles.namePrimary}>{template.name}</span>
           {template.pve_exists === false && template.status === "ready" && (
             <span className={styles.pveMissing} title="PVE 端找不到這個範本，可能已被手動刪除">
@@ -143,6 +239,7 @@ function ManagementRow({ template, cycleBusy, onClone, onEdit, onRetry, onCycle,
               cycleBusy={cycleBusy}
               onClone={onClone}
               onEdit={onEdit}
+              onManual={onManual}
               onRetry={onRetry}
               onCycle={onCycle}
               onDelete={onDelete}
@@ -165,7 +262,7 @@ function ManagementRow({ template, cycleBusy, onClone, onEdit, onRetry, onCycle,
   );
 }
 
-function StudentCatalog({ templates, onClone }) {
+function StudentCatalog({ templates, onClone, onManual }) {
   if (templates.length === 0) {
     return (
       <div className={styles.card}>
@@ -179,7 +276,11 @@ function StudentCatalog({ templates, onClone }) {
       {templates.map((template) => (
         <div key={template.id} className={styles.catalogCard}>
           <div className={styles.catalogHead}>
-            <MIcon name="library_books" size={18} />
+            {template.icon_url ? (
+              <img className={styles.iconThumb} src={template.icon_url} alt="" />
+            ) : (
+              <MIcon name="library_books" size={18} />
+            )}
             <span className={styles.catalogName}>{template.name}</span>
           </div>
           {template.description && (
@@ -199,15 +300,33 @@ function StudentCatalog({ templates, onClone }) {
               <span className={styles.typeChip}>{template.default_disk} GB 磁碟</span>
             )}
             <span className={styles.typeChip}>v{template.version}</span>
+            {template.requires_gpu && (
+              <span className={styles.typeChip}>需要 GPU</span>
+            )}
+            {template.allow_password_change === false && (
+              <span className={styles.typeChip}>固定帳密</span>
+            )}
           </div>
-          <button
-            type="button"
-            className={`${styles.btnPrimary} ${styles.catalogBtn}`}
-            onClick={() => onClone(template)}
-          >
-            <MIcon name="content_copy" size={14} />
-            一鍵克隆
-          </button>
+          <div className={styles.catalogActions}>
+            <button
+              type="button"
+              className={`${styles.btnPrimary} ${styles.catalogBtn}`}
+              onClick={() => onClone(template)}
+            >
+              <MIcon name="content_copy" size={14} />
+              一鍵克隆
+            </button>
+            {template.attachment_count > 0 && (
+              <button
+                type="button"
+                className={`${styles.btnSecondary} ${styles.catalogBtn}`}
+                onClick={() => onManual(template)}
+              >
+                <MIcon name="description" size={14} />
+                使用手冊（{template.attachment_count}）
+              </button>
+            )}
+          </div>
         </div>
       ))}
     </div>
@@ -226,10 +345,23 @@ export default function TemplatesPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
   const [cloneTarget, setCloneTarget] = useState(null);
+  const [manualTarget, setManualTarget] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [cycleBusy, setCycleBusy] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const timerRef = useRef(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // 儀表板「快速入門」深連結：?clone=<templateId> 直接打開克隆視窗
+  useEffect(() => {
+    const cloneId = searchParams.get("clone");
+    if (!cloneId || templates === null) return;
+    const target = templates.find(
+      (t) => t.id === cloneId && t.status === "ready",
+    );
+    if (target) setCloneTarget(target);
+    setSearchParams({}, { replace: true });
+  }, [templates, searchParams, setSearchParams]);
 
   const load = useCallback(async () => {
     try {
@@ -372,9 +504,7 @@ export default function TemplatesPage() {
       </div>
 
       {templates === null ? (
-        <div className={styles.card}>
-          <p className={styles.stateText}>載入範本中…</p>
-        </div>
+        <LoadingState fullPage text="載入範本中…" />
       ) : canManage ? (
         list.length === 0 ? (
           <div className={styles.card}>
@@ -404,6 +534,7 @@ export default function TemplatesPage() {
                     cycleBusy={cycleBusy}
                     onClone={setCloneTarget}
                     onEdit={setEditTarget}
+                    onManual={setManualTarget}
                     onRetry={handleRetry}
                     onCycle={handleCycle}
                     onDelete={setDeleteTarget}
@@ -414,7 +545,11 @@ export default function TemplatesPage() {
           </div>
         )
       ) : (
-        <StudentCatalog templates={readyTemplates} onClone={setCloneTarget} />
+        <StudentCatalog
+          templates={readyTemplates}
+          onClone={setCloneTarget}
+          onManual={setManualTarget}
+        />
       )}
 
       {createOpen && (
@@ -428,6 +563,12 @@ export default function TemplatesPage() {
           template={editTarget}
           onClose={() => setEditTarget(null)}
           onSaved={() => load()}
+        />
+      )}
+      {manualTarget && (
+        <ManualDialog
+          template={manualTarget}
+          onClose={() => setManualTarget(null)}
         />
       )}
       {cloneTarget && (

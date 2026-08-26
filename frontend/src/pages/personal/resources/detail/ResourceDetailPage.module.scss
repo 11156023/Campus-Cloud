@@ -757,3 +757,43 @@
     font-weight: $font-weight-500;
   }
 }
+
+/* ── 使用手冊（來源範本附件） ── */
+.manualList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.manualItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font-size: $font-size-12;
+}
+
+.manualName {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.manualBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: none;
+  background: none;
+  color: var(--color-primary);
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 6px;
+  flex-shrink: 0;
+
+  &:hover { background: var(--color-hover); }
+  &:disabled { opacity: 0.5; cursor: default; }
+}

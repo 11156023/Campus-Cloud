@@ -26,7 +26,13 @@ class VMTemplateCreate(BaseModel):
     visibility: VMTemplateVisibility = VMTemplateVisibility.private
     default_cores: int | None = Field(default=None, ge=1, le=64)
     default_memory: int | None = Field(default=None, ge=128, description="MB")
-    default_disk: int | None = Field(default=None, ge=1, description="GB")
+    # default_disk 不開放設定：轉換完成時自動偵測母機磁碟大小
+    allow_password_change: bool = Field(
+        default=True, description="克隆時允許使用者自訂/重設登入密碼"
+    )
+    requires_gpu: bool = Field(
+        default=False, description="使用此範本需要 GPU（僅 qemu 範本可設）"
+    )
 
 
 class VMTemplateUpdate(BaseModel):
@@ -37,7 +43,9 @@ class VMTemplateUpdate(BaseModel):
     visibility: VMTemplateVisibility | None = None
     default_cores: int | None = Field(default=None, ge=1, le=64)
     default_memory: int | None = Field(default=None, ge=128)
-    default_disk: int | None = Field(default=None, ge=1)
+    # default_disk 不開放更新：跟母機一致
+    allow_password_change: bool | None = None
+    requires_gpu: bool | None = None
 
 
 # ===== Response Schemas =====
@@ -59,6 +67,10 @@ class VMTemplatePublic(BaseModel):
     default_cores: int | None = None
     default_memory: int | None = None
     default_disk: int | None = None
+    allow_password_change: bool = True
+    requires_gpu: bool = False
+    icon_url: str | None = None
+    attachment_count: int = 0
     source_vmid: int | None = None
     version: int
     error_message: str | None = None
@@ -138,8 +150,18 @@ class TemplateCloneRequest(BaseModel):
     count: int = Field(default=1, ge=1, le=50)
     cores: int | None = Field(default=None, ge=1, le=64)
     memory: int | None = Field(default=None, ge=128, description="MB")
-    disk: int | None = Field(
-        default=None, ge=1, description="GB，僅能放大（僅 qemu 生效）"
+    # 磁碟不開放調整：克隆固定沿用範本磁碟大小
+    login_password: str | None = Field(
+        default=None,
+        min_length=8,
+        max_length=64,
+        description="自訂登入密碼（範本 allow_password_change 時才接受）",
+    )
+    gpu_mapping_id: str | None = Field(
+        default=None, description="GPU mapping（範本 requires_gpu 時必填）"
+    )
+    gpu_mdev_profile: str | None = Field(
+        default=None, description="vGPU 規格；未填時自動配最小可用規格"
     )
     start: bool = True
 
@@ -148,3 +170,29 @@ class TemplateCloneResponse(BaseModel):
     """每台克隆一個背景任務"""
 
     tasks: list[TaskRecordPublic]
+
+
+class TemplateAttachmentPublic(BaseModel):
+    """範本附件（使用手冊等）"""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    template_id: uuid.UUID
+    filename: str
+    content_type: str | None = None
+    size_bytes: int
+    created_at: datetime
+
+
+class TemplateAttachmentsPublic(BaseModel):
+    data: list[TemplateAttachmentPublic]
+    count: int
+
+
+class ResourceTemplateManual(BaseModel):
+    """克隆機來源範本的使用手冊（資源詳情頁用）"""
+
+    template_name: str | None = None
+    data: list[TemplateAttachmentPublic]
+    count: int

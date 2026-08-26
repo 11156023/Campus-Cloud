@@ -1,0 +1,495 @@
+"""範本政策（密碼/GPU/磁碟鎖定）與 icon/附件檔案的單元測試。
+
+mock PVE operations 與 repo，無 DB / Redis：
+- request_clone：密碼政策、requires_gpu 強制、GPU 節點相容、payload 加密
+- _reconfigure_qemu：login_password=None 時不得帶 cipassword
+- create/update template：LXC 不可設 requires_gpu
+- template_files：icon 與附件的實體檔案生命週期
+- add_attachment：副檔名 / 大小 / 數量上限
+"""
+
+from __future__ import annotations
+
+import shutil
+import tempfile
+import uuid
+from collections.abc import Iterator
+from pathlib import Path
+from types import SimpleNamespace
+from typing import Any
+
+import pytest
+
+from app.core.security import decrypt_value
+from app.exceptions import BadRequestError
+from app.models import VMTemplate, VMTemplateStatus
+from app.schemas.template import (
+    TemplateCloneRequest,
+    VMTemplateCreate,
+    VMTemplateUpdate,
+)
+from app.services.proxmox import provisioning_service
+from app.services.template import clone_service, template_files, template_service
+
+
+def make_user(role: str) -> SimpleNamespace:
+    return SimpleNamespace(id=uuid.uuid4(), role=role, is_superuser=False)
+
+
+def make_template(**overrides: Any) -> VMTemplate:
+    defaults: dict[str, Any] = dict(
+        id=uuid.uuid4(),
+        pve_vmid=9001,
+        name="lab-vm",
+        owner_id=None,
+        node="pve1",
+        resource_type="qemu",
+        status=VMTemplateStatus.ready,
+    )
+    defaults.update(overrides)
+    return VMTemplate(**defaults)
+
+
+@pytest.fixture
+def clone_target(monkeypatch: pytest.MonkeyPatch) -> VMTemplate:
+    template = make_template()
+    monkeypatch.setattr(
+        template_service, "_get_or_404", lambda session, template_id: template
+    )
+    monkeypatch.setattr(
+        template_service, "_require_view", lambda session, user, template: None
+    )
+    return template
+
+
+# ---------------------------------------------------------------------------
+# request_clone：政策驗證
+# ---------------------------------------------------------------------------
+
+
+async def test_request_clone_rejects_custom_password_when_locked(
+    clone_target: VMTemplate,
+) -> None:
+    clone_target.allow_password_change = False
+
+    with pytest.raises(BadRequestError, match="不允許自訂登入密碼"):
+        await clone_service.request_clone(
+            session=None,  # type: ignore[arg-type]
+            user=make_user("teacher"),
+            template_id=clone_target.id,
+            data=TemplateCloneRequest(count=1, login_password="Secret123"),
+        )
+
+
+async def test_request_clone_requires_gpu_selection(
+    clone_target: VMTemplate,
+) -> None:
+    clone_target.requires_gpu = True
+
+    with pytest.raises(BadRequestError, match="需要 GPU"):
+        await clone_service.request_clone(
+            session=None,  # type: ignore[arg-type]
+            user=make_user("teacher"),
+            template_id=clone_target.id,
+            data=TemplateCloneRequest(count=1),
+        )
+
+
+async def test_request_clone_rejects_gpu_on_lxc_template(
+    clone_target: VMTemplate,
+) -> None:
+    clone_target.resource_type = "lxc"
+
+    with pytest.raises(BadRequestError, match="LXC"):
+        await clone_service.request_clone(
+            session=None,  # type: ignore[arg-type]
+            user=make_user("teacher"),
+            template_id=clone_target.id,
+            data=TemplateCloneRequest(count=1, gpu_mapping_id="h200"),
+        )
+
+
+async def test_request_clone_rejects_gpu_not_on_template_node(
+    clone_target: VMTemplate, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    clone_target.requires_gpu = True
+    monkeypatch.setattr(
+        provisioning_service, "_gpu_mapping_nodes", lambda mapping_id: {"pve2"}
+    )
+
+    with pytest.raises(BadRequestError, match="不在範本所在節點"):
+        await clone_service.request_clone(
+            session=None,  # type: ignore[arg-type]
+            user=make_user("teacher"),
+            template_id=clone_target.id,
+            data=TemplateCloneRequest(count=1, gpu_mapping_id="h200"),
+        )
+
+
+async def test_request_clone_payload_encrypts_password_and_locks_disk(
+    clone_target: VMTemplate, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    clone_target.requires_gpu = True
+    monkeypatch.setattr(
+        provisioning_service, "_gpu_mapping_nodes", lambda mapping_id: {"pve1"}
+    )
+    payloads: list[dict[str, Any]] = []
+
+    async def fake_enqueue(**kwargs: Any) -> Any:
+        payloads.append(kwargs["payload"])
+        return SimpleNamespace(id=uuid.uuid4())
+
+    monkeypatch.setattr(clone_service, "enqueue_task", fake_enqueue)
+
+    await clone_service.request_clone(
+        session=None,  # type: ignore[arg-type]
+        user=make_user("teacher"),
+        template_id=clone_target.id,
+        data=TemplateCloneRequest(
+            count=1,
+            login_password="Secret123",
+            gpu_mapping_id="h200",
+            gpu_mdev_profile="nvidia-1028",
+        ),
+    )
+
+    payload = payloads[0]
+    # payload 會落 DB：密碼必須是密文且可還原；磁碟不得出現在 payload
+    assert payload["login_password_enc"] != "Secret123"
+    assert decrypt_value(payload["login_password_enc"]) == "Secret123"
+    assert payload["allow_password_reset"] is True
+    assert payload["gpu_mapping_id"] == "h200"
+    assert payload["gpu_mdev_profile"] == "nvidia-1028"
+    assert "disk" not in payload
+
+
+async def test_request_clone_locked_password_payload(
+    clone_target: VMTemplate, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    clone_target.allow_password_change = False
+    payloads: list[dict[str, Any]] = []
+
+    async def fake_enqueue(**kwargs: Any) -> Any:
+        payloads.append(kwargs["payload"])
+        return SimpleNamespace(id=uuid.uuid4())
+
+    monkeypatch.setattr(clone_service, "enqueue_task", fake_enqueue)
+
+    await clone_service.request_clone(
+        session=None,  # type: ignore[arg-type]
+        user=make_user("teacher"),
+        template_id=clone_target.id,
+        data=TemplateCloneRequest(count=1),
+    )
+
+    assert payloads[0]["allow_password_reset"] is False
+    assert payloads[0]["login_password_enc"] is None
+
+
+# ---------------------------------------------------------------------------
+# _reconfigure_qemu：密碼鎖定時不得帶 cipassword
+# ---------------------------------------------------------------------------
+
+
+def _reconfigure(monkeypatch: pytest.MonkeyPatch, password: str | None) -> dict:
+    captured: dict[str, Any] = {}
+
+    def fake_update_config(node: str, vmid: int, rtype: str, **params: Any) -> None:
+        captured.update(params)
+
+    monkeypatch.setattr(
+        clone_service.proxmox_ops, "update_config", fake_update_config
+    )
+    monkeypatch.setattr(
+        clone_service.proxmox_ops, "resize_disk", lambda *a, **kw: None
+    )
+    clone_service._reconfigure_qemu(
+        node="pve1",
+        vmid=200,
+        hostname="stu-01",
+        cores=2,
+        memory=2048,
+        disk=None,
+        public_key="ssh-ed25519 AAAA test",
+        login_password=password,
+        net_cfg={
+            "bridge_name": "vmbr1",
+            "prefix_len": 24,
+            "gateway": "10.0.0.1",
+        },
+        allocated_ip="10.0.0.50",
+    )
+    return captured
+
+
+def test_reconfigure_qemu_omits_cipassword_when_locked(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured = _reconfigure(monkeypatch, None)
+    assert "cipassword" not in captured
+
+
+def test_reconfigure_qemu_sets_custom_password(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured = _reconfigure(monkeypatch, "Custom1234")
+    assert captured["cipassword"] == "Custom1234"
+
+
+# ---------------------------------------------------------------------------
+# create / update template：LXC 不可設 requires_gpu
+# ---------------------------------------------------------------------------
+
+
+async def test_create_template_rejects_requires_gpu_for_lxc(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import app.core.authorizers as authorizers
+
+    monkeypatch.setattr(authorizers, "require_template_manage", lambda user: None)
+    monkeypatch.setattr(
+        template_service.template_repo,
+        "get_template_by_pve_vmid",
+        lambda **kw: None,
+    )
+    monkeypatch.setattr(
+        template_service.proxmox_ops,
+        "find_resource",
+        lambda vmid: {"vmid": vmid, "type": "lxc", "node": "pve1"},
+    )
+
+    with pytest.raises(BadRequestError, match="LXC"):
+        await template_service.create_template(
+            session=None,  # type: ignore[arg-type]
+            user=make_user("teacher"),
+            data=VMTemplateCreate(
+                source_vmid=321, name="ct-tpl", requires_gpu=True
+            ),
+        )
+
+
+def test_update_template_rejects_requires_gpu_for_lxc(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    template = make_template(resource_type="lxc")
+    monkeypatch.setattr(
+        template_service, "_get_or_404", lambda session, template_id: template
+    )
+    monkeypatch.setattr(
+        template_service, "_require_owner", lambda user, template: None
+    )
+
+    with pytest.raises(BadRequestError, match="LXC"):
+        template_service.update_template(
+            session=None,  # type: ignore[arg-type]
+            user=make_user("teacher"),
+            template_id=template.id,
+            data=VMTemplateUpdate(requires_gpu=True),
+        )
+
+
+# ---------------------------------------------------------------------------
+# template_files：實體檔案生命週期
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def file_dirs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> Iterator[tuple[Path, Path]]:
+    # 不用 tmp_path：部分環境的 pytest basetemp 目錄有 ACL 問題
+    base = Path(tempfile.mkdtemp(prefix="tpl-files-"))
+    icon_dir = base / "icons"
+    attach_dir = base / "files"
+    monkeypatch.setattr(template_files, "ICON_DIR", icon_dir)
+    monkeypatch.setattr(template_files, "ATTACHMENT_DIR", attach_dir)
+    yield icon_dir, attach_dir
+    shutil.rmtree(base, ignore_errors=True)
+
+
+def test_icon_save_replaces_old_extension(
+    file_dirs: tuple[Path, Path],
+) -> None:
+    template_id = uuid.uuid4()
+    template_files.save_icon(template_id, ".png", b"png-bytes")
+    template_files.save_icon(template_id, ".webp", b"webp-bytes")
+
+    found = template_files.find_icon(template_id)
+    assert found is not None and found.suffix == ".webp"
+    icon_dir = file_dirs[0]
+    assert not (icon_dir / f"{template_id}.png").exists()
+
+
+def test_attachment_lifecycle_and_bulk_cleanup(
+    file_dirs: tuple[Path, Path],
+) -> None:
+    template_id = uuid.uuid4()
+    attachment_id = uuid.uuid4()
+    template_files.save_icon(template_id, ".png", b"icon")
+    template_files.save_attachment(template_id, attachment_id, b"manual")
+
+    assert template_files.attachment_path(template_id, attachment_id) is not None
+
+    template_files.delete_all_for_template(template_id)
+    assert template_files.find_icon(template_id) is None
+    assert template_files.attachment_path(template_id, attachment_id) is None
+    assert not (file_dirs[1] / str(template_id)).exists()
+
+
+# ---------------------------------------------------------------------------
+# add_attachment：驗證規則
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def owned_template(monkeypatch: pytest.MonkeyPatch) -> VMTemplate:
+    template = make_template()
+    monkeypatch.setattr(
+        template_service, "_get_or_404", lambda session, template_id: template
+    )
+    monkeypatch.setattr(
+        template_service, "_require_owner", lambda user, template: None
+    )
+    return template
+
+
+def test_add_attachment_rejects_disallowed_extension(
+    owned_template: VMTemplate,
+) -> None:
+    with pytest.raises(BadRequestError, match="不支援的檔案類型"):
+        template_service.add_attachment(
+            session=None,  # type: ignore[arg-type]
+            user=make_user("teacher"),
+            template_id=owned_template.id,
+            filename="malware.exe",
+            content_type="application/octet-stream",
+            data=b"MZ",
+        )
+
+
+def test_add_attachment_rejects_oversize(
+    owned_template: VMTemplate, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(template_files, "ATTACHMENT_MAX_BYTES", 10)
+
+    with pytest.raises(BadRequestError, match="50MB"):
+        template_service.add_attachment(
+            session=None,  # type: ignore[arg-type]
+            user=make_user("teacher"),
+            template_id=owned_template.id,
+            filename="manual.pdf",
+            content_type="application/pdf",
+            data=b"x" * 11,
+        )
+
+
+def test_add_attachment_rejects_over_count_limit(
+    owned_template: VMTemplate, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        template_service,
+        "list_attachments",
+        lambda **kw: [SimpleNamespace()] * template_files.ATTACHMENT_MAX_COUNT,
+    )
+
+    with pytest.raises(BadRequestError, match="上限"):
+        template_service.add_attachment(
+            session=None,  # type: ignore[arg-type]
+            user=make_user("teacher"),
+            template_id=owned_template.id,
+            filename="manual.pdf",
+            content_type="application/pdf",
+            data=b"pdf",
+        )
+# ---------------------------------------------------------------------------
+# 資源詳情頁：依 Resource.template_id 反查來源範本手冊
+# ---------------------------------------------------------------------------
+
+
+class _ManualSession:
+    """session.get(Resource, vmid) 的最小替身。"""
+
+    def __init__(self, resource: object) -> None:
+        self._resource = resource
+
+    def get(self, model: type, key: object) -> object:
+        return self._resource
+
+
+def test_manual_lookup_returns_empty_for_non_clone(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session = _ManualSession(SimpleNamespace(template_id=None))
+    template, attachments = template_service.get_manual_for_cloned_resource(
+        session=session,  # type: ignore[arg-type]
+        vmid=400,
+    )
+    assert template is None
+    assert attachments == []
+
+    session = _ManualSession(None)
+    template, attachments = template_service.get_manual_for_cloned_resource(
+        session=session,  # type: ignore[arg-type]
+        vmid=400,
+    )
+    assert template is None
+
+
+def test_manual_lookup_resolves_template_by_pve_vmid(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = make_template(pve_vmid=9001)
+    attachment = SimpleNamespace(id=uuid.uuid4(), filename="manual.pdf")
+    monkeypatch.setattr(
+        template_service.template_repo,
+        "get_template_by_pve_vmid",
+        lambda **kw: source if kw["pve_vmid"] == 9001 else None,
+    )
+    monkeypatch.setattr(
+        template_service,
+        "_template_attachments",
+        lambda session, template_id: [attachment],
+    )
+
+    session = _ManualSession(SimpleNamespace(template_id=9001))
+    template, attachments = template_service.get_manual_for_cloned_resource(
+        session=session,  # type: ignore[arg-type]
+        vmid=400,
+    )
+    assert template is source
+    assert attachments == [attachment]
+
+
+def test_manual_download_validates_attachment_id(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.exceptions import NotFoundError
+
+    source = make_template(pve_vmid=9001)
+    attachment = SimpleNamespace(id=uuid.uuid4(), filename="manual.pdf")
+    monkeypatch.setattr(
+        template_service,
+        "get_manual_for_cloned_resource",
+        lambda **kw: (source, [attachment]),
+    )
+    fake_path = Path("manual-on-disk.pdf")
+    monkeypatch.setattr(
+        template_service.template_files,
+        "attachment_path",
+        lambda template_id, attachment_id: fake_path,
+    )
+
+    path, found = template_service.get_manual_attachment_for_cloned_resource(
+        session=None,  # type: ignore[arg-type]
+        vmid=400,
+        attachment_id=attachment.id,
+    )
+    assert path is fake_path
+    assert found is attachment
+
+    with pytest.raises(NotFoundError, match="Attachment not found"):
+        template_service.get_manual_attachment_for_cloned_resource(
+            session=None,  # type: ignore[arg-type]
+            vmid=400,
+            attachment_id=uuid.uuid4(),
+        )

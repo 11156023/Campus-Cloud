@@ -8,7 +8,8 @@
 
 import uuid
 
-from fastapi import APIRouter
+from fastapi import APIRouter, File, UploadFile
+from fastapi.responses import FileResponse
 
 from app.api.deps import CurrentUser, SessionDep
 from app.core.permissions import is_admin
@@ -17,6 +18,8 @@ from app.repositories import task_record as task_record_repo
 from app.schemas.template import (
     TaskRecordPublic,
     TaskRecordsPublic,
+    TemplateAttachmentPublic,
+    TemplateAttachmentsPublic,
     TemplateCloneRequest,
     TemplateCloneResponse,
     VMTemplateCreate,
@@ -25,7 +28,7 @@ from app.schemas.template import (
     VMTemplateTaskResponse,
     VMTemplateUpdate,
 )
-from app.services.template import clone_service, template_service
+from app.services.template import clone_service, template_files, template_service
 
 router = APIRouter(prefix="/templates", tags=["templates"])
 
@@ -148,6 +151,121 @@ async def clone_template(
     return TemplateCloneResponse(
         tasks=[TaskRecordPublic.from_record(r) for r in records]
     )
+
+
+# --- icon 與附件（使用手冊） ---
+
+
+@router.post("/{template_id}/icon", response_model=VMTemplatePublic)
+async def upload_template_icon(
+    session: SessionDep,
+    current_user: CurrentUser,
+    template_id: uuid.UUID,
+    file: UploadFile = File(...),
+) -> VMTemplatePublic:
+    """上傳範本 icon（擁有者或 admin；PNG/JPEG/WebP/SVG/GIF，2MB 內）。"""
+    data = await file.read()
+    return template_service.upload_icon(
+        session=session,
+        user=current_user,
+        template_id=template_id,
+        content_type=file.content_type,
+        data=data,
+    )
+
+
+@router.get("/{template_id}/icon")
+def get_template_icon(template_id: uuid.UUID) -> FileResponse:
+    """icon 圖檔。<img> 標籤無法帶 Authorization header，因此不做驗證；
+    template_id 由路由強制為 UUID，不會有路徑穿越問題。"""
+    path = template_files.find_icon(template_id)
+    if path is None:
+        raise NotFoundError("Icon not found")
+    return FileResponse(path)
+
+
+@router.delete("/{template_id}/icon", response_model=VMTemplatePublic)
+def delete_template_icon(
+    session: SessionDep, current_user: CurrentUser, template_id: uuid.UUID
+) -> VMTemplatePublic:
+    """移除範本 icon（擁有者或 admin）。"""
+    return template_service.remove_icon(
+        session=session, user=current_user, template_id=template_id
+    )
+
+
+@router.get(
+    "/{template_id}/attachments", response_model=TemplateAttachmentsPublic
+)
+def list_template_attachments(
+    session: SessionDep, current_user: CurrentUser, template_id: uuid.UUID
+) -> TemplateAttachmentsPublic:
+    """列出範本附件（可見範本的使用者皆可）。"""
+    attachments = template_service.list_attachments(
+        session=session, user=current_user, template_id=template_id
+    )
+    data = [TemplateAttachmentPublic.model_validate(a) for a in attachments]
+    return TemplateAttachmentsPublic(data=data, count=len(data))
+
+
+@router.post(
+    "/{template_id}/attachments", response_model=TemplateAttachmentPublic
+)
+async def upload_template_attachment(
+    session: SessionDep,
+    current_user: CurrentUser,
+    template_id: uuid.UUID,
+    file: UploadFile = File(...),
+) -> TemplateAttachmentPublic:
+    """上傳範本附件（使用手冊等；擁有者或 admin，50MB 內）。"""
+    data = await file.read()
+    attachment = template_service.add_attachment(
+        session=session,
+        user=current_user,
+        template_id=template_id,
+        filename=file.filename or "",
+        content_type=file.content_type,
+        data=data,
+    )
+    return TemplateAttachmentPublic.model_validate(attachment)
+
+
+@router.get("/{template_id}/attachments/{attachment_id}/download")
+def download_template_attachment(
+    session: SessionDep,
+    current_user: CurrentUser,
+    template_id: uuid.UUID,
+    attachment_id: uuid.UUID,
+) -> FileResponse:
+    """下載附件（可見範本的使用者皆可），還原原始檔名。"""
+    path, attachment = template_service.get_attachment_for_download(
+        session=session,
+        user=current_user,
+        template_id=template_id,
+        attachment_id=attachment_id,
+    )
+    return FileResponse(
+        path,
+        filename=attachment.filename,
+        media_type=attachment.content_type or "application/octet-stream",
+    )
+
+
+@router.delete("/{template_id}/attachments/{attachment_id}")
+def delete_template_attachment(
+    session: SessionDep,
+    current_user: CurrentUser,
+    template_id: uuid.UUID,
+    attachment_id: uuid.UUID,
+) -> dict[str, str]:
+    """刪除附件（擁有者或 admin）。"""
+    template_service.remove_attachment(
+        session=session,
+        user=current_user,
+        template_id=template_id,
+        attachment_id=attachment_id,
+    )
+    return {"message": "Attachment deleted"}
 
 
 # --- 更新循環：Clone → Modify → Convert ---

@@ -26,8 +26,9 @@ from sqlmodel import Session
 from app.core.config import settings
 from app.core.db import engine
 from app.core.permissions import is_admin
-from app.core.security import encrypt_value
+from app.core.security import decrypt_value, encrypt_value
 from app.exceptions import (
+    BadRequestError,
     ConflictError,
     NotFoundError,
     PermissionDeniedError,
@@ -94,6 +95,24 @@ async def request_clone(
     if data.count > 1 and not can_manage:
         raise PermissionDeniedError("Only teachers and admins can batch clone")
 
+    if data.login_password and not template.allow_password_change:
+        raise BadRequestError("此範本不允許自訂登入密碼")
+    if template.requires_gpu and not data.gpu_mapping_id:
+        raise BadRequestError("此範本需要 GPU，請選擇要配置的 GPU")
+    if data.gpu_mapping_id:
+        if template.resource_type == "lxc":
+            raise BadRequestError("LXC 範本不支援 GPU 直通")
+        from app.services.proxmox.provisioning_service import (  # noqa: PLC0415
+            _gpu_mapping_nodes,
+        )
+
+        gpu_nodes = _gpu_mapping_nodes(data.gpu_mapping_id)
+        if template.node not in gpu_nodes:
+            raise BadRequestError(
+                f"所選 GPU 不在範本所在節點 {template.node} 上，"
+                "請改選其他 GPU"
+            )
+
     if not can_manage and not is_admin(user):
         owned = len(
             resource_repo.get_resources_by_user(session=session, user_id=user.id)
@@ -118,8 +137,17 @@ async def request_clone(
                 "hostname": hostname,
                 "cores": data.cores,
                 "memory": data.memory,
-                "disk": data.disk,
+                # 磁碟不開放調整：固定沿用範本磁碟（batch 路徑仍可帶 disk）
                 "start": data.start,
+                "allow_password_reset": template.allow_password_change,
+                # payload 會落 DB（TaskRecord.payload），密碼必須加密存放
+                "login_password_enc": (
+                    encrypt_value(data.login_password)
+                    if data.login_password
+                    else None
+                ),
+                "gpu_mapping_id": data.gpu_mapping_id,
+                "gpu_mdev_profile": data.gpu_mdev_profile,
             },
         )
         records.append(record)
@@ -184,21 +212,23 @@ def _reconfigure_qemu(
     memory: int | None,
     disk: int | None,
     public_key: str,
-    login_password: str,
+    login_password: str | None,
     net_cfg: dict[str, Any],
     allocated_ip: str,
 ) -> None:
     config_updates: dict[str, Any] = {
         "name": hostname,
         "sshkeys": quote(public_key, safe=""),
-        # cloud-init 首次開機把預設使用者密碼設成本次隨機值（PVE 存 hash）
-        "cipassword": login_password,
         "ciupgrade": 0,
         "net0": f"virtio,bridge={net_cfg['bridge_name']},firewall=1",
         "ipconfig0": (
             f"ip={allocated_ip}/{net_cfg['prefix_len']},gw={net_cfg['gateway']}"
         ),
     }
+    if login_password is not None:
+        # cloud-init 首次開機套用密碼（PVE 存 hash）；範本禁止改密碼時
+        # 完全不帶 cipassword，沿用範本內建帳密
+        config_updates["cipassword"] = login_password
     if cores:
         config_updates["cores"] = cores
     if memory:
@@ -288,6 +318,10 @@ def run_clone_task(task_id: uuid.UUID, payload: dict[str, Any]) -> dict[str, Any
     memory = payload.get("memory")
     disk = payload.get("disk")
     start = bool(payload.get("start", True))
+    allow_password_reset = bool(payload.get("allow_password_reset", True))
+    login_password_enc = payload.get("login_password_enc")
+    gpu_mapping_id = payload.get("gpu_mapping_id")
+    gpu_mdev_profile = payload.get("gpu_mdev_profile")
     raw_batch = payload.get("batch_job_id")
     batch_job_id = uuid.UUID(str(raw_batch)) if raw_batch else None
     environment_type = payload.get("environment_type")
@@ -335,7 +369,15 @@ def run_clone_task(task_id: uuid.UUID, payload: dict[str, Any]) -> dict[str, Any
         report_progress(task_id, 60)
 
         private_key_pem, public_key = generate_ed25519_keypair()
-        login_password = generate_login_password()
+        # 範本禁止改密碼時完全不重設，沿用範本內建帳密；
+        # 允許時優先用使用者自訂密碼，未填才發隨機密碼
+        login_password: str | None = None
+        if allow_password_reset:
+            login_password = (
+                decrypt_value(str(login_password_enc))
+                if login_password_enc
+                else generate_login_password()
+            )
         password_applied = False
         if resource_type == "qemu":
             _reconfigure_qemu(
@@ -351,7 +393,22 @@ def run_clone_task(task_id: uuid.UUID, payload: dict[str, Any]) -> dict[str, Any
                 allocated_ip=allocated_ip,
             )
             # cipassword 已寫入 config，首次開機由 cloud-init 套用
-            password_applied = True
+            password_applied = login_password is not None
+            if gpu_mapping_id:
+                # 容量與 vGPU 規格以掛載當下重新驗證（與申請流程同一套檢查）
+                from app.services.proxmox.provisioning_service import (  # noqa: PLC0415
+                    _build_gpu_hostpci,
+                )
+
+                proxmox_ops.update_config(
+                    node,
+                    new_vmid,
+                    "qemu",
+                    hostpci0=_build_gpu_hostpci(
+                        str(gpu_mapping_id),
+                        str(gpu_mdev_profile) if gpu_mdev_profile else None,
+                    ),
+                )
         else:
             _reconfigure_lxc(
                 node=node,
@@ -367,7 +424,7 @@ def run_clone_task(task_id: uuid.UUID, payload: dict[str, Any]) -> dict[str, Any
         firewall_service.setup_default_rules(node, new_vmid, resource_type)
         if start:
             proxmox_ops.control(node, new_vmid, resource_type, "start")
-            if resource_type == "lxc":
+            if resource_type == "lxc" and login_password is not None:
                 password_applied = _set_lxc_root_password(
                     node, new_vmid, login_password
                 )
@@ -388,7 +445,9 @@ def run_clone_task(task_id: uuid.UUID, payload: dict[str, Any]) -> dict[str, Any
                 ),
                 ssh_public_key=public_key if resource_type == "qemu" else None,
                 login_password_encrypted=(
-                    encrypt_value(login_password) if password_applied else None
+                    encrypt_value(login_password)
+                    if password_applied and login_password is not None
+                    else None
                 ),
                 batch_job_id=batch_job_id,
             )

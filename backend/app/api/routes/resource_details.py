@@ -1,6 +1,8 @@
 import logging
+import uuid
 
 from fastapi import APIRouter
+from fastapi.responses import FileResponse
 
 from app.api.deps import (
     AdminUser,
@@ -9,6 +11,7 @@ from app.api.deps import (
     ResourceInfoDep,
     SessionDep,
     TeachingResourceInfoDep,
+    check_resource_ownership,
 )
 from app.schemas import (
     CurrentStatsResponse,
@@ -20,8 +23,13 @@ from app.schemas import (
     SnapshotInfo,
     SnapshotResponse,
 )
+from app.schemas.template import (
+    ResourceTemplateManual,
+    TemplateAttachmentPublic,
+)
 from app.services.network import snapshot_service
 from app.services.resource import reset_service, resource_service
+from app.services.template import template_service
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +37,48 @@ router = APIRouter(prefix="/resources", tags=["resource-details"])
 
 
 # ===== Endpoints =====
+
+
+@router.get("/{vmid}/template-manual", response_model=ResourceTemplateManual)
+def get_template_manual(
+    vmid: int, current_user: CurrentUser, session: SessionDep
+) -> ResourceTemplateManual:
+    """克隆機來源範本的使用手冊（資源擁有者或 admin）。
+
+    以資源擁有權授權，不受範本可見範圍影響——範本轉私人後，
+    已克隆機的擁有者仍可下載手冊。
+    """
+    check_resource_ownership(vmid, current_user, session)
+    template, attachments = template_service.get_manual_for_cloned_resource(
+        session=session, vmid=vmid
+    )
+    data = [TemplateAttachmentPublic.model_validate(a) for a in attachments]
+    return ResourceTemplateManual(
+        template_name=template.name if template else None,
+        data=data,
+        count=len(data),
+    )
+
+
+@router.get("/{vmid}/template-manual/{attachment_id}/download")
+def download_template_manual(
+    vmid: int,
+    attachment_id: uuid.UUID,
+    current_user: CurrentUser,
+    session: SessionDep,
+) -> FileResponse:
+    """下載來源範本手冊，還原原始檔名（資源擁有者或 admin）。"""
+    check_resource_ownership(vmid, current_user, session)
+    path, attachment = (
+        template_service.get_manual_attachment_for_cloned_resource(
+            session=session, vmid=vmid, attachment_id=attachment_id
+        )
+    )
+    return FileResponse(
+        path,
+        filename=attachment.filename,
+        media_type=attachment.content_type or "application/octet-stream",
+    )
 
 
 @router.get("/{vmid}/current-stats", response_model=CurrentStatsResponse)
