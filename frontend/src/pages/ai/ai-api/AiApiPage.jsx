@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import styles from "./AiApiPage.module.scss";
 import MIcon from "../../../components/MIcon";
 import LoadingState from "../../../components/LoadingState/LoadingState";
+import SharedEmptyState from "../../../components/EmptyState/EmptyState";
 import { AiApiService } from "../../../services/aiApi";
 import { useConfirm } from "../../../components/ConfirmDialog/ConfirmProvider";
 import { useToast } from "../../../hooks/useToast";
@@ -68,14 +69,10 @@ function credStatusInfo(item) {
 }
 
 /* ── Empty ── */
-function EmptyState({ icon, title, desc }) {
+function EmptyState({ icon, title, desc, guideId }) {
   return (
-    <div className={styles.empty}>
-      <div className={styles.emptyIcon}>
-        <MIcon name={icon} size={40} />
-      </div>
-      <h2 className={styles.emptyTitle}>{title}</h2>
-      <p className={styles.emptyDesc}>{desc}</p>
+    <div data-guide={guideId}>
+      <SharedEmptyState icon={icon} title={title} description={desc} />
     </div>
   );
 }
@@ -172,7 +169,7 @@ function CredentialCard({ item, onRefresh }) {
   };
 
   return (
-    <div className={styles.credCard}>
+    <div className={styles.credCard} data-guide="ai-keys-content">
       {/* Top row: name + badge */}
       <div className={styles.credHeader}>
         <div className={styles.credNameRow}>
@@ -237,7 +234,7 @@ function CredentialCard({ item, onRefresh }) {
       </div>
 
       {/* Actions */}
-      <div className={styles.credActions}>
+      <div className={styles.credActions} data-guide="ai-key-actions">
         <button type="button" className={styles.btnOutline} onClick={() => setShowKey((v) => !v)}>
           <MIcon name={showKey ? "visibility_off" : "visibility"} size={16} />
           {showKey ? "隱藏" : "顯示"}
@@ -263,7 +260,7 @@ function CredentialCard({ item, onRefresh }) {
 function RequestRow({ item }) {
   const st = statusStyle(item.status);
   return (
-    <div className={styles.requestRow}>
+    <div className={styles.requestRow} data-guide="ai-records-content">
       <div className={styles.requestInfo}>
         <span className={styles.requestName}>{item.api_key_name}</span>
         <span className={`${styles.badge} ${styles[`badge_${st}`]}`}>
@@ -366,7 +363,7 @@ function MyUsageTab() {
 
   return (
     <div className={styles.usageTab}>
-      <div className={styles.usageDateRow}>
+      <div className={styles.usageDateRow} data-guide="ai-usage-panel">
         {PRESETS.map((p) => (
           <button
             key={p.value}
@@ -385,7 +382,7 @@ function MyUsageTab() {
       ) : (
         <>
           {/* Proxy usage */}
-          <div className={styles.usagePanel}>
+          <div className={styles.usagePanel} data-guide="ai-proxy-usage">
             <div className={styles.usagePanelHeader}>
               <h3 className={styles.usagePanelTitle}>Proxy 用量</h3>
               <p className={styles.usagePanelDesc}>直接呼叫 AI API 的 Token 用量。</p>
@@ -412,7 +409,7 @@ function MyUsageTab() {
           </div>
 
           {/* Template usage */}
-          <div className={styles.usagePanel}>
+          <div className={styles.usagePanel} data-guide="ai-template-usage">
             <div className={styles.usagePanelHeader}>
               <h3 className={styles.usagePanelTitle}>Template 用量</h3>
               <p className={styles.usagePanelDesc}>使用 AI Template API 的 Token 用量。</p>
@@ -516,7 +513,7 @@ export default function AiApiPage() {
       </div>
 
       {/* ── Stat cards ── */}
-      <div className={styles.statRow}>
+      <div className={styles.statRow} data-guide="ai-stats">
         <StatCard label="申請紀錄" value={requests.length} icon="history" />
         <StatCard label="使用中金鑰" value={activeCredentials.length} icon="key" iconCls="statIconOk" />
         <StatCard label="過期金鑰" value={expiredCredentials.length} icon="cancel" iconCls="statIconErr" />
@@ -524,13 +521,17 @@ export default function AiApiPage() {
       </div>
 
       {/* ── Tabs ── */}
-      <div className={styles.tabs}>
+      <div className={styles.tabs} data-guide="ai-tabs" role="tablist" aria-label="AI API 功能分頁">
         {TABS.map((tab) => (
           <button
             key={tab.key}
             type="button"
             className={`${styles.tab} ${activeTab === tab.key ? styles.tabActive : ""}`}
             onClick={() => setActiveTab(tab.key)}
+            data-guide-tab={tab.key}
+            data-guide-has-content={tab.key !== "keys" || credentials.length > 0 ? "true" : "false"}
+            role="tab"
+            aria-selected={activeTab === tab.key}
           >
             <MIcon name={tab.icon} size={16} />
             {tab.label}
@@ -544,7 +545,7 @@ export default function AiApiPage() {
         {activeTab === "apply" && (
           <div className={styles.panel}>
             <div className={styles.panelHeader}>
-              <h2 className={styles.panelTitle}>送出新申請</h2>
+              <h2 className={styles.panelTitle} data-guide="ai-form">送出新申請</h2>
               <p className={styles.panelDesc}>填寫用途後送審。</p>
             </div>
 
@@ -558,6 +559,7 @@ export default function AiApiPage() {
                 onChange={(e) => setApiKeyName(e.target.value)}
                 placeholder="例如：課程專案用、測試用、我的 App"
                 maxLength={20}
+                data-guide="ai-apply-name"
               />
             </div>
 
@@ -570,6 +572,7 @@ export default function AiApiPage() {
                 onChange={(e) => setPurpose(e.target.value)}
                 placeholder="例如：課程專題串接聊天模型、工具原型開發、知識庫問答測試或自動化腳本整合。"
                 rows={5}
+                data-guide="ai-apply-purpose"
               />
             </div>
 
@@ -580,6 +583,7 @@ export default function AiApiPage() {
                 className={styles.formSelect}
                 value={duration}
                 onChange={(e) => setDuration(e.target.value)}
+                data-guide="ai-apply-duration"
               >
                 {DURATION_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -594,6 +598,7 @@ export default function AiApiPage() {
                 className={styles.btnPrimary}
                 onClick={handleSubmit}
                 disabled={purpose.trim().length < 10 || submitting}
+                data-guide="ai-submit"
               >
                 <MIcon name="send" size={16} />
                 {submitting ? "送出中…" : "送出申請"}
@@ -606,7 +611,7 @@ export default function AiApiPage() {
         {activeTab === "keys" && (
           <div className={styles.panel}>
             <div className={styles.panelHeader}>
-              <h2 className={styles.panelTitle}>我的 API Keys</h2>
+              <h2 className={styles.panelTitle} data-guide="ai-keys-panel">我的 API Keys</h2>
               <p className={styles.panelDesc}>查看、複製、刷新或刪除金鑰。</p>
             </div>
             {loading ? (
@@ -616,6 +621,7 @@ export default function AiApiPage() {
                 icon="vpn_key"
                 title="尚無金鑰"
                 desc="目前還沒有任何已核發的 AI API Key。當申請通過後，新的金鑰會出現在這裡。"
+                guideId="ai-keys-content"
               />
             ) : (
               <div className={styles.credList}>
@@ -631,7 +637,7 @@ export default function AiApiPage() {
         {activeTab === "records" && (
           <div className={styles.panel}>
             <div className={styles.panelHeader}>
-              <h2 className={styles.panelTitle}>申請紀錄</h2>
+              <h2 className={styles.panelTitle} data-guide="ai-records-panel">申請紀錄</h2>
               <p className={styles.panelDesc}>近期申請狀態。</p>
             </div>
             {loading ? (
@@ -641,6 +647,7 @@ export default function AiApiPage() {
                 icon="history"
                 title="尚無紀錄"
                 desc="目前還沒有 AI API 申請紀錄。"
+                guideId="ai-records-content"
               />
             ) : (
               <div className={styles.requestList}>

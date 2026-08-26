@@ -2,18 +2,33 @@
 
 import uuid
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
+from sqlmodel import select
 
+from app.ai.teacher_judge.script_executor_service import execute_script_run
+from app.ai.teacher_judge.script_run_service import create_script_run
 from app.api.deps import CurrentUser, SessionDep
+from app.infrastructure.worker import submit
+from app.models.teacher_judge_script_run import TeacherJudgeScriptRunTargetScope
+from app.models.teaching_class import (
+    TeachingClass,
+    TeachingClassMachineNode,
+    TeachingClassStudent,
+    TeachingClassStudentMachine,
+)
 from app.schemas.course import (
+    CourseAIAssignmentStudent,
+    CourseAICheckStudent,
     CourseAnswerResult,
     CourseAnswerSubmit,
     CourseDeploymentPublic,
     CoursePathDetail,
     CoursePathSummary,
+    CoursePracticeMachineStudent,
     CourseRoomStudentDetail,
 )
 from app.services.course import (
+    ai_assignment_service,
     course_service,
     deployment_service,
     progress_service,
@@ -36,6 +51,180 @@ def get_path(
 ) -> CoursePathDetail:
     return course_service.get_path_detail(
         session, user_id=current_user.id, path_id=path_id
+    )
+
+
+@router.get(
+    "/paths/{path_id}/ai-assignments",
+    response_model=list[CourseAIAssignmentStudent],
+)
+def list_ai_assignments(
+    session: SessionDep, current_user: CurrentUser, path_id: uuid.UUID
+) -> list[CourseAIAssignmentStudent]:
+    return ai_assignment_service.list_student_ai_assignments(
+        session,
+        user_id=current_user.id,
+        path_id=path_id,
+    )
+
+
+@router.get(
+    "/paths/{path_id}/practice-machines",
+    response_model=list[CoursePracticeMachineStudent],
+)
+def list_practice_machines(
+    session: SessionDep,
+    current_user: CurrentUser,
+    path_id: uuid.UUID,
+) -> list[CoursePracticeMachineStudent]:
+    """List every class machine assigned to this student for the path owner."""
+
+    path = course_service.get_published_path_or_404(session, path_id)
+    if path.created_by is None:
+        return []
+    rows = session.exec(
+        select(
+            TeachingClass,
+            TeachingClassStudentMachine,
+            TeachingClassMachineNode,
+        )
+        .join(
+            TeachingClassStudent,
+            TeachingClassStudent.class_id == TeachingClass.id,
+        )
+        .join(
+            TeachingClassStudentMachine,
+            TeachingClassStudentMachine.class_student_id == TeachingClassStudent.id,
+        )
+        .join(
+            TeachingClassMachineNode,
+            TeachingClassStudentMachine.machine_node_id == TeachingClassMachineNode.id,
+        )
+        .where(
+            TeachingClass.owner_id == path.created_by,
+            TeachingClassStudent.user_id == current_user.id,
+            TeachingClassStudent.status == "active",
+        )
+        .order_by(TeachingClass.name, TeachingClassMachineNode.sort_order)
+    ).all()
+    return [
+        CoursePracticeMachineStudent(
+            teaching_class_id=teaching_class.id,
+            teaching_class_name=teaching_class.name,
+            machine_node_id=node.id,
+            node_key=node.node_key,
+            name=node.name,
+            role=node.role,
+            resource_type=node.resource_type,
+            vmid=machine.vmid,
+            status=machine.status,
+        )
+        for teaching_class, machine, node in rows
+    ]
+
+
+@router.post(
+    "/paths/{path_id}/ai-assignments/{assignment_id}/checks",
+    response_model=CourseAICheckStudent,
+)
+def start_ai_check(
+    session: SessionDep,
+    current_user: CurrentUser,
+    path_id: uuid.UUID,
+    assignment_id: uuid.UUID,
+) -> CourseAICheckStudent:
+    """Run one approved assignment against the current student's own machine."""
+
+    assignment = ai_assignment_service.get_student_ai_assignment(
+        session,
+        user_id=current_user.id,
+        path_id=path_id,
+        assignment_id=assignment_id,
+    )
+    if assignment.latest_check and assignment.latest_check.status in {
+        "pending",
+        "running",
+    }:
+        return assignment.latest_check
+
+    enrollment = session.exec(
+        select(TeachingClassStudent).where(
+            TeachingClassStudent.class_id == assignment.teaching_class_id,
+            TeachingClassStudent.user_id == current_user.id,
+            TeachingClassStudent.status == "active",
+        )
+    ).first()
+    if enrollment is None:
+        raise HTTPException(status_code=404, detail="Class enrollment not found")
+
+    candidates = list(
+        session.exec(
+            select(TeachingClassStudentMachine, TeachingClassMachineNode)
+            .join(
+                TeachingClassMachineNode,
+                TeachingClassStudentMachine.machine_node_id
+                == TeachingClassMachineNode.id,
+            )
+            .where(
+                TeachingClassStudentMachine.class_student_id == enrollment.id,
+                TeachingClassStudentMachine.vmid.is_not(None),
+            )
+        ).all()
+    )
+    if not candidates:
+        raise HTTPException(
+            status_code=400,
+            detail="你的課堂機器尚未建立完成，請先確認環境已就緒。",
+        )
+
+    template_key = assignment.template_key.strip().lower()
+
+    def candidate_rank(candidate) -> tuple[int, int]:
+        _, node = candidate
+        searchable = f"{node.node_key} {node.name} {node.role}".lower()
+        return (0 if template_key and template_key in searchable else 1, node.sort_order)
+
+    machine, _ = sorted(candidates, key=candidate_rank)[0]
+    run = create_script_run(
+        session=session,
+        teaching_class_id=assignment.teaching_class_id,
+        artifact_id=assignment.id,
+        target_scope=TeacherJudgeScriptRunTargetScope.manual,
+        target_vmids=[int(machine.vmid)],
+        started_by=current_user.id,
+    )
+    run_id = uuid.UUID(run.id)
+    submit(
+        execute_script_run(run_id),
+        name=f"student_ai_check:{run.id}",
+        task_id=f"teacher_judge_script_run:{run.id}",
+    )
+    return ai_assignment_service.get_student_ai_check(
+        session,
+        user_id=current_user.id,
+        path_id=path_id,
+        assignment_id=assignment_id,
+        run_id=run_id,
+    )
+
+
+@router.get(
+    "/paths/{path_id}/ai-assignments/{assignment_id}/checks/{run_id}",
+    response_model=CourseAICheckStudent,
+)
+def get_ai_check(
+    session: SessionDep,
+    current_user: CurrentUser,
+    path_id: uuid.UUID,
+    assignment_id: uuid.UUID,
+    run_id: uuid.UUID,
+) -> CourseAICheckStudent:
+    return ai_assignment_service.get_student_ai_check(
+        session,
+        user_id=current_user.id,
+        path_id=path_id,
+        assignment_id=assignment_id,
+        run_id=run_id,
     )
 
 

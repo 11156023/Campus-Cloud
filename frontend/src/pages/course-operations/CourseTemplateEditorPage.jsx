@@ -12,6 +12,7 @@ import MIcon from "../../components/MIcon";
 import { useConfirm } from "../../components/ConfirmDialog/ConfirmProvider";
 import { CourseEnvironmentsService } from "../../services/courseEnvironments";
 import { apiGet } from "../../services/api";
+import EmptyState from "../../components/EmptyState/EmptyState";
 import { TemplatesService } from "../../services/templates";
 import ConnectionEdge from "../network/firewall/edges/ConnectionEdge";
 import styles from "./CourseOperations.module.scss";
@@ -222,7 +223,7 @@ function MachineEditor({ value, edges, onChange, onEdgesChange, pveTemplates, vm
             </> : null}
           </aside>
         </div>
-      </> : <div className={styles.emptyState}><MIcon name="dns" size={32} /><p>先加入一個節點，再設定機器之間的連線。</p></div>}
+      </> : <EmptyState icon="dns" title="先加入一個節點，再設定機器之間的連線。" />}
   </section>;
 }
 
@@ -345,6 +346,7 @@ export default function CourseTemplateEditorPage() {
   return <div className={styles.page}>
     <button type="button" className={styles.backLink} onClick={() => navigate(returnTo ?? "/course-template-management")}><MIcon name="arrow_back" size={18} />{returnTo ? "返回班級上課環境" : "返回課程環境"}</button>
     <div className={styles.pageHeader}><div className={styles.pageHeading}><div className={styles.titleLine}><h1 className={styles.pageTitle}>{isNew ? "建立課程環境" : template.name}</h1></div><p className={styles.pageSubtitle}>{isNew ? "定義可重複套用到班級的學生機器組合。" : `${template.code} · v${template.version} · ${template.updatedAt}`}</p></div><div className={styles.pageActions}><button type="button" className={styles.btnSecondary} onClick={() => navigate(returnTo ?? "/course-template-management")}>返回</button>{locked ? <button type="button" className={styles.btnPrimary} disabled={saving} onClick={newVersion}><MIcon name="content_copy" size={16} />建立新版本</button> : <><button type="button" className={styles.btnSecondary} disabled={isNew || saving || !template.name.trim() || !template.code.trim() || template.nodes.length === 0 || template.nodes.length > 3 || invalidTopology} onClick={publish}><MIcon name="lock" size={16} />儲存、發布並鎖定</button><button type="button" className={styles.btnPrimary} disabled={saving || !template.name.trim() || !template.code.trim() || template.nodes.length === 0 || template.nodes.length > 3 || invalidTopology} onClick={save}><MIcon name="save" size={16} />{saving ? "儲存中…" : "儲存草稿"}</button></>}</div></div>
+    {returnTo && <p className={styles.persistentFeedback}><MIcon name="bookmark_added" size={17} /><span><strong>班級草稿已保存。</strong>請完成機器配置並「發布」模板；發布後會自動回到班級建立流程。</span></p>}
     {message && <p className={styles.persistentFeedback}><MIcon name="info" size={17} />{message}</p>}
     {!locked && saveBlockReason && <p className={styles.persistentFeedback}><MIcon name="info" size={17} />尚不能儲存：{saveBlockReason}。</p>}
     <div className={styles.stepTabs}>{TABS.map(([key, label], index) => <button type="button" key={key} className={tab === key ? styles.stepActive : ""} onClick={() => changeTab(key)}><span>{index + 1}</span>{label}</button>)}</div>

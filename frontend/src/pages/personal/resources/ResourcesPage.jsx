@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import styles from "./ResourcesPage.module.scss";
 import MIcon from "../../../components/MIcon";
 import PowerMenu from "../../../components/PowerMenu/PowerMenu";
+import SharedEmptyState from "../../../components/EmptyState/EmptyState";
 import { ResourcesService } from "../../../services/resources";
 import {
   PENDING_POLL_INTERVAL,
@@ -284,7 +285,7 @@ function ResourceCard({ resource, onUpdated, onDeleted }) {
 
   return (
     <>
-      <div className={styles.card}>
+      <div className={styles.card} data-guide="resource-card">
 
         {/* ── Header ── */}
         <div className={styles.cardHeader}>
@@ -335,7 +336,7 @@ function ResourceCard({ resource, onUpdated, onDeleted }) {
         <div className={styles.cardFooter}>
           {isLive ? (
             <>
-              <button type="button" className={styles.terminalBtn} title={isLxc ? "終端機" : "控制台"} disabled={resource.status !== "running"} onClick={() => setConsoleOpen(true)}>
+              <button type="button" className={styles.terminalBtn} title={isLxc ? "終端機" : "控制台"} disabled={resource.status !== "running"} onClick={() => setConsoleOpen(true)} data-guide="resource-console">
                 <MIcon name={isLxc ? "terminal" : "desktop_windows"} size={14} />
                 {isLxc ? "終端機" : "控制台"}
               </button>
@@ -422,15 +423,7 @@ function SkeletonCard() {
 
 /* ── Empty / Error states ── */
 function EmptyState() {
-  return (
-    <div className={styles.empty}>
-      <div className={styles.emptyIcon}>
-        <MIcon name="dns" size={40} />
-      </div>
-      <h2 className={styles.emptyTitle}>尚無資源</h2>
-      <p className={styles.emptyDesc}>申請通過的虛擬機／容器將會顯示在這裡</p>
-    </div>
-  );
+  return <SharedEmptyState icon="dns" title="尚無資源" />;
 }
 
 function ErrorState({ onRetry }) {

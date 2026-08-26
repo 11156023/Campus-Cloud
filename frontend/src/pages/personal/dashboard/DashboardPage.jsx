@@ -179,7 +179,7 @@ export default function DashboardPage() {
 
       {/* ── 快速操作（非管理員）── */}
       {!isAdmin && (
-        <nav aria-label="快速操作" className={styles.quickActions}>
+        <nav aria-label="快速操作" className={styles.quickActions} data-guide="dashboard-quick-actions">
           <button
             type="button"
             className={styles.quickPrimary}
@@ -199,7 +199,7 @@ export default function DashboardPage() {
       )}
 
       {/* ── 課程推薦 ── */}
-      <section className={styles.section}>
+      <section className={styles.section} data-guide="dashboard-courses">
         <SectionHeader
           icon="school"
           title="課程推薦"
@@ -236,7 +236,7 @@ export default function DashboardPage() {
       </section>
 
       {/* ── 快速入門 ── */}
-      <section className={styles.section}>
+      <section className={styles.section} data-guide="dashboard-templates">
         <SectionHeader
           icon="bolt"
           title="快速入門"

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import styles from "./RequestReviewPage.module.scss";
 import MIcon from "../../../components/MIcon";
+import SharedEmptyState from "../../../components/EmptyState/EmptyState";
 import { useToast } from "../../../hooks/useToast";
 import useAutoRefresh from "../../../hooks/useAutoRefresh";
 import LoadingState from "../../../components/LoadingState/LoadingState";
@@ -231,13 +232,7 @@ function StatusBadge({ status }) {
 
 function EmptyState({ tab }) {
   return (
-    <div className={styles.empty}>
-      <div className={styles.emptyIcon}>
-        <MIcon name="assignment_turned_in" size={40} />
-      </div>
-      <h2 className={styles.emptyTitle}>沒有申請</h2>
-      <p className={styles.emptyDesc}>{EMPTY_TEXT[tab]}</p>
-    </div>
+    <SharedEmptyState icon="assignment_turned_in" title="沒有申請" description={EMPTY_TEXT[tab]} />
   );
 }
 

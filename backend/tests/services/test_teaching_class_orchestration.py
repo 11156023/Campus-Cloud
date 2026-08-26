@@ -129,15 +129,18 @@ def test_full_capacity_preview_checks_cluster_and_ip(monkeypatch):
     )
     monkeypatch.setattr(
         class_capacity_service,
-        "_check_cluster_capacity",
-        lambda _session, **_kwargs: {
-            "pve1": {
-                "cpu_cores": 6,
-                "memory_bytes": 6 * 1024**3,
-                "disk_bytes": 60 * 1024**3,
-                "machines": 3,
-            }
-        },
+        "_evaluate_cluster_capacity",
+        lambda _session, **_kwargs: (
+            {
+                "pve1": {
+                    "cpu_cores": 6,
+                    "memory_bytes": 6 * 1024**3,
+                    "disk_bytes": 60 * 1024**3,
+                    "machines": 3,
+                }
+            },
+            [],
+        ),
     )
 
     result = class_capacity_service.preview(
@@ -169,13 +172,10 @@ def test_full_capacity_preview_reports_cluster_issue(monkeypatch):
         lambda _session: {"available": 20},
     )
 
-    def reject_capacity(*_args, **_kwargs):
-        raise BadRequestError("pve1 RAM 不足")
-
     monkeypatch.setattr(
         class_capacity_service,
-        "_check_cluster_capacity",
-        reject_capacity,
+        "_evaluate_cluster_capacity",
+        lambda *_args, **_kwargs: ({}, ["pve1 RAM 不足"]),
     )
 
     result = class_capacity_service.preview(

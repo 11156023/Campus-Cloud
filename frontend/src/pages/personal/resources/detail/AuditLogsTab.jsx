@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import styles from "./ResourceDetailPage.module.scss";
 import LoadingState from "../../../../components/LoadingState/LoadingState";
+import EmptyState from "../../../../components/EmptyState/EmptyState";
 import { AuditLogsService } from "../../../../services/auditLogs";
 
 /** 依動作類型決定 badge 色系（僅使用四種語意色） */
@@ -37,7 +38,7 @@ export default function AuditLogsTab({ vmid }) {
           </div>
         </div>
         {logs.data.length === 0 ? (
-          <p className={styles.stateText}>尚無紀錄</p>
+          <EmptyState icon="receipt_long" title="尚無紀錄" />
         ) : (
           <table className={styles.table}>
             <thead>

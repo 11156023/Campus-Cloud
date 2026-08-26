@@ -5,16 +5,13 @@ from sqlmodel import Session
 
 from app.core.authorizers import (
     can_bypass_resource_ownership,
-    require_resource_access,
 )
 from app.exceptions import (
     BadRequestError,
     NotFoundError,
-    PermissionDeniedError,
     ProxmoxError,
 )
 from app.models import SpecChangeRequestStatus, SpecChangeType
-from app.repositories import resource as resource_repo
 from app.repositories import spec_change_request as spec_request_repo
 from app.schemas import (
     SpecChangeRequestCreate,
@@ -24,6 +21,7 @@ from app.schemas import (
 )
 from app.services.proxmox import proxmox_service
 from app.services.resource import quota_service
+from app.services.resource.access import require_resource_management
 from app.services.user import audit_service
 
 logger = logging.getLogger(__name__)
@@ -58,14 +56,7 @@ def _check_ownership_and_get_info(
 ) -> dict:
     """Check resource ownership and return Proxmox resource info."""
     if not can_bypass_resource_ownership(user):
-        db_resource = resource_repo.get_resource_by_vmid(
-            session=session, vmid=vmid
-        )
-        if not db_resource:
-            raise PermissionDeniedError(
-                "You don't have permission to access this resource"
-            )
-        require_resource_access(user, db_resource.user_id)
+        require_resource_management(session=session, user=user, vmid=vmid)
 
     return proxmox_service.find_resource(vmid)
 

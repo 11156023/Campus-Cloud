@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import styles from "./JobsPage.module.scss";
 import MIcon from "../../../components/MIcon";
 import LoadingState from "../../../components/LoadingState/LoadingState";
+import SharedEmptyState from "../../../components/EmptyState/EmptyState";
 import { JobsService } from "../../../services/jobs";
 import JobDetailDialog from "../../../components/Jobs/JobDetailDialog";
 import { useToast } from "../../../hooks/useToast";
@@ -38,15 +39,7 @@ const STATUS_OPTIONS = [
 
 function EmptyState() {
   return (
-    <div className={styles.empty}>
-      <div className={styles.emptyIcon}>
-        <MIcon name="hourglass_empty" size={40} />
-      </div>
-      <h2 className={styles.emptyTitle}>沒有符合條件的任務</h2>
-      <p className={styles.emptyDesc}>
-        所有部署、申請與規格變更等背景任務將顯示在這裡
-      </p>
-    </div>
+    <SharedEmptyState icon="hourglass_empty" title="沒有符合條件的任務" />
   );
 }
 

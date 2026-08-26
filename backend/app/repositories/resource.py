@@ -21,12 +21,18 @@ def create_resource(
     login_password_encrypted: str | None = None,
     batch_job_id: uuid.UUID | None = None,
     request_id: uuid.UUID | None = None,
+    teaching_class_id: uuid.UUID | None = None,
+    allocation_scope: str = "personal",
+    control_policy: str = "owner",
     commit: bool = True,
 ) -> Resource:
     db_resource = Resource(
         vmid=vmid,
         request_id=request_id,
         user_id=user_id,
+        teaching_class_id=teaching_class_id,
+        allocation_scope=allocation_scope,
+        control_policy=control_policy,
         environment_type=environment_type,
         os_info=os_info,
         expiry_date=expiry_date,
@@ -58,6 +64,40 @@ def get_resources_by_user(*, session: Session, user_id: uuid.UUID) -> list[Resou
     return list(
         session.exec(select(Resource).where(Resource.user_id == user_id)).all()
     )
+
+
+def get_resources_by_teaching_class(
+    *, session: Session, teaching_class_id: uuid.UUID
+) -> list[Resource]:
+    return list(
+        session.exec(
+            select(Resource).where(
+                Resource.teaching_class_id == teaching_class_id
+            )
+        ).all()
+    )
+
+
+def assign_to_teaching_class(
+    *,
+    session: Session,
+    vmid: int,
+    teaching_class_id: uuid.UUID,
+    commit: bool = True,
+) -> Resource | None:
+    resource = get_resource_by_vmid(session=session, vmid=vmid)
+    if resource is None:
+        return None
+    resource.teaching_class_id = teaching_class_id
+    resource.allocation_scope = "teaching_class"
+    resource.control_policy = "class_member"
+    session.add(resource)
+    if commit:
+        session.commit()
+        session.refresh(resource)
+    else:
+        session.flush()
+    return resource
 
 
 def update_resource(
@@ -172,9 +212,14 @@ def list_due_auto_stops(*, session: Session, now: datetime) -> list[Resource]:
 
 
 def list_resources_with_expiry(*, session: Session) -> list[Resource]:
-    """所有設定了到期日的資源（TTL 生命週期掃描用）。"""
+    """Personal resources with expiry dates for generic TTL governance.
+
+    Teaching-class resources use the class end time and reclaim workflow as
+    their single lifecycle authority.
+    """
     stmt = select(Resource).where(
         Resource.expiry_date.isnot(None),  # type: ignore[union-attr]
+        Resource.allocation_scope == "personal",
     )
     return list(session.exec(stmt).all())
 
@@ -186,7 +231,7 @@ def list_idle_scan_candidates(
     checked_before: datetime,
     limit: int,
 ) -> list[Resource]:
-    """閒置掃描候選：running 集合中最久未檢查的前 N 台。
+    """個人資源閒置掃描候選：running 集合中最久未檢查的前 N 台。
 
     ``idle_checked_at`` 為 NULL（從未檢查）優先，其次為早於
     ``checked_before`` 者，避免每個 tick 重複打同一批 RRD。
@@ -197,6 +242,7 @@ def list_idle_scan_candidates(
         select(Resource)
         .where(
             Resource.vmid.in_(vmids),  # type: ignore[attr-defined]
+            Resource.allocation_scope == "personal",
             (
                 Resource.idle_checked_at.is_(None)  # type: ignore[union-attr]
                 | (Resource.idle_checked_at < checked_before)  # type: ignore[operator]

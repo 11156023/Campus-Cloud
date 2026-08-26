@@ -10,6 +10,7 @@ import logging
 import uuid
 from datetime import datetime, timedelta, timezone
 
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
 from app.exceptions import AppError
@@ -70,7 +71,23 @@ def create_deletion_request(
         created_at=_utc_now(),
     )
     session.add(req)
-    session.commit()
+    try:
+        session.commit()
+    except IntegrityError:
+        # Another scheduler/API replica may have queued the same VM between
+        # our read and insert. The partial unique index is the final arbiter.
+        session.rollback()
+        existing = session.exec(
+            select(DeletionRequest).where(
+                DeletionRequest.vmid == vmid,
+                DeletionRequest.status.in_(  # type: ignore[union-attr]
+                    [DeletionRequestStatus.pending, DeletionRequestStatus.running]
+                ),
+            )
+        ).first()
+        if existing is not None:
+            return existing
+        raise
     session.refresh(req)
     logger.info("Queued deletion request %s for vmid=%s", req.id, vmid)
     return req

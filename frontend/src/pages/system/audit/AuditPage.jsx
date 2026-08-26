@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import styles from "./AuditPage.module.scss";
 import MIcon from "../../../components/MIcon";
 import LoadingState from "../../../components/LoadingState/LoadingState";
+import SharedEmptyState from "../../../components/EmptyState/EmptyState";
 import { useToast } from "../../../hooks/useToast";
 import { downloadBlob } from "../../../services/api";
 import { AuditLogsService } from "../../../services/auditLogs";
@@ -28,15 +29,11 @@ function toIso(dateStr, endOfDay = false) {
 
 function EmptyState({ hasFilter }) {
   return (
-    <div className={styles.empty}>
-      <div className={styles.emptyIcon}>
-        <MIcon name={hasFilter ? "search_off" : "receipt_long"} size={40} />
-      </div>
-      <h2 className={styles.emptyTitle}>{hasFilter ? "找不到符合的紀錄" : "尚無操作紀錄"}</h2>
-      <p className={styles.emptyDesc}>
-        {hasFilter ? "請調整篩選條件後重試。" : "系統操作紀錄將會顯示在這裡"}
-      </p>
-    </div>
+    <SharedEmptyState
+      icon={hasFilter ? "search_off" : "receipt_long"}
+      title={hasFilter ? "找不到符合的紀錄" : "尚無操作紀錄"}
+      description={hasFilter ? "請調整篩選條件後重試。" : undefined}
+    />
   );
 }
 

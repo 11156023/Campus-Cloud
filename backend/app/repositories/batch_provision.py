@@ -270,6 +270,27 @@ def update_job_status(
         session.commit()
 
 
+def transition_job_to_running(*, session: Session, job_id: uuid.UUID) -> bool:
+    """Atomically start an approved/pending job without reviving a cancelled job."""
+    import sqlalchemy as sa
+
+    result = session.exec(
+        sa.update(BatchProvisionJob)
+        .where(
+            BatchProvisionJob.id == job_id,
+            col(BatchProvisionJob.status).in_(
+                [BatchProvisionJobStatus.approved, BatchProvisionJobStatus.pending]
+            ),
+        )
+        .values(status=BatchProvisionJobStatus.running)
+    )
+    if result.rowcount == 0:
+        session.rollback()
+        return False
+    session.commit()
+    return True
+
+
 def list_jobs_by_teaching_class(
     *, session: Session, teaching_class_id: uuid.UUID
 ) -> list[BatchProvisionJob]:
@@ -294,8 +315,16 @@ def clear_task_vmid_references(
         return 0
 
     for task in tasks:
+        if task.status == BatchProvisionTaskStatus.completed:
+            job = session.get(BatchProvisionJob, task.job_id)
+            if job is not None:
+                job.done = max(0, job.done - 1)
+                job.failed_count += 1
+                session.add(job)
         task.vmid = None
         task.resource_vmid = None
+        task.status = BatchProvisionTaskStatus.failed
+        task.error = "Provisioned resource was removed and requires repair"
         session.add(task)
 
     if commit:

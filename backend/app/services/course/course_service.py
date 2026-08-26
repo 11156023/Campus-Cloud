@@ -119,9 +119,14 @@ def _path_public(session: Session, path: CoursePath) -> CoursePathPublic:
     )
 
 
-def list_paths(session: Session) -> list[CoursePathPublic]:
+def list_paths(
+    session: Session, *, owner_id: uuid.UUID | None = None
+) -> list[CoursePathPublic]:
+    statement = select(CoursePath)
+    if owner_id is not None:
+        statement = statement.where(CoursePath.created_by == owner_id)
     paths = session.exec(
-        select(CoursePath).order_by(CoursePath.created_at.desc())
+        statement.order_by(CoursePath.created_at.desc())
     ).all()
     return [_path_public(session, p) for p in paths]
 

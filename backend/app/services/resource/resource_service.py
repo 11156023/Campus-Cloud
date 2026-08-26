@@ -8,6 +8,7 @@ from typing import Literal
 from sqlmodel import Session
 
 from app.exceptions import BadRequestError, ProxmoxError
+from app.models import TeachingClass, TeachingClassStatus
 from app.models.vm_request import VMProvisioningStatus, VMRequestStatus
 from app.repositories import audit_log as audit_log_repo
 from app.repositories import batch_provision as batch_provision_repo
@@ -24,6 +25,7 @@ from app.schemas.resource import (
 from app.services.network import firewall_service
 from app.services.proxmox import proxmox_service
 from app.services.scheduling.recurrence import (
+    compute_active_or_next_window,
     get_schedule_policy,
     is_in_window,
 )
@@ -37,6 +39,37 @@ def _utc_now() -> datetime:
 
 
 def _enforce_start_window(*, session: Session, vmid: int) -> None:
+    resource = resource_repo.get_resource_by_vmid(session=session, vmid=vmid)
+    if resource and resource.teaching_class_id:
+        from app.models import BatchProvisionJob, TeachingClass, TeachingClassStatus
+
+        teaching_class = session.get(TeachingClass, resource.teaching_class_id)
+        if teaching_class is None or teaching_class.status != TeachingClassStatus.active:
+            raise BadRequestError("This teaching-class resource is no longer active.")
+        job = (
+            session.get(BatchProvisionJob, resource.batch_job_id)
+            if resource.batch_job_id
+            else None
+        )
+        if job is None or not job.recurrence_rule:
+            raise BadRequestError("This teaching-class resource has no active schedule.")
+        now = _utc_now()
+        if not is_in_window(job.next_window_start, job.next_window_end, now):
+            window = compute_active_or_next_window(
+                rule=job.recurrence_rule,
+                duration_minutes=job.recurrence_duration_minutes or 0,
+                timezone=job.schedule_timezone,
+                now=now,
+            )
+            job.next_window_start, job.next_window_end = window or (None, None)
+            session.add(job)
+            session.commit()
+        if not is_in_window(job.next_window_start, job.next_window_end, now):
+            raise BadRequestError(
+                "This teaching-class resource can only be started during its class window."
+            )
+        return
+
     request = vm_request_repo.get_latest_approved_vm_request_by_vmid(
         session=session,
         vmid=vmid,
@@ -92,6 +125,14 @@ def _normalize_live_resource_status(value: object) -> ResourceStatus:
     return "unknown"
 
 
+def _allocation_scope(value: object) -> Literal["personal", "teaching_class"]:
+    return "teaching_class" if value == "teaching_class" else "personal"
+
+
+def _control_policy(value: object) -> Literal["owner", "class_member"]:
+    return "class_member" if value == "class_member" else "owner"
+
+
 def _placeholder_resource_status(req) -> ResourceStatus:
     if req.provisioning_status == VMProvisioningStatus.failed or req.provisioning_error:
         return "failed"
@@ -106,6 +147,16 @@ def _build_resource_public(
     session: Session | None = None,
 ) -> ResourcePublic:
     vmid = resource.get("vmid")
+    class_governed = bool(
+        db_resource and db_resource.allocation_scope == "teaching_class"
+    )
+    class_available = not class_governed
+    if class_governed and session is not None and db_resource.teaching_class_id:
+        teaching_class = session.get(TeachingClass, db_resource.teaching_class_id)
+        class_available = bool(
+            teaching_class
+            and teaching_class.status == TeachingClassStatus.active
+        )
     ip_address = proxmox_service.get_ip_address(node, vmid, vm_type)
     if ip_address:
         if session is not None:
@@ -128,10 +179,21 @@ def _build_resource_public(
     return ResourcePublic(
         vmid=resource.get("vmid"),
         request_id=db_resource.request_id if db_resource else None,
+        teaching_class_id=db_resource.teaching_class_id if db_resource else None,
+        allocation_scope=_allocation_scope(
+            db_resource.allocation_scope if db_resource else None
+        ),
+        control_policy=_control_policy(
+            db_resource.control_policy if db_resource else None
+        ),
         name=_from_punycode_hostname(resource.get("name", "")),
         status=_normalize_live_resource_status(resource.get("status")),
         node=node,
         type=vm_type,
+        can_control=class_available,
+        can_delete=not class_governed,
+        can_request_spec_change=not class_governed,
+        can_extend=not class_governed,
         environment_type=db_resource.environment_type if db_resource else None,
         os_info=db_resource.os_info if db_resource else None,
         expiry_date=db_resource.expiry_date if db_resource else None,
@@ -270,6 +332,11 @@ def list_by_user(
                             ResourcePublic(
                                 vmid=db_r.vmid,
                                 request_id=db_r.request_id,
+                                teaching_class_id=db_r.teaching_class_id,
+                                allocation_scope=_allocation_scope(
+                                    db_r.allocation_scope
+                                ),
+                                control_policy=_control_policy(db_r.control_policy),
                                 name=(
                                     _from_punycode_hostname(request.hostname)
                                     if request
@@ -283,6 +350,9 @@ def list_by_user(
                                     getattr(request, "resource_type", None)
                                 ),
                                 can_control=False,
+                                can_delete=False,
+                                can_request_spec_change=False,
+                                can_extend=False,
                                 environment_type=db_r.environment_type,
                                 os_info=db_r.os_info,
                                 expiry_date=db_r.expiry_date,
@@ -548,6 +618,12 @@ def delete(
     purge: bool = True,
     force: bool = False,
 ) -> dict:
+    tracked_resource = resource_repo.get_resource_by_vmid(
+        session=session, vmid=vmid
+    )
+    teaching_class_id = (
+        tracked_resource.teaching_class_id if tracked_resource else None
+    )
     try:
         node = resource_info["node"]
         resource_type = resource_info["type"]
@@ -615,9 +691,15 @@ def delete(
                 exc,
             )
 
+        if teaching_class_id is not None:
+            _mark_class_machine_reclaimed(session=session, vmid=vmid)
+
         # Remove from database (resource record + all associated audit logs)
         resource_repo.delete_resource(session=session, vmid=vmid)
         audit_log_repo.delete_audit_logs_by_vmid(session=session, vmid=vmid)
+        _mark_class_reclaimed_if_empty(
+            session=session, teaching_class_id=teaching_class_id
+        )
 
         # Keep the original approval result for audit/review reporting.
         # Mark it as no longer schedulable so the scheduler will not
@@ -658,6 +740,13 @@ def delete_orphan_db_record(
     batch task unlinking, DB row deletion, VM request scheduling stop, audit log).
     Safe to call when the VM is already gone from Proxmox.
     """
+    tracked_resource = resource_repo.get_resource_by_vmid(
+        session=session, vmid=vmid
+    )
+    teaching_class_id = (
+        tracked_resource.teaching_class_id if tracked_resource else None
+    )
+
     try:
         from app.services.network import reverse_proxy_service  # noqa: PLC0415
         reverse_proxy_service.remove_reverse_proxy_rules_for_vmid(session, vmid)
@@ -676,8 +765,13 @@ def delete_orphan_db_record(
         session.rollback()
         logger.warning("Orphan cleanup: failed to clear batch task refs for vmid=%s: %s", vmid, exc)
 
+    if teaching_class_id is not None:
+        _mark_class_machine_reclaimed(session=session, vmid=vmid)
     resource_repo.delete_resource(session=session, vmid=vmid)
     audit_log_repo.delete_audit_logs_by_vmid(session=session, vmid=vmid)
+    _mark_class_reclaimed_if_empty(
+        session=session, teaching_class_id=teaching_class_id
+    )
 
     mark_linked_request_consumed(
         session=session, vmid=vmid, marker=RESOURCE_DELETED_ORPHAN_MARKER,
@@ -691,6 +785,49 @@ def delete_orphan_db_record(
         details=f"Orphan DB cleanup for vmid={vmid} (VM not found in Proxmox)",
     )
     logger.info("Orphan DB record for vmid=%s cleaned up", vmid)
+
+
+def _mark_class_reclaimed_if_empty(
+    *, session: Session, teaching_class_id: uuid.UUID | None
+) -> None:
+    if teaching_class_id is None:
+        return
+    from app.models import TeachingClass, TeachingClassStatus
+
+    teaching_class = session.get(TeachingClass, teaching_class_id)
+    if teaching_class is None:
+        return
+    if teaching_class.status != TeachingClassStatus.archived:
+        teaching_class.status = TeachingClassStatus.partial_failed
+        teaching_class.updated_at = _utc_now()
+    if resource_repo.get_resources_by_teaching_class(
+        session=session, teaching_class_id=teaching_class_id
+    ):
+        session.add(teaching_class)
+        session.commit()
+        return
+    teaching_class.resources_reclaimed_at = _utc_now()
+    session.add(teaching_class)
+    session.commit()
+
+
+def _mark_class_machine_reclaimed(*, session: Session, vmid: int) -> None:
+    from sqlmodel import select
+
+    from app.models import TeachingClassStudentMachine
+
+    mappings = session.exec(
+        select(TeachingClassStudentMachine).where(
+            TeachingClassStudentMachine.vmid == vmid
+        )
+    ).all()
+    for mapping in mappings:
+        mapping.vmid = None
+        mapping.status = "reclaimed"
+        mapping.error = None
+        session.add(mapping)
+    if mappings:
+        session.flush()
 
 
 def get_current_stats(*, vmid: int, resource_info: dict) -> dict:
@@ -804,6 +941,20 @@ def _set_auto_stop_for_user_start(*, session: Session, vmid: int) -> None:
     policy = get_schedule_policy(session=session)
     now = _utc_now()
 
+    resource = resource_repo.get_resource_by_vmid(session=session, vmid=vmid)
+    if resource and resource.teaching_class_id and resource.batch_job_id:
+        from app.models import BatchProvisionJob
+
+        job = session.get(BatchProvisionJob, resource.batch_job_id)
+        if job and is_in_window(job.next_window_start, job.next_window_end, now):
+            resource_repo.set_auto_stop(
+                session=session,
+                vmid=vmid,
+                auto_stop_at=job.next_window_end,
+                auto_stop_reason="window_grace",
+            )
+            return
+
     request = vm_request_repo.get_latest_approved_vm_request_by_vmid(
         session=session, vmid=vmid
     )
@@ -840,6 +991,10 @@ def extend_session(
     resource = resource_repo.get_resource_by_vmid(session=session, vmid=vmid)
     if resource is None:
         raise BadRequestError("Resource not found")
+    if resource.teaching_class_id is not None:
+        raise BadRequestError(
+            "Teaching-class resources cannot be extended by individual users."
+        )
     if resource.user_id != user_id:
         raise BadRequestError("Not the owner of this resource")
     if resource.auto_stop_reason != "practice_quota":

@@ -8,21 +8,30 @@ import threading
 import uuid
 from datetime import date
 
-from sqlmodel import Session
+from sqlmodel import Session, col, select
 
 from app.core.db import engine
 from app.exceptions import BadRequestError
-from app.models import VMTemplateStatus
+from app.models import (
+    ClassCapacityReservation,
+    TeachingClass,
+    TeachingClassMachineNode,
+    TeachingClassStatus,
+    TeachingClassStudent,
+    TeachingClassStudentMachine,
+    VMTemplateStatus,
+)
 from app.models.batch_provision import (
     BatchProvisionJob,
     BatchProvisionJobStatus,
     BatchProvisionTask,
 )
 from app.repositories import batch_provision as bp_repo
+from app.repositories import resource as resource_repo
 from app.repositories import vm_template as vm_template_repo
 from app.schemas import LXCCreateRequest, VMCreateRequest
 from app.services.network import ip_management_service
-from app.services.proxmox import provisioning_service
+from app.services.proxmox import provisioning_service, proxmox_service
 from app.services.resource import quota_service
 from app.services.template import clone_service
 
@@ -216,11 +225,10 @@ def review_batch_jobs(
 def _run_queue(job_id: uuid.UUID) -> None:
     """背景執行緒：逐一建立每個成員的資源。"""
     with Session(engine) as session:
-        bp_repo.update_job_status(
-            session=session,
-            job_id=job_id,
-            status=BatchProvisionJobStatus.running,
-        )
+        if not bp_repo.transition_job_to_running(
+            session=session, job_id=job_id
+        ):
+            return
 
     with Session(engine) as session:
         tasks = bp_repo.get_pending_tasks(session=session, job_id=job_id)
@@ -232,6 +240,8 @@ def _run_queue(job_id: uuid.UUID) -> None:
     with Session(engine) as session:
         job = bp_repo.get_job(session=session, job_id=job_id)
         if job is None:
+            return
+        if job.status == BatchProvisionJobStatus.cancelled:
             return
         final = (
             BatchProvisionJobStatus.failed
@@ -261,8 +271,26 @@ def _process_task(*, job_id: uuid.UUID, task_id: uuid.UUID) -> None:
         member_index = task.member_index
         user_id = task.user_id
         resource_type = job.resource_type
+        teaching_class_id = job.teaching_class_id
         hostname = _build_hostname(job.hostname_prefix, member_index)
         start_on_create = job.recurrence_rule is None
+        teaching_class = session.get(TeachingClass, teaching_class_id)
+        class_archived = (
+            teaching_class is None
+            or teaching_class.status == TeachingClassStatus.archived
+        )
+        job_cancelled = job.status == BatchProvisionJobStatus.cancelled
+        initiated_by_id = job.initiated_by
+
+    if class_archived or job_cancelled:
+        with Session(engine) as session:
+            bp_repo.update_task_failed(
+                session=session,
+                task_id=task_id,
+                error="Teaching class is archived or provisioning was cancelled",
+            )
+            bp_repo.increment_job_failed(session=session, job_id=job_id)
+        return
 
     with Session(engine) as session:
         bp_repo.update_task_running(session=session, task_id=task_id)
@@ -277,27 +305,126 @@ def _process_task(*, job_id: uuid.UUID, task_id: uuid.UUID) -> None:
                 params=params,
                 start=start_on_create,
                 batch_job_id=job_id,
+                teaching_class_id=teaching_class_id,
             )
 
         # E1：批量建立完成點也建初始快照（best-effort）
-        from app.services.resource import reset_service  # noqa: PLC0415
+        with Session(engine) as session:
+            resource = resource_repo.assign_to_teaching_class(
+                session=session,
+                vmid=vmid,
+                teaching_class_id=teaching_class_id,
+            )
+            if resource is None:
+                raise RuntimeError(
+                    f"Provisioned class resource {vmid} has no database record"
+                )
+            teaching_class = session.get(TeachingClass, teaching_class_id)
+            if (
+                teaching_class is None
+                or teaching_class.status == TeachingClassStatus.archived
+            ):
+                resource_info = proxmox_service.find_resource(vmid)
+                from app.services.resource import resource_service  # noqa: PLC0415
 
-        reset_service.ensure_init_snapshot(vmid)
+                resource_service.delete(
+                    session=session,
+                    vmid=vmid,
+                    resource_info=resource_info,
+                    user_id=initiated_by_id,
+                    purge=True,
+                    force=True,
+                )
+                raise RuntimeError(
+                    "Teaching class was archived while resource was provisioning"
+                )
+
+        # Snapshot failure must not turn a successfully created resource into
+        # a failed task, otherwise retrying can create a duplicate machine.
+        try:
+            from app.services.resource import reset_service  # noqa: PLC0415
+
+            reset_service.ensure_init_snapshot(vmid)
+        except Exception:
+            logger.warning("Initial snapshot failed for class vmid=%s", vmid)
 
         with Session(engine) as session:
             bp_repo.update_task_done(session=session, task_id=task_id, vmid=vmid)
+            _sync_class_machine_mapping(
+                session=session,
+                job_id=job_id,
+                task_id=task_id,
+                user_id=user_id,
+                vmid=vmid,
+                status="completed",
+            )
             bp_repo.increment_job_done(session=session, job_id=job_id)
 
         logger.info("Batch task %s done: vmid=%d user=%s", task_id, vmid, user_id)
 
-    except Exception as exc:
-        error_msg = str(exc)[:500]
+    except Exception:
+        logger.exception("Batch task failed task=%s user=%s", task_id, user_id)
+        error_msg = "Provisioning failed. Retry or contact an administrator."
         with Session(engine) as session:
             bp_repo.update_task_failed(
                 session=session, task_id=task_id, error=error_msg
             )
+            _sync_class_machine_mapping(
+                session=session,
+                job_id=job_id,
+                task_id=task_id,
+                user_id=user_id,
+                vmid=None,
+                status="failed",
+                error=error_msg,
+            )
             bp_repo.increment_job_failed(session=session, job_id=job_id)
-        logger.error("Batch task %s failed user=%s: %s", task_id, user_id, error_msg)
+
+
+def _sync_class_machine_mapping(
+    *,
+    session: Session,
+    job_id: uuid.UUID,
+    task_id: uuid.UUID,
+    user_id: uuid.UUID,
+    vmid: int | None,
+    status: str,
+    error: str | None = None,
+) -> None:
+    """Persist the class-to-student machine grant as soon as provisioning ends."""
+    job = session.get(BatchProvisionJob, job_id)
+    if job is None:
+        return
+    node = session.exec(
+        select(TeachingClassMachineNode).where(
+            TeachingClassMachineNode.batch_job_id == job_id
+        )
+    ).first()
+    enrollment = session.exec(
+        select(TeachingClassStudent).where(
+            TeachingClassStudent.class_id == job.teaching_class_id,
+            TeachingClassStudent.user_id == user_id,
+        )
+    ).first()
+    if node is None or enrollment is None:
+        return
+    mapping = session.exec(
+        select(TeachingClassStudentMachine).where(
+            TeachingClassStudentMachine.class_student_id == enrollment.id,
+            TeachingClassStudentMachine.machine_node_id == node.id,
+        )
+    ).first()
+    if mapping is None:
+        mapping = TeachingClassStudentMachine(
+            class_student_id=enrollment.id,
+            machine_node_id=node.id,
+        )
+    mapping.batch_task_id = task_id
+    mapping.vmid = vmid
+    mapping.status = status
+    mapping.error = error
+    session.add(mapping)
+    session.commit()
 
 
 def _provision_one(
@@ -309,20 +436,37 @@ def _provision_one(
     params: dict,
     start: bool = True,
     batch_job_id: uuid.UUID | None = None,
+    teaching_class_id: uuid.UUID | None = None,
 ) -> int:
     """建立單一資源，回傳 vmid。
 
     指定 ``vm_template_id`` 時走範本系統 2.0 統一克隆路徑
     （linked 優先退 full）；否則沿用 provisioning_service 舊路徑。
     """
-    quota_service.check_quota(
-        session,
-        user_id,
-        delta_cores=int(params.get("cores") or 0),
-        delta_memory_mb=int(params.get("memory") or 0),
-        delta_disk_gb=int(params.get("disk_size") or params.get("rootfs_size") or 0),
-        delta_instances=1,
-    )
+    # Formal classes use the administrator-approved whole-class capacity
+    # reservation and must not consume each student's personal quota.
+    if teaching_class_id is not None:
+        reservation = session.exec(
+            select(ClassCapacityReservation).where(
+                ClassCapacityReservation.class_id == teaching_class_id,
+                col(ClassCapacityReservation.status).in_(["reserved", "consumed"]),
+            )
+        ).first()
+        if reservation is None:
+            raise BadRequestError(
+                "Teaching class has no approved capacity reservation"
+            )
+    else:
+        quota_service.check_quota(
+            session,
+            user_id,
+            delta_cores=int(params.get("cores") or 0),
+            delta_memory_mb=int(params.get("memory") or 0),
+            delta_disk_gb=int(
+                params.get("disk_size") or params.get("rootfs_size") or 0
+            ),
+            delta_instances=1,
+        )
 
     if params.get("vm_template_id"):
         payload = {

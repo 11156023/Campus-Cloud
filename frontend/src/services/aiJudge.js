@@ -45,11 +45,21 @@ export const AiJudgeService = {
     );
   },
 
-  createSession(classId, { title, selectedFileId = null }) {
-    return apiPost(`/api/v1/teaching-classes/${classId}/judge/sessions/`, {
+  createSession(classId, {
+    title,
+    selectedFileId = null,
+    creationMode,
+    rubricName,
+    environmentKeys,
+  }) {
+    const payload = {
       title,
       selected_file_id: selectedFileId,
-    });
+    };
+    if (creationMode) payload.creation_mode = creationMode;
+    if (rubricName !== undefined) payload.rubric_name = rubricName;
+    if (environmentKeys !== undefined) payload.environment_keys = environmentKeys;
+    return apiPost(`/api/v1/teaching-classes/${classId}/judge/sessions/`, payload);
   },
 
   getSession(classId, sessionId) {
@@ -60,6 +70,13 @@ export const AiJudgeService = {
     return apiPatch(
       `/api/v1/teaching-classes/${classId}/judge/sessions/${sessionId}`,
       changes,
+    );
+  },
+
+  forkSession(classId, sessionId, title = null) {
+    return apiPost(
+      `/api/v1/teaching-classes/${classId}/judge/sessions/${sessionId}/fork`,
+      title ? { title } : {},
     );
   },
 
@@ -83,10 +100,14 @@ export const AiJudgeService = {
     );
   },
 
-  sendSessionMessage(classId, sessionId, content) {
+  sendSessionMessage(classId, sessionId, content, analysisRevision = null) {
+    const payload = { content };
+    if (analysisRevision !== null && analysisRevision !== undefined) {
+      payload.analysis_revision = analysisRevision;
+    }
     return apiPost(
       `/api/v1/teaching-classes/${classId}/judge/sessions/${sessionId}/messages`,
-      { content },
+      payload,
     );
   },
 
@@ -137,11 +158,29 @@ export const AiJudgeService = {
   },
 
   /** 更新已保存評分表的分析結果（項目編輯後持久化） */
-  updateFileAnalysis(classId, fileId, analysis) {
+  updateFileAnalysis(classId, fileId, analysis, expectedRevision = null) {
+    const payload = { analysis };
+    if (expectedRevision !== null && expectedRevision !== undefined) {
+      payload.expected_revision = expectedRevision;
+    }
     return apiPatch(
       `/api/v1/teaching-classes/${classId}/judge/files/${fileId}/analysis`,
-      { analysis },
+      payload,
     );
+  },
+
+  updateFileMetadata(classId, fileId, metadata) {
+    return apiPatch(
+      `/api/v1/teaching-classes/${classId}/judge/files/${fileId}`,
+      metadata,
+    );
+  },
+
+  createBlankFile(classId, { displayName, environmentKeys }) {
+    return apiPost(`/api/v1/teaching-classes/${classId}/judge/files/blank`, {
+      display_name: displayName,
+      environment_keys: environmentKeys,
+    });
   },
 
   /** 下載評分表原始檔 */

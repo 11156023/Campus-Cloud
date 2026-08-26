@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import styles from "./QuotasPage.module.scss";
 import MIcon from "../../../components/MIcon";
 import LoadingState from "../../../components/LoadingState/LoadingState";
+import EmptyState from "../../../components/EmptyState/EmptyState";
 import { QuotasService } from "../../../services/quotas";
 import { UsersService } from "../../../services/users";
 import { useConfirm } from "../../../components/ConfirmDialog/ConfirmProvider";
@@ -438,15 +439,15 @@ export default function QuotasPage() {
         {quotas === null ? (
           <LoadingState />
         ) : quotas.length === 0 ? (
-          <div className={styles.empty}>
-            <MIcon name="data_usage" size={32} />
-            <p>
-              尚未設定任何個人覆寫，所有使用者都套用上方的全域預設值
-              {globalQuota &&
-                `（${fmtLimit(globalQuota.max_cpu_cores, "cores")} / ${fmtLimit(globalQuota.max_memory_mb, "MB")} / ${fmtLimit(globalQuota.max_disk_gb, "GB")} / ${fmtLimit(globalQuota.max_instances, "台")}）`}
-              。
-            </p>
-          </div>
+          <EmptyState
+            icon="data_usage"
+            title="尚未設定任何個人覆寫"
+            description={`所有使用者都套用上方的全域預設值${
+              globalQuota
+                ? `（${fmtLimit(globalQuota.max_cpu_cores, "cores")} / ${fmtLimit(globalQuota.max_memory_mb, "MB")} / ${fmtLimit(globalQuota.max_disk_gb, "GB")} / ${fmtLimit(globalQuota.max_instances, "台")}）`
+                : ""
+            }。`}
+          />
         ) : (
           <table className={styles.table}>
             <thead>

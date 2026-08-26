@@ -12,7 +12,11 @@ export default defineConfig(({ mode }) => {
     },
     plugins: [react()],
     server: {
+      host: process.env.HOST || "127.0.0.1",
       port: Number(process.env.PORT) || 5173,
+      // 前端開發埠與本機 CORS/代理設定固定對齊；占用時直接失敗，
+      // 避免 Vite 靜默改用下一個埠造成前端與後端 origin 不一致。
+      strictPort: true,
       // VITE_API_URL 留空（same-origin）時，/api 由 dev server 轉發到後端，
       // 讓 dev server 不必落在後端 CORS 白名單的埠
       proxy: {

@@ -203,12 +203,18 @@ class ResourcePublic(BaseModel):
 
     vmid: int | None
     request_id: uuid.UUID | None = None
+    teaching_class_id: uuid.UUID | None = None
+    allocation_scope: Literal["personal", "teaching_class"] = "personal"
+    control_policy: Literal["owner", "class_member"] = "owner"
     name: str
     status: ResourceStatus
     node: str
     type: str
     is_placeholder: bool = False
     can_control: bool = True
+    can_delete: bool = True
+    can_request_spec_change: bool = True
+    can_extend: bool = True
     environment_type: str | None = None
     os_info: str | None = None
     expiry_date: date | None = None

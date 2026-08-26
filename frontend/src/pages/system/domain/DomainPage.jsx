@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import styles from "./DomainPage.module.scss";
 import MIcon from "../../../components/MIcon";
 import LoadingState from "../../../components/LoadingState/LoadingState";
+import EmptyState from "../../../components/EmptyState/EmptyState";
 import { useToast } from "../../../hooks/useToast";
 import { CloudflareService } from "../../../services/cloudflare";
 
@@ -363,7 +364,7 @@ export default function DomainPage() {
             用同一個工作台完成 Cloudflare 供應商連線、Zone 檢視，以及 DNS record 的新增、調整與刪除。
           </p>
         </div>
-        <div className={styles.headerActions}>
+        <div className={styles.headerActions} data-guide="domain-connect">
           <button
             type="button"
             className={styles.btnSecondary}
@@ -384,7 +385,7 @@ export default function DomainPage() {
       </div>
 
       {config && (
-        <div className={styles.configBar}>
+        <div className={styles.configBar} data-guide="domain-status">
           <span className={`${styles.badge} ${isConfigured ? styles.badge_success : styles.badge_danger}`}>
             <MIcon name={isConfigured ? "check_circle" : "error"} size={13} />
             {isConfigured ? "已連線" : "未設定"}
@@ -397,17 +398,15 @@ export default function DomainPage() {
       )}
 
       {!isConfigured && !loadingZones ? (
-        <div className={styles.empty}>
-          <div className={styles.emptyIcon}>
-            <MIcon name="domain" size={40} />
-          </div>
-          <h2 className={styles.emptyTitle}>尚未連線 Cloudflare</h2>
-          <p className={styles.emptyDesc}>點擊「連線設定」輸入 Account ID 與 API Token 後即可載入 Zone 與 DNS 紀錄</p>
-        </div>
+        <EmptyState
+          icon="domain"
+          title="尚未連線 Cloudflare"
+          description="點擊「連線設定」輸入 Account ID 與 API Token 後即可載入 Zone 與 DNS 紀錄"
+        />
       ) : (
         <div className={styles.workbench}>
           {/* Zone 側欄 */}
-          <div className={styles.zonePanel}>
+          <div className={styles.zonePanel} data-guide="domain-zones">
             <h2 className={styles.panelTitle}>Zones（{zones.length}）</h2>
             {loadingZones ? (
               <LoadingState />
@@ -434,7 +433,7 @@ export default function DomainPage() {
 
           {/* DNS record 主區 */}
           <div className={styles.recordPanel}>
-            <div className={styles.recordToolbar}>
+            <div className={styles.recordToolbar} data-guide="domain-records">
               <div className={styles.searchBox}>
                 <MIcon name="search" size={16} />
                 <input

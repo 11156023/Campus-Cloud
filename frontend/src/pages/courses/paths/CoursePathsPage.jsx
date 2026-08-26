@@ -1,153 +1,85 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import LoadingState from "../../../components/LoadingState/LoadingState";
 import MIcon from "../../../components/MIcon";
-import { useToast } from "../../../hooks/useToast";
+import EmptyState from "../../../components/EmptyState/EmptyState";
 import { CoursesService } from "../../../services/courses";
 import styles from "./CoursePathsPage.module.scss";
 
-const DIFFICULTY_META = {
-  easy:   { label: "簡單", cls: "diff_easy" },
-  medium: { label: "中等", cls: "diff_medium" },
-  hard:   { label: "困難", cls: "diff_hard" },
-};
+export function courseDestination(pathId) {
+  return `/dashboard-new/course/${pathId}`;
+}
 
 function ProgressBar({ percent }) {
   return (
-    <div className={styles.progressBar}>
-      <div
-        className={styles.progressFill}
-        style={{ width: `${Math.min(100, percent)}%` }}
-      />
+    <div className={styles.progressBar} aria-label={`課程進度 ${percent}%`}>
+      <span className={styles.progressFill} style={{ width: `${Math.min(100, percent)}%` }} />
     </div>
   );
 }
 
-function PathCard({ path, expanded, onToggle }) {
-  const navigate = useNavigate();
-  const [detail, setDetail] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const toast = useToast();
-
-  useEffect(() => {
-    if (!expanded || detail) return;
-    setLoading(true);
-    CoursesService.getPath(path.id)
-      .then(setDetail)
-      .catch((e) => toast.error(e.message ?? "載入房間失敗"))
-      .finally(() => setLoading(false));
-  }, [expanded, detail, path.id, toast]);
-
+function CourseCard({ path, onOpen }) {
   return (
-    <div className={styles.card}>
-      <button type="button" className={styles.cardHeader} onClick={onToggle}>
-        <span className={styles.cardIcon}>
-          <MIcon name="flag" size={22} />
+    <button type="button" className={styles.courseCard} onClick={onOpen}>
+      <span className={styles.cardIcon}><MIcon name="school" size={23} /></span>
+      <span className={styles.cardContent}>
+        <span className={styles.cardTopline}>
+          <strong>{path.title}</strong>
+          <em>{path.progress_percent}%</em>
         </span>
-        <span className={styles.cardHeading}>
-          <span className={styles.cardTitle}>{path.title}</span>
-          {path.description && (
-            <span className={styles.cardDesc}>{path.description}</span>
-          )}
-        </span>
+        {path.description && <span className={styles.cardDesc}>{path.description}</span>}
         <span className={styles.cardMeta}>
-          <span className={styles.metaText}>
-            {path.room_count} 個房間 · {path.completed_questions}/
-            {path.total_questions} 題
-          </span>
-          <span className={styles.percentText}>{path.progress_percent}%</span>
+          {path.completed_questions}/{path.total_questions} 個學習檢查已完成
+          {path.room_count > 0 && ` · ${path.room_count} 個課程單元`}
         </span>
-        <MIcon name={expanded ? "expand_less" : "expand_more"} size={20} />
-      </button>
-      <ProgressBar percent={path.progress_percent} />
-
-      {expanded && (
-        <div className={styles.roomList}>
-          {loading && <LoadingState />}
-          {!loading &&
-            detail?.rooms?.map((room) => {
-              const diff = DIFFICULTY_META[room.difficulty] ?? DIFFICULTY_META.easy;
-              return (
-                <button
-                  key={room.id}
-                  type="button"
-                  className={styles.roomRow}
-                  onClick={() => navigate(`/courses/rooms/${room.id}`)}
-                >
-                  <MIcon
-                    name={
-                      room.progress_percent >= 100
-                        ? "check_circle"
-                        : room.has_lab
-                          ? "computer"
-                          : "menu_book"
-                    }
-                    size={18}
-                  />
-                  <span className={styles.roomTitle}>{room.title}</span>
-                  {room.category && (
-                    <span className={styles.roomCategory}>{room.category}</span>
-                  )}
-                  <span className={`${styles.diffBadge} ${styles[diff.cls]}`}>
-                    {diff.label}
-                  </span>
-                  <span className={styles.roomProgress}>
-                    {room.completed_questions}/{room.total_questions} 題 ·{" "}
-                    {room.progress_percent}%
-                  </span>
-                </button>
-              );
-            })}
-          {!loading && detail && detail.rooms.length === 0 && (
-            <div className={styles.stateText}>此路徑尚無房間</div>
-          )}
-        </div>
-      )}
-    </div>
+        <ProgressBar percent={path.progress_percent} />
+      </span>
+      <span className={styles.cardAction}>查看任務<MIcon name="arrow_forward" size={17} /></span>
+    </button>
   );
 }
 
 export default function CoursePathsPage() {
+  const navigate = useNavigate();
   const [paths, setPaths] = useState(null);
   const [error, setError] = useState("");
-  const [expandedId, setExpandedId] = useState(null);
 
   useEffect(() => {
     CoursesService.listPaths()
       .then(setPaths)
-      .catch((e) => setError(e.message ?? "載入失敗"));
+      .catch((requestError) => setError(requestError.message ?? "載入失敗"));
   }, []);
 
   return (
     <div className={styles.page}>
-      <div className={styles.pageHeader}>
+      <header className={styles.pageHeader}>
         <div className={styles.pageHeading}>
-          <h1 className={styles.pageTitle}>課程學習</h1>
-          <p className={styles.pageSubtitle}>
-            選擇學習路徑，進入房間後啟動實驗機並提交 Flag 完成任務
-          </p>
+          <p className={styles.eyebrow}>我的學習</p>
+          <h1 className={styles.pageTitle}>我的課程</h1>
+          <p className={styles.pageSubtitle}>選擇課程後，直接查看截至今天的任務與老師分配的練習機器。</p>
         </div>
-      </div>
+      </header>
 
       {error && <div className={styles.stateText}>{error}</div>}
-      {!error && paths === null && <LoadingState fullPage />}
+      {!error && paths === null && <div className={styles.stateText}>正在整理你的課程…</div>}
       {!error && paths?.length === 0 && (
-        <div className={styles.empty}>
-          <MIcon name="school" size={32} />
-          <span>目前沒有已發布的學習路徑</span>
-        </div>
+        <EmptyState
+          icon="school"
+          title="目前沒有已發布的課程"
+          description="老師發布課程後會自動出現在這裡。"
+        />
       )}
 
-      {paths?.map((path) => (
-        <PathCard
-          key={path.id}
-          path={path}
-          expanded={expandedId === path.id}
-          onToggle={() =>
-            setExpandedId((cur) => (cur === path.id ? null : path.id))
-          }
-        />
-      ))}
+      {paths?.length > 0 && (
+        <div className={styles.courseList}>
+          {paths.map((path) => (
+            <CourseCard
+              key={path.id}
+              path={path}
+              onOpen={() => navigate(courseDestination(path.id))}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import LoadingState from "../../components/LoadingState/LoadingState";
 import MIcon from "../../components/MIcon";
 import { CourseEnvironmentsService } from "../../services/courseEnvironments";
+import EmptyState from "../../components/EmptyState/EmptyState";
 import styles from "./CourseOperations.module.scss";
 
 const STATUS_LABEL = { published: "已發布", draft: "草稿", retired: "已停用" };
@@ -27,7 +28,7 @@ export default function CourseTemplateManagementPage() {
     return matchesQuery && (status === "all" || template.status === status);
   }), [query, status, templates]);
 
-  return <div className={styles.page}>
+  return <div className={`${styles.page} ${styles.listPage}`}>
     <div className={styles.pageHeader}>
       <div className={styles.pageHeading}>
         <div className={styles.titleLine}><h1 className={styles.pageTitle}>課程環境</h1></div>
@@ -49,7 +50,7 @@ export default function CourseTemplateManagementPage() {
         <td><span className={`${styles.statusBadge} ${styles[`status_${template.status}`]}`}>{STATUS_LABEL[template.status]}</span></td>
         <td><button type="button" className={styles.iconBtn} aria-label="開啟模板"><MIcon name="chevron_right" size={19} /></button></td>
       </tr>)}</tbody></table></div>
-      {!rows.length && <div className={styles.emptyState}><MIcon name="view_quilt" size={32} /><p>沒有符合條件的課程環境。</p></div>}</>}
+      {!rows.length && <EmptyState icon="view_quilt" title="沒有符合條件的課程環境。" />}
     </section>
   </div>;
 }

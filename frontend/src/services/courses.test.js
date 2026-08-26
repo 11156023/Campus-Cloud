@@ -55,6 +55,34 @@ describe("CoursesService", () => {
     expect(JSON.parse(init.body)).toEqual({ answer: "FLAG{x}" });
   });
 
+  test("學生 AI Check 使用課程與任務範圍的專用端點", async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonRes(200, { run_id: "run-1", status: "pending" }))
+      .mockResolvedValueOnce(jsonRes(200, { run_id: "run-1", status: "completed" }));
+
+    await CoursesService.startAiCheck("path-1", "assignment-1");
+    await CoursesService.getAiCheck("path-1", "assignment-1", "run-1");
+
+    expect(fetchMock.mock.calls[0][0]).toContain(
+      "/api/v1/courses/paths/path-1/ai-assignments/assignment-1/checks",
+    );
+    expect(fetchMock.mock.calls[0][1].method).toBe("POST");
+    expect(fetchMock.mock.calls[1][0]).toContain(
+      "/api/v1/courses/paths/path-1/ai-assignments/assignment-1/checks/run-1",
+    );
+    expect(fetchMock.mock.calls[1][1].method).toBe("GET");
+  });
+
+  test("getPracticeMachines 取得課程的所有班級機器", async () => {
+    fetchMock.mockResolvedValueOnce(jsonRes(200, []));
+
+    await CoursesService.getPracticeMachines("path-1");
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toContain("/api/v1/courses/paths/path-1/practice-machines");
+    expect(init.method).toBe("GET");
+  });
+
   test("terminateDeployment 以 DELETE 打 /deployments/{id}", async () => {
     fetchMock.mockResolvedValueOnce(jsonRes(200, { status: "expired" }));
     await CoursesService.terminateDeployment("d-1");
