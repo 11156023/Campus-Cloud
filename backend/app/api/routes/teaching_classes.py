@@ -64,6 +64,7 @@ class ClassCreate(BaseModel):
     name: str = Field(min_length=1, max_length=255)
     code: str = Field(min_length=1, max_length=80)
     term: str = Field(min_length=1, max_length=80)
+    location: str | None = Field(default=None, max_length=255)
     start_date: date
     end_date: date
     weekday: int = Field(ge=0, le=6)
@@ -77,6 +78,7 @@ class ClassPatch(BaseModel):
     name: str | None = None
     code: str | None = None
     term: str | None = None
+    location: str | None = Field(default=None, max_length=255)
     start_date: date | None = None
     end_date: date | None = None
     weekday: int | None = Field(default=None, ge=0, le=6)

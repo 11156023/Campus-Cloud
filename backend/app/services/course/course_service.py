@@ -5,6 +5,8 @@ Flag 明文只在 create/update 進入，經 flag_service 雜湊後入庫；
 """
 
 import uuid
+from datetime import UTC, datetime
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlmodel import Session, func, select
 
@@ -16,6 +18,10 @@ from app.models import (
     CourseQuestionType,
     CourseRoom,
     CourseTask,
+    TeachingClass,
+    TeachingClassStatus,
+    TeachingClassStudent,
+    User,
     VMTemplate,
     VMTemplateStatus,
     get_datetime_utc,
@@ -35,6 +41,7 @@ from app.schemas.course import (
     CourseRoomStudentDetail,
     CourseRoomSummary,
     CourseRoomUpdate,
+    CourseScheduleStudent,
     CourseTaskCreate,
     CourseTaskPublic,
     CourseTaskStudent,
@@ -107,6 +114,11 @@ def _room_count(session: Session, path_id: uuid.UUID) -> int:
 
 
 def _path_public(session: Session, path: CoursePath) -> CoursePathPublic:
+    teaching_class = (
+        session.get(TeachingClass, path.teaching_class_id)
+        if path.teaching_class_id
+        else None
+    )
     return CoursePathPublic(
         id=path.id,
         title=path.title,
@@ -116,6 +128,8 @@ def _path_public(session: Session, path: CoursePath) -> CoursePathPublic:
         created_at=path.created_at,
         updated_at=path.updated_at,
         room_count=_room_count(session, path.id),
+        teaching_class_id=path.teaching_class_id,
+        teaching_class_name=teaching_class.name if teaching_class else None,
     )
 
 
@@ -134,10 +148,12 @@ def list_paths(
 def create_path(
     session: Session, *, user_id: uuid.UUID, data: CoursePathCreate
 ) -> CoursePathPublic:
+    _ensure_class_available(session, data.teaching_class_id)
     path = CoursePath(
         title=data.title,
         description=data.description,
         created_by=user_id,
+        teaching_class_id=data.teaching_class_id,
     )
     session.add(path)
     session.commit()
@@ -153,6 +169,13 @@ def update_path(
         path.title = data.title
     if data.description is not None:
         path.description = data.description
+    if "teaching_class_id" in data.model_fields_set:
+        _ensure_class_available(
+            session,
+            data.teaching_class_id,
+            excluding_path_id=path.id,
+        )
+        path.teaching_class_id = data.teaching_class_id
     path.updated_at = get_datetime_utc()
     session.add(path)
     session.commit()
@@ -178,6 +201,25 @@ def delete_path(session: Session, *, path_id: uuid.UUID) -> None:
     path = get_path_or_404(session, path_id)
     session.delete(path)
     session.commit()
+
+
+def _ensure_class_available(
+    session: Session,
+    teaching_class_id: uuid.UUID | None,
+    *,
+    excluding_path_id: uuid.UUID | None = None,
+) -> None:
+    """Keep the one-class-to-one-path relationship understandable before commit."""
+
+    if teaching_class_id is None:
+        return
+    statement = select(CoursePath).where(
+        CoursePath.teaching_class_id == teaching_class_id
+    )
+    if excluding_path_id is not None:
+        statement = statement.where(CoursePath.id != excluding_path_id)
+    if session.exec(statement).first() is not None:
+        raise BadRequestError("This teaching class is already linked to another path")
 
 
 # ── 房間 CRUD ──────────────────────────────────────────────────────────────
@@ -447,6 +489,122 @@ def list_published_paths(
             )
         )
     return summaries
+
+
+def _class_timezone(item: TeachingClass) -> ZoneInfo:
+    try:
+        return ZoneInfo(item.timezone)
+    except ZoneInfoNotFoundError:
+        return ZoneInfo("Asia/Taipei")
+
+
+def get_student_class_for_path(
+    session: Session,
+    *,
+    user_id: uuid.UUID,
+    path_id: uuid.UUID,
+) -> TeachingClass | None:
+    """Resolve the exact active class enrollment linked to one published path."""
+
+    path = get_published_path_or_404(session, path_id)
+    if path.teaching_class_id is None:
+        return None
+    return session.exec(
+        select(TeachingClass)
+        .join(
+            TeachingClassStudent,
+            TeachingClassStudent.class_id == TeachingClass.id,
+        )
+        .where(
+            TeachingClass.id == path.teaching_class_id,
+            TeachingClassStudent.user_id == user_id,
+            TeachingClassStudent.status == "active",
+        )
+    ).first()
+
+
+def list_student_schedule(
+    session: Session,
+    *,
+    user_id: uuid.UUID,
+    now: datetime | None = None,
+) -> list[CourseScheduleStudent]:
+    """Return only today's linked classes in their real timetable order."""
+
+    current = now or datetime.now(UTC)
+    rows = session.exec(
+        select(CoursePath, TeachingClass)
+        .join(TeachingClass, CoursePath.teaching_class_id == TeachingClass.id)
+        .join(
+            TeachingClassStudent,
+            TeachingClassStudent.class_id == TeachingClass.id,
+        )
+        .where(
+            CoursePath.status == CoursePathStatus.published,
+            TeachingClass.status == TeachingClassStatus.active,
+            TeachingClassStudent.user_id == user_id,
+            TeachingClassStudent.status == "active",
+        )
+    ).all()
+
+    teacher_ids = {teaching_class.owner_id for _, teaching_class in rows}
+    teachers = {
+        teacher.id: teacher
+        for teacher in session.exec(select(User).where(User.id.in_(teacher_ids))).all()
+    } if teacher_ids else {}
+    result: list[CourseScheduleStudent] = []
+    for path, teaching_class in rows:
+        timezone = _class_timezone(teaching_class)
+        local_now = current.astimezone(timezone)
+        local_date = local_now.date()
+        if not (
+            teaching_class.start_date <= local_date <= teaching_class.end_date
+            and local_date.weekday() == teaching_class.weekday
+        ):
+            continue
+        starts_at = datetime.combine(
+            local_date,
+            teaching_class.start_time,
+            tzinfo=timezone,
+        )
+        ends_at = datetime.combine(
+            local_date,
+            teaching_class.end_time,
+            tzinfo=timezone,
+        )
+        if local_now < starts_at:
+            state, label = "later", "今天稍後"
+        elif local_now <= ends_at:
+            state, label = "now", "正在上課"
+        else:
+            state, label = "ended", "今天已結束"
+        total, completed = progress_service.path_question_counts(
+            session,
+            path_id=path.id,
+            user_id=user_id,
+        )
+        teacher = teachers.get(teaching_class.owner_id)
+        result.append(
+            CourseScheduleStudent(
+                id=path.id,
+                title=path.title,
+                description=path.description,
+                room_count=_room_count(session, path.id),
+                total_questions=total,
+                completed_questions=completed,
+                progress_percent=flag_service.progress_percent(completed, total),
+                teaching_class_id=teaching_class.id,
+                teaching_class_name=teaching_class.name,
+                session_date=local_date,
+                start_at=starts_at,
+                end_at=ends_at,
+                teacher=(teacher.full_name or teacher.email) if teacher else "授課老師",
+                location=teaching_class.location,
+                state=state,  # type: ignore[arg-type]
+                label=label,
+            )
+        )
+    return sorted(result, key=lambda row: row.start_at)
 
 
 def get_published_path_or_404(
