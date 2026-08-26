@@ -37,6 +37,7 @@ const CourseTemplateManagementPage = lazy(() => import("./pages/course-operation
 const CourseTemplateEditorPage = lazy(() => import("./pages/course-operations/CourseTemplateEditorPage"));
 const ClassManagementPage = lazy(() => import("./pages/course-operations/ClassManagementPage"));
 const ClassWorkspacePage = lazy(() => import("./pages/course-operations/ClassWorkspacePage"));
+const AiJudgeRubricEditorPage = lazy(() => import("./pages/course-operations/AiJudgeRubricEditorPage"));
 
 // 系統管理
 const AdminPage = lazy(() => import("./pages/system/admin/AdminPage"));
@@ -158,6 +159,10 @@ function App() {
           <Route path="/course-template-management/:templateId" element={<CourseTemplateEditorPage />} />
           <Route path="/class-management" element={<ClassManagementPage />} />
           <Route path="/class-management/new" element={<ClassManagementPage openCreate />} />
+          <Route
+            path="/class-management/:classId/ai/checks/:sessionId/edit"
+            element={<AiJudgeRubricEditorPage />}
+          />
           <Route path="/class-management/:classId" element={<ClassWorkspacePage />} />
           <Route path="/class-management/:classId/:section" element={<ClassWorkspacePage />} />
 

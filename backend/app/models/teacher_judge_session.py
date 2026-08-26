@@ -37,6 +37,12 @@ class TeacherJudgeSession(SQLModel, table=True):
             "teaching_class_id",
             "last_activity_at",
         ),
+        sa.Index(
+            "ix_teacher_judge_sessions_class_pinned_activity",
+            "teaching_class_id",
+            "pinned_at",
+            "last_activity_at",
+        ),
     )
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
@@ -85,6 +91,10 @@ class TeacherJudgeSession(SQLModel, table=True):
     last_activity_at: datetime = Field(
         default_factory=get_datetime_utc,
         sa_column=Column(sa.DateTime(timezone=True), nullable=False, index=True),
+    )
+    pinned_at: datetime | None = Field(
+        default=None,
+        sa_column=Column(sa.DateTime(timezone=True), nullable=True, index=True),
     )
 
 

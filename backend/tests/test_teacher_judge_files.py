@@ -8,13 +8,18 @@ from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, SQLModel, create_engine, select
 
-from app.ai.teacher_judge import file_service, script_artifact_service
-from app.ai.teacher_judge.schemas import RubricAnalysis, RubricItem
+from app.ai.teacher_judge import file_service, script_artifact_service, session_service
+from app.ai.teacher_judge.schemas import (
+    RubricAnalysis,
+    RubricItem,
+    TeacherJudgeFileMetadataUpdateRequest,
+)
 from app.models.teacher_judge_file import TeacherJudgeFile, TeacherJudgeFileStatus
 from app.models.teacher_judge_script_artifact import (
     TeacherJudgeScriptArtifact,
     TeacherJudgeScriptStatus,
 )
+from app.models.teacher_judge_session import TeacherJudgeSession
 
 SAFE_SCRIPT = """
 import json
@@ -217,6 +222,140 @@ def test_active_filename_unique_constraint_blocks_duplicate_active_files() -> No
 
     with pytest.raises(IntegrityError):
         session.commit()
+
+
+def test_blank_file_has_created_source_metadata() -> None:
+    session = _session()
+    teaching_class_id = uuid.uuid4()
+
+    file = file_service.create_blank_file(
+        session=session,
+        teaching_class_id=teaching_class_id,
+        created_by=uuid.uuid4(),
+        display_name="Python 期中評分表",
+        environment_keys=["python", "linux", "python"],
+    )
+    session.commit()
+    session.refresh(file)
+
+    assert file.source_type == "created"
+    assert file.original_filename is None
+    assert file.file_hash is None
+    assert file.display_name == "Python 期中評分表"
+    assert file.environment_keys == ["python", "linux"]
+    assert file.template_key == "python"
+    assert file.analysis_revision == 1
+    assert file.analysis_json["items"] == []
+
+
+def test_analysis_update_requires_current_revision() -> None:
+    session = _session()
+    teaching_class_id = uuid.uuid4()
+    file = file_service.create_blank_file(
+        session=session,
+        teaching_class_id=teaching_class_id,
+        created_by=uuid.uuid4(),
+        display_name="Revision rubric",
+        environment_keys=["linux"],
+    )
+    session.commit()
+    session.refresh(file)
+
+    updated = file_service.update_file_analysis(
+        session=session,
+        teaching_class_id=teaching_class_id,
+        file_id=file.id,
+        analysis=_analysis("first"),
+        expected_revision=1,
+    )
+    assert updated.analysis_revision == 2
+    stored_before = session.get(TeacherJudgeFile, file.id)
+    assert stored_before is not None
+    before_json = stored_before.analysis_json
+
+    with pytest.raises(HTTPException) as exc_info:
+        file_service.update_file_analysis(
+            session=session,
+            teaching_class_id=teaching_class_id,
+            file_id=file.id,
+            analysis=_analysis("stale"),
+            expected_revision=1,
+        )
+
+    assert exc_info.value.status_code == 409
+    assert exc_info.value.detail["code"] == "teacher_judge_analysis_revision_conflict"
+    stored_after = session.get(TeacherJudgeFile, file.id)
+    assert stored_after is not None
+    assert stored_after.analysis_json == before_json
+
+
+def test_metadata_update_keeps_effective_template_in_environment_set() -> None:
+    session = _session()
+    teaching_class_id = uuid.uuid4()
+    file = file_service.create_blank_file(
+        session=session,
+        teaching_class_id=teaching_class_id,
+        created_by=uuid.uuid4(),
+        display_name="Metadata rubric",
+        environment_keys=["linux", "python"],
+    )
+    session.commit()
+
+    updated = file_service.update_file_metadata(
+        session=session,
+        teaching_class_id=teaching_class_id,
+        file_id=file.id,
+        payload=TeacherJudgeFileMetadataUpdateRequest(
+            display_name="Updated rubric",
+            environment_keys=["n8n", "python"],
+            template_key="python",
+        ),
+    )
+
+    assert updated.display_name == "Updated rubric"
+    assert updated.environment_keys == ["n8n", "python"]
+    assert updated.template_key == "python"
+
+
+def test_uploaded_file_clone_copies_bytes_and_analysis_independently(
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(file_service, "DATA_ROOT", tmp_path)
+    session = _session()
+    teaching_class_id = uuid.uuid4()
+    source = file_service.save_analyzed_file(
+        session=session,
+        teaching_class_id=teaching_class_id,
+        uploaded_by=uuid.uuid4(),
+        original_filename="midterm.pdf",
+        file_hash="a" * 64,
+        template_key="linux",
+        file_bytes=b"source bytes",
+        analysis=_analysis("source"),
+        conflict_strategy=None,
+    )
+    source_session = TeacherJudgeSession(
+        teaching_class_id=teaching_class_id,
+        title="Uploaded source",
+        selected_file_id=uuid.UUID(source.id),
+    )
+    session.add(source_session)
+    session.commit()
+    session.refresh(source_session)
+
+    cloned_session = session_service.fork_session_data(
+        session,
+        source_session,
+        title="Uploaded copy",
+        created_by=uuid.uuid4(),
+    )
+    cloned_file = session.get(TeacherJudgeFile, cloned_session.selected_file_id)
+    assert cloned_file is not None
+    assert cloned_file.id != uuid.UUID(source.id)
+    assert cloned_file.original_filename == "midterm (2).pdf"
+    assert (tmp_path / f"{cloned_file.id}.pdf").read_bytes() == b"source bytes"
+    assert cloned_file.analysis_json == session.get(TeacherJudgeFile, uuid.UUID(source.id)).analysis_json
 
 
 @pytest.mark.asyncio
