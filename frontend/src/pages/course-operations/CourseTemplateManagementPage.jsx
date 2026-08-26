@@ -50,7 +50,7 @@ export default function CourseTemplateManagementPage() {
         <td><span className={`${styles.statusBadge} ${styles[`status_${template.status}`]}`}>{STATUS_LABEL[template.status]}</span></td>
         <td><button type="button" className={styles.iconBtn} aria-label="開啟模板"><MIcon name="chevron_right" size={19} /></button></td>
       </tr>)}</tbody></table></div>
-      {!rows.length && <EmptyState icon="view_quilt" title="沒有符合條件的課程環境。" />}
+      {!rows.length && <EmptyState icon="view_quilt" title="沒有符合條件的課程環境。" />}</>}
     </section>
   </div>;
 }

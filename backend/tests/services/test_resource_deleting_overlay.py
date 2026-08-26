@@ -37,6 +37,9 @@ def _patch_common(monkeypatch: pytest.MonkeyPatch, *, vmid: int) -> None:
         login_password_encrypted=None,
         idle_since=None,
         mining_exempt=False,
+        teaching_class_id=None,
+        allocation_scope="personal",
+        control_policy="owner",
     )
     monkeypatch.setattr(
         resource_service.resource_repo,
