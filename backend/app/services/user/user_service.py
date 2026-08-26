@@ -11,7 +11,7 @@ from app.exceptions import (
     NotFoundError,
     PermissionDeniedError,
 )
-from app.models import AuditLog, SpecChangeRequest, User, VMRequest
+from app.models import AuditLog, SpecChangeRequest, TeachingClass, User, VMRequest
 from app.repositories import resource as resource_repo
 from app.repositories import user as user_repo
 from app.schemas import (
@@ -43,6 +43,14 @@ def _prepare_user_delete(*, session: Session, user: User) -> None:
     if resource_repo.get_resources_by_user(session=session, user_id=user.id):
         raise BadRequestError(
             "Cannot delete a user who still owns provisioned resources"
+        )
+    teaching_class = session.exec(
+        select(TeachingClass).where(TeachingClass.owner_id == user.id).limit(1)
+    ).first()
+    if teaching_class is not None:
+        raise ConflictError(
+            "Cannot delete a teacher who owns teaching-class history; "
+            "disable the account or reassign the class first"
         )
 
     vm_requests = session.exec(

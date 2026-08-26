@@ -41,6 +41,25 @@ describe("TeachingClassesService", () => {
     expect(fetchMock.mock.calls[1][0]).toContain("/class-1/reset-failed");
   });
 
+  test("supports class extension, archive, and reclaim lifecycle", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonRes({ end_date: "2026-12-31" }))
+      .mockResolvedValueOnce(jsonRes({ class: { status: "archived" } }))
+      .mockResolvedValueOnce(jsonRes({ queued_vmids: [101] }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await TeachingClassesService.extend("class-1", "2026-12-31");
+    await TeachingClassesService.archive("class-1");
+    await TeachingClassesService.reclaim("class-1", { force: true });
+
+    expect(fetchMock.mock.calls[0][0]).toContain("/class-1/extend");
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ end_date: "2026-12-31" });
+    expect(fetchMock.mock.calls[1][0]).toContain("/class-1/archive");
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ reclaim_resources: true, force: false });
+    expect(fetchMock.mock.calls[2][0]).toContain("/class-1/reclaim");
+    expect(JSON.parse(fetchMock.mock.calls[2][1].body)).toEqual({ reclaim_resources: true, force: true });
+  });
+
   test("admin reviews all class nodes through one endpoint", async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonRes([]));
     vi.stubGlobal("fetch", fetchMock);

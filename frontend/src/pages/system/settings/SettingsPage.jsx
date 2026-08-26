@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import styles from "./SettingsPage.module.scss";
 import MIcon from "../../../components/MIcon";
 import { useConfirm } from "../../../components/ConfirmDialog/ConfirmProvider";
+import EmptyState from "../../../components/EmptyState/EmptyState";
 import { useToast } from "../../../hooks/useToast";
 import { ProxmoxConfigService } from "../../../services/proxmoxConfig";
 import GovernanceTab from "./GovernanceTab";
@@ -567,11 +568,7 @@ function NodesTab() {
   if (loading) return <div className={styles.loading}>載入節點...</div>;
   if (nodes.length === 0) {
     return (
-      <div className={styles.empty}>
-        <div className={styles.emptyIcon}><MIcon name="lock" size={40} /></div>
-        <h2 className={styles.emptyTitle}>尚無節點資料</h2>
-        <p className={styles.emptyDesc}>請先完成 PVE 連線設定並執行同步</p>
-      </div>
+      <EmptyState icon="lock" title="尚無節點資料" description="請先完成 PVE 連線設定並執行同步" />
     );
   }
 
@@ -687,11 +684,7 @@ function StorageTab() {
   if (loading) return <div className={styles.loading}>載入 Storage...</div>;
   if (storages.length === 0) {
     return (
-      <div className={styles.empty}>
-        <div className={styles.emptyIcon}><MIcon name="storage" size={40} /></div>
-        <h2 className={styles.emptyTitle}>尚無 Storage 設定</h2>
-        <p className={styles.emptyDesc}>請先完成 PVE 連線設定並執行同步</p>
-      </div>
+      <EmptyState icon="storage" title="尚無 Storage 設定" description="請先完成 PVE 連線設定並執行同步" />
     );
   }
 

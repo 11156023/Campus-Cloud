@@ -11,6 +11,7 @@ import MIcon from "../../components/MIcon";
 import { useConfirm } from "../../components/ConfirmDialog/ConfirmProvider";
 import { CourseEnvironmentsService } from "../../services/courseEnvironments";
 import { apiGet } from "../../services/api";
+import EmptyState from "../../components/EmptyState/EmptyState";
 import { TemplatesService } from "../../services/templates";
 import ConnectionEdge from "../network/firewall/edges/ConnectionEdge";
 import styles from "./CourseOperations.module.scss";
@@ -221,7 +222,7 @@ function MachineEditor({ value, edges, onChange, onEdgesChange, pveTemplates, vm
             </> : null}
           </aside>
         </div>
-      </> : <div className={styles.emptyState}><MIcon name="dns" size={32} /><p>先加入一個節點，再設定機器之間的連線。</p></div>}
+      </> : <EmptyState icon="dns" title="先加入一個節點，再設定機器之間的連線。" />}
   </section>;
 }
 

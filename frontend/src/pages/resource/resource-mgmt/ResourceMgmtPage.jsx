@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import styles from "./ResourceMgmtPage.module.scss";
 import MIcon from "../../../components/MIcon";
 import PowerMenu from "../../../components/PowerMenu/PowerMenu";
+import SharedEmptyState from "../../../components/EmptyState/EmptyState";
 import { useToast } from "../../../hooks/useToast";
 import useAutoRefresh from "../../../hooks/useAutoRefresh";
 import { ResourcesService } from "../../../services/resources";
@@ -412,15 +413,7 @@ function SkeletonRow() {
 
 /* ── Empty / Error states ── */
 function EmptyState() {
-  return (
-    <div className={styles.empty}>
-      <div className={styles.emptyIcon}>
-        <MIcon name="dns" size={40} />
-      </div>
-      <h2 className={styles.emptyTitle}>尚無虛擬機或容器</h2>
-      <p className={styles.emptyDesc}>系統中還沒有任何虛擬機或 LXC 容器</p>
-    </div>
-  );
+  return <SharedEmptyState icon="dns" title="尚無虛擬機或容器" />;
 }
 
 function ErrorState({ onRetry }) {

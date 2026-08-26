@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import styles from "./AdminPage.module.scss";
 import MIcon from "../../../components/MIcon";
+import SharedEmptyState from "../../../components/EmptyState/EmptyState";
 import { useAuth } from "../../../contexts/AuthContext";
 import { useToast } from "../../../hooks/useToast";
 import useAutoRefresh from "../../../hooks/useAutoRefresh";
@@ -43,15 +44,11 @@ function formatDate(value) {
 
 function EmptyState({ hasQuery }) {
   return (
-    <div className={styles.empty}>
-      <div className={styles.emptyIcon}>
-        <MIcon name={hasQuery ? "search_off" : "manage_accounts"} size={40} />
-      </div>
-      <h2 className={styles.emptyTitle}>{hasQuery ? "找不到使用者" : "尚無使用者"}</h2>
-      <p className={styles.emptyDesc}>
-        {hasQuery ? "請調整搜尋關鍵字或清除篩選。" : "點擊新增使用者建立第一個帳戶。"}
-      </p>
-    </div>
+    <SharedEmptyState
+      icon={hasQuery ? "search_off" : "manage_accounts"}
+      title={hasQuery ? "找不到使用者" : "尚無使用者"}
+      description={hasQuery ? "請調整搜尋關鍵字或清除篩選。" : "點擊新增使用者建立第一個帳戶。"}
+    />
   );
 }
 

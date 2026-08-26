@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import styles from "./BatchReviewPage.module.scss";
 import MIcon from "../../../components/MIcon";
+import SharedEmptyState from "../../../components/EmptyState/EmptyState";
 import { BatchProvisionService } from "../../../services/batchProvision";
 import { useConfirm } from "../../../components/ConfirmDialog/ConfirmProvider";
 import { useToast } from "../../../hooks/useToast";
@@ -27,17 +28,7 @@ const STATUS_OPTIONS = [
 ];
 
 function EmptyState() {
-  return (
-    <div className={styles.empty}>
-      <div className={styles.emptyIcon}>
-        <MIcon name="library_add_check" size={40} />
-      </div>
-      <h2 className={styles.emptyTitle}>沒有待審核的批次申請</h2>
-      <p className={styles.emptyDesc}>
-        教師或助教提交的批量 VM 建立申請會顯示在這裡
-      </p>
-    </div>
-  );
+  return <SharedEmptyState icon="library_add_check" title="沒有待審核的批次申請" />;
 }
 
 function StatusBadge({ status }) {

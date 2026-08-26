@@ -9,7 +9,7 @@ from app.api.deps import (
     ResourceInfoDep,
     SessionDep,
 )
-from app.core.authorizers import can_bypass_resource_ownership, require_resource_access
+from app.core.authorizers import can_bypass_resource_ownership
 from app.core.security import decrypt_value
 from app.exceptions import NotFoundError, PermissionDeniedError, ProxmoxError
 from app.infrastructure.worker import submit_sync
@@ -25,6 +25,7 @@ from app.schemas.resource import (
 )
 from app.services.proxmox import proxmox_service
 from app.services.resource import deletion_service, resource_service
+from app.services.resource.access import require_resource_management
 
 logger = logging.getLogger(__name__)
 
@@ -193,11 +194,13 @@ def delete_resource(
         )
     elif not is_admin:
         try:
-            require_resource_access(current_user, db_resource.user_id)
+            require_resource_management(
+                session=session, user=current_user, vmid=vmid
+            )
         except PermissionDeniedError:
             logger.warning(
-                "User %s attempted to delete resource %s owned by %s",
-                current_user.email, vmid, db_resource.user_id,
+                "User %s attempted to delete resource %s without management rights",
+                current_user.email, vmid,
             )
             raise
 

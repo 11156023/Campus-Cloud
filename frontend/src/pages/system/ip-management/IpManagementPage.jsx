@@ -3,6 +3,7 @@ import styles from "./IpManagementPage.module.scss";
 import MIcon from "../../../components/MIcon";
 import SubnetConfigForm from "./SubnetConfigForm";
 import { useAuth } from "../../../contexts/AuthContext";
+import SharedEmptyState from "../../../components/EmptyState/EmptyState";
 import { IpManagementService } from "../../../services/ipManagement";
 import { useConfirm } from "../../../components/ConfirmDialog/ConfirmProvider";
 import { useToast } from "../../../hooks/useToast";
@@ -21,39 +22,28 @@ const PURPOSE_LABELS = {
 function EmptyState({ variant, canConfigure, onConfigure }) {
   if (variant === "unconfigured") {
     return (
-      <div className={styles.empty}>
-        <div className={styles.emptyIcon}>
-          <MIcon name="lan" size={40} />
-        </div>
-        <h2 className={styles.emptyTitle}>尚未設定子網</h2>
-        <p className={styles.emptyDesc}>
-          建立子網設定後，系統將自動為虛擬機與容器分配 IP 位址
-        </p>
-        {canConfigure && (
-          <button type="button" className={styles.btnPrimary} onClick={onConfigure}>
-            <MIcon name="add" size={18} />
-            建立子網設定
-          </button>
-        )}
-      </div>
+      <SharedEmptyState
+        icon="lan"
+        title="尚未設定子網"
+        description="建立子網設定後，系統將自動為虛擬機與容器分配 IP 位址"
+        action={
+          canConfigure ? (
+            <button type="button" className={styles.btnPrimary} onClick={onConfigure}>
+              <MIcon name="add" size={18} />
+              建立子網設定
+            </button>
+          ) : null
+        }
+      />
     );
   }
 
   const isNoMatch = variant === "no-match";
   return (
-    <div className={styles.empty}>
-      <div className={styles.emptyIcon}>
-        <MIcon name={isNoMatch ? "search_off" : "inbox"} size={40} />
-      </div>
-      <h2 className={styles.emptyTitle}>
-        {isNoMatch ? "沒有符合條件的 IP" : "尚無 IP 分配記錄"}
-      </h2>
-      <p className={styles.emptyDesc}>
-        {isNoMatch
-          ? "換個 IP、VMID 或備註關鍵字再試一次"
-          : "建立虛擬機或容器後，分配的 IP 會顯示在這裡"}
-      </p>
-    </div>
+    <SharedEmptyState
+      icon={isNoMatch ? "search_off" : "inbox"}
+      title={isNoMatch ? "沒有符合條件的 IP" : "尚無 IP 分配記錄"}
+    />
   );
 }
 

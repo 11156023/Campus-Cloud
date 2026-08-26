@@ -1,6 +1,7 @@
 import { Fragment, useCallback, useEffect, useState } from "react";
 import styles from "./MonitoringPage.module.scss";
 import MIcon from "../../../components/MIcon";
+import EmptyState from "../../../components/EmptyState/EmptyState";
 import RrdChart from "../../../components/RrdChart/RrdChart";
 import MiningIncidentsPanel from "./MiningIncidentsPanel";
 import { MonitoringService } from "../../../services/monitoring";
@@ -179,10 +180,7 @@ function AlertsCard() {
       {alerts === null ? (
         <p className={styles.cardEmpty}>載入中…</p>
       ) : alerts.length === 0 ? (
-        <div className={styles.cardEmpty}>
-          <MIcon name="notifications_off" size={24} />
-          <p>目前沒有活動告警</p>
-        </div>
+        <EmptyState icon="notifications_off" title="目前沒有活動告警" />
       ) : (
         <div className={styles.alertList}>
           {alerts.map((alert) => (
@@ -234,7 +232,7 @@ function TopVmTable({ title, entries, metric }) {
         <h2 className={styles.cardTitle}>{title}</h2>
       </div>
       {entries.length === 0 ? (
-        <p className={styles.cardEmpty}>無運行中的資源</p>
+        <EmptyState icon="dns" title="無運行中的資源" />
       ) : (
         <table className={styles.table}>
           <thead>

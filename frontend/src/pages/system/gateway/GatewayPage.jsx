@@ -3,6 +3,7 @@ import styles from "./GatewayPage.module.scss";
 import MIcon from "../../../components/MIcon";
 import ConfigCodeEditor from "./ConfigCodeEditor";
 import { useConfirm } from "../../../components/ConfirmDialog/ConfirmProvider";
+import EmptyState from "../../../components/EmptyState/EmptyState";
 import { useToast } from "../../../hooks/useToast";
 import { GatewayService } from "../../../services/gateway";
 
@@ -336,13 +337,11 @@ function ServiceTab({ service, gatewayReady, host, onDirtyChange }) {
 
   if (!gatewayReady) {
     return (
-      <div className={styles.empty}>
-        <div className={styles.emptyIcon}>
-          <MIcon name="dns" size={40} />
-        </div>
-        <h2 className={styles.emptyTitle}>尚未設定 Gateway 連線</h2>
-        <p className={styles.emptyDesc}>請先到「連線設定」完成 SSH 連線設定並測試成功</p>
-      </div>
+      <EmptyState
+        icon="dns"
+        title="尚未設定 Gateway 連線"
+        description="請先到「連線設定」完成 SSH 連線設定並測試成功"
+      />
     );
   }
 

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import styles from "./AiApiKeysPage.module.scss";
 import MIcon from "../../../components/MIcon";
+import SharedEmptyState from "../../../components/EmptyState/EmptyState";
 import { AiApiService } from "../../../services/aiApi";
 import { useToast } from "../../../hooks/useToast";
 import useAutoRefresh from "../../../hooks/useAutoRefresh";
@@ -28,13 +29,7 @@ function StatusBadge({ item }) {
 
 function EmptyState() {
   return (
-    <div className={styles.empty}>
-      <div className={styles.emptyIcon}>
-        <MIcon name="vpn_key" size={40} />
-      </div>
-      <h2 className={styles.emptyTitle}>尚無金鑰紀錄</h2>
-      <p className={styles.emptyDesc}>目前沒有符合條件的金鑰紀錄。</p>
-    </div>
+    <SharedEmptyState icon="vpn_key" title="尚無金鑰紀錄" />
   );
 }
 

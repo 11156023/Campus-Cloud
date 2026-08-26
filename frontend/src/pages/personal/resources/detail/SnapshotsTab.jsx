@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import styles from "./ResourceDetailPage.module.scss";
 import MIcon from "../../../../components/MIcon";
+import EmptyState from "../../../../components/EmptyState/EmptyState";
 import { ResourcesService } from "../../../../services/resources";
 import { useToast } from "../../../../hooks/useToast";
 
@@ -137,7 +138,7 @@ export default function SnapshotsTab({ vmid }) {
         </div>
 
         {snapshots.length === 0 ? (
-          <p className={styles.stateText}>尚無快照</p>
+          <EmptyState icon="photo_camera" title="尚無快照" />
         ) : (
           <table className={styles.table}>
             <thead>
