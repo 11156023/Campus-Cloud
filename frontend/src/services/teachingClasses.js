@@ -4,6 +4,7 @@ export const TeachingClassesService = {
   list() { return apiGet("/api/v1/teaching-classes"); },
   create(body) { return apiPost("/api/v1/teaching-classes", body); },
   get(classId) { return apiGet(`/api/v1/teaching-classes/${classId}`); },
+  resourceUsage(classId) { return apiGet(`/api/v1/teaching-classes/${classId}/resource-usage`); },
   update(classId, body) { return apiPatch(`/api/v1/teaching-classes/${classId}`, body); },
   capacityPreview(classId) { return apiGet(`/api/v1/teaching-classes/${classId}/capacity-preview`); },
   addStudents(classId, emails) { return apiPost(`/api/v1/teaching-classes/${classId}/students`, { emails }); },
