@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { machineRuntimeState, resourceUsageByVmid, usageForMetric } from "./classHeatmapUsage";
+import {
+  machineRuntimeState,
+  mergeResourceUsageByVmid,
+  resourceUsageByVmid,
+  usageForMetric,
+} from "./classHeatmapUsage";
 
 describe("class heatmap usage", () => {
   const machine = { vmid: 7300, status: "completed" };
@@ -20,5 +25,21 @@ describe("class heatmap usage", () => {
     expect(usageForMetric(runtime, "cpu")).toBe(43);
     expect(usageForMetric(runtime, "ram")).toBe(75);
     expect(usageForMetric({}, "cpu")).toBeNull();
+  });
+
+  it("reuses the previous snapshot until a displayed value changes", () => {
+    const current = resourceUsageByVmid([
+      { vmid: 7300, status: "running", cpu_usage_pct: 20, ram_usage_pct: 40 },
+    ]);
+    const unchanged = mergeResourceUsageByVmid(current, [
+      { vmid: 7300, status: "running", cpu_usage_pct: 20, ram_usage_pct: 40 },
+    ]);
+    const changed = mergeResourceUsageByVmid(current, [
+      { vmid: 7300, status: "running", cpu_usage_pct: 21, ram_usage_pct: 40 },
+    ]);
+
+    expect(unchanged).toBe(current);
+    expect(changed).not.toBe(current);
+    expect(changed["7300"].cpu_usage_pct).toBe(21);
   });
 });

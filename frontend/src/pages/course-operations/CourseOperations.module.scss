@@ -347,7 +347,7 @@
 .heatmapSummary dd { margin: 2px 0 0; color: var(--color-text-primary); font-size: 18px; font-weight: 720; }
 .heatmapSummary dd small { margin-left: 2px; font-weight: 500; }
 .heatGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(126px, 1fr)); gap: 7px; padding: 0 22px 18px; }
-.heatCell { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: auto auto; gap: 12px 9px; min-height: 92px; padding: 12px; overflow: hidden; border: 1px solid transparent; border-radius: 9px; transition: transform .15s, box-shadow .15s; }
+.heatCell { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: auto auto; gap: 12px 9px; min-height: 92px; padding: 12px; overflow: hidden; contain: layout paint; border: 1px solid transparent; border-radius: 9px; transition: transform .15s, box-shadow .15s; }
 .heatCell:hover { z-index: 1; transform: translateY(-2px); box-shadow: 0 5px 16px color-mix(in srgb, var(--color-text-primary) 16%, transparent); }
 .studentNumber { display: grid; grid-row: 1; width: 24px; height: 24px; place-items: center; border-radius: 6px; background: color-mix(in srgb, currentColor 9%, transparent); font-size: 9px; font-weight: 750; }
 .heatCell > div { display: flex; flex-direction: column; min-width: 0; }

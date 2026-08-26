@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Background, MarkerType, ReactFlow } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
@@ -13,8 +13,8 @@ import AiJudgePanel from "./AiJudgePanel";
 import ClassCreateDialog from "./ClassCreatePage";
 import {
   machineRuntimeState,
+  mergeResourceUsageByVmid,
   RESOURCE_METRICS,
-  resourceUsageByVmid,
   usageForMetric,
 } from "./classHeatmapUsage";
 import styles from "./CourseOperations.module.scss";
@@ -469,12 +469,34 @@ function heatLevel(usage) {
   return 1;
 }
 
+const StudentHeatCell = memo(function StudentHeatCell({
+  email,
+  index,
+  machineName,
+  metricLabel,
+  name,
+  nodeName,
+  state,
+  usage,
+  vmid,
+}) {
+  const hasUsage = state === "on" && usage !== null;
+  const detail = state === "off" ? "關機" : hasUsage ? `${metricLabel} ${usage}%` : "暫無資料";
+  const tone = state === "off" ? styles.heatOff : hasUsage ? styles[`heat_${heatLevel(usage)}`] : styles.heatUnavailable;
+  return <article className={`${styles.heatCell} ${tone}`} title={`${name}\n${email ?? ""}\n${nodeName} · VM ${vmid ?? "—"}\n${detail}`} aria-label={`${name}，${detail}`}>
+    <span className={styles.studentNumber}>{String(index + 1).padStart(2, "0")}</span>
+    <div><strong>{name}</strong><small>{vmid ? `VM ${vmid}` : machineName || "尚未建立"}</small></div>
+    <b>{state === "off" ? "關機" : hasUsage ? `${usage}%` : "暫無資料"}</b>
+  </article>;
+});
+
 function StudentMachines({ item }) {
   const [selectedNodeId, setSelectedNodeId] = useState(() => String(item.nodes[0]?.id ?? ""));
   const [metric, setMetric] = useState("cpu");
   const [usageByVmid, setUsageByVmid] = useState({});
   const [usageStatus, setUsageStatus] = useState("loading");
   const [collectedAt, setCollectedAt] = useState(null);
+  const usageByVmidRef = useRef(null);
 
   useEffect(() => {
     if (!item.nodes.some((node) => String(node.id) === selectedNodeId)) {
@@ -485,6 +507,7 @@ function StudentMachines({ item }) {
   useEffect(() => {
     let active = true;
     let timer = null;
+    usageByVmidRef.current = null;
     setUsageByVmid({});
     setUsageStatus("loading");
     setCollectedAt(null);
@@ -493,8 +516,14 @@ function StudentMachines({ item }) {
       try {
         const response = await TeachingClassesService.resourceUsage(item.id);
         if (!active) return;
-        setUsageByVmid(resourceUsageByVmid(response?.items));
-        setCollectedAt(response?.collected_at ? new Date(response.collected_at) : new Date());
+        const nextUsage = mergeResourceUsageByVmid(usageByVmidRef.current ?? {}, response?.items);
+        if (usageByVmidRef.current === null || nextUsage !== usageByVmidRef.current) {
+          usageByVmidRef.current = nextUsage;
+          startTransition(() => {
+            setUsageByVmid(nextUsage);
+            setCollectedAt(response?.collected_at ? new Date(response.collected_at) : new Date());
+          });
+        }
         setUsageStatus("ready");
       } catch {
         if (active) setUsageStatus("error");
@@ -560,17 +589,18 @@ function StudentMachines({ item }) {
         </div>
 
         <div className={styles.heatGrid} aria-label={`${selectedNode.name} ${metricInfo.label} 學生使用率`}>
-          {cells.map(({ student, machine, index, state, usage }) => {
-            const name = student.full_name || student.email || `學生 ${index + 1}`;
-            const hasUsage = state === "on" && usage !== null;
-            const detail = state === "off" ? "關機" : hasUsage ? `${metricInfo.label} ${usage}%` : "暫無資料";
-            const tone = state === "off" ? styles.heatOff : hasUsage ? styles[`heat_${heatLevel(usage)}`] : styles.heatUnavailable;
-            return <article key={student.id} className={`${styles.heatCell} ${tone}`} title={`${name}\n${student.email ?? ""}\n${selectedNode.name} · VM ${machine?.vmid ?? "—"}\n${detail}`} aria-label={`${name}，${detail}`}>
-              <span className={styles.studentNumber}>{String(index + 1).padStart(2, "0")}</span>
-              <div><strong>{name}</strong><small>{machine?.vmid ? `VM ${machine.vmid}` : "尚未建立"}</small></div>
-              <b>{state === "off" ? "關機" : hasUsage ? `${usage}%` : "暫無資料"}</b>
-            </article>;
-          })}
+          {cells.map(({ student, machine, index, state, usage }) => <StudentHeatCell
+            key={student.id}
+            email={student.email}
+            index={index}
+            machineName={machine?.name}
+            metricLabel={metricInfo.label}
+            name={student.full_name || student.email || `學生 ${index + 1}`}
+            nodeName={selectedNode.name}
+            state={state}
+            usage={usage}
+            vmid={machine?.vmid}
+          />)}
         </div>
 
         <div className={styles.heatLegend} aria-label="熱力圖圖例"><span><i className={styles.heatOff} />關機</span><span><i className={styles.heatUnavailable} />暫無資料</span><span className={styles.legendScale}>低<i className={styles.heat_1} /><i className={styles.heat_2} /><i className={styles.heat_3} /><i className={styles.heat_4} /><i className={styles.heat_5} />高</span><span>使用率</span></div>

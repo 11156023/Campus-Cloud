@@ -21,8 +21,15 @@ describe("TeachingClassesService", () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonRes({ items: [] }));
     vi.stubGlobal("fetch", fetchMock);
 
-    await TeachingClassesService.resourceUsage("class-1");
+    const [first, second] = await Promise.all([
+      TeachingClassesService.resourceUsage("class-1"),
+      TeachingClassesService.resourceUsage("class-1"),
+    ]);
+    const cached = await TeachingClassesService.resourceUsage("class-1");
 
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(first).toBe(second);
+    expect(cached).toBe(first);
     expect(fetchMock.mock.calls[0][0]).toContain(
       "/api/v1/teaching-classes/class-1/resource-usage",
     );
