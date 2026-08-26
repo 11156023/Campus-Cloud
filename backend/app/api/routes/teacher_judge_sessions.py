@@ -6,8 +6,10 @@ import json
 import uuid
 
 from fastapi import APIRouter, HTTPException, Query
-from sqlmodel import desc, select
+from sqlalchemy import case
+from sqlmodel import col, desc, select
 
+from app.ai.teacher_judge.file_service import create_blank_file
 from app.ai.teacher_judge.schemas import (
     TeacherJudgeRubricAnalysis,
     TeacherJudgeScriptArtifactPublic,
@@ -16,6 +18,7 @@ from app.ai.teacher_judge.schemas import (
     TeacherJudgeScriptRunSummary,
     TeacherJudgeSessionChatResponse,
     TeacherJudgeSessionCreateRequest,
+    TeacherJudgeSessionForkRequest,
     TeacherJudgeSessionMessageCreateRequest,
     TeacherJudgeSessionMessagePublic,
     TeacherJudgeSessionPublic,
@@ -29,6 +32,7 @@ from app.ai.teacher_judge.session_service import (
     bounded_history,
     delete_session_data,
     ensure_active,
+    fork_session_data,
     get_session,
     maybe_summarize,
     message_public,
@@ -65,7 +69,7 @@ router = APIRouter(
 def _access(db: SessionDep, class_id: uuid.UUID, user: InstructorUser) -> None:
     teaching_class = db.get(TeachingClass, class_id)
     if not teaching_class:
-        raise HTTPException(status_code=404, detail="Teaching class not found")
+        raise HTTPException(status_code=404, detail="找不到班級。")
     require_teaching_access(user, teaching_class.owner_id)
 
 
@@ -86,7 +90,10 @@ def list_sessions(
             TeacherJudgeSession.status == status,
         )
         .order_by(
-            desc(TeacherJudgeSession.last_activity_at), desc(TeacherJudgeSession.id)
+            desc(case((col(TeacherJudgeSession.pinned_at).is_not(None), 1), else_=0)),
+            desc(TeacherJudgeSession.pinned_at),
+            desc(TeacherJudgeSession.last_activity_at),
+            desc(TeacherJudgeSession.id),
         )
         .offset(skip)
         .limit(limit)
@@ -102,17 +109,51 @@ def create_session(
     current_user: InstructorUser,
 ) -> TeacherJudgeSessionPublic:
     _access(session, teaching_class_id, current_user)
-    validate_selected_file(session, teaching_class_id, payload.selected_file_id)
-    item = TeacherJudgeSession(
-        teaching_class_id=teaching_class_id,
-        title=payload.title.strip(),
-        selected_file_id=payload.selected_file_id,
+    try:
+        selected_file_id = payload.selected_file_id
+        if payload.creation_mode == "blank":
+            rubric = create_blank_file(
+                session=session,
+                teaching_class_id=teaching_class_id,
+                created_by=current_user.id,
+                display_name=payload.rubric_name or "評分表",
+                environment_keys=payload.environment_keys or [],
+            )
+            selected_file_id = rubric.id
+        else:
+            validate_selected_file(session, teaching_class_id, selected_file_id)
+        item = TeacherJudgeSession(
+            teaching_class_id=teaching_class_id,
+            title=payload.title.strip(),
+            selected_file_id=selected_file_id,
+            created_by=current_user.id,
+        )
+        session.add(item)
+        session.commit()
+        session.refresh(item)
+        return session_public(session, item)
+    except Exception:
+        session.rollback()
+        raise
+
+
+@router.post("/{session_id}/fork", response_model=TeacherJudgeSessionPublic)
+def fork_session(
+    teaching_class_id: uuid.UUID,
+    session_id: uuid.UUID,
+    payload: TeacherJudgeSessionForkRequest,
+    session: SessionDep,
+    current_user: InstructorUser,
+) -> TeacherJudgeSessionPublic:
+    _access(session, teaching_class_id, current_user)
+    source = get_session(session, teaching_class_id, session_id)
+    cloned = fork_session_data(
+        session,
+        source,
+        title=payload.title,
         created_by=current_user.id,
     )
-    session.add(item)
-    session.commit()
-    session.refresh(item)
-    return session_public(session, item)
+    return session_public(session, cloned)
 
 
 @router.get("/{session_id}", response_model=TeacherJudgeSessionPublic)
@@ -138,15 +179,22 @@ def update_session(
     item = get_session(session, teaching_class_id, session_id)
     changes = payload.model_fields_set
     if item.status == TeacherJudgeSessionStatus.archived and changes - {"status"}:
-        raise HTTPException(status_code=409, detail="已封存的 session 為唯讀。")
+        raise HTTPException(status_code=409, detail="已封存的檢查為唯讀。")
     if "title" in changes and payload.title is not None:
         item.title = payload.title.strip()
     if "selected_file_id" in changes:
         validate_selected_file(session, teaching_class_id, payload.selected_file_id)
         item.selected_file_id = payload.selected_file_id
+    from app.models.base import get_datetime_utc
+
     if payload.status is not None:
         item.status = TeacherJudgeSessionStatus(payload.status)
-    from app.models.base import get_datetime_utc
+        if item.status == TeacherJudgeSessionStatus.archived:
+            item.pinned_at = None
+    if payload.is_pinned is not None:
+        if item.status == TeacherJudgeSessionStatus.archived and payload.is_pinned:
+            raise HTTPException(status_code=409, detail="已封存的檢查不能釘選。")
+        item.pinned_at = get_datetime_utc() if payload.is_pinned else None
 
     item.updated_at = get_datetime_utc()
     item.last_activity_at = item.updated_at
@@ -203,7 +251,7 @@ def list_messages(
     if before:
         cursor = session.get(TeacherJudgeSessionMessage, before)
         if not cursor or cursor.session_id != session_id:
-            raise HTTPException(status_code=400, detail="Invalid message cursor")
+            raise HTTPException(status_code=400, detail="訊息游標無效。")
         query = query.where(
             (TeacherJudgeSessionMessage.created_at < cursor.created_at)
             | (
@@ -235,6 +283,20 @@ async def create_message(
     item = get_session(session, teaching_class_id, session_id)
     ensure_active(item)
     file = selected_file_for_chat(session, item)
+    base_revision = file.analysis_revision if file else None
+    if (
+        file
+        and payload.analysis_revision is not None
+        and payload.analysis_revision != file.analysis_revision
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "teacher_judge_analysis_revision_conflict",
+                "message": "評分表已被其他變更更新，請重新載入後再請 AI 提案。",
+                "analysis_revision": file.analysis_revision,
+            },
+        )
     user_message = TeacherJudgeSessionMessage(
         session_id=item.id,
         role=TeacherJudgeMessageRole.user,
@@ -265,9 +327,13 @@ async def create_message(
             message_type=TeacherJudgeMessageType.rubric_proposal
             if proposal
             else TeacherJudgeMessageType.chat,
-            metadata_json={"metrics": metrics, "rubric_proposal": proposal}
+            metadata_json={
+                "metrics": metrics,
+                "rubric_proposal": proposal,
+                "base_revision": base_revision,
+            }
             if proposal
-            else {"metrics": metrics},
+            else {"metrics": metrics, "base_revision": base_revision},
         )
     except HTTPException as exc:
         assistant = TeacherJudgeSessionMessage(
@@ -292,6 +358,7 @@ async def create_message(
         user_message=message_public(user_message),
         assistant_message=message_public(assistant),
         rubric_proposal=proposal,
+        base_revision=base_revision,
     )
 
 
@@ -384,7 +451,7 @@ def get_session_run(
         )
     ).first()
     if not run:
-        raise HTTPException(status_code=404, detail="Session run not found")
+        raise HTTPException(status_code=404, detail="找不到這項檢查的執行結果。")
     return _run_to_public(run)
 
 
@@ -409,7 +476,7 @@ def create_session_run(
         or artifact.teaching_class_id != teaching_class_id
         or artifact.session_id != session_id
     ):
-        raise HTTPException(status_code=404, detail="Session script not found")
+        raise HTTPException(status_code=404, detail="找不到這項檢查的腳本。")
     run = create_script_run(
         session=session,
         teaching_class_id=teaching_class_id,

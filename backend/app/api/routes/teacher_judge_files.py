@@ -10,6 +10,8 @@ from fastapi.responses import FileResponse
 from app.ai.monitoring import CALL_TJ_RUBRIC, record_ai_template_call
 from app.ai.teacher_judge.config import settings
 from app.ai.teacher_judge.file_service import (
+    _file_to_public,
+    create_blank_file,
     delete_file,
     get_file_download,
     list_files,
@@ -18,9 +20,12 @@ from app.ai.teacher_judge.file_service import (
     raise_if_file_name_conflict,
     save_analyzed_file,
     update_file_analysis,
+    update_file_metadata,
 )
 from app.ai.teacher_judge.schemas import (
     TeacherJudgeFileAnalysisUpdateRequest,
+    TeacherJudgeFileCreateRequest,
+    TeacherJudgeFileMetadataUpdateRequest,
     TeacherJudgeFilePublic,
     TeacherJudgeFileUploadResponse,
 )
@@ -47,7 +52,7 @@ def _ensure_class_access(
 ) -> None:
     teaching_class = session.get(TeachingClass, teaching_class_id)
     if not teaching_class:
-        raise HTTPException(status_code=404, detail="Teaching class not found")
+        raise HTTPException(status_code=404, detail="找不到班級。")
     require_teaching_access(current_user, teaching_class.owner_id)
 
 
@@ -131,6 +136,8 @@ async def upload_class_teacher_judge_file(
         file_bytes=file_bytes,
         analysis=analysis,
         conflict_strategy=conflict_strategy,
+        environment_keys=[template_key],
+        display_name=original_filename,
     )
     record_ai_template_call(
         session=session,
@@ -143,9 +150,31 @@ async def upload_class_teacher_judge_file(
     return TeacherJudgeFileUploadResponse(
         file=saved_file,
         analysis=analysis,
-        ai_metrics=metrics,
+        ai_metrics=dict(metrics),
         template_key=template_key,
     )
+
+
+@router.post("/blank", response_model=TeacherJudgeFilePublic)
+def create_blank_class_teacher_judge_file(
+    teaching_class_id: uuid.UUID,
+    payload: TeacherJudgeFileCreateRequest,
+    session: SessionDep,
+    current_user: InstructorUser,
+) -> TeacherJudgeFilePublic:
+    _ensure_class_access(
+        session=session, teaching_class_id=teaching_class_id, current_user=current_user
+    )
+    file = create_blank_file(
+        session=session,
+        teaching_class_id=teaching_class_id,
+        created_by=current_user.id,
+        display_name=payload.display_name,
+        environment_keys=payload.environment_keys,
+    )
+    session.commit()
+    session.refresh(file)
+    return _file_to_public(file)
 
 
 @router.get("/{file_id}/download")
@@ -182,6 +211,26 @@ def update_class_teacher_judge_file_analysis(
         teaching_class_id=teaching_class_id,
         file_id=file_id,
         analysis=payload.analysis,
+        expected_revision=payload.expected_revision,
+    )
+
+
+@router.patch("/{file_id}", response_model=TeacherJudgeFilePublic)
+def update_class_teacher_judge_file_metadata(
+    teaching_class_id: uuid.UUID,
+    file_id: uuid.UUID,
+    payload: TeacherJudgeFileMetadataUpdateRequest,
+    session: SessionDep,
+    current_user: InstructorUser,
+) -> TeacherJudgeFilePublic:
+    _ensure_class_access(
+        session=session, teaching_class_id=teaching_class_id, current_user=current_user
+    )
+    return update_file_metadata(
+        session=session,
+        teaching_class_id=teaching_class_id,
+        file_id=file_id,
+        payload=payload,
     )
 
 

@@ -13,12 +13,31 @@
    python -m http.server 8088
    ```
 
-3. 填入 backend API base（預設 `http://localhost:8000/api/v1`）與目前 access token。
+3. 填入 backend API base（預設 `http://localhost:18200/api/v1`）與目前 access token。
 4. 載入模板，VMID 預設固定為測試機 `102`；後端仍會重新驗證使用者與 VMID scope。
 
 流程是「選模板 → 輸入任務 → 觀察 tool call → 若為未知／自訂 SSH 指令則確認 →
 顯示 exit code/stdout/stderr → 由 AI 產生下一步」。頁面不使用 `localStorage` 或
 `sessionStorage`。
+
+## 從網頁 F12 取得 Access token
+
+建議從已登入的 Campus-Cloud 網頁請求取得，不要把帳號密碼或 token 貼到聊天、Issue、截圖或 log。
+
+1. 開啟 Campus-Cloud 網頁並登入，按 `F12`（或 `Ctrl+Shift+I`）開啟開發者工具。
+2. 切換到 **Network**，勾選 **Fetch/XHR**；若清單是空的，重新整理頁面或執行一次需要登入的操作。
+3. 找一筆已登入的 API 請求，例如 `/api/v1/users/me` 或 `/api/v1/resources`，點開後查看 **Headers → Request Headers**。
+4. 找到 `Authorization`，其格式會類似：
+
+   ```text
+   Authorization: Bearer <access-token>
+   ```
+
+5. 只複製 `Bearer ` 後面的完整字串（不要包含 `Bearer `），貼到本 harness 的 **Access token** 欄位。
+
+若看不到 `Authorization`，請確認挑選的是登入後的請求，而不是 `/login/*` 登入請求；也可以回到網頁重新登入後再擷取。收到 `401` 時通常代表 token 已過期，請重新登入並取得新的 token。
+
+> 備用方式：在 **Application → Local Storage** 選取 Campus-Cloud 網頁 origin，尋找以 `auth_session_tokens:` 開頭的項目；其 JSON 的 `accessToken` 值就是 Access token。請勿複製或分享同一筆資料中的 `refreshToken`。
 
 ## 前端驗證要件
 
