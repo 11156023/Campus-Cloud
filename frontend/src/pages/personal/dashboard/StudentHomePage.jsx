@@ -2,14 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import MIcon from "../../../components/MIcon";
-import { useAuth } from "../../../contexts/AuthContext";
 import TerminalDialog from "../resources/TerminalDialog";
 import VncDialog from "../resources/VncDialog";
 import { CoursesService } from "../../../services/courses";
 import { ResourcesService } from "../../../services/resources";
 import { TemplatesService } from "../../../services/templates";
-import styles from "./StudentHomeNewPage.module.scss";
-import dashboardStyles from "./DashboardPage.module.scss";
+import styles from "./StudentHomePage.module.scss";
 
 const STATUS_META = {
   running: { label: "環境已就緒", tone: "success", icon: "check_circle" },
@@ -357,117 +355,9 @@ function normalizeSchedule(row) {
   };
 }
 
-function reminderStorageKey(user) {
-  return `skylab:student-reminders:v1:${user?.id ?? user?.email ?? "student"}`;
-}
-
-function ReminderCenter({ reminders = [], user, onNavigate }) {
-  const [open, setOpen] = useState(false);
-  const [readIds, setReadIds] = useState(() => {
-    try {
-      const stored = JSON.parse(window.localStorage.getItem(reminderStorageKey(user)) ?? "[]");
-      return Array.isArray(stored) ? stored : [];
-    } catch {
-      return [];
-    }
-  });
-  const rootRef = useRef(null);
-  const unreadCount = reminders.filter((item) => !readIds.includes(item.id)).length;
-
-  useEffect(() => {
-    window.localStorage.setItem(reminderStorageKey(user), JSON.stringify(readIds));
-  }, [readIds, user]);
-
-  useEffect(() => {
-    if (!open) return undefined;
-    const close = (event) => {
-      if (event.type === "keydown" && event.key !== "Escape") return;
-      if (event.type === "mousedown" && rootRef.current?.contains(event.target)) return;
-      setOpen(false);
-    };
-    document.addEventListener("mousedown", close);
-    document.addEventListener("keydown", close);
-    return () => {
-      document.removeEventListener("mousedown", close);
-      document.removeEventListener("keydown", close);
-    };
-  }, [open]);
-
-  const openReminder = (reminder) => {
-    setReadIds((current) => current.includes(reminder.id) ? current : [...current, reminder.id]);
-    setOpen(false);
-    onNavigate(reminder.target);
-  };
-
-  return (
-    <div className={styles.reminderCenter} ref={rootRef} data-guide="home-reminders">
-      <button
-        type="button"
-        className={`${styles.reminderButton} ${open ? styles.reminderButtonOpen : ""}`}
-        onClick={() => setOpen((value) => !value)}
-        aria-expanded={open}
-        aria-haspopup="dialog"
-      >
-        <MIcon name="notifications" size={17} />
-        <span>提醒</span>
-        {unreadCount > 0 && <span className={styles.reminderCount}>{unreadCount}</span>}
-      </button>
-
-      {open && (
-        <section className={styles.reminderPopover} role="dialog" aria-label="近期提醒">
-          <div className={styles.reminderHeader}>
-            <div><p className={styles.eyebrow}>近期事項</p><h2>提醒</h2></div>
-            <span>{unreadCount > 0 ? `${unreadCount} 則未讀` : "全部已讀"}</span>
-          </div>
-          <div className={styles.reminderList}>
-            {reminders.length === 0 && (
-              <div className={styles.reminderEmpty}>
-                <MIcon name="notifications_none" size={25} />
-                <strong>目前沒有新提醒</strong>
-                <span>機器期限、審核結果與近期課堂任務會出現在這裡。</span>
-              </div>
-            )}
-            {reminders.map((reminder) => {
-              const unread = !readIds.includes(reminder.id);
-              return (
-                <button
-                  type="button"
-                  key={reminder.id}
-                  className={`${styles.reminderItem} ${unread ? styles.reminderItemUnread : ""}`}
-                  onClick={() => openReminder(reminder)}
-                >
-                  <span className={`${styles.reminderIcon} ${styles[reminder.tone]}`}>
-                    <MIcon name={reminder.icon} size={19} />
-                  </span>
-                  <span className={styles.reminderContent}>
-                    <strong>{reminder.title}</strong>
-                    <small>{reminder.description}</small>
-                    <time>{reminder.time_label}</time>
-                  </span>
-                  {unread && <span className={styles.unreadDot} aria-label="未讀" />}
-                  <MIcon name="chevron_right" size={18} />
-                </button>
-              );
-            })}
-          </div>
-          <button
-            type="button"
-            className={styles.reminderFooter}
-            onClick={() => setReadIds(reminders.map((item) => item.id))}
-            disabled={unreadCount === 0}
-          >
-            全部標為已讀<MIcon name="done_all" size={17} />
-          </button>
-        </section>
-      )}
-    </div>
-  );
-}
-
-export default function StudentHomeNewPage({ courseView = false }) {
+export default function StudentHomePage({ courseView = false }) {
   const navigate = useNavigate();
   const { pathId } = useParams();
-  const { user } = useAuth();
   const [view, setView] = useState({
     loading: true,
     hasError: false,
@@ -478,7 +368,6 @@ export default function StudentHomeNewPage({ courseView = false }) {
     roomDetail: null,
     aiAssignments: [],
     practiceMachines: [],
-    reminders: [],
   });
   const [quickTemplates, setQuickTemplates] = useState([]);
   const [templatesLoading, setTemplatesLoading] = useState(!courseView);
@@ -502,11 +391,10 @@ export default function StudentHomeNewPage({ courseView = false }) {
     let cancelled = false;
 
     async function loadStudentHome() {
-      const [pathsResult, resourcesResult, scheduleResult, remindersResult] = await Promise.allSettled([
+      const [pathsResult, resourcesResult, scheduleResult] = await Promise.allSettled([
         CoursesService.listPaths(),
         ResourcesService.list(),
         CoursesService.listSchedule(),
-        courseView ? Promise.resolve([]) : CoursesService.listReminders(),
       ]);
 
       if (cancelled) return;
@@ -571,9 +459,6 @@ export default function StudentHomeNewPage({ courseView = false }) {
           roomDetail,
           aiAssignments,
           practiceMachines,
-          reminders: remindersResult.status === "fulfilled" && Array.isArray(remindersResult.value)
-            ? remindersResult.value
-            : [],
         });
       }
     }
@@ -786,7 +671,6 @@ export default function StudentHomeNewPage({ courseView = false }) {
               </div>
               <div className={styles.scheduleActions}>
                 {view.paths.some((path) => path.schedule?.state === "now") && <span>有一堂正在進行</span>}
-                <ReminderCenter reminders={view.reminders} user={user} onNavigate={navigate} />
               </div>
             </div>
             {view.paths.length > 0 ? (
@@ -1086,7 +970,7 @@ export default function StudentHomeNewPage({ courseView = false }) {
 
         <div className={styles.needGrid}>
           <article className={styles.needCard} data-student-tour="practice">
-            <span className={`${styles.needIcon} ${styles.violet}`}><MIcon name="history" size={22} /></span>
+            <span className={`${styles.needIcon} ${styles.needIcon_primary}`}><MIcon name="history" size={22} /></span>
             <div>
               <span className={styles.needBadge}>下課後練習 · 沿用原環境</span>
               <h3>繼續上次的課堂進度</h3>
@@ -1099,9 +983,9 @@ export default function StudentHomeNewPage({ courseView = false }) {
           </article>
 
           <article className={`${styles.needCard} ${styles.researchCard}`} data-student-tour="research">
-            <span className={`${styles.needIcon} ${styles.amber}`}><MIcon name="science" size={22} /></span>
+            <span className={`${styles.needIcon} ${styles.needIcon_info}`}><MIcon name="science" size={22} /></span>
             <div>
-              <span className={`${styles.needBadge} ${styles.waiting}`}>自主研究 · 需要申請</span>
+              <span className={`${styles.needBadge} ${styles.needBadge_info}`}>自主研究 · 需要申請</span>
               <h3>建立自己的研究環境</h3>
               <p>適合專題、開發或實驗需求；這個入口先保留，申請流程將再持續優化。</p>
             </div>
@@ -1126,29 +1010,29 @@ export default function StudentHomeNewPage({ courseView = false }) {
               {[0, 1, 2].map((item) => <div key={item} className={styles.quickTemplateSkeleton} />)}
             </div>
           ) : displayedQuickTemplates.length > 0 ? (
-            <div className={dashboardStyles.templateGrid}>
+            <div className={styles.quickTemplateGrid}>
               {displayedQuickTemplates.map((template) => (
                 <button
                   type="button"
                   key={template.id}
-                  className={dashboardStyles.templateCard}
-                  style={{ "--accent-color": "#5471bf" }}
+                  className={styles.templateCard}
+                  style={{ "--accent-color": "var(--color-primary)" }}
                   onClick={() => navigate(`/quick-template/${template.id}`, { state: { from: "/dashboard-new" } })}
                 >
-                  <div className={dashboardStyles.templateHeader}>
-                    <span className={dashboardStyles.templateLogo}><MIcon name="layers" size={22} /></span>
-                    <span className={dashboardStyles.templateCategoryChip}>
+                  <div className={styles.templateHeader}>
+                    <span className={styles.templateLogo}><MIcon name="layers" size={22} /></span>
+                    <span className={styles.templateCategoryChip}>
                       免人工審核
                     </span>
                   </div>
-                  <div className={dashboardStyles.templateBody}>
-                    <h4 className={dashboardStyles.templateName}>{template.name}</h4>
-                    <p className={dashboardStyles.templateDesc}>
+                  <div className={styles.templateBody}>
+                    <h4 className={styles.templateName}>{template.name}</h4>
+                    <p className={styles.templateDesc}>
                       {template.description || "由範本快速建立，適合臨時練習、指令測試與輕量開發。"}
                     </p>
                   </div>
-                  <div className={dashboardStyles.templateFooter}>
-                    <span className={dashboardStyles.templateAction}>
+                  <div className={styles.templateFooter}>
+                    <span className={styles.templateAction}>
                       立即建立
                       <MIcon name="arrow_forward" size={14} />
                     </span>

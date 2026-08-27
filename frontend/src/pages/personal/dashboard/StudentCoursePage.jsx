@@ -1,5 +1,5 @@
-import StudentHomeNewPage from "./StudentHomeNewPage";
+import StudentHomePage from "./StudentHomePage";
 
 export default function StudentCoursePage() {
-  return <StudentHomeNewPage courseView />;
+  return <StudentHomePage courseView />;
 }

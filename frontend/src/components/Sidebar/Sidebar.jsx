@@ -8,7 +8,6 @@ import JobsButton from "../Jobs/JobsButton";
 
 const topItems = [
   { key: "dashboard", label: "首頁", icon: "dashboard" },
-  { key: "dashboard-new", label: "首頁 (new)", icon: "space_dashboard" },
 ];
 
 const navGroups = [
