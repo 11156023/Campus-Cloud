@@ -19,9 +19,9 @@ const navGroups = [
     items: [
       { key: "my-resources",  label: "我的資源",    icon: "inventory_2" },
       { key: "my-requests",   label: "我的申請",    icon: "assignment" },
-      { key: "resource-mgmt", label: "資源管理",    icon: "storage" },
+      { key: "resource-mgmt", label: "資源管理",    icon: "storage", adminOnly: true },
       { key: "templates",     label: "機器範本",    icon: "library_books" },
-      { key: "gpu-mgmt",      label: "GPU 管理",    icon: "memory" },
+      { key: "gpu-mgmt",      label: "GPU 管理",    icon: "memory", adminOnly: true },
     ],
   },
   {
@@ -29,8 +29,8 @@ const navGroups = [
     label: "審核",
     icon: "fact_check",
     items: [
-      { key: "request-review", label: "申請審核", icon: "fact_check" },
-      { key: "batch-review",   label: "批量審核", icon: "library_add_check" },
+      { key: "request-review", label: "申請審核", icon: "fact_check", adminOnly: true },
+      { key: "batch-review",   label: "批量審核", icon: "library_add_check", adminOnly: true },
     ],
   },
   {
@@ -70,12 +70,12 @@ const navGroups = [
     label: "系統管理",
     icon: "tune",
     items: [
-      { key: "admin",         label: "使用者管理", icon: "admin_panel_settings" },
-      { key: "quotas",        label: "配額管理",   icon: "data_usage" },
-      { key: "ip-management", label: "IP 管理",    icon: "lan" },
-      { key: "domain",        label: "網域管理",   icon: "domain" },
-      { key: "gateway",       label: "閘道 VM",    icon: "dns" },
-      { key: "settings",      label: "系統設定",   icon: "settings" },
+      { key: "admin",         label: "使用者管理", icon: "admin_panel_settings", adminOnly: true },
+      { key: "quotas",        label: "配額管理",   icon: "data_usage", adminOnly: true },
+      { key: "ip-management", label: "IP 管理",    icon: "lan", adminOnly: true },
+      { key: "domain",        label: "網域管理",   icon: "domain", adminOnly: true },
+      { key: "gateway",       label: "閘道 VM",    icon: "dns", adminOnly: true },
+      { key: "settings",      label: "系統設定",   icon: "settings", adminOnly: true },
     ],
   },
   {
@@ -83,9 +83,9 @@ const navGroups = [
     label: "監控與日誌",
     icon: "insights",
     items: [
-      { key: "monitoring",    label: "資源監控",       icon: "monitor_heart" },
+      { key: "monitoring",    label: "資源監控",       icon: "monitor_heart", adminOnly: true },
       { key: "jobs",          label: "背景任務",       icon: "task_alt" },
-      { key: "audit",         label: "Audit Logs",     icon: "receipt_long" },
+      { key: "audit",         label: "Audit Logs",     icon: "receipt_long", adminOnly: true },
     ],
   },
 ];
