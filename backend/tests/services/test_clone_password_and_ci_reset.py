@@ -480,3 +480,116 @@ def test_run_convert_task_network_cleanup_is_best_effort(
     assert result["vmid"] == 401
     assert template.status == VMTemplateStatus.ready
     assert nat_removed == [401]
+
+
+# ---------------------------------------------------------------------------
+# execute_provision（lxc_clone）：使用者自訂密碼必須於啟動後套用；
+# Course Lab（apply_login_password=False）沿用範本內建帳密
+# ---------------------------------------------------------------------------
+
+
+def _lxc_clone_plan(**overrides: Any) -> dict[str, Any]:
+    plan: dict[str, Any] = {
+        "vmid": 300,
+        "target_node": "pve1",
+        "resource_type": "lxc",
+        "hostname": "quick-01",
+        "lxc_clone": True,
+        "template_id": 9000,
+        "template_node": "pve1",
+        "target_storage": "local-lvm",
+        "cores": 2,
+        "memory": 2048,
+        "password": "MyCustomPw1",
+        "start_immediately": True,
+        "apply_login_password": True,
+        "allocated_ip": "10.0.0.60",
+        "net_cfg": {
+            "bridge_name": "vmbr1",
+            "prefix_len": 24,
+            "gateway": "10.0.0.1",
+        },
+    }
+    plan.update(overrides)
+    return plan
+
+
+@pytest.fixture()
+def _patched_lxc_clone_provision(
+    monkeypatch: pytest.MonkeyPatch,
+) -> dict[str, Any]:
+    from app.services.proxmox import provisioning_service
+
+    calls: dict[str, Any] = {"set_password": [], "control": []}
+
+    monkeypatch.setattr(
+        provisioning_service,
+        "get_proxmox_settings_for_node",
+        lambda node: SimpleNamespace(pool_name="skylab"),
+    )
+    monkeypatch.setattr(
+        clone_service, "clone_with_fallback", lambda **kw: "linked"
+    )
+    monkeypatch.setattr(
+        clone_service,
+        "_set_lxc_root_password",
+        lambda node, vmid, password: calls["set_password"].append(
+            (node, vmid, password)
+        )
+        or True,
+    )
+    monkeypatch.setattr(
+        provisioning_service.proxmox_service,
+        "update_config",
+        lambda *a, **kw: None,
+    )
+    monkeypatch.setattr(
+        provisioning_service.proxmox_service,
+        "control",
+        lambda *a: calls["control"].append(a),
+    )
+    monkeypatch.setattr(
+        provisioning_service.firewall_service,
+        "setup_default_rules",
+        lambda *a, **kw: None,
+    )
+    return calls
+
+
+def test_execute_provision_lxc_clone_applies_custom_password(
+    _patched_lxc_clone_provision: dict[str, Any],
+) -> None:
+    from app.services.proxmox import provisioning_service
+
+    vmid, node = provisioning_service.execute_provision(_lxc_clone_plan())
+
+    assert (vmid, node) == (300, "pve1")
+    assert _patched_lxc_clone_provision["set_password"] == [
+        ("pve1", 300, "MyCustomPw1")
+    ]
+
+
+def test_execute_provision_lxc_clone_course_keeps_template_credentials(
+    _patched_lxc_clone_provision: dict[str, Any],
+) -> None:
+    from app.services.proxmox import provisioning_service
+
+    provisioning_service.execute_provision(
+        _lxc_clone_plan(apply_login_password=False)
+    )
+
+    assert _patched_lxc_clone_provision["set_password"] == []
+
+
+def test_execute_provision_lxc_clone_no_start_skips_password(
+    _patched_lxc_clone_provision: dict[str, Any],
+) -> None:
+    from app.services.proxmox import provisioning_service
+
+    provisioning_service.execute_provision(
+        _lxc_clone_plan(start_immediately=False)
+    )
+
+    # 未啟動無法 pct exec，不得誤呼叫（憑證沿用範本，僅記 warning）
+    assert _patched_lxc_clone_provision["set_password"] == []
+    assert _patched_lxc_clone_provision["control"] == []

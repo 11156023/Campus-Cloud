@@ -743,6 +743,11 @@ def plan_provision(*, session: Session, db_request) -> dict:
         plan["lxc_clone"] = True
         plan["template_id"] = db_request.template_id
         plan["template_node"] = template_row.node
+        # Course Lab 的 password 是佔位隨機值（憑證以範本內烘焙為準），
+        # 其餘來源（申請單 / 快速範本）為使用者自訂密碼，克隆後必須套用
+        plan["apply_login_password"] = (
+            getattr(db_request, "request_kind", "") != "course"
+        )
         plan["target_storage"] = _resolve_managed_storage(
             session=session,
             node=template_row.node,
@@ -841,8 +846,10 @@ def execute_provision(plan: dict) -> tuple[int, str]:
             )
 
             if plan.get("lxc_clone"):
-                # Course Lab：克隆 LXC 範本（linked 優先退 full），克隆後重配置。
-                # LXC 無 cloud-init，登入憑證沿用範本內建帳密。
+                # LXC 範本克隆（linked 優先退 full），克隆後重配置。
+                # LXC 無 cloud-init：使用者自訂密碼須待啟動後以 pct exec 設定
+                # （_set_lxc_root_password）；Course Lab 憑證以範本內烘焙為準，
+                # 不套用（plan["apply_login_password"] = False）。
                 from app.services.template import clone_service  # noqa: PLC0415
 
                 clone_service.clone_with_fallback(
@@ -866,8 +873,21 @@ def execute_provision(plan: dict) -> tuple[int, str]:
                     actual_node, new_vmid, "lxc", **clone_updates
                 )
                 firewall_service.setup_default_rules(actual_node, new_vmid, "lxc")
+                apply_password = bool(
+                    plan.get("apply_login_password") and plan.get("password")
+                )
                 if plan["start_immediately"]:
                     proxmox_service.control(actual_node, new_vmid, "lxc", "start")
+                    if apply_password:
+                        clone_service._set_lxc_root_password(
+                            actual_node, new_vmid, plan["password"]
+                        )
+                elif apply_password:
+                    logger.warning(
+                        "CT %s not started at provision time; custom root "
+                        "password not applied (template credentials remain)",
+                        new_vmid,
+                    )
                 logger.info("Provisioned lxc VMID %s on node %s", new_vmid, actual_node)
                 return new_vmid, actual_node
 
