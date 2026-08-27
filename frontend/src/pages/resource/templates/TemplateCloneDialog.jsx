@@ -79,6 +79,9 @@ export default function TemplateCloneDialog({ template, canBatch, onClose, onClo
 
   const selectedGpu = gpuOptions.find((g) => g.mapping_id === gpuMappingId);
   const gpuProfiles = selectedGpu?.profiles ?? [];
+  const smallestCreatableProfile = gpuProfiles
+    .filter((p) => p.creatable && p.vram_mb > 0)
+    .reduce((min, p) => (min && min.vram_mb <= p.vram_mb ? min : p), null);
 
   const handleDownload = async (attachment) => {
     setDownloadingId(attachment.id);
@@ -314,10 +317,12 @@ export default function TemplateCloneDialog({ template, canBatch, onClose, onClo
                 <label htmlFor="clone-gpu-profile">vGPU 規格</label>
                 <select
                   id="clone-gpu-profile"
-                  value={gpuProfile}
+                  value={gpuProfile || smallestCreatableProfile?.mdev_type || ""}
                   onChange={(e) => setGpuProfile(e.target.value)}
                 >
-                  <option value="">自動 — 最小可用規格</option>
+                  {!smallestCreatableProfile && (
+                    <option value="" disabled>無可建立的規格（記憶體不足）</option>
+                  )}
                   {gpuProfiles.map((p) => (
                     <option key={p.mdev_type} value={p.mdev_type} disabled={!p.creatable}>
                       {`${p.name || p.mdev_type} — ${formatVram(p.vram_mb)}`}
