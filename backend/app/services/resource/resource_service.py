@@ -9,7 +9,7 @@ from sqlmodel import Session
 
 from app.exceptions import BadRequestError, ProxmoxError
 from app.models import TeachingClass, TeachingClassStatus
-from app.models.vm_request import VMProvisioningStatus, VMRequestStatus
+from app.models.vm_request import VMProvisioningStatus, VMRequest, VMRequestStatus
 from app.repositories import audit_log as audit_log_repo
 from app.repositories import batch_provision as batch_provision_repo
 from app.repositories import resource as resource_repo
@@ -176,6 +176,12 @@ def _build_resource_public(
         # VM 離線時用 DB 快取
         if session is not None:
             ip_address = resource_repo.get_cached_ip_address(session=session, vmid=vmid)
+    quick_practice_limited = False
+    if session is not None and db_resource and db_resource.request_id:
+        source_request = session.get(VMRequest, db_resource.request_id)
+        quick_practice_limited = bool(
+            source_request and source_request.request_kind == "quick_template"
+        )
     return ResourcePublic(
         vmid=resource.get("vmid"),
         request_id=db_resource.request_id if db_resource else None,
@@ -193,7 +199,7 @@ def _build_resource_public(
         can_control=class_available,
         can_delete=not class_governed,
         can_request_spec_change=not class_governed,
-        can_extend=not class_governed,
+        can_extend=class_available and not quick_practice_limited,
         environment_type=db_resource.environment_type if db_resource else None,
         os_info=db_resource.os_info if db_resource else None,
         expiry_date=db_resource.expiry_date if db_resource else None,
@@ -944,31 +950,34 @@ def extend_session(
     vmid: int,
     user_id: uuid.UUID,
 ) -> ExtendSessionResponse:
-    """Extend a practice-quota session by another ``practice_session_hours``.
+    """Extend an active personal or teaching-class machine session.
 
     Only allowed when:
     - Caller owns the resource
-    - VM is currently running
-    - ``auto_stop_reason == "practice_quota"`` (window-grace stops are not
-      extendable — the course window dictates that)
+    - An auto-stop is scheduled for either a practice quota or course window
+
+    The configured practice-session duration is added after the later of now
+    and the current stop time, so extending early never shortens the session.
     """
     resource = resource_repo.get_resource_by_vmid(session=session, vmid=vmid)
     if resource is None:
         raise BadRequestError("Resource not found")
-    if resource.teaching_class_id is not None:
-        raise BadRequestError(
-            "Teaching-class resources cannot be extended by individual users."
-        )
     if resource.user_id != user_id:
         raise BadRequestError("Not the owner of this resource")
-    if resource.auto_stop_reason != "practice_quota":
+    request_id = getattr(resource, "request_id", None)
+    request = session.get(VMRequest, request_id) if request_id else None
+    if request and request.request_kind == "quick_template":
+        raise BadRequestError("Quick-practice sessions have a fixed time limit.")
+    if resource.auto_stop_reason not in {"practice_quota", "window_grace"}:
         raise BadRequestError(
-            "Session can only be extended during a practice (out-of-window) session."
+            "Session can only be extended while an automatic stop is scheduled."
         )
 
     policy = get_schedule_policy(session=session)
     now = _utc_now()
-    new_stop = now + timedelta(hours=policy.practice_session_hours)
+    current_stop = _ensure_utc(resource.auto_stop_at)
+    extension_base = max(now, current_stop) if current_stop else now
+    new_stop = extension_base + timedelta(hours=policy.practice_session_hours)
     resource_repo.set_auto_stop(
         session=session,
         vmid=vmid,
@@ -1010,6 +1019,11 @@ def get_session_status(
     running = resource_info.get("status") == "running"
     auto_stop_at = resource.auto_stop_at if resource else None
     auto_stop_reason = resource.auto_stop_reason if resource else None
+    request_id = getattr(resource, "request_id", None) if resource else None
+    request = session.get(VMRequest, request_id) if request_id else None
+    quick_practice_limited = bool(
+        request and request.request_kind == "quick_template"
+    )
 
     policy = get_schedule_policy(session=session)
 
@@ -1049,9 +1063,13 @@ def get_session_status(
         hours_until_expiry=hours_until_expiry,
         should_warn=warn_reason is not None,
         warn_reason=warn_reason,
-        # Only practice-quota sessions can be extended via the button.
+        # Practice and teaching-window sessions can both be extended by the owner.
         # Expiry extensions go through spec_change_requests, not this endpoint.
-        can_extend=running and auto_stop_reason == "practice_quota",
+        can_extend=(
+            running
+            and not quick_practice_limited
+            and auto_stop_reason in {"practice_quota", "window_grace"}
+        ),
     )
 
 

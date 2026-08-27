@@ -9,7 +9,6 @@ import { useConfirm } from "../../components/ConfirmDialog/ConfirmProvider";
 import { ClassroomService } from "../../services/classroom";
 import { courseNodeHasUsableSource, CourseEnvironmentsService } from "../../services/courseEnvironments";
 import { TeachingClassesService } from "../../services/teachingClasses";
-import { COURSE_MACHINE_ACCESS_PREVIEW } from "../../mocks/environmentGroups";
 import AiJudgePanel from "./AiJudgePanel";
 import ClassCreateDialog from "./ClassCreatePage";
 import {
@@ -74,17 +73,17 @@ function normalizeClass(item) {
   };
 }
 
-function CourseMachineAccessPreview({ onNavigate }) {
+function CourseMachineAccess({ item, onNavigate }) {
   const [expanded, setExpanded] = useState(false);
-  const group = COURSE_MACHINE_ACCESS_PREVIEW;
-  const running = group.machines.filter((machine) => machine.status === "running").length;
+  const machines = item.nodes ?? [];
+  const running = Math.min(item.readyMachines, machines.length);
 
   return <section className={`${styles.overviewInfoCard} ${styles.machineAccessCard}`}>
     <div className={styles.overviewCardHeader}>
       <div className={styles.machineAccessTitle}>
         <span className={styles.machineAccessIcon}><MIcon name="dns" size={18} /></span>
-        <div><h2>使用課堂機器</h2><small>{group.title} · {group.machines.length} 台機器</small></div>
-        <em>介面預覽</em>
+        <div><h2>使用課堂機器</h2><small>{item.name} · {machines.length} 種機器</small></div>
+        <em>已連接課程</em>
       </div>
       <div className={styles.machineAccessHeaderActions}>
         <button type="button" onClick={() => onNavigate("progress")}>查看資源狀態<MIcon name="monitoring" size={15} /></button>
@@ -94,16 +93,16 @@ function CourseMachineAccessPreview({ onNavigate }) {
       </div>
     </div>
     <div className={styles.machineAccessSummary}>
-      <span className={styles.machineAccessStatus}><i />{running}/{group.machines.length} 台執行中</span>
-      <span><MIcon name="schedule" size={15} />{group.timingLabel}</span>
-      <p>從課程頁直接找到這堂課的所有機器；目前按鈕僅供確認操作流程。</p>
+      <span className={styles.machineAccessStatus}><i />{running}/{item.totalMachines || machines.length} 台已就緒</span>
+      <span><MIcon name="schedule" size={15} />依課程上課時段管理</span>
+      <p>從課程頁直接查看本班機器配置與每位學生的實際資源狀態。</p>
     </div>
     {expanded && <div className={styles.machineAccessList}>
-      {group.machines.map((machine) => <article key={machine.id}>
-        <span className={styles.machineAccessMachineIcon}><MIcon name={machine.type === "lxc" ? "terminal" : "desktop_windows"} size={18} /></span>
-        <div><strong>{machine.name}</strong><small>{machine.role} · {machine.os} · {machine.ip}</small></div>
-        <span className={machine.status === "running" ? styles.machineRunning : styles.machineStopped}>{machine.status === "running" ? "執行中" : "已關機"}</span>
-        <button type="button" disabled title="接上真實機器 API 後開放">{machine.type === "lxc" ? "終端機" : "控制台"}</button>
+      {machines.map((machine) => <article key={machine.id}>
+        <span className={styles.machineAccessMachineIcon}><MIcon name={machine.resource_type === "lxc" ? "terminal" : "desktop_windows"} size={18} /></span>
+        <div><strong>{machine.name}</strong><small>{machine.role} · {String(machine.resource_type).toUpperCase()} · {machine.cpu} CPU / {Math.round(machine.memory_mb / 1024)} GB</small></div>
+        <span className={styles.machineRunning}>課程配置</span>
+        <button type="button" onClick={() => onNavigate("progress")}>查看學生機器</button>
       </article>)}
     </div>}
   </section>;
@@ -206,7 +205,7 @@ function Overview({
       {message && <p className={styles.persistentFeedback}><MIcon name="info" size={17} />{message}</p>}
     </section>
     <div className={styles.overviewDetailGrid}>
-      <CourseMachineAccessPreview onNavigate={onNavigate} />
+      <CourseMachineAccess item={item} onNavigate={onNavigate} />
       <section className={styles.overviewInfoCard}>
         <div className={styles.overviewCardHeader}><h2>班級資訊</h2>{item.status === "planning" && <button type="button" onClick={onEditSchedule}>編輯班級與課表<MIcon name="edit" size={15} /></button>}</div>
         <div className={styles.classFacts}>

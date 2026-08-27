@@ -10,7 +10,8 @@ import useAutoRefresh from "../../../hooks/useAutoRefresh";
 import { ResourcesService } from "../../../services/resources";
 import TerminalDialog from "../../personal/resources/TerminalDialog";
 import VncDialog from "../../personal/resources/VncDialog";
-import { ENVIRONMENT_GROUP_PREVIEW } from "../../../mocks/environmentGroups";
+import { QuickPracticeService } from "../../../services/quickPractice";
+import { buildEnvironmentGroups, groupedResourceKeys } from "../../../utils/environmentGroups";
 
 /* ── Constants ── */
 const STATUS_MAP = {
@@ -81,9 +82,33 @@ function StatusBadge({ status }) {
   );
 }
 
-function EnvironmentMachineRow({ machine }) {
+function EnvironmentMachineRow({ machine, onUpdated }) {
+  const toast = useToast();
   const type = TYPE_MAP[machine.type] ?? { label: machine.type, icon: "computer" };
-  return (
+  const [consoleOpen, setConsoleOpen] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
+  const resource = machine.resource;
+  const isLxc = machine.type === "lxc";
+  const canControl = Boolean(resource?.vmid && resource.can_control !== false);
+  const canOpen = canControl && resource.status === "running";
+  const controlAction = resource?.status === "running" ? "shutdown" : "start";
+
+  async function handleControl() {
+    if (!canControl || actionLoading) return;
+    setActionLoading(true);
+    try {
+      await ResourcesService[controlAction](resource.vmid);
+      const status = controlAction === "start" ? "running" : "stopped";
+      onUpdated({ ...resource, status });
+      toast.success(controlAction === "start" ? "已送出啟動指令" : "已送出正常關機指令");
+    } catch (error) {
+      toast.error(error?.message ?? "機器操作失敗");
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  return <>
     <tr className={`${styles.tr} ${styles.environmentMachineRow}`}>
       <td className={`${styles.td} ${styles.checkCell}`} />
       <td className={styles.td}>
@@ -98,23 +123,26 @@ function EnvironmentMachineRow({ machine }) {
       </td>
       <td className={styles.td}>
         <div className={styles.envPrimary}>{machine.os}</div>
-        <div className={styles.envSub}>介面預覽</div>
+        <div className={styles.envSub}>{machine.resource ? "已連接實際資源" : "建立中"}</div>
       </td>
       <td className={styles.td}><StatusBadge status={machine.status} /></td>
       <td className={styles.td}><span className={styles.mono}>{machine.ip}</span></td>
       <td className={styles.td}><span className={styles.noAction}>依環境統一管理</span></td>
       <td className={styles.td}>{machine.node}</td>
-      <td className={styles.td}>
-        <button type="button" className={styles.consoleBtn} disabled title="接上真實機器 API 後開放">
-          <MIcon name={machine.type === "lxc" ? "terminal" : "desktop_windows"} size={14} />
-          {machine.type === "lxc" ? "終端機" : "控制台"}
+      <td className={styles.td}><div className={styles.actions}>
+        <button type="button" className={styles.consoleBtn} disabled={!canOpen} title={canOpen ? (isLxc ? "終端機" : "控制台") : "機器尚未完成或未開機"} onClick={() => setConsoleOpen(true)}>
+          <MIcon name={isLxc ? "terminal" : "desktop_windows"} size={14} />
+          {isLxc ? "終端機" : "控制台"}
         </button>
-      </td>
+        <button type="button" className={styles.consoleBtn} disabled={!canControl || actionLoading || !["running", "stopped"].includes(resource?.status)} onClick={handleControl}><MIcon name={actionLoading ? "hourglass_empty" : controlAction === "start" ? "play_arrow" : "power_settings_new"} size={14} />{controlAction === "start" ? "啟動" : "關機"}</button>
+      </div></td>
     </tr>
-  );
+    {consoleOpen && isLxc && createPortal(<TerminalDialog resource={resource} onClose={() => setConsoleOpen(false)} />, document.body)}
+    {consoleOpen && !isLxc && createPortal(<VncDialog resource={resource} onClose={() => setConsoleOpen(false)} />, document.body)}
+  </>;
 }
 
-function EnvironmentGroupRows({ group }) {
+function EnvironmentGroupRows({ group, onUpdated }) {
   const [expanded, setExpanded] = useState(true);
   const running = group.machines.filter((machine) => machine.status === "running").length;
   const allRunning = running === group.machines.length;
@@ -131,12 +159,12 @@ function EnvironmentGroupRows({ group }) {
           >
             <MIcon name={expanded ? "expand_more" : "chevron_right"} size={20} />
             <span className={styles.environmentIcon}><MIcon name={group.kind === "course" ? "school" : "bolt"} size={19} /></span>
-            <span><strong>{group.kindLabel}｜{group.title}</strong><small>{group.machines.length} 台機器 · 介面預覽</small></span>
+            <span><strong>{group.kindLabel}｜{group.title}</strong><small>{group.machines.length} 台機器 · 整組管理</small></span>
           </button>
         </td>
         <td className={styles.td}>
           <div className={styles.envPrimary}>{group.kind === "course" ? "課程多機環境" : "快速練習環境"}</div>
-          <div className={styles.envSub}>整組建立與關機</div>
+          <div className={styles.envSub}>整組檢視、逐台操作</div>
         </td>
         <td className={styles.td}>
           <span className={`${styles.badge} ${styles[`badge_${allRunning ? "success" : "info"}`]}`}>{running}/{group.machines.length} 執行中</span>
@@ -151,7 +179,7 @@ function EnvironmentGroupRows({ group }) {
         </td>
       </tr>
       {expanded && group.machines.map((machine) => (
-        <EnvironmentMachineRow key={machine.id} machine={machine} />
+        <EnvironmentMachineRow key={machine.id} machine={machine} onUpdated={onUpdated} />
       ))}
     </>
   );
@@ -513,11 +541,18 @@ function ErrorState({ onRetry }) {
 export default function ResourceMgmtPage() {
   const navigate = useNavigate();
   const [resources, setResources] = useState([]);
+  const [quickSessions, setQuickSessions] = useState([]);
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState(false);
   const [selectedVmids, setSelectedVmids] = useState(() => new Set());
 
-  const selectableVmids = resources
+  const environmentGroups = buildEnvironmentGroups(resources, quickSessions);
+  const grouped = groupedResourceKeys(environmentGroups);
+  const visibleResources = resources.filter((resource) => (
+    !grouped.vmids.has(resource.vmid)
+    && !grouped.requestIds.has(String(resource.request_id))
+  ));
+  const selectableVmids = visibleResources
     .filter((r) => r.can_control !== false && r.vmid != null && r.vmid > 0)
     .map((r) => r.vmid);
   const allSelected = selectableVmids.length > 0 && selectableVmids.every((v) => selectedVmids.has(v));
@@ -542,8 +577,12 @@ export default function ResourceMgmtPage() {
       setError(false);
     }
     try {
-      const data = await ResourcesService.listAll({ signal });
+      const [data, sessions] = await Promise.all([
+        ResourcesService.listAll({ signal }),
+        QuickPracticeService.listAllSessions({ signal }).catch(() => []),
+      ]);
       setResources(data ?? []);
+      setQuickSessions(sessions ?? []);
     } catch (err) {
       if (!silent && !err?.cancelled) setError(true);
     } finally {
@@ -601,12 +640,12 @@ export default function ResourceMgmtPage() {
       {/* ── 內容 ── */}
       <div className={styles.content}>
         <div className={styles.previewNotice} role="note">
-          <MIcon name="science" size={17} />
-          <span><strong>環境群組介面預覽</strong>目前先用假資料確認條列操作，真實機器控制尚未啟用。</span>
+          <MIcon name="account_tree" size={17} />
+          <span><strong>多機環境</strong>課堂機器與快速練習會整組顯示，展開後可操作實際機器。</span>
         </div>
         {error ? (
           <ErrorState onRetry={fetchResources} />
-        ) : !loading && resources.length === 0 && ENVIRONMENT_GROUP_PREVIEW.length === 0 ? (
+        ) : !loading && visibleResources.length === 0 && environmentGroups.length === 0 ? (
           <EmptyState />
         ) : (
           <div className={styles.tableWrap}>
@@ -632,8 +671,8 @@ export default function ResourceMgmtPage() {
                 {loading
                   ? [0, 1, 2, 3].map((i) => <SkeletonRow key={i} />)
                   : <>
-                      {ENVIRONMENT_GROUP_PREVIEW.map((group) => <EnvironmentGroupRows key={group.id} group={group} />)}
-                      {resources.map((r, index) => (
+                      {environmentGroups.map((group) => <EnvironmentGroupRows key={group.id} group={group} onUpdated={handleUpdated} />)}
+                      {visibleResources.map((r, index) => (
                         <ResourceRow
                           key={resourceRowKey(r, index)}
                           resource={r}

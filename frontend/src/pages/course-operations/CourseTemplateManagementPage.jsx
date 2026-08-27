@@ -6,6 +6,7 @@ import EmptyState from "../../components/EmptyState/EmptyState";
 import styles from "./CourseOperations.module.scss";
 
 const STATUS_LABEL = { published: "已發布", draft: "草稿", retired: "已停用" };
+const USAGE_LABEL = { course: "正式課程", quick_practice: "快速練習", both: "課程＋快速練習" };
 
 export default function CourseTemplateManagementPage() {
   const navigate = useNavigate();
@@ -18,7 +19,7 @@ export default function CourseTemplateManagementPage() {
     let active = true;
     CourseEnvironmentsService.list()
       .then((rows) => active && setTemplates(rows))
-      .catch((reason) => active && setError(reason?.message ?? "無法讀取課程環境"))
+      .catch((reason) => active && setError(reason?.message ?? "無法讀取多機環境"))
       .finally(() => active && setLoading(false));
     return () => { active = false; };
   }, []);
@@ -30,10 +31,10 @@ export default function CourseTemplateManagementPage() {
   return <div className={`${styles.page} ${styles.listPage}`}>
     <div className={styles.pageHeader}>
       <div className={styles.pageHeading}>
-        <div className={styles.titleLine}><h1 className={styles.pageTitle}>課程環境</h1></div>
-        <p className={styles.pageSubtitle}>定義每位學生需要的機器組合，再重複套用到不同班級。</p>
+        <div className={styles.titleLine}><h1 className={styles.pageTitle}>多機環境模板</h1></div>
+        <p className={styles.pageSubtitle}>定義一組固定機器配置，提供給正式課程、快速練習或兩者共用。</p>
       </div>
-      <button type="button" className={styles.btnPrimary} onClick={() => navigate("/course-template-management/new")}><MIcon name="add" size={16} />建立課程環境</button>
+      <button type="button" className={styles.btnPrimary} onClick={() => navigate("/course-template-management/new")}><MIcon name="add" size={16} />建立多機環境</button>
     </div>
 
     <section className={styles.card}>
@@ -42,14 +43,14 @@ export default function CourseTemplateManagementPage() {
         <div className={styles.pillTabs}>{[["all", "全部"], ["published", "已發布"], ["draft", "草稿"]].map(([key, label]) => <button type="button" key={key} className={status === key ? styles.pillActive : ""} onClick={() => setStatus(key)}>{label}</button>)}</div>
       </div>
       {error && <p className={styles.errorMessage}>{error}</p>}
-      <div className={styles.listSummary}><span>{loading ? "正在讀取…" : `顯示 ${rows.length} 個可重複使用課程環境`}</span><span>課程環境只定義機器與網路，不包含上課內容</span></div><div className={styles.tableWrap}><table className={styles.table}><thead><tr><th>環境名稱</th><th>每位學生的機器</th><th>資源合計</th><th>版本</th><th>使用班級</th><th>狀態</th><th /></tr></thead><tbody>{rows.map((template) => <tr key={template.id} className={styles.rowLink} onClick={() => navigate(`/course-template-management/${template.id}`)}>
+      <div className={styles.listSummary}><span>{loading ? "正在讀取…" : `顯示 ${rows.length} 個可重複使用的多機環境`}</span><span>同一份多機環境可套用到正式課程或快速練習</span></div><div className={styles.tableWrap}><table className={styles.table}><thead><tr><th>環境名稱</th><th>每位學生的機器</th><th>資源合計</th><th>版本</th><th>提供方式</th><th>使用班級</th><th>狀態</th><th /></tr></thead><tbody>{rows.map((template) => <tr key={template.id} className={styles.rowLink} onClick={() => navigate(`/course-template-management/${template.id}`)}>
         <td><strong>{template.name}</strong><small>{template.code}<br />{template.description}</small></td>
         <td><strong>{template.nodes.length} 台／每位學生</strong><small>{template.nodes.map((node) => node.name).join("、")}</small></td>
-        <td>{template.nodes.reduce((sum, node) => sum + node.cpu, 0)} CPU · {template.nodes.reduce((sum, node) => sum + node.memory, 0)} GB RAM</td><td>v{template.version}</td><td>{template.classes} 個班級</td>
+        <td>{template.nodes.reduce((sum, node) => sum + node.cpu, 0)} CPU · {template.nodes.reduce((sum, node) => sum + node.memory, 0)} GB RAM</td><td>v{template.version}</td><td>{USAGE_LABEL[template.usageScope] ?? "正式課程"}</td><td>{template.classes} 個班級</td>
         <td><span className={`${styles.statusBadge} ${styles[`status_${template.status}`]}`}>{STATUS_LABEL[template.status]}</span></td>
         <td><button type="button" className={styles.iconBtn} aria-label="開啟模板"><MIcon name="chevron_right" size={19} /></button></td>
       </tr>)}</tbody></table></div>
-      {!rows.length && <EmptyState icon="view_quilt" title="沒有符合條件的課程環境。" />}
+      {!rows.length && <EmptyState icon="view_quilt" title="沒有符合條件的多機環境。" />}
     </section>
   </div>;
 }

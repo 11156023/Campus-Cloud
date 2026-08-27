@@ -516,6 +516,43 @@ def create_course_request(
     return db_request
 
 
+def create_quick_practice_request(
+    *, session: Session, request_in: VMRequestCreate, user
+) -> VMRequest:
+    """Create one machine request inside an already validated quick-practice session.
+
+    The quick-practice orchestrator validates the whole environment, enforces
+    aggregate quota and active-session limits before calling this function.
+    Keeping the request creation here preserves the same approval, placement,
+    audit and provisioning path used by the legacy quick-template flow.
+    """
+    db_request = vm_request_repo.create_vm_request(
+        session=session,
+        vm_request_in=request_in,
+        user_id=user.id,
+        encrypted_password=encrypt_value(request_in.password),
+        request_kind="quick_template",
+        commit=False,
+    )
+    _approve_and_place(
+        session=session,
+        db_request=db_request,
+        reviewer_id=user.id,
+    )
+    audit_service.log_action(
+        session=session,
+        user_id=user.id,
+        action="quick_practice_machine_create",
+        details=(
+            f"Quick practice machine: {request_in.resource_type} "
+            f"{request_in.hostname}, {request_in.cores} cores, "
+            f"{request_in.memory}MB RAM. Auto-approved."
+        ),
+        commit=False,
+    )
+    return db_request
+
+
 def submit_course_provision(request_id: uuid.UUID) -> None:
     """課程實驗機 provision 背景觸發（commit 後呼叫）。"""
     submit_sync(
