@@ -4,7 +4,7 @@ import styles from "./TemplatesPage.module.scss";
 import MIcon from "../../../components/MIcon";
 import EmptyState from "../../../components/EmptyState/EmptyState";
 import { useAuth } from "../../../contexts/AuthContext";
-import { TemplatesService } from "../../../services/templates";
+import { TemplatesService, safeTemplateIconUrl } from "../../../services/templates";
 import { downloadBlob } from "../../../services/api";
 import { useToast } from "../../../hooks/useToast";
 import { useConfirm } from "../../../components/ConfirmDialog/ConfirmProvider";
@@ -205,8 +205,12 @@ function ManagementRow({ template, cycleBusy, onClone, onEdit, onManual, onRetry
     <tr className={styles.tr}>
       <td className={styles.td}>
         <div className={styles.nameCell}>
-          {template.icon_url && (
-            <img className={styles.iconThumbSmall} src={template.icon_url} alt="" />
+          {safeTemplateIconUrl(template.icon_url) && (
+            <img
+              className={styles.iconThumbSmall}
+              src={safeTemplateIconUrl(template.icon_url)}
+              alt=""
+            />
           )}
           <span className={styles.namePrimary}>{template.name}</span>
           {template.pve_exists === false && template.status === "ready" && (
@@ -277,8 +281,12 @@ function StudentCatalog({ templates, onClone, onManual }) {
       {templates.map((template) => (
         <div key={template.id} className={styles.catalogCard}>
           <div className={styles.catalogHead}>
-            {template.icon_url ? (
-              <img className={styles.iconThumb} src={template.icon_url} alt="" />
+            {safeTemplateIconUrl(template.icon_url) ? (
+              <img
+                className={styles.iconThumb}
+                src={safeTemplateIconUrl(template.icon_url)}
+                alt=""
+              />
             ) : (
               <MIcon name="library_books" size={18} />
             )}

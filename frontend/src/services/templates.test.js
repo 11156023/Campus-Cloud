@@ -4,7 +4,7 @@
  */
 
 import { beforeEach, describe, expect, test, vi } from "vitest";
-import { TemplatesService } from "./templates";
+import { TemplatesService, safeTemplateIconUrl } from "./templates";
 
 function fakeStorage() {
   const m = new Map();
@@ -27,6 +27,18 @@ beforeEach(() => {
   vi.stubGlobal("localStorage", fakeStorage());
   fetchMock = vi.fn();
   vi.stubGlobal("fetch", fetchMock);
+});
+
+describe("safeTemplateIconUrl", () => {
+  test("接受本服務 icon 端點與 blob 預覽，拒絕其他來源", () => {
+    const good = "/api/v1/templates/0b7f8a3e-1234-4abc-9def-0123456789ab/icon?v=123";
+    expect(safeTemplateIconUrl(good)).toBe(good);
+    expect(safeTemplateIconUrl("blob:http://x/abc")).toBe("blob:http://x/abc");
+    expect(safeTemplateIconUrl(null)).toBeNull();
+    expect(safeTemplateIconUrl("javascript:alert(1)")).toBeNull();
+    expect(safeTemplateIconUrl("https://evil.example/icon.svg")).toBeNull();
+    expect(safeTemplateIconUrl("/api/v1/users/x/avatar")).toBeNull();
+  });
 });
 
 describe("TemplatesService", () => {

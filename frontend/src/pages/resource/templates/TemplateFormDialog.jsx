@@ -3,7 +3,7 @@ import styles from "./TemplatesPage.module.scss";
 import MIcon from "../../../components/MIcon";
 import { useAuth } from "../../../contexts/AuthContext";
 import { ResourcesService } from "../../../services/resources";
-import { TemplatesService } from "../../../services/templates";
+import { TemplatesService, safeTemplateIconUrl } from "../../../services/templates";
 import { useToast } from "../../../hooks/useToast";
 import { useConfirm } from "../../../components/ConfirmDialog/ConfirmProvider";
 
@@ -306,7 +306,7 @@ export default function TemplateFormDialog({ template, onClose, onSaved }) {
     }
   };
 
-  const shownIconUrl = isEdit ? iconUrl : pendingIconUrl;
+  const shownIconUrl = safeTemplateIconUrl(isEdit ? iconUrl : pendingIconUrl);
   const shownAttachments = isEdit
     ? attachments
     : pendingAttachments.map((file, idx) => ({

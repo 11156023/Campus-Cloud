@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import styles from "./TemplatesPage.module.scss";
 import MIcon from "../../../components/MIcon";
-import { TemplatesService } from "../../../services/templates";
+import { TemplatesService, safeTemplateIconUrl } from "../../../services/templates";
 import { GpuService } from "../../../services/gpu";
 import { downloadBlob } from "../../../services/api";
 import { useToast } from "../../../hooks/useToast";
@@ -131,8 +131,12 @@ export default function TemplateCloneDialog({ template, canBatch, onClose, onClo
     <div className={styles.modalOverlay} onClick={onClose}>
       <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
         <span className={styles.modalTitle}>
-          {template.icon_url ? (
-            <img className={styles.iconThumbSmall} src={template.icon_url} alt="" />
+          {safeTemplateIconUrl(template.icon_url) ? (
+            <img
+              className={styles.iconThumbSmall}
+              src={safeTemplateIconUrl(template.icon_url)}
+              alt=""
+            />
           ) : (
             <MIcon name="content_copy" size={20} />
           )}

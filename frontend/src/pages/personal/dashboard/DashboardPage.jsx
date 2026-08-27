@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../../contexts/AuthContext";
 import { useDragScroll } from "../../../hooks/useDragScroll";
-import { TemplatesService } from "../../../services/templates";
+import { TemplatesService, safeTemplateIconUrl } from "../../../services/templates";
 import MIcon from "../../../components/MIcon";
 import LoadingState from "../../../components/LoadingState/LoadingState";
 import styles from "./DashboardPage.module.scss";
@@ -257,7 +257,7 @@ export default function DashboardPage() {
                 name={t.name}
                 desc={t.description || "由範本克隆建立，數秒內完成佈建。"}
                 icon="layers"
-                logo={t.icon_url || undefined}
+                logo={safeTemplateIconUrl(t.icon_url) || undefined}
                 accent={TEMPLATE_ACCENT}
                 categoryTitle={`${t.resource_type === "lxc" ? "LXC" : "VM"} · v${t.version}`}
                 onSelect={() =>

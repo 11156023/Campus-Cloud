@@ -177,11 +177,20 @@ async def upload_template_icon(
 @router.get("/{template_id}/icon")
 def get_template_icon(template_id: uuid.UUID) -> FileResponse:
     """icon 圖檔。<img> 標籤無法帶 Authorization header，因此不做驗證；
-    template_id 由路由強制為 UUID，不會有路徑穿越問題。"""
+    template_id 由路由強制為 UUID，不會有路徑穿越問題。
+
+    CSP sandbox：icon 可為 SVG，直接開啟 URL 時禁止內嵌 script 執行，
+    避免 stored XSS。"""
     path = template_files.find_icon(template_id)
     if path is None:
         raise NotFoundError("Icon not found")
-    return FileResponse(path)
+    return FileResponse(
+        path,
+        headers={
+            "Content-Security-Policy": "default-src 'none'; sandbox",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
 
 
 @router.delete("/{template_id}/icon", response_model=VMTemplatePublic)

@@ -7,6 +7,16 @@ import {
   apiPostMultipart,
 } from "./api";
 
+/** 範本 icon URL 白名單：僅接受本服務的 icon 端點或本地 blob 預覽。
+ * icon_url 來自 API 資料，直接進 <img src> 前先驗證格式（防 XSS）。 */
+const ICON_URL_RE = /^\/api\/v1\/templates\/[0-9a-fA-F-]{36}\/icon(\?v=\d+)?$/;
+
+export function safeTemplateIconUrl(url) {
+  if (!url) return null;
+  if (url.startsWith("blob:")) return url; // 上傳前的本地預覽（createObjectURL）
+  return ICON_URL_RE.test(url) ? url : null;
+}
+
 export const TemplatesService = {
   /** 列出可見範本（admin 全部；teacher 自有+可見；student 僅 ready 且可見） */
   list(options) {
