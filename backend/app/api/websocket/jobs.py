@@ -16,21 +16,32 @@ from sqlmodel import Session
 from app.api.deps.auth import get_ws_current_user
 from app.models import User
 from app.schemas.jobs import JobsListResponse
+from app.services.course import reminder_service
 from app.services.jobs import jobs_service
 
 logger = logging.getLogger(__name__)
 
 
 _SNAPSHOT_INTERVAL_SECONDS = 3.0
+# 提醒（資源期限／審核結果／課堂任務）變化以天、小時計，
+# 不必跟 jobs 一樣每輪重算：每 N 輪查一次，其餘輪沿用快取。
+_REMINDER_REFRESH_ROUNDS = 10
 
 
-def _fetch_snapshot(session: Session, user: User, limit: int) -> JobsListResponse:
+def _fetch_snapshot(
+    session: Session, user: User, limit: int, *, include_reminders: bool
+) -> JobsListResponse:
     # 長連線重用同一個 session：每輪先 expire identity map，否則已載入的
     # job 物件屬性不會被新查詢覆寫，狀態會永遠停在第一次查到的值；
     # 查完 rollback 結束交易，避免整個 WS 生命週期佔住 idle-in-transaction 連線。
     session.expire_all()
     try:
-        return jobs_service.list_recent_for_user(session=session, user=user, limit=limit)
+        snapshot = jobs_service.list_recent_for_user(session=session, user=user, limit=limit)
+        if include_reminders:
+            snapshot.reminders = reminder_service.list_student_reminders(
+                session, user_id=user.id
+            )
+        return snapshot
     finally:
         session.rollback()
 
@@ -42,20 +53,30 @@ async def jobs_ws_proxy(websocket: WebSocket, token: str) -> None:
     logger.debug("Jobs WS connected: user=%s", user_email)
 
     last_payload: str | None = None
+    cached_reminders: list | None = None
+    round_index = 0
 
     try:
         while True:
+            include_reminders = round_index % _REMINDER_REFRESH_ROUNDS == 0
+            round_index += 1
             try:
                 snapshot = await asyncio.to_thread(
                     _fetch_snapshot,
                     session,
                     user,
                     20,
+                    include_reminders=include_reminders,
                 )
             except Exception:  # noqa: BLE001 — 單次失敗不應斷線
                 logger.exception("Jobs WS snapshot fetch failed")
                 await asyncio.sleep(_SNAPSHOT_INTERVAL_SECONDS)
                 continue
+
+            if include_reminders:
+                cached_reminders = snapshot.reminders or []
+            else:
+                snapshot.reminders = cached_reminders
 
             payload = snapshot.model_dump_json()
             if payload != last_payload:
