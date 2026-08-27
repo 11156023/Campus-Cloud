@@ -39,7 +39,9 @@ def test_fetch_snapshot_expires_then_rolls_back(
 
     monkeypatch.setattr(jobs_service, "list_recent_for_user", fake_list_recent)
 
-    result = jobs_ws._fetch_snapshot(session, user=object(), limit=20)
+    result = jobs_ws._fetch_snapshot(
+        session, user=object(), limit=20, include_reminders=False
+    )
 
     assert result is sentinel
     assert session.calls == ["expire_all", "query", "rollback"]
@@ -56,7 +58,43 @@ def test_fetch_snapshot_rolls_back_even_on_failure(
     monkeypatch.setattr(jobs_service, "list_recent_for_user", failing_list_recent)
 
     with pytest.raises(RuntimeError):
-        jobs_ws._fetch_snapshot(session, user=object(), limit=20)
+        jobs_ws._fetch_snapshot(
+            session, user=object(), limit=20, include_reminders=False
+        )
 
     # rollback in finally keeps the session usable for the next poll cycle
     assert session.calls == ["expire_all", "rollback"]
+
+
+def test_fetch_snapshot_attaches_reminders_when_requested(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session = _FakeSession()
+
+    class _Snapshot:
+        reminders: Any = None
+
+    snapshot = _Snapshot()
+
+    def fake_list_recent(*, session: Any, user: Any, limit: int) -> Any:  # noqa: ARG001
+        session.calls.append("query")
+        return snapshot
+
+    def fake_reminders(session: Any, *, user_id: Any, now: Any = None) -> Any:  # noqa: ARG001
+        session.calls.append("reminders")
+        return ["reminder"]
+
+    monkeypatch.setattr(jobs_service, "list_recent_for_user", fake_list_recent)
+    monkeypatch.setattr(
+        jobs_ws.reminder_service, "list_student_reminders", fake_reminders
+    )
+
+    class _User:
+        id = "user-id"
+
+    result = jobs_ws._fetch_snapshot(
+        session, user=_User(), limit=20, include_reminders=True
+    )
+
+    assert result.reminders == ["reminder"]
+    assert session.calls == ["expire_all", "query", "reminders", "rollback"]

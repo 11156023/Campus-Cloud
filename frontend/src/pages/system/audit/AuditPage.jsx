@@ -6,6 +6,7 @@ import SharedEmptyState from "../../../components/EmptyState/EmptyState";
 import { useToast } from "../../../hooks/useToast";
 import { downloadBlob } from "../../../services/api";
 import { AuditLogsService } from "../../../services/auditLogs";
+import PageHeader from "../../../components/PageHeader/PageHeader";
 
 const PAGE_SIZE = 50;
 
@@ -136,11 +137,7 @@ export default function AuditPage() {
 
   return (
     <div className={styles.page}>
-      <div className={styles.pageHeader}>
-        <div className={styles.pageHeading}>
-          <h1 className={styles.pageTitle}>稽核日誌</h1>
-          <p className={styles.pageSubtitle}>查看所有系統操作記錄</p>
-        </div>
+      <PageHeader title="稽核日誌" subtitle="查看所有系統操作記錄">
         <button
           type="button"
           className={styles.btnSecondary}
@@ -150,7 +147,7 @@ export default function AuditPage() {
           <MIcon name="download" size={16} />
           {exporting ? "匯出中..." : "匯出 CSV"}
         </button>
-      </div>
+      </PageHeader>
 
       {stats && (
         <div className={styles.summaryGrid}>

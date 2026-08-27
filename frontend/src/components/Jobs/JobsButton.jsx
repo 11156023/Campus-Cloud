@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import MIcon from "../MIcon";
 import { useJobs } from "./JobsProvider";
-import { JobEmpty, JobLoading, JobRow } from "./JobRow";
+import { JobEmpty, JobLoading, JobRow, ReminderRow } from "./JobRow";
 import styles from "./Jobs.module.scss";
 
 const POPOVER_WIDTH = 360;
@@ -19,7 +19,19 @@ const MARGIN = 16;  // popover 與視窗邊緣的最小留白
  * fixed 子元素的定位基準，加上 overflow-x: hidden 會把彈出內容裁掉。
  */
 export default function JobsButton({ collapsed = false }) {
-  const { items, isAdmin, notifyOnlyMine, setNotifyOnlyMine, openJob } = useJobs();
+  const {
+    items,
+    isAdmin,
+    notifyOnlyMine,
+    setNotifyOnlyMine,
+    openJob,
+    reminders,
+    readReminderIds,
+    refreshReminders,
+    markReminderRead,
+    markAllRemindersRead,
+  } = useJobs();
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState(null);
   const btnRef = useRef(null);
@@ -67,6 +79,22 @@ export default function JobsButton({ collapsed = false }) {
 
   const running = items?.length ?? 0;
   const hasRunning = running > 0;
+  const unreadReminders = (reminders ?? []).filter((item) => !readReminderIds.includes(item.id));
+  const attention = running + unreadReminders.length;
+
+  const openReminder = (reminder) => {
+    markReminderRead(reminder.id);
+    setOpen(false);
+    if (reminder.target) navigate(reminder.target);
+  };
+
+  const toggleOpen = () => {
+    setOpen((v) => {
+      // 開啟當下順手刷新提醒，讓期限／審核結果保持最新
+      if (!v) refreshReminders();
+      return !v;
+    });
+  };
 
   return (
     <>
@@ -74,19 +102,19 @@ export default function JobsButton({ collapsed = false }) {
         ref={btnRef}
         type="button"
         className={`${styles.sidebarBtn} ${collapsed ? styles.sidebarBtnCollapsed : ""} ${open ? styles.sidebarBtnActive : ""}`}
-        onClick={() => setOpen((v) => !v)}
+        onClick={toggleOpen}
         title={collapsed ? "背景任務" : undefined}
         aria-label="背景任務"
         aria-expanded={open}
       >
         <span className={styles.sidebarBtnIcon}>
           <MIcon name="notifications" size={20} />
-          {collapsed && hasRunning && <span className={styles.bellDot} />}
+          {collapsed && attention > 0 && <span className={styles.bellDot} />}
         </span>
         {!collapsed && (
           <>
             <span className={styles.sidebarBtnLabel}>背景任務</span>
-            {hasRunning && <span className={styles.countBadge}>{running}</span>}
+            {attention > 0 && <span className={styles.countBadge}>{attention}</span>}
           </>
         )}
       </button>
@@ -130,6 +158,41 @@ export default function JobsButton({ collapsed = false }) {
                 />
               ))
             )}
+          </div>
+          <div className={styles.popoverSection}>
+            <div className={styles.popoverHeader}>
+              <span className={styles.popoverTitle}>提醒</span>
+              {unreadReminders.length > 0 ? (
+                <button
+                  type="button"
+                  className={styles.markAllBtn}
+                  onClick={markAllRemindersRead}
+                >
+                  全部標為已讀
+                  <MIcon name="done_all" size={14} />
+                </button>
+              ) : (
+                <span className={styles.popoverSub}>
+                  {(reminders?.length ?? 0) > 0 ? "全部已讀" : "沒有新提醒"}
+                </span>
+              )}
+            </div>
+            <div className={styles.popoverList}>
+              {reminders === null ? (
+                <JobLoading />
+              ) : reminders.length === 0 ? (
+                <JobEmpty message="機器期限、審核結果與近期課堂任務會出現在這裡" />
+              ) : (
+                reminders.map((reminder) => (
+                  <ReminderRow
+                    key={reminder.id}
+                    reminder={reminder}
+                    unread={!readReminderIds.includes(reminder.id)}
+                    onClick={openReminder}
+                  />
+                ))
+              )}
+            </div>
           </div>
           <div className={styles.popoverFooter}>
             <Link to="/jobs" className={styles.popoverLink} onClick={() => setOpen(false)}>

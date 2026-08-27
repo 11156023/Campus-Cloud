@@ -6,6 +6,7 @@ import { useToast } from "../../../hooks/useToast";
 import { LayoutContext } from "../../../layout/DashboardLayout";
 import { QuickPracticeService } from "../../../services/quickPractice";
 import AiSidePanel from "../requests/AiSidePanel";
+import PageHeader from "../../../components/PageHeader/PageHeader";
 import styles from "./QuickTemplateFormPage.module.scss";
 
 export default function QuickTemplateFormPage() {
@@ -69,10 +70,9 @@ export default function QuickTemplateFormPage() {
   const totalDisk = template.nodes.reduce((sum, node) => sum + Number(node.disk || 0), 0);
 
   return <div className={styles.page}>
-    <div className={styles.pageHeader}>
-      <div className={styles.pageHeading}><h1 className={styles.pageTitle}>啟動快速練習</h1><p className={styles.pageSubtitle}>固定配置、免人工審核；送出後會一次建立整組機器</p></div>
+    <PageHeader title="啟動快速練習" subtitle="固定配置、免人工審核；送出後會一次建立整組機器">
       <button type="button" className={styles.backBtn} onClick={onBack}><MIcon name="arrow_back" size={18} />返回</button>
-    </div>
+    </PageHeader>
 
     <div className={styles.body}>
       <div className={styles.formScroll}>

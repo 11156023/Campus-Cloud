@@ -7,6 +7,7 @@ import { useAuth } from "../../../contexts/AuthContext";
 import { useToast } from "../../../hooks/useToast";
 import useAutoRefresh from "../../../hooks/useAutoRefresh";
 import { UsersService } from "../../../services/users";
+import PageHeader from "../../../components/PageHeader/PageHeader";
 
 const ROLE_OPTIONS = [
   { value: "student", label: "學生" },
@@ -304,16 +305,12 @@ export default function AdminPage() {
 
   return (
     <div className={styles.page}>
-      <div className={styles.pageHeader}>
-        <div className={styles.pageHeading}>
-          <h1 className={styles.pageTitle}>使用者管理</h1>
-          <p className={styles.pageSubtitle}>管理使用者帳戶、角色與登入狀態</p>
-        </div>
+      <PageHeader title="使用者管理" subtitle="管理使用者帳戶、角色與登入狀態">
         <button type="button" className={styles.btnPrimary} onClick={() => setModal({ mode: "create" })}>
           <MIcon name="person_add" size={16} />
           新增使用者
         </button>
-      </div>
+      </PageHeader>
 
       <div className={styles.summaryGrid}>
         <div className={styles.summaryItem}>

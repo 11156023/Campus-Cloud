@@ -7,6 +7,7 @@ import RrdChart from "../../../components/RrdChart/RrdChart";
 import MiningIncidentsPanel from "./MiningIncidentsPanel";
 import { MonitoringService } from "../../../services/monitoring";
 import { useToast } from "../../../hooks/useToast";
+import PageHeader from "../../../components/PageHeader/PageHeader";
 
 const TIMEFRAMES = [
   { value: "hour", label: "最近 1 小時" },
@@ -320,11 +321,7 @@ export default function MonitoringPage() {
 
   return (
     <div className={styles.page}>
-      <div className={styles.pageHeader}>
-        <div className={styles.pageHeading}>
-          <h1 className={styles.pageTitle}>資源監控</h1>
-          <p className={styles.pageSubtitle}>叢集資源使用、節點趨勢與閾值告警</p>
-        </div>
+      <PageHeader title="資源監控" subtitle="叢集資源使用、節點趨勢與閾值告警">
         <div className={styles.pageActions}>
           <div className={styles.segment}>
             {TIMEFRAMES.map((t) => (
@@ -339,7 +336,7 @@ export default function MonitoringPage() {
             ))}
           </div>
         </div>
-      </div>
+      </PageHeader>
 
       {/* 叢集用量卡片 */}
       <div className={styles.statRow}>

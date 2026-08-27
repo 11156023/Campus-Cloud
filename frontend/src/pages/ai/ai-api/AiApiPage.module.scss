@@ -13,44 +13,11 @@
 }
 
 /* ── Header ── */
-.pageHeader {
-  @include flex-between;
-  flex-wrap: wrap;
-  gap: $spacing-16;
-  align-items: center;
-}
-
-.pageHeading {
-  @include flex-column;
-  gap: $spacing-4;
-}
-
-.titleRow {
-  display: flex;
-  align-items: baseline;
-  gap: $spacing-8;
-}
-
 .breadcrumb {
   font-size: $font-size-24;
   font-weight: $font-weight-500;
   color: var(--color-text-primary);
   letter-spacing: 0.05em;
-}
-
-.pageTitle {
-  font-size: $font-size-24;
-  font-weight: $font-weight-700;
-  color: var(--color-text-primary);
-
-  @include respond-to(sm) {
-    font-size: $font-size-28;
-  }
-}
-
-.pageSubtitle {
-  font-size: $font-size-14;
-  color: var(--color-text-secondary);
 }
 
 /* ── Stat cards ── */

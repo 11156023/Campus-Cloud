@@ -4,87 +4,63 @@ import { useAuth } from "../../contexts/AuthContext";
 import MIcon from "../MIcon";
 import styles from "./UserGuide.module.scss";
 
+const STUDENT_HOME_GUIDE = {
+  id: "student-home",
+  title: "首頁",
+  icon: "home",
+  steps: [
+    {
+      selector: '[data-guide="home-schedule"]',
+      title: "從今天的課程開始",
+      text: "這裡只放今天會用到的課。綠色課程代表正在上課，點整張課程卡就能查看課堂環境與今天的任務。",
+    },
+    {
+      selector: '[data-guide="home-quick-templates"]',
+      title: "臨時練習不用等待人工審核",
+      text: "需要快速測試指令或做輕量練習時，選擇模板並填寫容器名稱與密碼，系統會自動核准並開始建立。",
+    },
+    {
+      selector: '[data-guide="home-other-needs"]',
+      title: "下課練習或自主研究",
+      text: "不是現在要上課時，可以從這裡回到上次的課程進度；自主研究則會帶你前往資源申請。",
+    },
+    {
+      selector: '[data-guide="home-current-course"]',
+      title: "這是你現在要上的課",
+      text: "課程名稱、上課時間與「正在上課」狀態都集中在這張卡片。進首頁先看這裡，就知道今天要進哪堂課。",
+    },
+    {
+      selector: '[data-guide="home-progress"]',
+      title: "這條是章節完成進度",
+      text: "進度條代表目前章節已完成的比例，不是機器建立進度。做完任務後，這個數字會往前增加。",
+    },
+    {
+      selector: '[data-guide="home-start"]',
+      title: "按這裡直接開始上課",
+      text: "「開始練習」會帶你進入老師安排的內容；課堂環境由系統準備，一般上課不必另外申請機器。",
+    },
+    {
+      selector: '[data-guide="home-environment"]',
+      title: "先看環境是否可以使用",
+      text: "「環境已就緒」表示可以開始。IP 是連線位置；「可使用至」是這台課堂機器的到期時間。",
+    },
+    {
+      selector: '[data-guide="home-tasks"]',
+      title: "完成數量看這裡",
+      text: "例如「2 / 4 已完成」表示共有 4 個任務、已完成 2 個。標示「下一步」的項目是建議你接著做的內容。",
+    },
+    {
+      selector: '[data-guide="course-ai-assignments"]',
+      title: "這些是老師交給 AI 的評分項目",
+      text: "只會顯示老師已核准的檢查要求。「可自動檢查」會由系統確認；「老師人工確認」代表最後仍由老師判定。你不需要在這裡另外送出資料。",
+      optional: true,
+    },
+  ],
+};
+
 const PAGE_GUIDES = {
-  "/dashboard": {
-    id: "dashboard",
-    title: "首頁",
-    icon: "home",
-    steps: [
-      {
-        selector: '[data-guide="dashboard-quick-actions"]',
-        title: "這兩個按鈕都只處理自主申請",
-        text: "「申請新資源」會直接開啟申請表；「查看我的申請」只看進度。上課使用老師分發的機器時，不需要按這裡。",
-      },
-      {
-        selector: '[data-guide="dashboard-courses"]',
-        title: "左右箭頭只是在切換推薦內容",
-        text: "這區顯示推薦課程，右上角箭頭用來橫向瀏覽，不會改變你的修課或申請狀態。",
-      },
-      {
-        selector: '[data-guide="dashboard-templates"]',
-        title: "版本數字代表範本版本",
-        text: "例如「v3」表示這是範本的第 3 版。點「立即建立」會用該範本建立練習環境；課堂需求仍建議從首頁 (new) 進入。",
-      },
-    ],
-  },
-  "/dashboard-new": {
-    id: "student-home",
-    title: "首頁",
-    icon: "home",
-    steps: [
-      {
-        selector: '[data-guide="home-schedule"]',
-        title: "從今天的課程開始",
-        text: "這裡只放今天會用到的課。綠色課程代表正在上課，點整張課程卡就能查看課堂環境與今天的任務。",
-      },
-      {
-        selector: '[data-guide="home-reminders"]',
-        title: "重要期限與結果會出現在這裡",
-        text: "提醒會集中顯示機器到期、資源審核結果與任務期限。點一則提醒就會直接前往對應頁面。",
-      },
-      {
-        selector: '[data-guide="home-quick-templates"]',
-        title: "臨時練習不用等待人工審核",
-        text: "需要快速測試指令或做輕量練習時，選擇模板並填寫容器名稱與密碼，系統會自動核准並開始建立。",
-      },
-      {
-        selector: '[data-guide="home-other-needs"]',
-        title: "下課練習或自主研究",
-        text: "不是現在要上課時，可以從這裡回到上次的課程進度；自主研究則會帶你前往資源申請。",
-      },
-      {
-        selector: '[data-guide="home-current-course"]',
-        title: "這是你現在要上的課",
-        text: "課程名稱、上課時間與「正在上課」狀態都集中在這張卡片。進首頁先看這裡，就知道今天要進哪堂課。",
-      },
-      {
-        selector: '[data-guide="home-progress"]',
-        title: "這條是章節完成進度",
-        text: "進度條代表目前章節已完成的比例，不是機器建立進度。做完任務後，這個數字會往前增加。",
-      },
-      {
-        selector: '[data-guide="home-start"]',
-        title: "按這裡直接開始上課",
-        text: "「開始練習」會帶你進入老師安排的內容；課堂環境由系統準備，一般上課不必另外申請機器。",
-      },
-      {
-        selector: '[data-guide="home-environment"]',
-        title: "先看環境是否可以使用",
-        text: "「環境已就緒」表示可以開始。IP 是連線位置；「可使用至」是這台課堂機器的到期時間。",
-      },
-      {
-        selector: '[data-guide="home-tasks"]',
-        title: "完成數量看這裡",
-        text: "例如「2 / 4 已完成」表示共有 4 個任務、已完成 2 個。標示「下一步」的項目是建議你接著做的內容。",
-      },
-      {
-        selector: '[data-guide="course-ai-assignments"]',
-        title: "這些是老師交給 AI 的評分項目",
-        text: "只會顯示老師已核准的檢查要求。「可自動檢查」會由系統確認；「老師人工確認」代表最後仍由老師判定。你不需要在這裡另外送出資料。",
-        optional: true,
-      },
-    ],
-  },
+  "/dashboard": STUDENT_HOME_GUIDE,
+  "/dashboard-new": STUDENT_HOME_GUIDE,
   "/my-requests": {
     id: "my-requests",
     title: "我的申請",

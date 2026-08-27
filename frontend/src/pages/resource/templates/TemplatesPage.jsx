@@ -12,6 +12,7 @@ import { TemplateStatusBadge } from "./TemplateBadges";
 import TemplateCloneDialog from "./TemplateCloneDialog";
 import TemplateFormDialog from "./TemplateFormDialog";
 import LoadingState from "../../../components/LoadingState/LoadingState";
+import PageHeader from "../../../components/PageHeader/PageHeader";
 
 function visibilityLabel(template) {
   return template.visibility === "global"
@@ -480,15 +481,7 @@ export default function TemplatesPage() {
 
   return (
     <div className={styles.page}>
-      <div className={styles.pageHeader}>
-        <div className={styles.pageHeading}>
-          <h1 className={styles.pageTitle}>機器範本</h1>
-          <p className={styles.pageSubtitle}>
-            {canManage
-              ? "把設定好的母機轉為範本，學生即可一鍵克隆出自己的環境"
-              : "從老師提供的範本一鍵克隆出自己的環境，開好即用"}
-          </p>
-        </div>
+      <PageHeader title="機器範本" subtitle={canManage ? "把設定好的母機轉為範本，學生即可一鍵克隆出自己的環境" : "從老師提供的範本一鍵克隆出自己的環境，開好即用"}>
         <div className={styles.pageActions}>
           <button
             type="button"
@@ -510,7 +503,7 @@ export default function TemplatesPage() {
             </button>
           )}
         </div>
-      </div>
+      </PageHeader>
 
       {templates === null ? (
         <LoadingState fullPage text="載入範本中…" />

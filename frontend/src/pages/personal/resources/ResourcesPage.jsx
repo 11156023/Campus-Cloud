@@ -18,6 +18,7 @@ import useAutoRefresh from "../../../hooks/useAutoRefresh";
 import TerminalDialog from "./TerminalDialog";
 import VncDialog from "./VncDialog";
 import QuotaUsageBar from "../../../components/Teaching/QuotaUsageBar";
+import PageHeader from "../../../components/PageHeader/PageHeader";
 import { QuickPracticeService } from "../../../services/quickPractice";
 import { buildEnvironmentGroups, groupedResourceKeys } from "../../../utils/environmentGroups";
 
@@ -460,11 +461,7 @@ export default function ResourcesPage() {
 
   return (
     <div className={styles.page}>
-      <div className={styles.pageHeader}>
-        <div className={styles.pageHeading}>
-          <h1 className={styles.pageTitle}>我的資源</h1>
-          <p className={styles.pageSubtitle}>查看與管理申請通過的虛擬機和容器</p>
-        </div>
+      <PageHeader title="我的資源" subtitle="查看與管理申請通過的虛擬機和容器">
         <button
           type="button"
           className={styles.btnPrimary}
@@ -473,7 +470,7 @@ export default function ResourcesPage() {
           <MIcon name="add" size={16} />
           申請資源
         </button>
-      </div>
+      </PageHeader>
 
       {/* 我的配額用量（模組 E） */}
       <QuotaUsageBar />

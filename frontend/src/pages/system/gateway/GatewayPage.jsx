@@ -7,6 +7,7 @@ import { useConfirm } from "../../../components/ConfirmDialog/ConfirmProvider";
 import EmptyState from "../../../components/EmptyState/EmptyState";
 import { useToast } from "../../../hooks/useToast";
 import { GatewayService } from "../../../services/gateway";
+import PageHeader from "../../../components/PageHeader/PageHeader";
 
 const TABS = [
   { key: "connection", label: "連線設定" },
@@ -458,11 +459,7 @@ export default function GatewayPage() {
 
   return (
     <div className={styles.page}>
-      <div className={styles.pageHeader}>
-        <div className={styles.pageHeading}>
-          <h1 className={styles.pageTitle}>Gateway VM 管理</h1>
-          <p className={styles.pageSubtitle}>管理 haproxy、Traefik、frp 服務設定與狀態</p>
-        </div>
+      <PageHeader title="Gateway VM 管理" subtitle="管理 haproxy、Traefik、frp 服務設定與狀態">
 
         <div className={styles.tabs}>
           {TABS.map((tab) => (
@@ -476,7 +473,7 @@ export default function GatewayPage() {
             </button>
           ))}
         </div>
-      </div>
+      </PageHeader>
 
       <div className={styles.content}>
         {loading ? (

@@ -5,6 +5,7 @@ import MIcon from "../../components/MIcon";
 import { CourseEnvironmentsService } from "../../services/courseEnvironments";
 import EmptyState from "../../components/EmptyState/EmptyState";
 import styles from "./CourseOperations.module.scss";
+import PageHeader from "../../components/PageHeader/PageHeader";
 
 const STATUS_LABEL = { published: "已發布", draft: "草稿", retired: "已停用" };
 const USAGE_LABEL = { course: "正式課程", quick_practice: "快速練習", both: "課程＋快速練習" };
@@ -30,13 +31,9 @@ export default function CourseTemplateManagementPage() {
   }), [query, status, templates]);
 
   return <div className={`${styles.page} ${styles.listPage}`}>
-    <div className={styles.pageHeader}>
-      <div className={styles.pageHeading}>
-        <div className={styles.titleLine}><h1 className={styles.pageTitle}>多機環境模板</h1></div>
-        <p className={styles.pageSubtitle}>定義一組固定機器配置，提供給正式課程、快速練習或兩者共用。</p>
-      </div>
+    <PageHeader title="多機環境模板" subtitle="定義一組固定機器配置，提供給正式課程、快速練習或兩者共用。">
       <button type="button" className={styles.btnPrimary} onClick={() => navigate("/course-template-management/new")}><MIcon name="add" size={16} />建立多機環境</button>
-    </div>
+    </PageHeader>
 
     <section className={styles.card}>
       <div className={styles.toolbar}>

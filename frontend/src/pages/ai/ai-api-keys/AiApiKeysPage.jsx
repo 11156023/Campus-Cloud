@@ -6,6 +6,7 @@ import SharedEmptyState from "../../../components/EmptyState/EmptyState";
 import { AiApiService } from "../../../services/aiApi";
 import { useToast } from "../../../hooks/useToast";
 import useAutoRefresh from "../../../hooks/useAutoRefresh";
+import PageHeader from "../../../components/PageHeader/PageHeader";
 
 const PAGE_SIZE = 50;
 
@@ -137,14 +138,7 @@ export default function AiApiKeysPage() {
 
   return (
     <div className={styles.page}>
-      <div className={styles.pageHeader}>
-        <div className={styles.pageHeading}>
-          <h1 className={styles.pageTitle}>AI API 金鑰管理</h1>
-          <p className={styles.pageSubtitle}>
-            查看目前資料庫中所有 AI API 金鑰紀錄與狀態（僅顯示現存紀錄）。
-          </p>
-        </div>
-      </div>
+      <PageHeader title="AI API 金鑰管理" subtitle="查看目前資料庫中所有 AI API 金鑰紀錄與狀態（僅顯示現存紀錄）。" />
 
       {/* ── Stat cards ── */}
       <div className={styles.statRow}>
