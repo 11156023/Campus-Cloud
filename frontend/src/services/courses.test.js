@@ -30,6 +30,20 @@ beforeEach(() => {
 });
 
 describe("CoursesService", () => {
+  test("首頁課表與提醒使用各自的學生 API", async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonRes(200, []))
+      .mockResolvedValueOnce(jsonRes(200, []));
+
+    await CoursesService.listSchedule();
+    await CoursesService.listReminders();
+
+    expect(fetchMock.mock.calls[0][0]).toContain("/api/v1/courses/schedule");
+    expect(fetchMock.mock.calls[1][0]).toContain("/api/v1/courses/reminders");
+    expect(fetchMock.mock.calls[0][1].method).toBe("GET");
+    expect(fetchMock.mock.calls[1][1].method).toBe("GET");
+  });
+
   test("listPaths 以 GET 打 /courses/paths", async () => {
     fetchMock.mockResolvedValueOnce(jsonRes(200, []));
     await CoursesService.listPaths();

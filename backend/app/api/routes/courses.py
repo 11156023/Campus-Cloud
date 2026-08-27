@@ -25,17 +25,46 @@ from app.schemas.course import (
     CoursePathDetail,
     CoursePathSummary,
     CoursePracticeMachineStudent,
+    CourseReminderStudent,
     CourseRoomStudentDetail,
+    CourseScheduleStudent,
 )
 from app.services.course import (
     ai_assignment_service,
     course_service,
     deployment_service,
     progress_service,
+    reminder_service,
 )
 from app.services.course.progress_hub import course_progress_hub
 
 router = APIRouter(prefix="/courses", tags=["courses"])
+
+
+@router.get("/schedule", response_model=list[CourseScheduleStudent])
+def list_schedule(
+    session: SessionDep,
+    current_user: CurrentUser,
+) -> list[CourseScheduleStudent]:
+    """Return today's real classes linked to this student's course paths."""
+
+    return course_service.list_student_schedule(
+        session,
+        user_id=current_user.id,
+    )
+
+
+@router.get("/reminders", response_model=list[CourseReminderStudent])
+def list_reminders(
+    session: SessionDep,
+    current_user: CurrentUser,
+) -> list[CourseReminderStudent]:
+    """Build the student's actionable reminders from current platform data."""
+
+    return reminder_service.list_student_reminders(
+        session,
+        user_id=current_user.id,
+    )
 
 
 @router.get("/paths", response_model=list[CoursePathSummary])
@@ -77,10 +106,14 @@ def list_practice_machines(
     current_user: CurrentUser,
     path_id: uuid.UUID,
 ) -> list[CoursePracticeMachineStudent]:
-    """List every class machine assigned to this student for the path owner."""
+    """List machines assigned in the exact class linked to this path."""
 
-    path = course_service.get_published_path_or_404(session, path_id)
-    if path.created_by is None:
+    teaching_class = course_service.get_student_class_for_path(
+        session,
+        user_id=current_user.id,
+        path_id=path_id,
+    )
+    if teaching_class is None:
         return []
     rows = session.exec(
         select(
@@ -101,7 +134,7 @@ def list_practice_machines(
             TeachingClassStudentMachine.machine_node_id == TeachingClassMachineNode.id,
         )
         .where(
-            TeachingClass.owner_id == path.created_by,
+            TeachingClass.id == teaching_class.id,
             TeachingClassStudent.user_id == current_user.id,
             TeachingClassStudent.status == "active",
         )

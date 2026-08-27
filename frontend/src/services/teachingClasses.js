@@ -1,9 +1,46 @@
 import { apiDelete, apiGet, apiPatch, apiPost, apiPostMultipart, apiPut } from "./api";
 
+const RESOURCE_USAGE_CACHE_TTL_MS = 5_000;
+const resourceUsageCache = new Map();
+
+function getResourceUsage(classId) {
+  const key = String(classId);
+  const now = Date.now();
+  resourceUsageCache.forEach((entry, cachedKey) => {
+    if (!entry.pending && now - entry.cachedAt >= RESOURCE_USAGE_CACHE_TTL_MS) {
+      resourceUsageCache.delete(cachedKey);
+    }
+  });
+  const cached = resourceUsageCache.get(key);
+  if (cached?.value && now - cached.cachedAt < RESOURCE_USAGE_CACHE_TTL_MS) {
+    return Promise.resolve(cached.value);
+  }
+  if (cached?.pending) return cached.pending;
+
+  const pending = apiGet(`/api/v1/teaching-classes/${classId}/resource-usage`)
+    .then((value) => {
+      resourceUsageCache.set(key, { value, cachedAt: Date.now(), pending: null });
+      return value;
+    })
+    .catch((error) => {
+      if (resourceUsageCache.get(key)?.pending === pending) {
+        resourceUsageCache.delete(key);
+      }
+      throw error;
+    });
+  resourceUsageCache.set(key, {
+    value: cached?.value,
+    cachedAt: cached?.cachedAt ?? 0,
+    pending,
+  });
+  return pending;
+}
+
 export const TeachingClassesService = {
   list() { return apiGet("/api/v1/teaching-classes"); },
   create(body) { return apiPost("/api/v1/teaching-classes", body); },
   get(classId) { return apiGet(`/api/v1/teaching-classes/${classId}`); },
+  resourceUsage(classId) { return getResourceUsage(classId); },
   update(classId, body) { return apiPatch(`/api/v1/teaching-classes/${classId}`, body); },
   capacityPreview(classId) { return apiGet(`/api/v1/teaching-classes/${classId}/capacity-preview`); },
   addStudents(classId, emails) { return apiPost(`/api/v1/teaching-classes/${classId}/students`, { emails }); },

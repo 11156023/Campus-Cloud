@@ -54,16 +54,11 @@ def _artifact(
     )
 
 
-def test_student_sees_only_approved_assignments_from_own_teacher_group() -> None:
+def test_student_sees_only_approved_assignments_from_linked_class() -> None:
     session = _session()
     teacher_id = uuid.uuid4()
     other_teacher_id = uuid.uuid4()
     student_id = uuid.uuid4()
-    path = CoursePath(
-        title="Linux",
-        status=CoursePathStatus.published,
-        created_by=teacher_id,
-    )
     own_class = TeachingClass(
         name="Linux A 班",
         code="linux-a",
@@ -86,18 +81,46 @@ def test_student_sees_only_approved_assignments_from_own_teacher_group() -> None
         start_time=time(9),
         end_time=time(11),
     )
+    same_teacher_other_class = TeachingClass(
+        name="同老師另一班",
+        code="linux-b",
+        term="2026-1",
+        owner_id=teacher_id,
+        start_date=date(2026, 8, 1),
+        end_date=date(2026, 12, 31),
+        weekday=3,
+        start_time=time(9),
+        end_time=time(11),
+    )
+    path = CoursePath(
+        title="Linux",
+        status=CoursePathStatus.published,
+        created_by=teacher_id,
+        teaching_class_id=own_class.id,
+    )
     session.add(path)
     session.add(own_class)
     session.add(other_class)
+    session.add(same_teacher_other_class)
     session.commit()
 
     session.add(TeachingClassStudent(class_id=own_class.id, user_id=student_id))
     session.add(TeachingClassStudent(class_id=other_class.id, user_id=student_id))
     session.add(
+        TeachingClassStudent(class_id=same_teacher_other_class.id, user_id=student_id)
+    )
+    session.add(
         _artifact(
             teaching_class_id=own_class.id,
             status=TeacherJudgeScriptStatus.approved,
             name="Linux 權限任務",
+        )
+    )
+    session.add(
+        _artifact(
+            teaching_class_id=same_teacher_other_class.id,
+            status=TeacherJudgeScriptStatus.approved,
+            name="同老師但不同班的任務",
         )
     )
     session.add(
@@ -136,11 +159,6 @@ def test_student_assignment_includes_only_safe_latest_ai_feedback() -> None:
     session = _session()
     teacher_id = uuid.uuid4()
     student_id = uuid.uuid4()
-    path = CoursePath(
-        title="Linux",
-        status=CoursePathStatus.published,
-        created_by=teacher_id,
-    )
     teaching_class = TeachingClass(
         name="Linux A 班",
         code="linux-a",
@@ -151,6 +169,12 @@ def test_student_assignment_includes_only_safe_latest_ai_feedback() -> None:
         weekday=1,
         start_time=time(9),
         end_time=time(11),
+    )
+    path = CoursePath(
+        title="Linux",
+        status=CoursePathStatus.published,
+        created_by=teacher_id,
+        teaching_class_id=teaching_class.id,
     )
     session.add(path)
     session.add(teaching_class)

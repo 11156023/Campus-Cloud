@@ -17,6 +17,24 @@ beforeEach(() => {
 });
 
 describe("TeachingClassesService", () => {
+  test("loads all class machine usage through one batch endpoint", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonRes({ items: [] }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const [first, second] = await Promise.all([
+      TeachingClassesService.resourceUsage("class-1"),
+      TeachingClassesService.resourceUsage("class-1"),
+    ]);
+    const cached = await TeachingClassesService.resourceUsage("class-1");
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(first).toBe(second);
+    expect(cached).toBe(first);
+    expect(fetchMock.mock.calls[0][0]).toContain(
+      "/api/v1/teaching-classes/class-1/resource-usage",
+    );
+  });
+
   test("runs full capacity preview before provisioning", async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonRes({ ready: true }));
     vi.stubGlobal("fetch", fetchMock);

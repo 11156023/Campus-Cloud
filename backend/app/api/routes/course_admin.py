@@ -9,6 +9,8 @@ from app.core.authorizers import (
     can_bypass_teaching_ownership,
     require_teaching_access,
 )
+from app.exceptions import BadRequestError, NotFoundError
+from app.models import TeachingClass
 from app.schemas.course import (
     CoursePathCreate,
     CoursePathPublic,
@@ -55,6 +57,18 @@ def _require_question_path(
     _require_task_path(session, current_user, question.task_id)
     return question
 
+
+def _require_linkable_class(
+    session: SessionDep,
+    current_user,
+    teaching_class_id: uuid.UUID,
+) -> TeachingClass:
+    teaching_class = session.get(TeachingClass, teaching_class_id)
+    if teaching_class is None:
+        raise NotFoundError("Teaching class not found")
+    require_teaching_access(current_user, teaching_class.owner_id)
+    return teaching_class
+
 # ── 路徑 ───────────────────────────────────────────────────────────────────
 
 
@@ -72,9 +86,14 @@ def list_paths(
 def create_path(
     session: SessionDep, current_user: InstructorUser, data: CoursePathCreate
 ) -> CoursePathPublic:
-    return course_service.create_path(
-        session, user_id=current_user.id, data=data
-    )
+    owner_id = current_user.id
+    if data.teaching_class_id is not None:
+        owner_id = _require_linkable_class(
+            session,
+            current_user,
+            data.teaching_class_id,
+        ).owner_id
+    return course_service.create_path(session, user_id=owner_id, data=data)
 
 
 @router.put("/paths/{path_id}", response_model=CoursePathPublic)
@@ -84,7 +103,17 @@ def update_path(
     path_id: uuid.UUID,
     data: CoursePathUpdate,
 ) -> CoursePathPublic:
-    _require_path(session, current_user, path_id)
+    path = _require_path(session, current_user, path_id)
+    if data.teaching_class_id is not None:
+        teaching_class = _require_linkable_class(
+            session,
+            current_user,
+            data.teaching_class_id,
+        )
+        if teaching_class.owner_id != path.created_by:
+            raise BadRequestError(
+                "Course path and teaching class must have the same owner"
+            )
     return course_service.update_path(session, path_id=path_id, data=data)
 
 

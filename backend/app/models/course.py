@@ -56,6 +56,17 @@ class CoursePath(SQLModel, table=True):
             nullable=True,
         ),
     )
+    teaching_class_id: uuid.UUID | None = Field(
+        default=None,
+        sa_column=Column(
+            sa.Uuid,
+            sa.ForeignKey("teaching_classes.id", ondelete="SET NULL"),
+            nullable=True,
+            unique=True,
+            index=True,
+        ),
+        description="Teaching class whose schedule, machines and AI tasks belong to this path",
+    )
     created_at: datetime = Field(
         default_factory=get_datetime_utc,
         sa_column=Column(DateTime(timezone=True), nullable=False),

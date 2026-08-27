@@ -1,11 +1,7 @@
 """Student-safe projection of approved Teacher Judge assignments.
 
-Teacher Judge artifacts are teaching-class-scoped while Course Lab paths are
-owned by an instructor. Until the data model gains an explicit path-to-class link, a
-student can see approved artifacts from teaching classes that both:
-
-1. are owned by the instructor who created the published path; and
-2. contain the current student as a member.
+Teacher Judge artifacts and Course Lab paths are both linked to one teaching class.
+A student can only see approved artifacts from the exact class linked to the path.
 
 Only the rubric requirements are exposed.  Generated scripts, command keys,
 detection methods, fallbacks, policy reviews, and other students' results stay
@@ -139,8 +135,12 @@ def list_student_ai_assignments(
 ) -> list[CourseAIAssignmentStudent]:
     """Return approved AI assignments visible to one student for a path."""
 
-    path = course_service.get_published_path_or_404(session, path_id)
-    if path.created_by is None:
+    teaching_class = course_service.get_student_class_for_path(
+        session,
+        user_id=user_id,
+        path_id=path_id,
+    )
+    if teaching_class is None:
         return []
 
     rows = session.exec(
@@ -154,7 +154,7 @@ def list_student_ai_assignments(
             TeachingClassStudent.class_id == TeachingClass.id,
         )
         .where(
-            TeachingClass.owner_id == path.created_by,
+            TeachingClass.id == teaching_class.id,
             TeachingClassStudent.user_id == user_id,
             TeachingClassStudent.status == "active",
             TeacherJudgeScriptArtifact.status == TeacherJudgeScriptStatus.approved,

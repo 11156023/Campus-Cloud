@@ -3,6 +3,7 @@
 import csv
 import io
 import logging
+import math
 import uuid
 from datetime import UTC, date, datetime, time, timedelta
 from pathlib import Path
@@ -63,6 +64,7 @@ class ClassCreate(BaseModel):
     name: str = Field(min_length=1, max_length=255)
     code: str = Field(min_length=1, max_length=80)
     term: str = Field(min_length=1, max_length=80)
+    location: str | None = Field(default=None, max_length=255)
     start_date: date
     end_date: date
     weekday: int = Field(ge=0, le=6)
@@ -76,6 +78,7 @@ class ClassPatch(BaseModel):
     name: str | None = None
     code: str | None = None
     term: str | None = None
+    location: str | None = Field(default=None, max_length=255)
     start_date: date | None = None
     end_date: date | None = None
     weekday: int | None = Field(default=None, ge=0, le=6)
@@ -135,6 +138,20 @@ class WeekIn(BaseModel):
     files: list[WeekFileIn] = Field(default_factory=list)
 
 
+class ClassResourceUsageItem(BaseModel):
+    vmid: int
+    status: str
+    cpu_usage_pct: float | None = None
+    ram_usage_pct: float | None = None
+    mem_used_bytes: int | None = None
+    mem_total_bytes: int | None = None
+
+
+class ClassResourceUsageResponse(BaseModel):
+    collected_at: datetime
+    items: list[ClassResourceUsageItem]
+
+
 def _get_class(session: SessionDep, current_user, class_id: uuid.UUID) -> TeachingClass:
     item = session.get(TeachingClass, class_id)
     if not item:
@@ -159,6 +176,62 @@ def _public_machine_dump(row: TeachingClassStudentMachine) -> dict:
     if data.get("error"):
         data["error"] = PUBLIC_PROVISION_ERROR
     return data
+
+
+def _finite_float(value) -> float | None:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return number if math.isfinite(number) else None
+
+
+def _usage_percent(used, total) -> float | None:
+    used_number = _finite_float(used)
+    total_number = _finite_float(total)
+    if used_number is None or total_number is None or total_number <= 0:
+        return None
+    return round(max(0.0, min(100.0, used_number / total_number * 100)), 2)
+
+
+def _class_resource_usage_items(
+    vmids: list[int], cluster_resources: list[dict]
+) -> list[ClassResourceUsageItem]:
+    resources_by_vmid = {
+        int(resource["vmid"]): resource
+        for resource in cluster_resources
+        if resource.get("vmid") is not None
+    }
+    items: list[ClassResourceUsageItem] = []
+    for vmid in sorted(set(vmids)):
+        resource = resources_by_vmid.get(vmid)
+        if resource is None:
+            items.append(ClassResourceUsageItem(vmid=vmid, status="unknown"))
+            continue
+
+        cpu_ratio = _finite_float(resource.get("cpu"))
+        cpu_usage_pct = (
+            round(max(0.0, min(100.0, cpu_ratio * 100)), 2)
+            if cpu_ratio is not None
+            else None
+        )
+        mem_used = resource.get("mem")
+        mem_total = resource.get("maxmem")
+        items.append(
+            ClassResourceUsageItem(
+                vmid=vmid,
+                status=str(resource.get("status") or "unknown").lower(),
+                cpu_usage_pct=cpu_usage_pct,
+                ram_usage_pct=_usage_percent(mem_used, mem_total),
+                mem_used_bytes=int(float(mem_used))
+                if _finite_float(mem_used) is not None
+                else None,
+                mem_total_bytes=int(float(mem_total))
+                if _finite_float(mem_total) is not None
+                else None,
+            )
+        )
+    return items
 
 
 def _serialize(session: SessionDep, item: TeachingClass) -> dict:
@@ -319,6 +392,36 @@ def list_classes(session: SessionDep, current_user: InstructorUser):
 @router.get("/{class_id}")
 def get_class(class_id: uuid.UUID, session: SessionDep, current_user: InstructorUser):
     return _serialize(session, _get_class(session, current_user, class_id))
+
+
+@router.get(
+    "/{class_id}/resource-usage",
+    response_model=ClassResourceUsageResponse,
+)
+def get_class_resource_usage(
+    class_id: uuid.UUID,
+    session: SessionDep,
+    current_user: InstructorUser,
+) -> ClassResourceUsageResponse:
+    item = _get_class(session, current_user, class_id)
+    enrollment_ids = [row.id for row in _students(session, item.id)]
+    machine_rows = (
+        list(
+            session.exec(
+                select(TeachingClassStudentMachine).where(
+                    TeachingClassStudentMachine.class_student_id.in_(enrollment_ids)
+                )
+            ).all()
+        )
+        if enrollment_ids
+        else []
+    )
+    vmids = [row.vmid for row in machine_rows if row.vmid is not None]
+    resources = proxmox_service.list_all_resources() if vmids else []
+    return ClassResourceUsageResponse(
+        collected_at=get_datetime_utc(),
+        items=_class_resource_usage_items(vmids, resources),
+    )
 
 
 @router.patch("/{class_id}")

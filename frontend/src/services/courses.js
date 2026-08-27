@@ -7,6 +7,16 @@ import { apiDelete, apiGet, apiPost, apiPut } from "./api";
  * 欄位見後端 app/schemas/course.py。
  */
 export const CoursesService = {
+  /** 今天實際有排課、且學生已加入的課程。 */
+  listSchedule() {
+    return apiGet("/api/v1/courses/schedule");
+  },
+
+  /** 由資源期限、申請審核與近期課堂任務產生的提醒。 */
+  listReminders() {
+    return apiGet("/api/v1/courses/reminders");
+  },
+
   /** 已發布路徑清單（含我的進度 %） */
   listPaths() {
     return apiGet("/api/v1/courses/paths");
