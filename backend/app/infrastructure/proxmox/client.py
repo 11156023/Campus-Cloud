@@ -119,6 +119,29 @@ def get_node_host(node_name: str) -> str | None:
     return entry[1] if entry is not None else None
 
 
+def get_nodes_for_connection(connection_id: int | None) -> set[str]:
+    """列出屬於指定連線的所有節點名稱；映射不可用時回空集合。
+
+    clone 不可跨連線：placement 以此把 VM 範本克隆限制在範本所屬連線內。
+    """
+    now = time.monotonic()
+    with _node_connection_map_lock:
+        fresh = (now - _node_connection_map_at) < NODE_CONNECTION_MAP_TTL
+        if fresh and _node_connection_map:
+            return {
+                name
+                for name, (cid, _host) in _node_connection_map.items()
+                if cid == connection_id
+            }
+    _refresh_node_connection_map()
+    with _node_connection_map_lock:
+        return {
+            name
+            for name, (cid, _host) in _node_connection_map.items()
+            if cid == connection_id
+        }
+
+
 def _connect_proxmox(connection_id: _ClientKey) -> tuple[ProxmoxAPI, str]:
     """Probe the connection's nodes and return a validated client and active host.
 

@@ -501,8 +501,14 @@ export default function RequestFormPage({ onBack, className }) {
           cores: form.cores,
           memory: form.memory,
           ...(resourceType === "lxc"
-            ? { rootfs_size: form.rootfs_size }
-            : { disk_size: form.disk_size }),
+            ? {
+                rootfs_size: form.rootfs_size,
+                ostemplate: !selectedTplId && form.ostemplate ? form.ostemplate : undefined,
+              }
+            : {
+                disk_size: form.disk_size,
+                template_id: form.template_id ? Number(form.template_id) : undefined,
+              }),
           gpu_required: selectedGpuId ? 1 : 0,
           gpu_mapping_id: selectedGpuId || undefined,
           start_at: form.start_at,
@@ -1007,8 +1013,15 @@ export default function RequestFormPage({ onBack, className }) {
                       cores:         form.cores,
                       memory:        form.memory,
                       ...(resourceType === "lxc"
-                        ? { rootfs_size: form.rootfs_size }
-                        : { disk_size:   form.disk_size }),
+                        ? {
+                            rootfs_size: form.rootfs_size,
+                            /* 模板節點約束：行事曆只推薦拿得到模板的節點（克隆路徑節點由範本釘死，不帶） */
+                            ostemplate: !selectedTplId && form.ostemplate ? form.ostemplate : undefined,
+                          }
+                        : {
+                            disk_size: form.disk_size,
+                            template_id: form.template_id ? Number(form.template_id) : undefined,
+                          }),
                       gpu_required: resourceType === "vm" && form.gpu_mapping_id ? 1 : 0,
                       gpu_mapping_id: resourceType === "vm" && form.gpu_mapping_id
                         ? form.gpu_mapping_id

@@ -29,7 +29,7 @@ from app.services.network import (
 )
 from app.services.proxmox import gpu_service, proxmox_service
 from app.services.user import audit_service
-from app.services.vm import vm_request_placement_service
+from app.services.vm import placement_support, vm_request_placement_service
 from app.utils.hostname import to_punycode_hostname
 
 logger = logging.getLogger(__name__)
@@ -196,6 +196,22 @@ def _select_request_placement(
     placement_strategy: str,
 ):
     compatible_nodes = _gpu_mapping_nodes(getattr(db_request, "gpu_mapping_id", None))
+    # 模板節點白名單（None = 不受限）：vztmpl 只在部分節點可見、
+    # VM 克隆不可跨連線，指定節點與自動選擇都必須落在白名單內。
+    template_nodes = placement_support.allowed_template_nodes_for_request(
+        placement_request
+    )
+
+    def _template_node_error(node: str) -> ProxmoxError:
+        template_label = (
+            getattr(db_request, "ostemplate", None)
+            or getattr(db_request, "template_id", None)
+            or "unknown"
+        )
+        return ProxmoxError(
+            f"Node '{node}' cannot access template '{template_label}'"
+            f"（模板僅存在於：{', '.join(sorted(template_nodes)) or '無任何節點'}）。"
+        )
 
     pinned_node = getattr(db_request, "desired_node", None) or getattr(
         db_request, "assigned_node", None
@@ -206,6 +222,8 @@ def _select_request_placement(
                 f"Pinned node '{pinned_node}' is not compatible with GPU mapping "
                 f"'{getattr(db_request, 'gpu_mapping_id', '')}'."
             )
+        if template_nodes is not None and str(pinned_node) not in template_nodes:
+            raise _template_node_error(str(pinned_node))
 
         nodes, resources = placement_advisor._load_cluster_state()
         cpu_overcommit_ratio, disk_overcommit_ratio = (
@@ -263,6 +281,11 @@ def _select_request_placement(
                         f"No feasible GPU-compatible node for mapping "
                         f"'{getattr(db_request, 'gpu_mapping_id', '')}' in the selected time window."
                     )
+                if (
+                    template_nodes is not None
+                    and str(fallback.node) not in template_nodes
+                ):
+                    raise _template_node_error(str(fallback.node))
                 logger.warning(
                     "Reserved node %s is no longer feasible for request %s; falling back to %s",
                     pinned_node,
@@ -285,6 +308,12 @@ def _select_request_placement(
             f"Selected node '{selection.node}' is not compatible with GPU mapping "
             f"'{getattr(db_request, 'gpu_mapping_id', '')}'."
         )
+    if (
+        template_nodes is not None
+        and selection.node
+        and str(selection.node) not in template_nodes
+    ):
+        raise _template_node_error(str(selection.node))
     return selection
 
 
@@ -723,6 +752,21 @@ def plan_provision(*, session: Session, db_request) -> dict:
             required_content="rootdir",
         )
     elif db_request.resource_type == "lxc":
+        # 早期防線：vzcreate 前確認目標節點真的看得到這個 vztmpl，
+        # 避免 PVE 端 volume does not exist 的晚期失敗（映射整批查詢
+        # 失敗時為空 map，此時不擋、交由 PVE 把關）。
+        template_node_map = proxmox_service.get_lxc_template_node_map()
+        if (
+            db_request.ostemplate
+            and template_node_map
+            and target_node
+            not in template_node_map.get(str(db_request.ostemplate), set())
+        ):
+            raise ProxmoxError(
+                f"Node '{target_node}' cannot access LXC template "
+                f"'{db_request.ostemplate}'（模板僅存在於："
+                f"{', '.join(sorted(template_node_map.get(str(db_request.ostemplate), set()))) or '無任何節點'}）。"
+            )
         plan["target_storage"] = _resolve_managed_storage(
             session=session,
             node=target_node,
@@ -1007,6 +1051,7 @@ def provision_from_request(
 
 
 def get_lxc_templates() -> list[TemplateSchema]:
+    node_map = proxmox_service.get_lxc_template_node_map()
     templates: list[dict] = []
     for node in proxmox_service.get_available_nodes():
         node_name = node.get("node") or node.get("name")
@@ -1023,6 +1068,7 @@ def get_lxc_templates() -> list[TemplateSchema]:
             volid=t["volid"],
             format=t.get("format", ""),
             size=t.get("size", 0),
+            nodes=sorted(node_map.get(str(t["volid"]), set())),
         )
         for t in templates
         if t.get("content") == "vztmpl"

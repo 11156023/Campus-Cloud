@@ -117,6 +117,8 @@ class TemplateSchema(BaseModel):
     volid: str
     format: str
     size: int
+    # 看得到此模板的節點（跨連線彙總）；申請只能落在這些節點上
+    nodes: list[str] = []
 
 
 class VMTemplateSchema(BaseModel):

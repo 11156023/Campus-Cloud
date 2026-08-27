@@ -237,6 +237,10 @@ class VMRequestAvailabilityRequest(BaseModel):
     instance_count: int = Field(default=1, ge=1, le=100)
     gpu_required: int = Field(default=0, ge=0, le=16)
     gpu_mapping_id: str | None = Field(default=None, max_length=128)
+    # 模板節點約束：LXC 帶 vztmpl volid、VM 帶範本 VMID，
+    # 讓可用性行事曆只推薦拿得到模板的節點
+    ostemplate: str | None = Field(default=None, max_length=512)
+    template_id: int | None = Field(default=None, ge=1)
     days: int = Field(default=7, ge=1, le=90)
     timezone: str = Field(default="Asia/Taipei", min_length=1, max_length=64)
     policy_role: UserRole | None = None
@@ -254,6 +258,8 @@ class VMRequestWindowAvailabilityRequest(BaseModel):
     rootfs_size: int | None = Field(default=None, ge=1, le=65536)
     gpu_required: int = Field(default=0, ge=0, le=16)
     gpu_mapping_id: str | None = Field(default=None, max_length=128)
+    ostemplate: str | None = Field(default=None, max_length=512)
+    template_id: int | None = Field(default=None, ge=1)
     start_at: datetime
     end_at: datetime
     mode: Literal["quick_template", "research", "scheduled"] = "research"

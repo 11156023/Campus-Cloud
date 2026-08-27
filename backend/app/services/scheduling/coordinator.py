@@ -157,7 +157,7 @@ def _provision_new_resource(
             session=session,
             db_request=request,
         )
-    except Exception:
+    except Exception as plan_exc:
         # Plan failed — revert to approved so scheduler can retry.
         # IP allocated during plan_provision is already flushed to session;
         # rollback first, then revert status cleanly.
@@ -167,7 +167,9 @@ def _provision_new_resource(
         )
         if request:
             request.provisioning_status = VMProvisioningStatus.failed
-            request.provisioning_error = "Failed to plan provisioning"
+            request.provisioning_error = (
+                f"Failed to plan provisioning: {plan_exc}"[:500]
+            )
             session.add(request)
             session.commit()
         raise
@@ -186,7 +188,7 @@ def _provision_new_resource(
     # --- Phase 2: execute clone (NO open transaction) ---------------------
     try:
         new_vmid, actual_node = provisioning_service.execute_provision(plan)
-    except Exception:
+    except Exception as provision_exc:
         # Clone failed — revert to approved and release allocated IP.
         with Session(engine) as rollback_session:
             # Release IP allocated during planning
@@ -201,7 +203,9 @@ def _provision_new_resource(
             )
             if req and req.vmid is None:
                 req.provisioning_status = VMProvisioningStatus.failed
-                req.provisioning_error = "Failed to execute provisioning"
+                req.provisioning_error = (
+                    f"Failed to execute provisioning: {provision_exc}"[:500]
+                )
                 rollback_session.add(req)
                 rollback_session.commit()
                 logger.warning("Reverted request %s to approved after provision failure", request_id)
