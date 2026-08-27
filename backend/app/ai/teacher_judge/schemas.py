@@ -81,7 +81,7 @@ class TeacherJudgeRubricChatRequest(BaseModel):
         default="", description="目前評分表的 JSON 字串（作為背景知識）"
     )
     is_refine: bool = Field(
-        default=False, description="True = 老師手動調整後觸發的全表潤飾模式"
+        default=False, description="True = 以目前評分表執行整表潤飾模式"
     )
     template_key: str = Field(
         default="linux",
@@ -227,6 +227,10 @@ class TeacherJudgeSessionPublic(BaseModel):
 class TeacherJudgeSessionMessageCreateRequest(BaseModel):
     content: str = Field(..., min_length=1, max_length=20000)
     analysis_revision: int | None = Field(default=None, ge=1)
+    is_refine: bool = Field(
+        default=False,
+        description="True = 以目前評分表執行整表潤飾",
+    )
 
 
 class TeacherJudgeSessionMessagePublic(BaseModel):

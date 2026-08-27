@@ -348,7 +348,7 @@ async def create_message(
         reply, proposal, metrics = await chat_with_rubric(
             bounded_history(session, item.id),
             json.dumps(file.analysis_json, ensure_ascii=False) if file else "{}",
-            is_refine=False,
+            is_refine=payload.is_refine,
             template_key=file.template_key if file else "linux",
             template_commands=get_enabled_template_commands(
                 session, file.template_key if file else "linux"

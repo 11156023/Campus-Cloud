@@ -311,6 +311,7 @@ async def test_message_without_rubric_is_saved_and_uses_general_chat(
     async def fake_chat(messages, rubric_context, **kwargs):
         assert messages[-1].content == "先討論檢查需求"
         assert rubric_context == "{}"
+        assert kwargs["is_refine"] is False
         assert kwargs["template_key"] == "linux"
         return "可以，先描述目標環境。", None, {}
 
@@ -332,6 +333,49 @@ async def test_message_without_rubric_is_saved_and_uses_general_chat(
     assert result.assistant_message.content == "可以，先描述目標環境。"
     assert result.rubric_proposal is None
     assert len(db.exec(select(TeacherJudgeSessionMessage)).all()) == 2
+
+
+@pytest.mark.asyncio
+async def test_refine_message_uses_the_rubric_polish_prompt_mode(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    db = _session()
+    class_id = uuid.uuid4()
+    rubric_file = _file(db, class_id)
+    item = TeacherJudgeSession(
+        teaching_class_id=class_id,
+        title="Polish rubric",
+        selected_file_id=rubric_file.id,
+    )
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+
+    async def fake_chat(messages, rubric_context, **kwargs):
+        assert messages[-1].content == "請審核並潤飾目前的評分表"
+        assert '"items": []' in rubric_context
+        assert kwargs["is_refine"] is True
+        return "檢查完畢，評分表目前狀態良好。", None, {}
+
+    monkeypatch.setattr(teacher_judge_sessions, "_access", lambda *args: None)
+    monkeypatch.setattr(teacher_judge_sessions, "chat_with_rubric", fake_chat)
+    monkeypatch.setattr(
+        teacher_judge_sessions, "get_enabled_template_commands", lambda *args: []
+    )
+
+    result = await teacher_judge_sessions.create_message(
+        class_id,
+        item.id,
+        TeacherJudgeSessionMessageCreateRequest(
+            content="請審核並潤飾目前的評分表",
+            is_refine=True,
+        ),
+        db,
+        SimpleNamespace(id=uuid.uuid4()),
+    )
+
+    assert result.assistant_message.content == "檢查完畢，評分表目前狀態良好。"
+    assert result.rubric_proposal is None
 
 
 @pytest.mark.asyncio

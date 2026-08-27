@@ -20,6 +20,9 @@ export const TEMPLATE_OPTIONS = [
   { key: "linux", label: "一般 Linux/LXC" },
 ];
 
+/** 目前評分表唯一的整表 AI 動作；正式工作區與獨立編輯頁共用。 */
+export const RUBRIC_POLISH_PROMPT = "請審核並潤飾目前的評分表，指出缺漏並提出可套用的修改建議";
+
 export function getTemplateLabel(templateKey) {
   return (
     TEMPLATE_OPTIONS.find((option) => option.key === templateKey)?.label ??
@@ -115,11 +118,18 @@ export const AiJudgeService = {
     );
   },
 
-  sendSessionMessage(classId, sessionId, content, analysisRevision = null) {
+  sendSessionMessage(
+    classId,
+    sessionId,
+    content,
+    analysisRevision = null,
+    { isRefine = false } = {},
+  ) {
     const payload = { content };
     if (analysisRevision !== null && analysisRevision !== undefined) {
       payload.analysis_revision = analysisRevision;
     }
+    if (isRefine) payload.is_refine = true;
     return apiPost(
       `/api/v1/teaching-classes/${classId}/judge/sessions/${sessionId}/messages`,
       payload,

@@ -4,6 +4,7 @@ import MIcon from "../../components/MIcon";
 import { useToast } from "../../hooks/useToast";
 import {
   AiJudgeService,
+  RUBRIC_POLISH_PROMPT,
   TEMPLATE_OPTIONS,
   getTemplateLabel,
 } from "../../services/aiJudge";
@@ -453,13 +454,19 @@ export default function AiJudgeRubricEditorPage() {
     scheduleSave(next);
   }
 
-  async function sendAssistant(content) {
+  async function sendAssistant(content, { isRefine = false } = {}) {
     if (!content.trim() || assistantBusy || readOnly || !sessionId) return;
     const requestEditVersion = editVersionRef.current;
     const requestHadPendingLocalChanges = Boolean(pendingRef.current);
     setAssistantBusy(true);
     try {
-      const response = await AiJudgeService.sendSessionMessage(classId, sessionId, content, revisionRef.current);
+      const response = await AiJudgeService.sendSessionMessage(
+        classId,
+        sessionId,
+        content,
+        revisionRef.current,
+        { isRefine },
+      );
       setMessages((current) => [...current, response.user_message, response.assistant_message]);
       const rawProposal = response.rubric_proposal ?? null;
       const diff = rawProposal
@@ -614,7 +621,7 @@ export default function AiJudgeRubricEditorPage() {
           <section className={styles.card}>
             <div className={styles.cardHeading}><div><h2>評估項目（{analysis.items.length}）</h2><p>每一項都會成為腳本與執行結果的判定依據。</p></div><button type="button" className={styles.secondaryButton} disabled={readOnly} onClick={addItem}><MIcon name="add" size={17} />新增項目</button></div>
             {!analysis.items.length ? <div className={styles.emptyItems}><MIcon name="playlist_add" size={28} /><strong>尚未新增評估項目</strong><p>可手動新增第一項，或請右側 AI 評分表助手產生初稿。</p><button type="button" className={styles.primaryButton} disabled={readOnly || assistantBusy} onClick={() => sendAssistant("請依目前檢查名稱與評分環境，產生評估項目初稿")}>產生評估項目初稿</button></div> : <div className={styles.itemsList}>{analysis.items.map((item, index) => <ItemEditor key={item.id ?? index} item={item} index={index} disabled={readOnly} assistantDisabled={assistantBusy} onChange={(next) => updateItem(index, next)} onDelete={() => deleteItem(index)} onAssist={() => sendAssistant(`請協助改善第 ${index + 1} 項「${item.title ?? "未命名項目"}」的說明、可偵測性與檢查步驟，只提出可供我確認的評分表提案。`)} />)}</div>}
-            {analysis.items.length > 0 && <div className={styles.itemsFooter}><span>{analysis.items.filter((item) => item.detectable === "auto").length} 項可自動偵測 · {analysis.items.filter((item) => item.detectable === "partial").length} 項部分可偵測 · {analysis.items.filter((item) => item.detectable === "manual").length} 項需人工評閱</span><button type="button" className={styles.secondaryButton} disabled={readOnly || assistantBusy} onClick={() => sendAssistant("請檢查目前評分表，指出缺漏並提出可套用的修改建議")}>檢查目前評分表</button></div>}
+            {analysis.items.length > 0 && <div className={styles.itemsFooter}><span>{analysis.items.filter((item) => item.detectable === "auto").length} 項可自動偵測 · {analysis.items.filter((item) => item.detectable === "partial").length} 項部分可偵測 · {analysis.items.filter((item) => item.detectable === "manual").length} 項需人工評閱</span></div>}
           </section>
         </section>
 
@@ -630,11 +637,12 @@ export default function AiJudgeRubricEditorPage() {
           </button>
           {assistantOpen && <button type="button" className={styles.assistantBackdrop} aria-label="關閉 AI 評分表助手" onClick={() => setAssistantOpen(false)} />}
           <div id="rubric-assistant" ref={assistantCardRef} className={styles.assistantCard}>
-            <div className={styles.assistantHeading}><span className={styles.assistantIcon}><MIcon name="smart_toy" size={20} /></span><div><h2>AI 評分表助手</h2><p>提案會先送給你確認，不會直接改內容。</p></div><button type="button" className={styles.assistantClose} aria-label="關閉 AI 評分表助手" onClick={() => setAssistantOpen(false)}><MIcon name="close" size={18} /></button></div>
+            <div className={styles.assistantHeading}><span className={styles.assistantIcon}><MIcon name="smart_toy" size={20} /></span><div><h2>AI 評分表助手</h2><p>你可以直接編輯左側項目；AI 潤飾會先提出可確認的修改。</p></div><button type="button" className={styles.assistantClose} aria-label="關閉 AI 評分表助手" onClick={() => setAssistantOpen(false)}><MIcon name="close" size={18} /></button></div>
             <div className={styles.assistantMessages}>
-              {!messages.length ? <div className={styles.assistantEmpty}><MIcon name="lightbulb" size={24} /><p>你可以請 AI 產生初稿、補缺漏，或改寫單一項目的說明。</p><button type="button" className={styles.assistantAction} disabled={readOnly || assistantBusy} onClick={() => sendAssistant(analysis.items.length ? "請檢查目前評分表，提出改善建議" : "請依目前檢查名稱與評分環境，產生評估項目初稿")}><MIcon name="auto_awesome" size={16} />{analysis.items.length ? "檢查目前評分表" : "產生評估項目初稿"}</button></div> : messages.map((message) => <div key={message.id ?? `${message.role}-${message.created_at}`} className={`${styles.message} ${message.role === "user" ? styles.messageUser : ""}`}><span>{message.role === "user" ? "你" : "AI"}</span><p>{message.content}</p></div>)}
+              {!messages.length ? <div className={styles.assistantEmpty}><MIcon name="lightbulb" size={24} /><p>{analysis.items.length ? "你可以直接編輯左側評分項目，或使用下方的潤飾評分表。" : "先建立第一個評估項目，或請 AI 產生評估項目初稿。"}</p>{!analysis.items.length && <button type="button" className={styles.assistantAction} disabled={readOnly || assistantBusy} onClick={() => sendAssistant("請依目前檢查名稱與評分環境，產生評估項目初稿")}><MIcon name="auto_awesome" size={16} />產生評估項目初稿</button>}</div> : messages.map((message) => <div key={message.id ?? `${message.role}-${message.created_at}`} className={`${styles.message} ${message.role === "user" ? styles.messageUser : ""}`}><span>{message.role === "user" ? "你" : "AI"}</span><p>{message.content}</p></div>)}
               {assistantBusy && <div className={styles.typing}><span /><span /><span />AI 正在整理提案…</div>}
             </div>
+            {analysis.items.length > 0 && <div className={styles.assistantToolbar}><button type="button" className={styles.secondaryButton} disabled={readOnly || assistantBusy} onClick={() => sendAssistant(RUBRIC_POLISH_PROMPT, { isRefine: true })}><MIcon name="auto_fix_high" size={15} />潤飾評分表</button></div>}
             <form className={styles.assistantForm} onSubmit={(event) => { event.preventDefault(); const input = event.currentTarget.elements.namedItem("assistant"); if (input.value.trim()) { sendAssistant(input.value); input.value = ""; } }}><textarea name="assistant" rows={2} placeholder="例如：補充 Python 套件版本檢查" disabled={readOnly || assistantBusy} /><button type="submit" className={styles.primaryButton} disabled={readOnly || assistantBusy}><MIcon name="send" size={16} />送出</button></form>
             <ProposalPanel proposal={proposal} selectedIds={selectedProposalIds} onToggle={(id) => setSelectedProposalIds((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; })} onApply={applyProposal} onSkip={() => { setProposal(null); setProposalMeta(null); }} disabled={readOnly || assistantBusy} />
           </div>

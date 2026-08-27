@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
-import { AiJudgeService, TEMPLATE_OPTIONS, getTemplateLabel } from "./aiJudge";
+import {
+  AiJudgeService,
+  RUBRIC_POLISH_PROMPT,
+  TEMPLATE_OPTIONS,
+  getTemplateLabel,
+} from "./aiJudge";
 
 function fakeStorage() {
   const values = new Map();
@@ -125,6 +130,23 @@ describe("AiJudgeService persistent sessions", () => {
     expect(JSON.parse(init.body)).toEqual({
       content: "補充檢查步驟",
       analysis_revision: 4,
+    });
+  });
+
+  test("潤飾評分表請求會沿用目前評分表 revision 並啟用 refine 模式", async () => {
+    await AiJudgeService.sendSessionMessage(
+      "class-1",
+      "check-1",
+      RUBRIC_POLISH_PROMPT,
+      4,
+      { isRefine: true },
+    );
+
+    const [, init] = fetchMock.mock.calls[0];
+    expect(JSON.parse(init.body)).toEqual({
+      content: RUBRIC_POLISH_PROMPT,
+      analysis_revision: 4,
+      is_refine: true,
     });
   });
 

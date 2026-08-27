@@ -305,7 +305,7 @@ async def chat_with_rubric(
     """
     Multi-turn chat with rubric context injected into system prompt.
     Returns (reply_text, updated_items_or_None, metrics).
-    - is_refine: True 表示老師手動修改完表單後觸發的「全表潤飾」模式。
+    - is_refine: True 表示針對目前評分表執行「全表潤飾」模式。
     - updated_items: complete list of rubric item dicts when AI modified the rubric;
       None when AI only answered a question without changes.
     """

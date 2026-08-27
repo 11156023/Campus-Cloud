@@ -7,6 +7,7 @@ import useAutoRefresh from "../../hooks/useAutoRefresh";
 import { downloadBlob } from "../../services/api";
 import {
   AiJudgeService,
+  RUBRIC_POLISH_PROMPT,
   TEMPLATE_OPTIONS,
   getTemplateLabel,
   rubricToContext,
@@ -347,10 +348,10 @@ function ChatPanel({
           type="button"
           className={styles.btnSecondary}
           disabled={isLoading || disabled || !hasRubric}
-          onClick={() => onSendMessage("請幫我審核並潤飾目前的評分表", true)}
+          onClick={() => onSendMessage(RUBRIC_POLISH_PROMPT, true)}
         >
           <MIcon name="auto_fix_high" size={14} />
-          全表潤飾
+          潤飾評分表
         </button>
         <form
           className={styles.chatForm}
@@ -572,6 +573,24 @@ export function CreateCheckChooser({ onChoose, onCancel, busy = false, error = "
   );
 }
 
+export function getSelectedRubricSource(files, selectedFileId) {
+  if (!selectedFileId || !Array.isArray(files)) return null;
+  return files.find((file) => file.status === "active" && file.id === selectedFileId) ?? null;
+}
+
+export function getVisibleRubricSources(files, selectedFileId, showOtherSources = false) {
+  if (!selectedFileId || !Array.isArray(files)) return [];
+  const activeFiles = files.filter((file) => file.status === "active");
+  if (!activeFiles.some((file) => file.id === selectedFileId)) return [];
+  if (showOtherSources) return activeFiles;
+  return activeFiles.filter((file) => file.id === selectedFileId);
+}
+
+export function resolveActiveSessionId(currentId, sessions) {
+  if (!currentId || !Array.isArray(sessions)) return null;
+  return sessions.some((session) => session.id === currentId) ? currentId : null;
+}
+
 function RubricSourceRail({ classId, judgeSession, readOnly, onSessionUpdated, onAddSource }) {
   const toast = useToast();
   const sourceRailRef = useRef(null);
@@ -579,14 +598,25 @@ function RubricSourceRail({ classId, judgeSession, readOnly, onSessionUpdated, o
   const [loading, setLoading] = useState(true);
   const [openMenuId, setOpenMenuId] = useState(null);
   const [busyId, setBusyId] = useState(null);
+  const [showOtherSources, setShowOtherSources] = useState(false);
+  const selectedFileId = judgeSession?.selected_file_id ?? null;
 
   const load = useCallback(async () => {
+    if (!selectedFileId) {
+      setFiles([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try { setFiles(await AiJudgeService.listFiles(classId)); }
     catch (error) { toast.error(error?.message ?? "載入評分表來源失敗"); }
     finally { setLoading(false); }
-  }, [classId, toast]);
-  useEffect(() => { load(); }, [load, judgeSession?.selected_file_id]);
+  }, [classId, selectedFileId, toast]);
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    setShowOtherSources(false);
+    setOpenMenuId(null);
+  }, [selectedFileId]);
 
   useEffect(() => {
     if (!openMenuId) return undefined;
@@ -626,11 +656,12 @@ function RubricSourceRail({ classId, judgeSession, readOnly, onSessionUpdated, o
   }, [openMenuId]);
 
   async function selectFile(file) {
-    if (readOnly || busyId || file.id === judgeSession?.selected_file_id) return;
+    if (readOnly || busyId || file.id === selectedFileId) return;
     setBusyId(file.id);
     try {
       const updated = await AiJudgeService.updateSession(classId, judgeSession.id, { selected_file_id: file.id });
       onSessionUpdated(updated);
+      setShowOtherSources(false);
     } catch (error) { toast.error(error?.message ?? "切換評分表來源失敗"); }
     finally { setBusyId(null); }
   }
@@ -654,15 +685,25 @@ function RubricSourceRail({ classId, judgeSession, readOnly, onSessionUpdated, o
   }
 
   const activeFiles = files.filter((file) => file.status === "active");
+  const selectedFile = getSelectedRubricSource(files, selectedFileId);
+  const visibleFiles = getVisibleRubricSources(files, selectedFileId, showOtherSources);
   return (
     <aside ref={sourceRailRef} className={styles.sourceRail} aria-label="評分表來源">
-        <div className={styles.sourceRailHead}>
-          <div><h3>評分表來源</h3><p>{activeFiles.length} 份可用來源</p></div>
-          <div className={styles.sourceRailActions}>
-            {!readOnly && <button type="button" className={styles.iconBtn} aria-label="新增來源" title="新增來源" onClick={onAddSource}><MIcon name="add" size={19} /></button>}
-          </div>
+      <div className={styles.sourceRailHead}>
+        <div>
+          <h3>評分表來源</h3>
+          <p>{loading ? "正在確認目前來源…" : selectedFile ? "目前檢查使用的來源" : "尚未選擇來源"}</p>
         </div>
-         {loading ? <p className={styles.mutedText}>載入來源中…</p> : activeFiles.length === 0 ? <div className={styles.sourceEmpty}><MIcon name="description" size={24} /><p>尚未保存評分表。</p>{!readOnly && <button type="button" className={styles.btnSecondary} onClick={onAddSource}><MIcon name="add" size={15} />新增來源</button>}</div> : <div className={styles.sourceList}>{activeFiles.map((file) => <div key={file.id} className={`${styles.sourceRow} ${file.id === judgeSession?.selected_file_id ? styles.sourceRowSelected : ""}`}><button type="button" className={styles.sourceSelect} disabled={readOnly || busyId === file.id} onClick={() => selectFile(file)}><span className={styles.sourceIndicator} aria-hidden="true"><MIcon name={file.id === judgeSession?.selected_file_id ? "radio_button_checked" : "radio_button_unchecked"} size={17} /></span><span className={styles.sourceText}><b>{file.display_name ?? file.original_filename ?? "未命名評分表"}</b><small>{(file.environment_keys?.length ? file.environment_keys : [file.template_key]).map(getTemplateLabel).join("、")} · {file.analysis_json?.items?.length ?? 0} 項 · {formatDateTime(file.updated_at)} · {file.source_type === "created" ? "建立於系統" : "已上傳"}</small>{file.id === judgeSession?.selected_file_id && <em>已選用</em>}</span></button>{(file.source_type !== "created" || !readOnly) && <div className={styles.sourceActions}><button type="button" className={styles.iconBtn} aria-label={`管理 ${file.display_name ?? "評分表"}`} title="管理評分表來源" aria-haspopup="menu" aria-expanded={openMenuId === file.id} onClick={(event) => { event.stopPropagation(); setOpenMenuId((current) => current === file.id ? null : file.id); }}><MIcon name="more_vert" size={18} /></button>{openMenuId === file.id && <div className={styles.sourceMenu} role="menu">{file.source_type !== "created" && <button type="button" role="menuitem" onClick={() => download(file)}><MIcon name="download" size={15} />下載原始文件</button>}{!readOnly && <button type="button" role="menuitem" className={styles.menuDanger} disabled={busyId === file.id} onClick={() => remove(file)}><MIcon name="delete" size={15} />刪除來源</button>}</div>}</div>}</div>)}</div>}
+        <div className={styles.sourceRailActions}>
+          {!readOnly && selectedFile && activeFiles.length > 1 && <button type="button" className={styles.btnSecondary} aria-expanded={showOtherSources} onClick={() => setShowOtherSources((current) => !current)}>{showOtherSources ? "只看目前來源" : "切換來源"}</button>}
+          {!readOnly && <button type="button" className={styles.iconBtn} aria-label="新增來源" title="新增來源" onClick={onAddSource}><MIcon name="add" size={19} /></button>}
+        </div>
+      </div>
+      {loading ? <p className={styles.mutedText}>載入來源中…</p> : visibleFiles.length > 0 ? (
+        <div className={styles.sourceList}>
+          {visibleFiles.map((file) => <div key={file.id} className={`${styles.sourceRow} ${file.id === selectedFileId ? styles.sourceRowSelected : ""}`}><button type="button" className={styles.sourceSelect} disabled={readOnly || busyId === file.id} onClick={() => selectFile(file)}><span className={styles.sourceIndicator} aria-hidden="true"><MIcon name={file.id === selectedFileId ? "radio_button_checked" : "radio_button_unchecked"} size={17} /></span><span className={styles.sourceText}><b>{file.display_name ?? file.original_filename ?? "未命名評分表"}</b><small>{(file.environment_keys?.length ? file.environment_keys : [file.template_key]).map(getTemplateLabel).join("、")} · {file.analysis_json?.items?.length ?? 0} 項 · {formatDateTime(file.updated_at)} · {file.source_type === "created" ? "建立於系統" : "已上傳"}</small>{file.id === selectedFileId && <em>已選用</em>}</span></button>{(file.source_type !== "created" || !readOnly) && <div className={styles.sourceActions}><button type="button" className={styles.iconBtn} aria-label={`管理 ${file.display_name ?? "評分表"}`} title="管理評分表來源" aria-haspopup="menu" aria-expanded={openMenuId === file.id} onClick={(event) => { event.stopPropagation(); setOpenMenuId((current) => current === file.id ? null : file.id); }}><MIcon name="more_vert" size={18} /></button>{openMenuId === file.id && <div className={styles.sourceMenu} role="menu">{file.source_type !== "created" && <button type="button" role="menuitem" onClick={() => download(file)}><MIcon name="download" size={15} />下載原始文件</button>}{!readOnly && <button type="button" role="menuitem" className={styles.menuDanger} disabled={busyId === file.id} onClick={() => remove(file)}><MIcon name="delete" size={15} />刪除來源</button>}</div>}</div>}</div>)}
+        </div>
+      ) : <div className={styles.sourceEmpty}><MIcon name="description" size={24} /><p>{selectedFileId ? "目前來源已無法使用，請重新選擇。" : "這項檢查尚未選擇評分表來源。"}</p>{!readOnly && <button type="button" className={styles.btnSecondary} onClick={onAddSource}><MIcon name="add" size={15} />新增來源</button>}</div>}
     </aside>
   );
 }
@@ -884,8 +925,9 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
         const response = await AiJudgeService.sendSessionMessage(
           classId,
           judgeSession.id,
-          isRefine ? `請全表潤飾：${content}` : content,
+          content,
           files.find((file) => file.id === sourceFileId)?.analysis_revision,
+          { isRefine },
         );
         setMessages((current) => {
           const withoutOptimistic = current.slice(0, -1);
@@ -2409,7 +2451,7 @@ function TeacherWorkspacePanel({ classId, members }) {
       const rows = await AiJudgeService.listSessions(classId, statusFilter);
       if (requestVersion !== requestVersionRef.current || classIdRef.current !== requestClassId) return;
       setSessions(rows);
-      setActiveSessionId((current) => rows.some((item) => item.id === current) ? current : rows[0]?.id ?? null);
+      setActiveSessionId((current) => resolveActiveSessionId(current, rows));
     } catch (error) {
       if (requestVersion === requestVersionRef.current && classIdRef.current === requestClassId) {
         setSessions([]);
