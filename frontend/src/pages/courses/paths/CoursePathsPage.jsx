@@ -4,6 +4,7 @@ import MIcon from "../../../components/MIcon";
 import EmptyState from "../../../components/EmptyState/EmptyState";
 import { CoursesService } from "../../../services/courses";
 import styles from "./CoursePathsPage.module.scss";
+import PageHeader from "../../../components/PageHeader/PageHeader";
 
 export function courseDestination(pathId) {
   return `/dashboard-new/course/${pathId}`;
@@ -51,13 +52,10 @@ export default function CoursePathsPage() {
 
   return (
     <div className={styles.page}>
-      <header className={styles.pageHeader}>
-        <div className={styles.pageHeading}>
-          <p className={styles.eyebrow}>我的學習</p>
-          <h1 className={styles.pageTitle}>我的課程</h1>
-          <p className={styles.pageSubtitle}>選擇課程後，直接查看截至今天的任務與老師分配的練習機器。</p>
-        </div>
-      </header>
+      <PageHeader
+        title="我的課程"
+        subtitle="選擇課程後，直接查看截至今天的任務與老師分配的練習機器。"
+      />
 
       {error && <div className={styles.stateText}>{error}</div>}
       {!error && paths === null && <div className={styles.stateText}>正在整理你的課程…</div>}

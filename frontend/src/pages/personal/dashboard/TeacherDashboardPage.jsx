@@ -5,6 +5,7 @@ import { useAuth } from "../../../contexts/AuthContext";
 import { CourseAdminService } from "../../../services/courses";
 import { TeachingClassesService } from "../../../services/teachingClasses";
 import styles from "./TeacherDashboardPage.module.scss";
+import PageHeader from "../../../components/PageHeader/PageHeader";
 
 const CLASS_STATUS = {
   planning: "準備中",
@@ -146,10 +147,9 @@ export default function TeacherDashboardPage() {
   const firstName = user?.full_name?.trim()?.split(/\s+/)[0] ?? user?.email?.split("@")[0] ?? "老師";
 
   return <div className={styles.page}>
-    <header className={styles.header}>
-      <div><span className={styles.eyebrow}>教師儀表板</span><h1>{firstName}老師，今天想先看哪個班級？</h1><p>集中查看學生 checkpoint 完成度、近期課堂與課程準備狀態。</p></div>
+    <PageHeader title={`${firstName}老師，今天想先看哪個班級？`} subtitle="集中查看學生 checkpoint 完成度、近期課堂與課程準備狀態。">
       <button type="button" className={styles.btnPrimary} onClick={() => navigate("/class-setup")}><MIcon name="add" size={18} />一鍵建立班級</button>
-    </header>
+    </PageHeader>
 
     {error && <div className={styles.error}><MIcon name="error_outline" size={18} />{error}</div>}
 

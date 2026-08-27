@@ -15,34 +15,6 @@
 }
 
 /* ── Header (對齊 RequestFormPage) ── */
-.pageHeader {
-  @include flex-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: $spacing-16;
-  flex-shrink: 0;
-}
-
-.pageHeading {
-  @include flex-column;
-  gap: $spacing-4;
-}
-
-.pageTitle {
-  font-size: $font-size-24;
-  font-weight: $font-weight-700;
-  color: var(--color-text-primary);
-  margin: 0;
-
-  @include respond-to(sm) { font-size: $font-size-28; }
-}
-
-.pageSubtitle {
-  font-size: $font-size-14;
-  color: var(--color-text-secondary);
-  margin: 0;
-}
-
 .backBtn {
   display: inline-flex;
   align-items: center;

@@ -9,18 +9,6 @@
   }
 }
 
-.pageHeader {
-  @include flex-between;
-  flex-wrap: wrap;
-  gap: $spacing-16;
-}
-
-.pageHeading {
-  display: flex;
-  align-items: center;
-  gap: $spacing-8;
-}
-
 .backBtn {
   @include flex-center;
   width: 36px;
@@ -33,16 +21,6 @@
   &:hover {
     background: var(--color-hover);
     color: var(--color-text);
-  }
-}
-
-.pageTitle {
-  font-size: $font-size-24;
-  font-weight: $font-weight-700;
-  color: var(--color-text-primary);
-
-  @include respond-to(sm) {
-    font-size: $font-size-28;
   }
 }
 

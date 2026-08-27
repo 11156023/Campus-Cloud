@@ -10,30 +10,6 @@
   @include respond-to(md) { padding: 0 0 $spacing-32; }
 }
 
-.pageHeader {
-  @include glass-surface($shadow: none);
-  padding: $spacing-24;
-  border-radius: $radius-16;
-}
-
-.pageHeading { @include flex-column; gap: $spacing-4; }
-
-.eyebrow {
-  margin: 0;
-  color: var(--color-primary);
-  font-size: $font-size-12;
-  font-weight: $font-weight-700;
-  letter-spacing: .04em;
-}
-
-.pageTitle { margin: 0; color: var(--color-text-primary); font-size: $font-size-28; }
-
-.pageSubtitle {
-  color: var(--color-text-secondary);
-  font-size: $font-size-14;
-  line-height: 1.6;
-}
-
 .stateText,
 .empty {
   padding: $spacing-32 $spacing-16;

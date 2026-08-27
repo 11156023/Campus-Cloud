@@ -8,6 +8,7 @@ import { CoursesService } from "../../../services/courses";
 import { ResourcesService } from "../../../services/resources";
 import { TemplatesService } from "../../../services/templates";
 import styles from "./StudentHomePage.module.scss";
+import PageHeader from "../../../components/PageHeader/PageHeader";
 
 const STATUS_META = {
   running: { label: "環境已就緒", tone: "success", icon: "check_circle" },
@@ -661,18 +662,17 @@ export default function StudentHomePage({ courseView = false }) {
 
       {!courseView && (
         <>
-          <section className={styles.todaySchedule} aria-labelledby="today-schedule-title" data-guide="home-schedule">
-            <div className={styles.scheduleHeading}>
-              <div>
-                <p className={styles.eyebrow}>今日課表 · {todayLabel}</p>
-                <h2 id="today-schedule-title">
-                  {view.paths.length > 0 ? `目前有 ${view.paths.length} 堂課` : "目前沒有課程"}
-                </h2>
-              </div>
+          <PageHeader
+            title={`今日課表 · ${todayLabel}`}
+            subtitle={view.paths.length > 0 ? `目前有 ${view.paths.length} 堂課` : "目前沒有課程"}
+          >
+            {view.paths.some((path) => path.schedule?.state === "now") && (
               <div className={styles.scheduleActions}>
-                {view.paths.some((path) => path.schedule?.state === "now") && <span>有一堂正在進行</span>}
+                <span>有一堂正在進行</span>
               </div>
-            </div>
+            )}
+          </PageHeader>
+          <section className={styles.todaySchedule} aria-label="今日課表" data-guide="home-schedule">
             {view.paths.length > 0 ? (
             <div className={styles.scheduleGrid}>
               {view.paths.map((path, index) => (

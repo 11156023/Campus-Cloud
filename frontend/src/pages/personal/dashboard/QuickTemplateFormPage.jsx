@@ -8,6 +8,7 @@ import { useToast } from "../../../hooks/useToast";
 import { LayoutContext } from "../../../layout/DashboardLayout";
 import { VmRequestsService } from "../../../services/vmRequests";
 import { TemplatesService } from "../../../services/templates";
+import PageHeader from "../../../components/PageHeader/PageHeader";
 
 const QUICK_TEMPLATE_MAX = { cores: 2, memory: 4096, disk: 32 };
 
@@ -226,16 +227,12 @@ export default function QuickTemplateFormPage() {
   return (
     <div className={styles.page}>
       {/* Header */}
-      <div className={styles.pageHeader}>
-        <div className={styles.pageHeading}>
-          <h1 className={styles.pageTitle}>快速建立</h1>
-          <p className={styles.pageSubtitle}>選擇模板一鍵建立練習環境，送出後系統會自動審核並佈建</p>
-        </div>
+      <PageHeader title="快速建立" subtitle="選擇模板一鍵建立練習環境，送出後系統會自動審核並佈建">
         <button type="button" className={styles.backBtn} onClick={onBack}>
           <MIcon name="arrow_back" size={18} />
           返回
         </button>
-      </div>
+      </PageHeader>
 
       <div className={styles.body}>
         <div className={styles.formScroll}>

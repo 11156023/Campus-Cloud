@@ -5,6 +5,7 @@ import MIcon from "../../components/MIcon";
 import { CourseEnvironmentsService } from "../../services/courseEnvironments";
 import EmptyState from "../../components/EmptyState/EmptyState";
 import styles from "./CourseOperations.module.scss";
+import PageHeader from "../../components/PageHeader/PageHeader";
 
 const STATUS_LABEL = { published: "已發布", draft: "草稿", retired: "已停用" };
 
@@ -29,13 +30,9 @@ export default function CourseTemplateManagementPage() {
   }), [query, status, templates]);
 
   return <div className={`${styles.page} ${styles.listPage}`}>
-    <div className={styles.pageHeader}>
-      <div className={styles.pageHeading}>
-        <div className={styles.titleLine}><h1 className={styles.pageTitle}>課程環境</h1></div>
-        <p className={styles.pageSubtitle}>定義每位學生需要的機器組合，再重複套用到不同班級。</p>
-      </div>
+    <PageHeader title="課程環境" subtitle="定義每位學生需要的機器組合，再重複套用到不同班級。">
       <button type="button" className={styles.btnPrimary} onClick={() => navigate("/course-template-management/new")}><MIcon name="add" size={16} />建立課程環境</button>
-    </div>
+    </PageHeader>
 
     <section className={styles.card}>
       <div className={styles.toolbar}>

@@ -9,6 +9,7 @@ import { useToast } from "../../../hooks/useToast";
 import { ProxmoxConfigService } from "../../../services/proxmoxConfig";
 import GovernanceTab from "./GovernanceTab";
 import LdapTab from "./LdapTab";
+import PageHeader from "../../../components/PageHeader/PageHeader";
 
 const TABS = [
   { key: "pve",       label: "PVE 連線",  icon: "device_hub"    },
@@ -799,13 +800,7 @@ export default function SettingsPage() {
   return (
     <div className={styles.page}>
       {/* ── 頁首 ── */}
-      <div className={styles.pageHeader}>
-        <div className={styles.pageHeading}>
-          <h1 className={styles.pageTitle}>系統設定</h1>
-          <p className={styles.pageSubtitle}>
-            管理 Proxmox VE 連線、節點、Storage 與資源排程設定。
-          </p>
-        </div>
+      <PageHeader title="系統設定" subtitle="管理 Proxmox VE 連線、節點、Storage 與資源排程設定。">
 
         {/* ── Tabs ── */}
         <div className={styles.tabs}>
@@ -821,7 +816,7 @@ export default function SettingsPage() {
             </button>
           ))}
         </div>
-      </div>
+      </PageHeader>
 
       {/* ── 內容 ── */}
       <div className={styles.content}>

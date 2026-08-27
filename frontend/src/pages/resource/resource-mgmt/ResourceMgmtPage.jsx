@@ -11,6 +11,7 @@ import LoadingState from "../../../components/LoadingState/LoadingState";
 import { ResourcesService } from "../../../services/resources";
 import TerminalDialog from "../../personal/resources/TerminalDialog";
 import VncDialog from "../../personal/resources/VncDialog";
+import PageHeader from "../../../components/PageHeader/PageHeader";
 
 /* ── Constants ── */
 const STATUS_MAP = {
@@ -476,18 +477,14 @@ export default function ResourceMgmtPage() {
   return (
     <div className={styles.page}>
       {/* ── 頁首 ── */}
-      <div className={styles.pageHeader}>
-        <div className={styles.pageHeading}>
-          <h1 className={styles.pageTitle}>虛擬機與容器</h1>
-          <p className={styles.pageSubtitle}>查看與管理系統中所有虛擬機與 LXC 容器</p>
-        </div>
+      <PageHeader title="虛擬機與容器" subtitle="查看與管理系統中所有虛擬機與 LXC 容器">
         <div className={styles.pageActions}>
           <button type="button" className={styles.btnPrimary} onClick={() => navigate("/my-requests")}>
             <MIcon name="add" size={16} />
             建立資源
           </button>
         </div>
-      </div>
+      </PageHeader>
 
       {/* ── 批次操作 ── */}
       <BatchActionBar

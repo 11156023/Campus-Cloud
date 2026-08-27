@@ -5,6 +5,7 @@ import MIcon from "../../components/MIcon";
 import EmptyState from "../../components/EmptyState/EmptyState";
 import { TeachingClassesService } from "../../services/teachingClasses";
 import styles from "./CourseOperations.module.scss";
+import PageHeader from "../../components/PageHeader/PageHeader";
 
 const STATUS = {
   planning: "準備中",
@@ -84,15 +85,11 @@ export default function ClassManagementPage() {
   );
 
   return <div className={`${styles.page} ${styles.listPage}`}>
-    <header className={styles.pageHeader}>
-      <div className={styles.pageHeading}>
-        <h1 className={styles.pageTitle}>我的班級</h1>
-        <p className={styles.pageSubtitle}>從尚未完成的班級繼續準備，或進入已就緒的班級開始上課。</p>
-      </div>
+    <PageHeader title="我的班級" subtitle="從尚未完成的班級繼續準備，或進入已就緒的班級開始上課。">
       <button type="button" className={styles.btnPrimary} onClick={() => navigate("/class-setup")}>
         <MIcon name="add" size={17} />一鍵建立班級
       </button>
-    </header>
+    </PageHeader>
 
     {error && <p className={styles.errorMessage}>{error}</p>}
     {location.state?.message && <p className={styles.persistentFeedback}><MIcon name="cloud_done" size={17} />{location.state.message}</p>}

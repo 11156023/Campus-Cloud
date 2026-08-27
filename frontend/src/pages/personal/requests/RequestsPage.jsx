@@ -8,6 +8,7 @@ import useAutoRefresh from "../../../hooks/useAutoRefresh";
 import RequestFormPage from "./RequestFormPage";
 import MIcon from "../../../components/MIcon";
 import SharedEmptyState from "../../../components/EmptyState/EmptyState";
+import PageHeader from "../../../components/PageHeader/PageHeader";
 
 /* ── Constants ── */
 const STATUS_MAP = {
@@ -40,7 +41,6 @@ function canCancel(req) {
     (req.status === "approved" && req.vmid == null)
   );
 }
-
 /* approved 在 UI 上再依開通進度細分（vmid 為空時 provisioning_status 反映開通流程） */
 function getDisplayStatus(req) {
   if (req.status === "approved") {
@@ -251,8 +251,7 @@ function RequestRow({ req, onUpdated }) {
                 <MIcon name="close" size={13} />
                 撤銷
               </button>
-            )}
-            {hasDetail && (
+            )}            {hasDetail && (
               <button
                 type="button"
                 className={`${styles.expandBtn} ${expanded ? styles.expandBtnOpen : ""}`}
@@ -432,16 +431,12 @@ export default function RequestsPage() {
       className={`${styles.page} ${returning ? styles.animSlideInLeft : ""}`}
       onAnimationEnd={returning ? () => setReturning(false) : undefined}
     >
-      <div className={styles.pageHeader}>
-        <div className={styles.pageHeading}>
-          <h1 className={styles.pageTitle}>我的申請</h1>
-          <p className={styles.pageSubtitle}>管理你的虛擬機與容器申請</p>
-        </div>
+      <PageHeader title="我的申請" subtitle="管理你的虛擬機與容器申請">
         <button type="button" className={styles.btnPrimary} onClick={() => setView(VIEW_CREATE)} data-guide="request-create">
           <MIcon name="add" size={16} />
           申請資源
         </button>
-      </div>
+      </PageHeader>
 
       <div className={styles.content} data-guide="request-list">
         {error ? (

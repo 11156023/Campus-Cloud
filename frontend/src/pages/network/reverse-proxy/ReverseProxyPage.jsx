@@ -7,6 +7,7 @@ import { useAuth } from "../../../contexts/AuthContext";
 import { useToast } from "../../../hooks/useToast";
 import { ReverseProxyService } from "../../../services/reverseProxy";
 import ReverseProxyRuleModal from "../../../components/ReverseProxyRuleModal/ReverseProxyRuleModal";
+import PageHeader from "../../../components/PageHeader/PageHeader";
 
 function isAdminUser(user) {
   return user?.role === "admin" || user?.is_superuser === true;
@@ -288,13 +289,7 @@ export default function ReverseProxyPage() {
   return (
     <div className={styles.page}>
       {/* Header */}
-      <div className={styles.pageHeader}>
-        <div className={styles.pageHeading}>
-          <h1 className={styles.pageTitle}>反向代理</h1>
-          <p className={styles.pageSubtitle}>
-            讓別人透過一個好記的網址來訪問你 VM 裡的網站或服務
-          </p>
-        </div>
+      <PageHeader title="反向代理" subtitle="讓別人透過一個好記的網址來訪問你 VM 裡的網站或服務">
         <div className={styles.headerActions}>
           {isAdmin && (
             <button type="button" className={styles.btnSecondary} onClick={handleSync} disabled={syncing}>
@@ -307,7 +302,7 @@ export default function ReverseProxyPage() {
             新增網址
           </button>
         </div>
-      </div>
+      </PageHeader>
 
       {setupBlocked && (
         <div className={styles.noticeDanger}>

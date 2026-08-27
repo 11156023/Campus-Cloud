@@ -7,16 +7,6 @@
   gap: $spacing-24;
   width: 100%;
 }
-.header {
-  @include flex-between;
-  gap: $spacing-24;
-}
-.header h1 {
-  margin: $spacing-4 0 $spacing-8;
-  color: var(--color-text-primary);
-  font-size: $font-size-28;
-}
-.header p,
 .panelHeader p {
   margin: 0;
   color: var(--color-text-secondary);

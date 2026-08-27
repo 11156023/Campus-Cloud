@@ -1,6 +1,4 @@
 .page { display: flex; flex: 1; flex-direction: column; gap: 24px; min-width: 0; padding: 8px 16px; color: var(--color-text-primary); }
-.pageHeader { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
-.pageHeading { display: flex; flex-direction: column; gap: 4px; }
 .titleLine { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
 .pageTitle { margin: 0; color: var(--color-text-primary); font-size: 24px; font-weight: 700; }
 .pageSubtitle { margin: 0; color: var(--color-text-secondary); font-size: 14px; }
@@ -251,12 +249,10 @@
 
 @media (min-width: 768px) { .page { padding: 0; } .pageTitle { font-size: 28px; } }
 @media (max-width: 1050px) { .templateChoices { grid-template-columns: 1fr; } .splitContent, .twoColumns { grid-template-columns: 1fr; } .weekTimeline { grid-template-columns: repeat(4, minmax(200px, 1fr)); } }
-@media (max-width: 720px) { .pageHeader, .workspaceHeader, .cardHeader, .toolbar, .integrationStrip, .confirmBar { align-items: flex-start; flex-direction: column; } .formGrid, .studentTools, .weekDetail, .weekBuilder { grid-template-columns: 1fr; } .csvArea { padding-top: 16px; padding-left: 0; border-top: 1px solid var(--color-border); border-left: 0; } .compactSelect { width: 100%; min-width: 0; } .ruleGrid { grid-template-columns: 1fr; } .integrationStrip .btnSecondary { align-self: stretch; } }
+@media (max-width: 720px) { .workspaceHeader, .cardHeader, .toolbar, .integrationStrip, .confirmBar { align-items: flex-start; flex-direction: column; } .formGrid, .studentTools, .weekDetail, .weekBuilder { grid-template-columns: 1fr; } .csvArea { padding-top: 16px; padding-left: 0; border-top: 1px solid var(--color-border); border-left: 0; } .compactSelect { width: 100%; min-width: 0; } .ruleGrid { grid-template-columns: 1fr; } .integrationStrip .btnSecondary { align-self: stretch; } }
 
 /* Product-design pass: calm, task-led teacher workspace. */
 .page { width: 100%; gap: 20px; }
-.pageHeader { min-height: 76px; padding-bottom: 16px; border-bottom: 1px solid var(--color-border); }
-.pageHeading { gap: 7px; }
 .pageTitle { font-size: clamp(25px, 2.2vw, 32px); font-weight: 650; letter-spacing: -.025em; }
 .pageSubtitle { max-width: 760px; line-height: 1.6; }
 .pageKicker { color: var(--color-primary); font-size: 10px; font-weight: 750; letter-spacing: .12em; }
@@ -649,8 +645,6 @@
 
 /* 班級管理 / 環境模板：頁面外框對齊其他列表頁（滿版寬度、無標題分隔線、玻璃卡片） */
 .page.listPage { max-width: none; margin: 0; gap: 24px; }
-.listPage .pageHeader { min-height: 0; padding-bottom: 0; border-bottom: 0; }
-.listPage .pageHeading { gap: 4px; }
 .listPage .pageTitle { font-size: 24px; font-weight: 700; letter-spacing: normal; }
 .listPage .pageSubtitle { max-width: none; line-height: 1.5; }
 .listPage .card {
