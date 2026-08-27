@@ -80,7 +80,27 @@ class VMTemplate(SQLModel, table=True):
     )
     default_cores: int | None = Field(default=None, description="克隆預設 CPU 核數")
     default_memory: int | None = Field(default=None, description="克隆預設記憶體 MB")
-    default_disk: int | None = Field(default=None, description="克隆預設磁碟 GB")
+    default_disk: int | None = Field(
+        default=None,
+        description="範本磁碟 GB（轉換完成時自動偵測，唯讀；克隆固定沿用）",
+    )
+    allow_password_change: bool = Field(
+        default=True,
+        sa_column=Column(
+            sa.Boolean, nullable=False, server_default=sa.true()
+        ),
+        description="克隆時是否允許使用者自訂/重設登入密碼；否則沿用範本內建帳密",
+    )
+    requires_gpu: bool = Field(
+        default=False,
+        sa_column=Column(
+            sa.Boolean, nullable=False, server_default=sa.false()
+        ),
+        description="使用此範本是否需要 GPU（僅 qemu；克隆時強制選擇 GPU）",
+    )
+    icon_url: str | None = Field(
+        default=None, max_length=512, description="範本 icon 圖片 URL（選填）"
+    )
     source_vmid: int | None = Field(
         default=None,
         description="建立範本時的來源母機 VMID",
@@ -97,7 +117,31 @@ class VMTemplate(SQLModel, table=True):
     )
 
 
+class TemplateAttachment(SQLModel, table=True):
+    """範本附件（使用手冊等）。實體檔存 data/template_files/{template_id}/。"""
+
+    __tablename__ = "template_attachments"
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    template_id: uuid.UUID = Field(
+        sa_column=Column(
+            sa.Uuid,
+            sa.ForeignKey("vm_templates.id", ondelete="CASCADE"),
+            nullable=False,
+            index=True,
+        ),
+    )
+    filename: str = Field(max_length=255, description="原始檔名（下載時還原）")
+    content_type: str | None = Field(default=None, max_length=100)
+    size_bytes: int = Field(default=0)
+    created_at: datetime = Field(
+        default_factory=get_datetime_utc,
+        sa_column=Column(DateTime(timezone=True), nullable=False),
+    )
+
+
 __all__ = [
+    "TemplateAttachment",
     "VMTemplate",
     "VMTemplateStatus",
     "VMTemplateVisibility",

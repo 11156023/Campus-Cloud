@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import logging
+import time
 import uuid
 from typing import Any, Literal
 
@@ -23,6 +24,8 @@ logger = logging.getLogger(__name__)
 INIT_SNAPSHOT_NAME = "skylab-init"
 INIT_SNAPSHOT_DESCRIPTION = "SkyLab 初始快照（受保護）"
 INIT_SNAPSHOT_WAIT_SECONDS = 120.0
+INIT_SNAPSHOT_ATTEMPTS = 3
+INIT_SNAPSHOT_RETRY_SECONDS = 10.0
 
 
 def _rtype(resource_info: dict[str, Any]) -> Literal["qemu", "lxc"]:
@@ -35,31 +38,47 @@ def _has_init_snapshot(node: str, vmid: int, rtype: Literal["qemu", "lxc"]) -> b
 
 
 def ensure_init_snapshot(vmid: int) -> bool:
-    """Provision 完成點 hook；失敗不阻斷 provision。"""
-    try:
-        info = proxmox_service.find_resource(vmid)
-        node = str(info["node"])
-        rtype = _rtype(info)
-        if _has_init_snapshot(node, vmid, rtype):
+    """Provision 完成點 hook；失敗不阻斷 provision。
+
+    provision 尾聲常伴隨剛下發的 start（qmstart 持有 config lock），
+    快照會被 PVE 以 lock timeout 拒絕，因此帶固定間隔重試。
+    """
+    for attempt in range(1, INIT_SNAPSHOT_ATTEMPTS + 1):
+        try:
+            info = proxmox_service.find_resource(vmid)
+            node = str(info["node"])
+            rtype = _rtype(info)
+            if _has_init_snapshot(node, vmid, rtype):
+                return True
+            proxmox_service.create_snapshot(
+                node,
+                vmid,
+                rtype,
+                wait_timeout_seconds=INIT_SNAPSHOT_WAIT_SECONDS,
+                snapname=INIT_SNAPSHOT_NAME,
+                description=INIT_SNAPSHOT_DESCRIPTION,
+            )
+            logger.info("Init snapshot created for vmid=%s", vmid)
             return True
-        proxmox_service.create_snapshot(
-            node,
-            vmid,
-            rtype,
-            wait_timeout_seconds=INIT_SNAPSHOT_WAIT_SECONDS,
-            snapname=INIT_SNAPSHOT_NAME,
-            description=INIT_SNAPSHOT_DESCRIPTION,
-        )
-        logger.info("Init snapshot created for vmid=%s", vmid)
-        return True
-    except Exception:
-        logger.warning(
-            "Init snapshot failed for vmid=%s (reset unavailable until"
-            " an instructor re-creates it)",
-            vmid,
-            exc_info=True,
-        )
-        return False
+        except Exception:
+            if attempt < INIT_SNAPSHOT_ATTEMPTS:
+                logger.info(
+                    "Init snapshot attempt %d/%d failed for vmid=%s;"
+                    " retrying in %.0fs",
+                    attempt,
+                    INIT_SNAPSHOT_ATTEMPTS,
+                    vmid,
+                    INIT_SNAPSHOT_RETRY_SECONDS,
+                )
+                time.sleep(INIT_SNAPSHOT_RETRY_SECONDS)
+                continue
+            logger.warning(
+                "Init snapshot failed for vmid=%s (reset unavailable until"
+                " an instructor re-creates it)",
+                vmid,
+                exc_info=True,
+            )
+    return False
 
 
 def create_init_snapshot(

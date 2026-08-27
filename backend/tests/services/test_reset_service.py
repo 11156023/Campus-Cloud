@@ -99,8 +99,32 @@ def test_create_init_snapshot_conflicts_when_exists(pve: dict) -> None:
 def test_ensure_init_snapshot_swallow_errors(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    sleeps: list[float] = []
+    monkeypatch.setattr(reset_service.time, "sleep", sleeps.append)
+
     def _boom(vmid):
         raise RuntimeError("PVE down")
 
     monkeypatch.setattr(reset_service.proxmox_service, "find_resource", _boom)
     assert reset_service.ensure_init_snapshot(101) is False
+    # 每次失敗（最後一次除外）都會等一段再重試
+    assert len(sleeps) == reset_service.INIT_SNAPSHOT_ATTEMPTS - 1
+
+
+def test_ensure_init_snapshot_retries_after_lock_timeout(
+    pve: dict, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """qmstart 持鎖導致首次快照失敗時，重試後應成功。"""
+    monkeypatch.setattr(reset_service.time, "sleep", lambda s: None)
+    attempts: list[int] = []
+
+    def _locked_then_ok(node, vmid, rtype, wait_timeout_seconds=None, **p):
+        attempts.append(vmid)
+        if len(attempts) == 1:
+            raise RuntimeError("can't lock file - got timeout")
+
+    monkeypatch.setattr(
+        reset_service.proxmox_service, "create_snapshot", _locked_then_ok
+    )
+    assert reset_service.ensure_init_snapshot(101) is True
+    assert len(attempts) == 2

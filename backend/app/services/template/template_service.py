@@ -6,12 +6,16 @@
 
 from __future__ import annotations
 
+import logging
+import re
 import time
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
-from sqlmodel import Session, select
+from sqlalchemy import func as sa_func
+from sqlmodel import Session, col, select
 
 from app.core.db import engine
 from app.core.permissions import is_admin
@@ -28,6 +32,7 @@ from app.models import (
     Resource,
     TaskRecord,
     TaskRecordStatus,
+    TemplateAttachment,
     User,
     VMTemplate,
     VMTemplateStatus,
@@ -39,6 +44,9 @@ from app.schemas.template import (
     VMTemplatePublic,
     VMTemplateUpdate,
 )
+from app.services.template import template_files
+
+logger = logging.getLogger(__name__)
 
 TASK_CONVERT = "template.convert"
 TASK_DELETE = "template.delete"
@@ -55,11 +63,35 @@ def _to_public(
     template: VMTemplate,
     *,
     pve_vmids: set[int] | None = None,
+    attachment_count: int | None = None,
 ) -> VMTemplatePublic:
     public = VMTemplatePublic.model_validate(template)
     if pve_vmids is not None:
         public.pve_exists = template.pve_vmid in pve_vmids
+    if attachment_count is not None:
+        public.attachment_count = attachment_count
     return public
+
+
+def _attachment_counts(
+    session: Session, template_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, int]:
+    """各範本的附件數（一次 group by；失敗回空 dict 不擋列表）。"""
+    if not template_ids:
+        return {}
+    try:
+        rows = session.exec(
+            select(
+                TemplateAttachment.template_id,
+                sa_func.count(col(TemplateAttachment.id)),
+            )
+            .where(col(TemplateAttachment.template_id).in_(template_ids))
+            .group_by(col(TemplateAttachment.template_id))
+        ).all()
+        return {template_id: int(count) for template_id, count in rows}
+    except Exception as exc:
+        logger.warning("Failed to count template attachments: %s", exc)
+        return {}
 
 
 def _pve_template_vmids() -> set[int] | None:
@@ -82,8 +114,14 @@ def list_templates(*, session: Session, user: User) -> list[VMTemplatePublic]:
         )
     _reconcile_failed_template_tasks(session, templates)
     pve_vmids = _pve_template_vmids()
+    counts = _attachment_counts(session, [t.id for t in templates])
     return [
-        _to_public(t, pve_vmids=pve_vmids) for t in templates
+        _to_public(
+            t,
+            pve_vmids=pve_vmids,
+            attachment_count=counts.get(t.id, 0),
+        )
+        for t in templates
     ]
 
 
@@ -93,7 +131,12 @@ def get_template_for_user(
     template = _get_or_404(session, template_id)
     _require_view(session, user, template)
     _reconcile_failed_template_tasks(session, [template])
-    return _to_public(template, pve_vmids=_pve_template_vmids())
+    counts = _attachment_counts(session, [template.id])
+    return _to_public(
+        template,
+        pve_vmids=_pve_template_vmids(),
+        attachment_count=counts.get(template.id, 0),
+    )
 
 
 def _reconcile_failed_template_tasks(
@@ -191,6 +234,9 @@ async def create_template(
     resource_type = "lxc" if pve_resource.get("type") == "lxc" else "qemu"
     node = str(pve_resource["node"])
 
+    if data.requires_gpu and resource_type == "lxc":
+        raise BadRequestError("LXC 範本不支援 GPU 直通，無法設定需要 GPU")
+
     # 母機若是平台管理的資源，僅擁有者或 admin 能轉換（轉換後原 VM 消失）
     owned = session.get(Resource, data.source_vmid)
     if owned is not None and owned.user_id != user.id and not is_admin(user):
@@ -210,7 +256,8 @@ async def create_template(
             visibility=data.visibility,
             default_cores=data.default_cores,
             default_memory=data.default_memory,
-            default_disk=data.default_disk,
+            allow_password_change=data.allow_password_change,
+            requires_gpu=data.requires_gpu,
             source_vmid=data.source_vmid,
         )
     else:
@@ -225,7 +272,8 @@ async def create_template(
             visibility=data.visibility,
             default_cores=data.default_cores,
             default_memory=data.default_memory,
-            default_disk=data.default_disk,
+            allow_password_change=data.allow_password_change,
+            requires_gpu=data.requires_gpu,
             source_vmid=data.source_vmid,
         )
     try:
@@ -337,8 +385,186 @@ def update_template(
     updates: dict[str, Any] = data.model_dump(exclude_unset=True)
     for field, value in updates.items():
         setattr(template, field, value)
+    if template.requires_gpu and template.resource_type == "lxc":
+        raise BadRequestError("LXC 範本不支援 GPU 直通，無法設定需要 GPU")
     template_repo.touch(session=session, template=template)
     return _to_public(template)
+
+
+# ---------------------------------------------------------------------------
+# icon 與附件（使用手冊）
+# ---------------------------------------------------------------------------
+
+def upload_icon(
+    *,
+    session: Session,
+    user: User,
+    template_id: uuid.UUID,
+    content_type: str | None,
+    data: bytes,
+) -> VMTemplatePublic:
+    template = _get_or_404(session, template_id)
+    _require_owner(user, template)
+    ext = template_files.ICON_CONTENT_TYPES.get((content_type or "").lower())
+    if ext is None:
+        raise BadRequestError("僅支援 PNG / JPEG / WebP / SVG / GIF 圖片")
+    if len(data) > template_files.ICON_MAX_BYTES:
+        raise BadRequestError("圖片大小不可超過 2MB")
+    template_files.save_icon(template.id, ext, data)
+    # v= 時間戳讓 <img> 換圖時不吃瀏覽器快取
+    template.icon_url = (
+        f"/api/v1/templates/{template.id}/icon?v={int(time.time())}"
+    )
+    template_repo.touch(session=session, template=template)
+    return _to_public(template)
+
+
+def remove_icon(
+    *, session: Session, user: User, template_id: uuid.UUID
+) -> VMTemplatePublic:
+    template = _get_or_404(session, template_id)
+    _require_owner(user, template)
+    template_files.delete_icon(template.id)
+    template.icon_url = None
+    template_repo.touch(session=session, template=template)
+    return _to_public(template)
+
+
+def _template_attachments(
+    session: Session, template_id: uuid.UUID
+) -> list[TemplateAttachment]:
+    return list(
+        session.exec(
+            select(TemplateAttachment)
+            .where(TemplateAttachment.template_id == template_id)
+            .order_by(col(TemplateAttachment.created_at).asc())
+        ).all()
+    )
+
+
+def list_attachments(
+    *, session: Session, user: User, template_id: uuid.UUID
+) -> list[TemplateAttachment]:
+    template = _get_or_404(session, template_id)
+    _require_view(session, user, template)
+    return _template_attachments(session, template.id)
+
+
+def get_manual_for_cloned_resource(
+    *, session: Session, vmid: int
+) -> tuple[VMTemplate | None, list[TemplateAttachment]]:
+    """克隆機來源範本的手冊（依 Resource.template_id = 範本 pve_vmid 反查）。
+
+    權限由呼叫端以資源擁有權驗證；刻意不檢查範本可見範圍——
+    範本事後轉私人，已克隆機的擁有者仍應拿得到手冊。
+    """
+    resource = session.get(Resource, vmid)
+    if resource is None or not resource.template_id:
+        return None, []
+    template = template_repo.get_template_by_pve_vmid(
+        session=session, pve_vmid=resource.template_id
+    )
+    if template is None:
+        return None, []
+    return template, _template_attachments(session, template.id)
+
+
+def get_manual_attachment_for_cloned_resource(
+    *, session: Session, vmid: int, attachment_id: uuid.UUID
+) -> tuple[Path, TemplateAttachment]:
+    template, attachments = get_manual_for_cloned_resource(
+        session=session, vmid=vmid
+    )
+    if template is None:
+        raise NotFoundError("Manual not found for this resource")
+    attachment = next(
+        (a for a in attachments if a.id == attachment_id), None
+    )
+    if attachment is None:
+        raise NotFoundError("Attachment not found")
+    path = template_files.attachment_path(template.id, attachment.id)
+    if path is None:
+        raise NotFoundError("Attachment file is missing on server")
+    return path, attachment
+
+
+def add_attachment(
+    *,
+    session: Session,
+    user: User,
+    template_id: uuid.UUID,
+    filename: str,
+    content_type: str | None,
+    data: bytes,
+) -> TemplateAttachment:
+    template = _get_or_404(session, template_id)
+    _require_owner(user, template)
+
+    safe_name = Path(filename or "").name.strip()
+    if not safe_name:
+        raise BadRequestError("檔名不可為空")
+    ext = Path(safe_name).suffix.lower()
+    if ext not in template_files.ATTACHMENT_ALLOWED_EXTENSIONS:
+        allowed = "、".join(
+            sorted(template_files.ATTACHMENT_ALLOWED_EXTENSIONS)
+        )
+        raise BadRequestError(f"不支援的檔案類型 {ext or '(無副檔名)'}；可上傳：{allowed}")
+    if len(data) > template_files.ATTACHMENT_MAX_BYTES:
+        raise BadRequestError("檔案大小不可超過 50MB")
+    existing = list_attachments(
+        session=session, user=user, template_id=template_id
+    )
+    if len(existing) >= template_files.ATTACHMENT_MAX_COUNT:
+        raise BadRequestError(
+            f"附件數量已達上限 {template_files.ATTACHMENT_MAX_COUNT} 個"
+        )
+
+    attachment = TemplateAttachment(
+        template_id=template.id,
+        filename=safe_name[:255],
+        content_type=(content_type or None),
+        size_bytes=len(data),
+    )
+    template_files.save_attachment(template.id, attachment.id, data)
+    session.add(attachment)
+    session.commit()
+    session.refresh(attachment)
+    return attachment
+
+
+def get_attachment_for_download(
+    *,
+    session: Session,
+    user: User,
+    template_id: uuid.UUID,
+    attachment_id: uuid.UUID,
+) -> tuple[Path, TemplateAttachment]:
+    template = _get_or_404(session, template_id)
+    _require_view(session, user, template)
+    attachment = session.get(TemplateAttachment, attachment_id)
+    if attachment is None or attachment.template_id != template.id:
+        raise NotFoundError("Attachment not found")
+    path = template_files.attachment_path(template.id, attachment.id)
+    if path is None:
+        raise NotFoundError("Attachment file is missing on server")
+    return path, attachment
+
+
+def remove_attachment(
+    *,
+    session: Session,
+    user: User,
+    template_id: uuid.UUID,
+    attachment_id: uuid.UUID,
+) -> None:
+    template = _get_or_404(session, template_id)
+    _require_owner(user, template)
+    attachment = session.get(TemplateAttachment, attachment_id)
+    if attachment is None or attachment.template_id != template.id:
+        raise NotFoundError("Attachment not found")
+    session.delete(attachment)
+    session.commit()
+    template_files.delete_attachment(template.id, attachment_id)
 
 
 # ---------------------------------------------------------------------------
@@ -507,6 +733,108 @@ def _ensure_stopped(
         raise RuntimeError(f"VM {vmid} 無法停止")
 
 
+# cloud-init clean 讓克隆機首次開機重跑 first-boot 模組；host key 只在
+# guest 有 cloud-init 時才刪（否則克隆機 sshd 會因缺 host key 起不來）。
+# machine-id 清空後 systemd 會在下次開機自動重生，避免全班克隆機共用同一組。
+_CLOUD_INIT_RESET_SCRIPT = (
+    "if command -v cloud-init >/dev/null 2>&1; then "
+    "cloud-init clean --logs || true; "
+    "rm -f /etc/ssh/ssh_host_*; "
+    "fi; "
+    "truncate -s 0 /etc/machine-id 2>/dev/null || true; "
+    "rm -f /var/lib/dbus/machine-id 2>/dev/null || true"
+)
+
+# Windows 對應：刪整個 Cloudbase-Init registry key（含 per-instance plugin
+# 執行紀錄與 unattend 狀態），克隆機首次開機重跑全部 plugin；OpenSSH host
+# key 一併清掉（Win32-OpenSSH 的 sshd 服務啟動時會自動重生）。全部
+# SilentlyContinue：沒裝 Cloudbase-Init / OpenSSH 也照樣成功。sysprep 因
+# rearm 次數限制刻意不在此執行。字串刻意只用單引號，避免 qemu-ga 組
+# Windows 命令列時的雙引號跳脫問題。
+_CLOUDBASE_INIT_RESET_SCRIPT = (
+    "Remove-Item -Recurse -Force "
+    "'HKLM:\\SOFTWARE\\Cloudbase Solutions\\Cloudbase-Init' "
+    "-ErrorAction SilentlyContinue; "
+    "Remove-Item -Force 'C:\\ProgramData\\ssh\\ssh_host_*' "
+    "-ErrorAction SilentlyContinue; "
+    "exit 0"
+)
+
+
+_BOOT_AGENT_TIMEOUT_SECONDS = 120
+
+
+def _wait_for_guest_agent(node: str, vmid: int, timeout: float) -> bool:
+    """輪詢 agent ping 直到回應或逾時（開機後 agent 起來需時）。"""
+    from app.infrastructure.proxmox import guest  # noqa: PLC0415
+
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if guest.ping_qemu_agent(node, vmid):
+            return True
+        time.sleep(_POLL_INTERVAL_SECONDS)
+    return False
+
+
+def _reset_cloud_init_state(
+    node: str, vmid: int, resource_type: proxmox_ops.ResourceType
+) -> bool:
+    """轉範本關機前重設 guest 內 cloud-init / Cloudbase-Init 狀態（best-effort）。
+
+    僅 qemu 才執行；母機是關機狀態會先開機等 agent 起來再重設，
+    隨後 _ensure_stopped 照原流程關機。agent get-osinfo 回 mswindows
+    時走 PowerShell 清 Cloudbase-Init registry 與 OpenSSH host key，
+    其餘（含 get-osinfo 不支援時）走 /bin/sh 的 cloud-init 清理。
+    LXC 無 cloud-init、agent 未裝都靜默略過，不阻擋轉換。回傳是否
+    有執行成功。
+    """
+    if resource_type != "qemu":
+        return False
+    try:
+        from app.infrastructure.proxmox import guest  # noqa: PLC0415
+
+        status = proxmox_ops.get_status(node, vmid, resource_type)
+        if status.get("status") != "running":
+            # 關機的母機先開機重設；轉換流程接著會把它關回去
+            proxmox_ops.control(node, vmid, resource_type, "start")
+            if not _wait_for_guest_agent(
+                node, vmid, _BOOT_AGENT_TIMEOUT_SECONDS
+            ):
+                logger.warning(
+                    "VM %d booted for cloud-init reset but guest agent "
+                    "did not come up within %ds; skipping reset",
+                    vmid,
+                    _BOOT_AGENT_TIMEOUT_SECONDS,
+                )
+                return False
+
+        osinfo = guest.get_osinfo_qemu(node, vmid) or {}
+        if str(osinfo.get("id") or "").lower() == "mswindows":
+            command = [
+                "powershell.exe",
+                "-NonInteractive",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-Command",
+                _CLOUDBASE_INIT_RESET_SCRIPT,
+            ]
+        else:
+            command = ["/bin/sh", "-c", _CLOUD_INIT_RESET_SCRIPT]
+        code, _out, err = guest.exec_qemu(node, vmid, command)
+        if code != 0:
+            logger.warning(
+                "cloud-init reset failed for VM %d (exit %d): %s",
+                vmid,
+                code,
+                (err or "").strip()[:300],
+            )
+            return False
+        return True
+    except Exception as exc:
+        logger.warning("cloud-init reset skipped for VM %d: %s", vmid, exc)
+        return False
+
+
 def _remove_snapshots_for_convert(
     node: str, vmid: int, resource_type: proxmox_ops.ResourceType
 ) -> None:
@@ -519,6 +847,81 @@ def _remove_snapshots_for_convert(
     real = [s for s in snapshots if s.get("name") and s["name"] != "current"]
     for snap in sorted(real, key=lambda s: s.get("snaptime") or 0, reverse=True):
         proxmox_ops.delete_snapshot(node, vmid, resource_type, snap["name"])
+
+
+_QEMU_BOOT_DISK_KEYS = ("scsi0", "virtio0", "sata0", "ide0")
+
+
+def _parse_disk_size_gb(raw: str) -> int | None:
+    match = re.search(r"size=(\d+)([MGT]?)", raw)
+    if match is None:
+        return None
+    value = int(match.group(1))
+    unit = match.group(2) or "G"
+    if unit == "M":
+        return max(1, (value + 1023) // 1024)
+    if unit == "T":
+        return value * 1024
+    return value
+
+
+def _detect_template_disk_gb(
+    node: str, vmid: int, resource_type: proxmox_ops.ResourceType
+) -> int | None:
+    """從 PVE config 讀範本開機磁碟大小（GB，best-effort）。
+
+    default_disk 不開放使用者設定，一律以轉換完成當下的實際磁碟為準
+    （克隆固定沿用，前端僅唯讀顯示）。
+    """
+    try:
+        config = proxmox_ops.get_config(node, vmid, resource_type)
+        if resource_type == "lxc":
+            raw = config.get("rootfs")
+        else:
+            bootdisk = str(config.get("bootdisk") or "")
+            raw = config.get(bootdisk) if bootdisk else None
+            if raw is None:
+                for key in _QEMU_BOOT_DISK_KEYS:
+                    if config.get(key):
+                        raw = config[key]
+                        break
+        if not raw:
+            return None
+        return _parse_disk_size_gb(str(raw))
+    except Exception as exc:
+        logger.warning(
+            "Failed to detect disk size for VM %d: %s", vmid, exc
+        )
+        return None
+
+
+def _strip_hostpci_for_convert(
+    node: str, vmid: int, resource_type: proxmox_ops.ResourceType
+) -> None:
+    """轉範本前剝離 hostpci 直通裝置（best-effort，失敗不擋轉換）。
+
+    範本不該綁實體 PCI 裝置：克隆機繼承 raw passthrough / SR-IOV VF 會
+    導致同裝置只能一台開機、跨節點開機失敗，且 GPU 用量掃描（見
+    gpu_service._build_usage_map）會把範本與克隆機都算進佔用，繞過
+    申請流程。僅 qemu 有 hostpci；LXC 直接略過。
+    """
+    if resource_type != "qemu":
+        return
+    try:
+        config = proxmox_ops.get_config(node, vmid, resource_type)
+        keys = [f"hostpci{i}" for i in range(16) if config.get(f"hostpci{i}")]
+        if not keys:
+            return
+        proxmox_ops.update_config(
+            node, vmid, resource_type, delete=",".join(keys)
+        )
+        logger.info(
+            "Stripped %s from VM %d before template convert",
+            ",".join(keys),
+            vmid,
+        )
+    except Exception as exc:
+        logger.warning("hostpci strip skipped for VM %d: %s", vmid, exc)
 
 
 def _set_template_error(
@@ -539,15 +942,19 @@ def _set_template_error(
 
 
 def run_convert_task(task_id: uuid.UUID, payload: dict[str, Any]) -> dict[str, Any]:
-    """建立範本：關機 → convert-to-template → 標記 ready、移除母機 Resource 紀錄。"""
+    """建立範本：重設 cloud-init → 關機 → convert → 標記 ready、移除母機 Resource。"""
     template_id = uuid.UUID(payload["template_id"])
     pve_vmid = int(payload["pve_vmid"])
     resource_type = _as_resource_type(payload["resource_type"])
     node = str(payload["node"])
     try:
         report_progress(task_id, 10)
+        cloud_init_reset = _reset_cloud_init_state(node, pve_vmid, resource_type)
+        report_progress(task_id, 25)
         _ensure_stopped(node, pve_vmid, resource_type)
         report_progress(task_id, 40)
+        # 關機後才剝離，避免變更卡在 pending 被一起轉進範本
+        _strip_hostpci_for_convert(node, pve_vmid, resource_type)
         _remove_snapshots_for_convert(node, pve_vmid, resource_type)
         report_progress(task_id, 60)
         proxmox_ops.convert_to_template(node, pve_vmid, resource_type)
@@ -557,18 +964,46 @@ def run_convert_task(task_id: uuid.UUID, payload: dict[str, Any]) -> dict[str, A
             template_id, str(exc), status=VMTemplateStatus.failed
         )
         raise
+    detected_disk = _detect_template_disk_gb(node, pve_vmid, resource_type)
     with Session(engine) as session:
         template = session.get(VMTemplate, template_id)
         if template is not None:
             template.status = VMTemplateStatus.ready
             template.error_message = None
+            if detected_disk is not None:
+                template.default_disk = detected_disk
             template_repo.touch(session=session, template=template, commit=False)
         # 母機已轉為唯讀範本，從資源列表移除（克隆端會重新配置 IP/防火牆）
         resource = session.get(Resource, pve_vmid)
         if resource is not None:
             session.delete(resource)
+        # 母機網路資源一併回收：IP 若留在已配置狀態會永久佔用，gateway
+        # 上殘留的 NAT 埠轉發在 IP 重配給別台 VM 後會導流到新住戶
+        try:
+            from app.services.network import ip_management_service  # noqa: PLC0415
+
+            ip_management_service.release_ip(session, pve_vmid)
+        except Exception as exc:
+            logger.warning("Failed to release IP for VM %s: %s", pve_vmid, exc)
+        try:
+            from app.services.network import nat_service  # noqa: PLC0415
+
+            nat_service.remove_nat_rules_for_vmid(session, pve_vmid)
+        except Exception as exc:
+            logger.warning(
+                "Failed to remove NAT rules for VM %s: %s", pve_vmid, exc
+            )
+        # 母機若來自申請單，一併標為已消耗；否則排程器會反覆嘗試
+        # 啟動範本，資源頁也會把申請單復活成「建立失敗」placeholder
+        from app.services.resource import resource_service  # noqa: PLC0415
+
+        resource_service.mark_linked_request_consumed(
+            session=session,
+            vmid=pve_vmid,
+            marker=resource_service.RESOURCE_CONVERTED_TO_TEMPLATE_MARKER,
+        )
         session.commit()
-    return {"vmid": pve_vmid}
+    return {"vmid": pve_vmid, "cloud_init_reset": cloud_init_reset}
 
 
 def run_delete_task(task_id: uuid.UUID, payload: dict[str, Any]) -> dict[str, Any]:
@@ -596,7 +1031,16 @@ def run_delete_task(task_id: uuid.UUID, payload: dict[str, Any]) -> dict[str, An
         if template is not None:
             template.status = VMTemplateStatus.deleted
             template.error_message = None
-            template_repo.touch(session=session, template=template)
+            template.icon_url = None
+            template_repo.touch(session=session, template=template, commit=False)
+        for attachment in session.exec(
+            select(TemplateAttachment).where(
+                TemplateAttachment.template_id == template_id
+            )
+        ).all():
+            session.delete(attachment)
+        session.commit()
+    template_files.delete_all_for_template(template_id)
     return {"vmid": pve_vmid}
 
 
@@ -662,6 +1106,8 @@ def run_update_convert_task(
     node = str(payload["node"])
     try:
         report_progress(task_id, 10)
+        cloud_init_reset = _reset_cloud_init_state(node, temp_vmid, resource_type)
+        report_progress(task_id, 25)
         _ensure_stopped(node, temp_vmid, resource_type)
         report_progress(task_id, 40)
         _remove_snapshots_for_convert(node, temp_vmid, resource_type)
@@ -678,6 +1124,7 @@ def run_update_convert_task(
     except Exception as exc:  # 舊版可能仍有 linked clone 子機，容忍失敗
         warning = f"舊版範本 {old_pve_vmid} 刪除失敗: {exc}"
     report_progress(task_id, 90)
+    detected_disk = _detect_template_disk_gb(node, temp_vmid, resource_type)
     with Session(engine) as session:
         template = session.get(VMTemplate, template_id)
         if template is not None:
@@ -686,13 +1133,18 @@ def run_update_convert_task(
             template.version += 1
             template.status = VMTemplateStatus.ready
             template.error_message = warning
+            if detected_disk is not None:
+                template.default_disk = detected_disk
             template_repo.touch(session=session, template=template, commit=False)
         # 暫存機已轉為範本，撤下資源列表紀錄
         temp_resource = session.get(Resource, temp_vmid)
         if temp_resource is not None:
             session.delete(temp_resource)
         session.commit()
-    result: dict[str, Any] = {"vmid": temp_vmid}
+    result: dict[str, Any] = {
+        "vmid": temp_vmid,
+        "cloud_init_reset": cloud_init_reset,
+    }
     if warning:
         result["warning"] = warning
     return result

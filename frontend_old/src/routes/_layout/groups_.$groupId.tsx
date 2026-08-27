@@ -688,7 +688,7 @@ function BatchProvisionDialog({
 
                 <div className="grid gap-2">
                   <Label>
-                    Root 密碼 <span className="text-destructive">*</span>
+                    密碼 <span className="text-destructive">*</span>
                   </Label>
                   <Input
                     type="password"

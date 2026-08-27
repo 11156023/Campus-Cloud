@@ -433,3 +433,71 @@ def test_remove_snapshots_for_convert_deletes_snapshots_newest_first(
     template_service._remove_snapshots_for_convert("pve1", 9001, resource_type)
 
     assert deleted == ["new", "old"]
+# ---------------------------------------------------------------------------
+# _strip_hostpci_for_convert：轉範本前剝離 GPU 直通
+# ---------------------------------------------------------------------------
+
+
+def test_strip_hostpci_deletes_all_present_slots(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        template_service.proxmox_ops,
+        "get_config",
+        lambda node, vmid, rt: {
+            "hostpci0": "mapping=h200-gpu,mdev=nvidia-1028",
+            "hostpci2": "0000:81:00.0,pcie=1",
+            "net0": "virtio=AA:BB:CC:DD:EE:FF,bridge=vmbr1",
+        },
+    )
+    captured: dict[str, Any] = {}
+
+    def fake_update_config(node: str, vmid: int, rt: str, **params: Any) -> None:
+        captured.update(params)
+
+    monkeypatch.setattr(
+        template_service.proxmox_ops, "update_config", fake_update_config
+    )
+
+    template_service._strip_hostpci_for_convert("pve1", 9001, "qemu")
+
+    # 稀疏槽位（0 與 2）都要刪到，非 hostpci 鍵不受影響
+    assert captured["delete"] == "hostpci0,hostpci2"
+
+
+def test_strip_hostpci_skips_lxc(monkeypatch: pytest.MonkeyPatch) -> None:
+    def boom(*a: Any, **kw: Any) -> None:
+        raise AssertionError("lxc must not touch PVE config")
+
+    monkeypatch.setattr(template_service.proxmox_ops, "get_config", boom)
+
+    template_service._strip_hostpci_for_convert("pve1", 9001, "lxc")
+
+
+def test_strip_hostpci_noop_without_devices(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        template_service.proxmox_ops,
+        "get_config",
+        lambda node, vmid, rt: {"net0": "virtio=AA:BB:CC:DD:EE:FF"},
+    )
+
+    def boom(*a: Any, **kw: Any) -> None:
+        raise AssertionError("update_config must not be called without hostpci")
+
+    monkeypatch.setattr(template_service.proxmox_ops, "update_config", boom)
+
+    template_service._strip_hostpci_for_convert("pve1", 9001, "qemu")
+
+
+def test_strip_hostpci_tolerates_pve_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def boom(*a: Any, **kw: Any) -> None:
+        raise RuntimeError("connection refused")
+
+    monkeypatch.setattr(template_service.proxmox_ops, "get_config", boom)
+
+    # best-effort：PVE 連不上只記 warning，不得拋出
+    template_service._strip_hostpci_for_convert("pve1", 9001, "qemu")

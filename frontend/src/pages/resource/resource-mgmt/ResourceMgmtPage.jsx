@@ -7,6 +7,7 @@ import PowerMenu from "../../../components/PowerMenu/PowerMenu";
 import SharedEmptyState from "../../../components/EmptyState/EmptyState";
 import { useToast } from "../../../hooks/useToast";
 import useAutoRefresh from "../../../hooks/useAutoRefresh";
+import LoadingState from "../../../components/LoadingState/LoadingState";
 import { ResourcesService } from "../../../services/resources";
 import TerminalDialog from "../../personal/resources/TerminalDialog";
 import VncDialog from "../../personal/resources/VncDialog";
@@ -388,29 +389,6 @@ function ResourceRow({ resource, onUpdated, onDeleted, selected = false, onToggl
   );
 }
 
-/* ── Skeleton ── */
-function SkeletonRow() {
-  return (
-    <tr className={styles.tr} aria-hidden>
-      <td className={`${styles.td} ${styles.checkCell}`} />
-      <td className={styles.td}>
-        <div className={styles.nameCell}>
-          <div className={`${styles.nameIcon} ${styles.skeleton}`} />
-          <div className={styles.skMeta}>
-            <div className={`${styles.skeleton} ${styles.skRow}`} style={{ width: 120, height: 13 }} />
-            <div className={`${styles.skeleton} ${styles.skRow}`} style={{ width: 80, height: 11 }} />
-          </div>
-        </div>
-      </td>
-      {[0, 1, 2, 3, 4, 5].map((i) => (
-        <td key={i} className={styles.td}>
-          <div className={`${styles.skeleton} ${styles.skRow}`} style={{ width: i === 1 ? 56 : 72, height: 12 }} />
-        </td>
-      ))}
-    </tr>
-  );
-}
-
 /* ── Empty / Error states ── */
 function EmptyState() {
   return <SharedEmptyState icon="dns" title="尚無虛擬機或容器" />;
@@ -525,7 +503,9 @@ export default function ResourceMgmtPage() {
       <div className={styles.content}>
         {error ? (
           <ErrorState onRetry={fetchResources} />
-        ) : !loading && resources.length === 0 ? (
+        ) : loading ? (
+          <LoadingState fullPage />
+        ) : resources.length === 0 ? (
           <EmptyState />
         ) : (
           <div className={styles.tableWrap}>
@@ -548,18 +528,16 @@ export default function ResourceMgmtPage() {
                 </tr>
               </thead>
               <tbody>
-                {loading
-                  ? [0, 1, 2, 3].map((i) => <SkeletonRow key={i} />)
-                  : resources.map((r, index) => (
-                      <ResourceRow
-                        key={resourceRowKey(r, index)}
-                        resource={r}
-                        onUpdated={handleUpdated}
-                        onDeleted={handleDeleted}
-                        selected={selectedVmids.has(r.vmid)}
-                        onToggleSelect={toggleSelect}
-                      />
-                    ))}
+                {resources.map((r, index) => (
+                  <ResourceRow
+                    key={resourceRowKey(r, index)}
+                    resource={r}
+                    onUpdated={handleUpdated}
+                    onDeleted={handleDeleted}
+                    selected={selectedVmids.has(r.vmid)}
+                    onToggleSelect={toggleSelect}
+                  />
+                ))}
               </tbody>
             </table>
           </div>

@@ -6,6 +6,7 @@ import { BatchProvisionService } from "../../../services/batchProvision";
 import { useConfirm } from "../../../components/ConfirmDialog/ConfirmProvider";
 import { useToast } from "../../../hooks/useToast";
 import useAutoRefresh from "../../../hooks/useAutoRefresh";
+import LoadingState from "../../../components/LoadingState/LoadingState";
 
 const STATUS_LABELS = {
   pending_review: "待審核",
@@ -245,7 +246,9 @@ export default function BatchReviewPage() {
       </div>
 
       <div className={styles.content}>
-        {visible.length === 0 ? (
+        {loading ? (
+          <LoadingState fullPage />
+        ) : visible.length === 0 ? (
           <EmptyState />
         ) : (
           <div className={styles.tableWrap}>

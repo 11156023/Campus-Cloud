@@ -60,7 +60,7 @@ export default function VncDialog({ resource, onClose }) {
         const ticket = data.ticket ?? "";
         const port   = data.port   ?? "";
         if (!ticket) {
-          setError("無法取得 VNC ticket");
+          setError("無法建立遠端畫面連線，請稍後再試");
           return;
         }
         let url = `${proto}//${apiUrl.host}/ws/vnc/${resource.vmid}?token=${encodeURIComponent(token)}&vnc_ticket=${encodeURIComponent(ticket)}`;

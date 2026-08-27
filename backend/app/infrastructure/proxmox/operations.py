@@ -6,6 +6,8 @@ duplicate the same cluster.resources iteration or qemu/lxc dispatch logic.
 """
 
 import logging
+import threading
+import time
 from typing import Any, Literal
 
 import httpx
@@ -583,6 +585,55 @@ def get_lxc_templates(node: str) -> list[dict]:
 def get_vm_templates() -> list[dict]:
     """Return all VM templates in each connection's pool."""
     return [vm for vm in _pool_vms() if vm.get("template") == 1]
+
+
+_TEMPLATE_NODE_MAP_TTL_SECONDS = 60.0
+_template_node_map: dict[str, set[str]] = {}
+_template_node_map_at = 0.0
+_template_node_map_lock = threading.Lock()
+
+
+def get_lxc_template_node_map() -> dict[str, set[str]]:
+    """volid → 看得到該 vztmpl 的節點集合（跨連線彙總，TTL 快取）。
+
+    vztmpl 存在與否是節點層事實（各連線 iso_storage 未必共享到每個節點），
+    placement 與模板清單都以此判斷。個別節點查詢失敗視為該節點沒有模板。
+    """
+    global _template_node_map_at
+    now = time.monotonic()
+    with _template_node_map_lock:
+        if (now - _template_node_map_at) < _TEMPLATE_NODE_MAP_TTL_SECONDS:
+            return {volid: set(nodes) for volid, nodes in _template_node_map.items()}
+
+    mapping: dict[str, set[str]] = {}
+    for node in get_available_nodes():
+        node_name = str(node.get("node") or node.get("name") or "")
+        if not node_name:
+            continue
+        try:
+            contents = get_lxc_templates(node_name)
+        except Exception as exc:
+            logger.warning(
+                "Failed to list LXC templates on node %s: %s", node_name, exc
+            )
+            continue
+        for item in contents:
+            if item.get("content") != "vztmpl":
+                continue
+            volid = item.get("volid")
+            if volid:
+                mapping.setdefault(str(volid), set()).add(node_name)
+
+    with _template_node_map_lock:
+        _template_node_map.clear()
+        _template_node_map.update(mapping)
+        _template_node_map_at = time.monotonic()
+    return {volid: set(nodes) for volid, nodes in mapping.items()}
+
+
+def get_vztmpl_nodes(volid: str) -> set[str]:
+    """看得到指定 vztmpl volid 的節點集合；模板不存在任何節點時為空集合。"""
+    return get_lxc_template_node_map().get(str(volid), set())
 
 
 # ---------------------------------------------------------------------------

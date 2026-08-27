@@ -7,6 +7,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import LoadingState from "../../components/LoadingState/LoadingState";
 import MIcon from "../../components/MIcon";
 import { useConfirm } from "../../components/ConfirmDialog/ConfirmProvider";
 import { CourseEnvironmentsService } from "../../services/courseEnvironments";
@@ -32,7 +33,7 @@ function TopologyMachineNode({ data, selected, isConnectable }) {
     <div className={styles.flowNodeIcon}><MIcon name={node.type === "lxc" ? "deployed_code" : "dns"} size={18} /></div>
     <div className={styles.flowNodeLabel}>
       <strong>{node.name}</strong>
-      <span>{node.sourceType === "custom" ? "自訂" : "範本"} · {String(node.type).toUpperCase()}</span>
+      <span>{node.sourceType === "custom" ? "自訂" : "範本"} · {node.type === "lxc" ? "容器 (LXC)" : "虛擬機"}</span>
       <small>{node.cpu} CPU · {node.memory} GB RAM · {node.disk} GB</small>
     </div>
     <Handle type="source" position={Position.Right} isConnectable={isConnectable} />
@@ -204,12 +205,12 @@ function MachineEditor({ value, edges, onChange, onEdgesChange, pveTemplates, vm
               <label>方向<select disabled={locked} value={selectedEdge.direction} onChange={(event) => patchEdge({ direction: event.target.value })}><option value="one_way">單向</option><option value="bidirectional">雙向</option></select></label>
               <div className={styles.inspectorSplit}>
                 <label>協定<select disabled={locked} value={selectedEdge.protocol} onChange={(event) => patchEdge({ protocol: event.target.value })}>{selectedEdge.protocol === "any" && <option value="any">全部（舊設定）</option>}{FIREWALL_PROTOCOLS.map((protocol) => <option key={protocol} value={protocol}>{protocol.toUpperCase()}</option>)}</select></label>
-                <label>Port<input disabled={locked || selectedEdge.protocol === "any"} type="number" min="1" max="65535" value={selectedEdge.port ?? ""} onChange={(event) => patchEdge({ port: event.target.value })} /></label>
+                <label>連接埠<input disabled={locked || selectedEdge.protocol === "any"} type="number" min="1" max="65535" value={selectedEdge.port ?? ""} onChange={(event) => patchEdge({ port: event.target.value })} /></label>
               </div>
               <p className={styles.inspectorHint}>單向會建立來源 OUT 與目標 IN 規則；雙向會再建立反向規則。</p>
               {!locked && <button type="button" className={styles.inspectorDanger} onClick={() => removeEdge(selectedEdge.id)}><MIcon name="delete_outline" size={16} />刪除連線</button>}
             </> : selectedNode ? <>
-              <div className={styles.inspectorTitle}><MIcon name="dns" size={18} /><div><strong>{selectedNode.name}</strong><small>{selectedNode.sourceType === "custom" ? "自訂規格" : "既有範本"} · {String(selectedNode.type).toUpperCase()}</small></div></div>
+              <div className={styles.inspectorTitle}><MIcon name="dns" size={18} /><div><strong>{selectedNode.name}</strong><small>{selectedNode.sourceType === "custom" ? "自訂規格" : "既有範本"} · {selectedNode.type === "lxc" ? "容器 (LXC)" : "虛擬機"}</small></div></div>
               <label>名稱<input disabled={locked} value={selectedNode.name} onChange={(event) => patchNode(selectedNode.id, { name: event.target.value })} /></label>
               <label>角色<input disabled={locked} value={selectedNode.role} onChange={(event) => patchNode(selectedNode.id, { role: event.target.value })} /></label>
               <div className={styles.inspectorSplit}>
@@ -257,7 +258,7 @@ export default function CourseTemplateEditorPage() {
         : template.nodes.length > 3
           ? "每位學生最多只能配置三台機器"
           : invalidTopology
-            ? "請修正拓撲連線的 Port"
+            ? "請修正拓撲連線的連接埠"
             : "";
   useEffect(() => {
     if (!templateId) { setTemplate(structuredClone(emptyTemplate)); setLoading(false); return undefined; }
@@ -296,7 +297,7 @@ export default function CourseTemplateEditorPage() {
     Promise.all([apiGet("/api/v1/vm/templates"), apiGet("/api/v1/lxc/templates")])
       .then(([vms, lxcs]) => {
         if (!active) return;
-        setVmImages((vms ?? []).map((item) => ({ value: String(item.vmid), label: `${item.name} · VMID ${item.vmid} · ${item.node}` })));
+        setVmImages((vms ?? []).map((item) => ({ value: String(item.vmid), label: `${item.name} · 編號 ${item.vmid} · ${item.node}`})));
         setLxcImages((lxcs ?? []).map((item) => ({ value: item.volid, label: item.volid.split("/").pop() ?? item.volid })));
       })
       .catch((reason) => {
@@ -341,7 +342,7 @@ export default function CourseTemplateEditorPage() {
     catch (reason) { setMessage(reason?.message ?? "建立新版本失敗"); }
     finally { setSaving(false); }
   }
-  if (loading) return <div className={styles.emptyState}><p>正在讀取課程環境…</p></div>;
+  if (loading) return <LoadingState fullPage text="正在讀取課程環境…" />;
   return <div className={styles.page}>
     <button type="button" className={styles.backLink} onClick={() => navigate(returnTo ?? "/course-template-management")}><MIcon name="arrow_back" size={18} />{returnTo ? "返回班級上課環境" : "返回課程環境"}</button>
     <div className={styles.pageHeader}><div className={styles.pageHeading}><div className={styles.titleLine}><h1 className={styles.pageTitle}>{isNew ? "建立課程環境" : template.name}</h1></div><p className={styles.pageSubtitle}>{isNew ? "定義可重複套用到班級的學生機器組合。" : `${template.code} · v${template.version} · ${template.updatedAt}`}</p></div><div className={styles.pageActions}><button type="button" className={styles.btnSecondary} onClick={() => navigate(returnTo ?? "/course-template-management")}>返回</button>{locked ? <button type="button" className={styles.btnPrimary} disabled={saving} onClick={newVersion}><MIcon name="content_copy" size={16} />建立新版本</button> : <><button type="button" className={styles.btnSecondary} disabled={isNew || saving || !template.name.trim() || !template.code.trim() || template.nodes.length === 0 || template.nodes.length > 3 || invalidTopology} onClick={publish}><MIcon name="lock" size={16} />儲存、發布並鎖定</button><button type="button" className={styles.btnPrimary} disabled={saving || !template.name.trim() || !template.code.trim() || template.nodes.length === 0 || template.nodes.length > 3 || invalidTopology} onClick={save}><MIcon name="save" size={16} />{saving ? "儲存中…" : "儲存草稿"}</button></>}</div></div>

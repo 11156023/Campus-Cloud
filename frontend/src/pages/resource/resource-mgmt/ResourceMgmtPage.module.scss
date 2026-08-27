@@ -372,26 +372,6 @@
   background: color-mix(in srgb, #dc3545 8%, transparent);
 }
 
-/* ── Skeleton ── */
-@keyframes shimmer {
-  0%   { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
-}
-
-.skeleton {
-  background: linear-gradient(
-    90deg,
-    var(--color-hover) 25%,
-    color-mix(in srgb, var(--color-text-secondary) 8%, var(--color-hover)) 50%,
-    var(--color-hover) 75%
-  );
-  background-size: 200% 100%;
-  animation: shimmer 1.4s ease-in-out infinite;
-}
-
-.skRow  { border-radius: 4px; }
-.skMeta { @include flex-column; gap: 6px; }
-
 /* ── Modal ── */
 .modalOverlay {
   position: fixed;

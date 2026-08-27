@@ -21,7 +21,9 @@ def build_chat_runtime_context(
         vram = str(option.get("vram") or "").strip()
         node = str(option.get("node") or "").strip()
         available = safe_int(option.get("available_count"))
-        total = safe_int(option.get("device_count"))
+        total = safe_int(option.get("capacity_count")) or safe_int(
+            option.get("device_count")
+        )
 
         label = model or str(option.get("description") or "").strip() or mapping_id or "GPU"
         parts = [f"{label}"]

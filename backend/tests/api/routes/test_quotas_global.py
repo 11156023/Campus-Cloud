@@ -97,10 +97,26 @@ def test_put_applies_partial_update(
     assert response.json()["max_cpu_cores"] == 32
 
 
+def test_put_accepts_zero_as_unlimited(
+    api_client: TestClient, as_admin: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """0 = 無限制，是合法值。"""
+    monkeypatch.setattr(
+        quota_service,
+        "update_global_quota",
+        lambda session, data: _config(**data),
+    )
+
+    response = api_client.put(BASE, json={"max_cpu_cores": 0})
+
+    assert response.status_code == 200
+    assert response.json()["max_cpu_cores"] == 0
+
+
 def test_put_rejects_out_of_range_value(
     api_client: TestClient, as_admin: None
 ) -> None:
-    response = api_client.put(BASE, json={"max_cpu_cores": 0})
+    response = api_client.put(BASE, json={"max_cpu_cores": -1})
 
     assert response.status_code == 422
     # 必須是 body 欄位的範圍錯誤；若路由被 /{quota_id} 吃掉，422 會來自

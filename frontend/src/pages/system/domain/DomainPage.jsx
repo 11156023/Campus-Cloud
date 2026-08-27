@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import styles from "./DomainPage.module.scss";
 import MIcon from "../../../components/MIcon";
+import LoadingState from "../../../components/LoadingState/LoadingState";
 import EmptyState from "../../../components/EmptyState/EmptyState";
 import { useToast } from "../../../hooks/useToast";
 import { CloudflareService } from "../../../services/cloudflare";
@@ -408,7 +409,7 @@ export default function DomainPage() {
           <div className={styles.zonePanel} data-guide="domain-zones">
             <h2 className={styles.panelTitle}>Zones（{zones.length}）</h2>
             {loadingZones ? (
-              <div className={styles.loading}>載入中...</div>
+              <LoadingState />
             ) : zones.length === 0 ? (
               <p className={styles.panelEmpty}>找不到任何 Zone</p>
             ) : (
@@ -459,7 +460,7 @@ export default function DomainPage() {
             {!selectedZone ? (
               <p className={styles.panelEmpty}>請先選擇左側 Zone</p>
             ) : loadingRecords ? (
-              <div className={styles.loading}>載入 DNS 紀錄...</div>
+              <LoadingState text="載入 DNS 紀錄..." />
             ) : records.length === 0 ? (
               <p className={styles.panelEmpty}>此 Zone 尚無 DNS 紀錄</p>
             ) : (

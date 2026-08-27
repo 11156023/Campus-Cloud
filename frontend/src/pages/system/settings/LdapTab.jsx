@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import styles from "./SettingsPage.module.scss";
 import MIcon from "../../../components/MIcon";
+import LoadingState from "../../../components/LoadingState/LoadingState";
 import { LdapConfigService } from "../../../services/ldapConfig";
 import { useToast } from "../../../hooks/useToast";
 
@@ -92,7 +93,7 @@ export default function LdapTab() {
     }
   }
 
-  if (!form) return <div className={styles.loading}>載入 LDAP 設定...</div>;
+  if (!form) return <LoadingState text="載入 LDAP 設定..." />;
 
   return (
     <form className={styles.panelStack} onSubmit={handleSave}>
