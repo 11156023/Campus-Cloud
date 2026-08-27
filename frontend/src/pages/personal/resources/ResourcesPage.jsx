@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../../contexts/AuthContext";
 import styles from "./ResourcesPage.module.scss";
 import MIcon from "../../../components/MIcon";
 import PowerMenu from "../../../components/PowerMenu/PowerMenu";
@@ -244,6 +245,9 @@ function resourceCardKey(resource, index) {
 /* ── ResourceCard ── */
 function ResourceCard({ resource, onUpdated, onDeleted }) {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  /* VMID 是系統內部編號，僅管理員／老師看得到 */
+  const showVmid = user?.is_superuser || user?.role === "admin" || user?.role === "teacher";
   const [actionLoading, setActionLoading] = useState(null);
   const [deleteConfirm, setDeleteConfirm]  = useState(false);
   const [deleting, setDeleting]            = useState(false);
@@ -307,7 +311,7 @@ function ResourceCard({ resource, onUpdated, onDeleted }) {
             )}
             <div className={styles.cardChips}>
               <span className={styles.typeChip}>{type.label}</span>
-              {resource.vmid > 0 && <span className={styles.vmidChip}>編號 {resource.vmid}</span>}
+              {showVmid && resource.vmid > 0 && <span className={styles.vmidChip}>編號 {resource.vmid}</span>}
             </div>
           </div>
           <StatusBadge status={resource.status} />
@@ -378,7 +382,7 @@ function ResourceCard({ resource, onUpdated, onDeleted }) {
       {deleteConfirm && (
         <ConfirmModal
           title="確定刪除資源？"
-          desc={`「${resource.name}」(編號 ${resource.vmid}) 刪除後無法復原，所有資料將會消失。`}
+          desc={`「${resource.name}」${showVmid ? `(編號 ${resource.vmid}) ` : ""}刪除後無法復原，所有資料將會消失。`}
           confirmLabel="刪除"
           danger
           loading={deleting}

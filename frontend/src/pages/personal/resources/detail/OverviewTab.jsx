@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useAuth } from "../../../../contexts/AuthContext";
 import styles from "./ResourceDetailPage.module.scss";
 import MIcon from "../../../../components/MIcon";
 import LoadingState from "../../../../components/LoadingState/LoadingState";
@@ -14,6 +15,9 @@ const STATUS_BADGE = {
 
 export default function OverviewTab({ vmid }) {
   const toast = useToast();
+  const { user } = useAuth();
+  /* VMID 是系統內部編號，僅管理員／老師看得到 */
+  const showVmid = user?.is_superuser || user?.role === "admin" || user?.role === "teacher";
   const [resource, setResource] = useState(null);
   const [sshKey, setSshKey] = useState(null);
   const [showPrivateKey, setShowPrivateKey] = useState(false);
@@ -125,10 +129,12 @@ export default function OverviewTab({ vmid }) {
           </div>
         </div>
         <div className={`${styles.cardBody} ${styles.factGrid}`}>
-          <div className={styles.fact}>
-            <span className={styles.factLabel}>編號</span>
-            <span className={styles.factValue}>{resource.vmid}</span>
-          </div>
+          {showVmid && (
+            <div className={styles.fact}>
+              <span className={styles.factLabel}>編號</span>
+              <span className={styles.factValue}>{resource.vmid}</span>
+            </div>
+          )}
           <div className={styles.fact}>
             <span className={styles.factLabel}>名稱</span>
             <span className={styles.factValue}>{resource.name}</span>

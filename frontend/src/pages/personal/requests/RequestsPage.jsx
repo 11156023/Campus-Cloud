@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
+import { useAuth } from "../../../contexts/AuthContext";
 import styles from "./RequestsPage.module.scss";
 import { VmRequestsService } from "../../../services/vmRequests";
 import { useToast } from "../../../hooks/useToast";
@@ -163,6 +164,9 @@ function ConfirmModal({ title, desc, confirmLabel = "確定", danger = false, lo
 /* ── RequestRow ── */
 function RequestRow({ req, onUpdated }) {
   const toast = useToast();
+  const { user } = useAuth();
+  /* VMID 是系統內部編號，僅管理員／老師看得到 */
+  const showVmid = user?.is_superuser || user?.role === "admin" || user?.role === "teacher";
   const [expanded, setExpanded]           = useState(false);
   const [cancelConfirm, setCancelConfirm] = useState(false);
   const [cancelling, setCancelling]       = useState(false);
@@ -221,7 +225,7 @@ function RequestRow({ req, onUpdated }) {
               <span className={styles.namePrimary}>{req.hostname}</span>
               <span className={styles.nameSub}>
                 {type.label}
-                {req.vmid != null && ` · 編號 ${req.vmid}`}
+                {showVmid && req.vmid != null && ` · 編號 ${req.vmid}`}
               </span>
             </div>
           </div>

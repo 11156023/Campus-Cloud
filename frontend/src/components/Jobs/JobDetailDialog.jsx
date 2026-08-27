@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import MIcon from "../MIcon";
+import { useAuth } from "../../contexts/AuthContext";
 import { JobsService } from "../../services/jobs";
 import { JOB_KIND_LABEL, JOB_STATUS_META } from "./JobRow";
 import styles from "./Jobs.module.scss";
@@ -80,6 +81,8 @@ const ACTIVE_STATUSES = new Set(["pending", "running", "blocked"]);
 
 export default function JobDetailDialog({ jobId, onClose }) {
   const open = jobId !== null;
+  const { user } = useAuth();
+  const showVmid = user?.is_superuser || user?.role === "admin" || user?.role === "teacher";
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -132,7 +135,10 @@ export default function JobDetailDialog({ jobId, onClose }) {
   const statusMeta = item ? JOB_STATUS_META[item.status] : null;
   const extraEntries = data
     ? Object.entries(data.extra ?? {}).filter(
-        ([, v]) => v !== null && v !== undefined && v !== "",
+        ([k, v]) =>
+          v !== null && v !== undefined && v !== ""
+          /* VMID 是系統內部編號，僅管理員／老師看得到 */
+          && (showVmid || k !== "vmid"),
       )
     : [];
 
