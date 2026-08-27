@@ -5,7 +5,7 @@ flag_hash，學生端與管理端讀取皆然。
 """
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -22,11 +22,13 @@ from app.models.course import (
 class CoursePathCreate(BaseModel):
     title: str = Field(min_length=1, max_length=255)
     description: str | None = Field(default=None, max_length=2000)
+    teaching_class_id: uuid.UUID | None = None
 
 
 class CoursePathUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=255)
     description: str | None = Field(default=None, max_length=2000)
+    teaching_class_id: uuid.UUID | None = None
 
 
 class CoursePathPublish(BaseModel):
@@ -42,6 +44,8 @@ class CoursePathPublic(BaseModel):
     created_at: datetime
     updated_at: datetime
     room_count: int = 0
+    teaching_class_id: uuid.UUID | None = None
+    teaching_class_name: str | None = None
 
 
 # ── 管理端：房間 ────────────────────────────────────────────────────────────
@@ -144,6 +148,41 @@ class CoursePathSummary(BaseModel):
     total_questions: int
     completed_questions: int
     progress_percent: float
+
+
+class CourseScheduleStudent(BaseModel):
+    """One real teaching-class session shown on the student's home page."""
+
+    id: uuid.UUID
+    title: str
+    description: str | None = None
+    room_count: int
+    total_questions: int
+    completed_questions: int
+    progress_percent: float
+    teaching_class_id: uuid.UUID
+    teaching_class_name: str
+    session_date: date
+    start_at: datetime
+    end_at: datetime
+    teacher: str
+    location: str | None = None
+    state: Literal["now", "later", "ended"]
+    label: str
+
+
+class CourseReminderStudent(BaseModel):
+    """Derived reminder; read state remains a per-browser UI preference."""
+
+    id: str
+    kind: Literal["resource_expiry", "request_review", "class_task"]
+    tone: Literal["warning", "success", "danger", "info"]
+    icon: str
+    title: str
+    description: str
+    time_label: str
+    target: str
+    occurred_at: datetime
 
 
 class CourseRoomSummary(BaseModel):
@@ -326,6 +365,8 @@ __all__ = [
     "CourseQuestionUpdate",
     "CourseQuestionPublic",
     "CoursePathSummary",
+    "CourseScheduleStudent",
+    "CourseReminderStudent",
     "CourseRoomSummary",
     "CoursePathDetail",
     "CourseQuestionStudent",

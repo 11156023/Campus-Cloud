@@ -27,11 +27,6 @@ def test_student_gets_every_assigned_course_machine_in_role_order() -> None:
     session = _session()
     teacher_id = uuid.uuid4()
     student_id = uuid.uuid4()
-    path = CoursePath(
-        title="Linux",
-        status=CoursePathStatus.published,
-        created_by=teacher_id,
-    )
     teaching_class = TeachingClass(
         name="Linux A 班",
         code="linux-a",
@@ -42,6 +37,12 @@ def test_student_gets_every_assigned_course_machine_in_role_order() -> None:
         weekday=1,
         start_time=time(9),
         end_time=time(11),
+    )
+    path = CoursePath(
+        title="Linux",
+        status=CoursePathStatus.published,
+        created_by=teacher_id,
+        teaching_class_id=teaching_class.id,
     )
     session.add(path)
     session.add(teaching_class)

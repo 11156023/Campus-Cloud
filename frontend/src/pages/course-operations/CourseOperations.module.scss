@@ -320,6 +320,7 @@
 .heatmapHeader p { margin: 6px 0 0; color: var(--color-text-secondary); font-size: 13px; line-height: 1.5; }
 .heatmapEyebrow { color: var(--color-primary); font-size: 10px; font-weight: 750; letter-spacing: .12em; }
 .prototypeBadge { display: inline-flex; align-items: center; gap: 5px; flex: 0 0 auto; padding: 5px 9px; border: 1px solid color-mix(in srgb, #b7791f 24%, var(--color-border)); border-radius: 999px; color: #9a6700; background: color-mix(in srgb, #d99a00 7%, var(--color-surface)); font-size: 11px; font-weight: 650; }
+.liveBadge { display: inline-flex; align-items: center; gap: 5px; flex: 0 0 auto; padding: 5px 9px; border: 1px solid color-mix(in srgb, var(--color-success) 28%, var(--color-border)); border-radius: 999px; color: var(--color-success); background: color-mix(in srgb, var(--color-success) 7%, var(--color-surface)); font-size: 11px; font-weight: 650; }
 .heatmapToolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 0 22px 18px; border-bottom: 1px solid var(--color-border); }
 .machineTabs { display: flex; gap: 7px; min-width: 0; overflow-x: auto; scrollbar-width: none; }
 .machineTabs::-webkit-scrollbar { display: none; }
@@ -346,7 +347,7 @@
 .heatmapSummary dd { margin: 2px 0 0; color: var(--color-text-primary); font-size: 18px; font-weight: 720; }
 .heatmapSummary dd small { margin-left: 2px; font-weight: 500; }
 .heatGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(126px, 1fr)); gap: 7px; padding: 0 22px 18px; }
-.heatCell { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: auto auto; gap: 12px 9px; min-height: 92px; padding: 12px; overflow: hidden; border: 1px solid transparent; border-radius: 9px; transition: transform .15s, box-shadow .15s; }
+.heatCell { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: auto auto; gap: 12px 9px; min-height: 92px; padding: 12px; overflow: hidden; contain: layout paint; border: 1px solid transparent; border-radius: 9px; transition: transform .15s, box-shadow .15s; }
 .heatCell:hover { z-index: 1; transform: translateY(-2px); box-shadow: 0 5px 16px color-mix(in srgb, var(--color-text-primary) 16%, transparent); }
 .studentNumber { display: grid; grid-row: 1; width: 24px; height: 24px; place-items: center; border-radius: 6px; background: color-mix(in srgb, currentColor 9%, transparent); font-size: 9px; font-weight: 750; }
 .heatCell > div { display: flex; flex-direction: column; min-width: 0; }
@@ -355,6 +356,7 @@
 .heatCell > b { grid-column: 1 / -1; font-size: 17px; line-height: 1; }
 .heatOff { border-color: var(--color-border); color: var(--color-text-muted); background: transparent; }
 .heatOff.heatCell { border-style: dashed; }
+.heatUnavailable { border-color: var(--color-border); color: var(--color-text-muted); background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--color-hover) 70%, var(--color-surface)) 0 7px, var(--color-surface) 7px 14px); }
 .heat_1 { border-color: color-mix(in srgb, #2f9e44 22%, var(--color-border)); color: var(--color-text-primary); background: color-mix(in srgb, #2f9e44 18%, var(--color-surface)); }
 .heat_2 { border-color: color-mix(in srgb, #82c91e 36%, var(--color-border)); color: var(--color-text-primary); background: color-mix(in srgb, #82c91e 34%, var(--color-surface)); }
 .heat_3 { border-color: color-mix(in srgb, #f5b301 58%, var(--color-border)); color: var(--color-text-primary); background: color-mix(in srgb, #f5b301 52%, var(--color-surface)); }
@@ -642,7 +644,7 @@
 
 @media (max-width: 560px) {
   .heatmapHeader, .heatmapToolbar, .heatmapSummary { padding-right: 16px; padding-left: 16px; }
-  .prototypeBadge { align-self: flex-start; }
+  .prototypeBadge, .liveBadge { align-self: flex-start; }
   .machineTabs { grid-template-columns: 1fr; }
   .heatGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); padding-right: 16px; padding-left: 16px; }
   .heatCell { min-height: 86px; padding: 10px; }

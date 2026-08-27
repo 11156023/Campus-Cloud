@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Background, MarkerType, ReactFlow } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
@@ -11,6 +11,12 @@ import { courseNodeHasUsableSource, CourseEnvironmentsService } from "../../serv
 import { TeachingClassesService } from "../../services/teachingClasses";
 import AiJudgePanel from "./AiJudgePanel";
 import ClassCreateDialog from "./ClassCreatePage";
+import {
+  machineRuntimeState,
+  mergeResourceUsageByVmid,
+  RESOURCE_METRICS,
+  usageForMetric,
+} from "./classHeatmapUsage";
 import styles from "./CourseOperations.module.scss";
 
 const TABS = [
@@ -455,40 +461,6 @@ function ClassMonitor({ item }) {
   </div>;
 }
 
-const RESOURCE_METRICS = {
-  cpu: {
-    label: "CPU",
-    icon: "memory",
-    fields: ["vm_cpu_usage_pct", "cpu_usage_pct", "cpu_usage", "cpu"],
-  },
-  ram: {
-    label: "RAM",
-    icon: "storage",
-    fields: ["vm_ram_usage_pct", "ram_usage_pct", "memory_usage_pct", "mem_used_pct"],
-  },
-};
-
-function stableNumber(value) {
-  return [...String(value)].reduce((total, character) => ((total * 31) + character.charCodeAt(0)) >>> 0, 7);
-}
-
-function readUsage(machine, metric, fallbackKey) {
-  const raw = RESOURCE_METRICS[metric].fields.map((field) => machine?.[field]).find((value) => value !== null && value !== undefined && value !== "" && Number.isFinite(Number(value)));
-  if (raw !== undefined) {
-    const numeric = Number(raw);
-    return Math.round(Math.max(0, Math.min(100, numeric <= 1 ? numeric * 100 : numeric)));
-  }
-  return 6 + (stableNumber(fallbackKey) % 91);
-}
-
-function machineIsOn(machine, fallbackKey) {
-  if (!machine?.vmid || !["completed", "running"].includes(machine.status)) return false;
-  const powerState = String(machine.power_status ?? machine.runtime_status ?? "").toLowerCase();
-  if (["stopped", "offline", "shutdown", "off"].includes(powerState)) return false;
-  if (["running", "online", "started", "on"].includes(powerState)) return true;
-  return stableNumber(fallbackKey) % 11 !== 0;
-}
-
 function heatLevel(usage) {
   if (usage >= 80) return 5;
   if (usage >= 60) return 4;
@@ -497,9 +469,34 @@ function heatLevel(usage) {
   return 1;
 }
 
+const StudentHeatCell = memo(function StudentHeatCell({
+  email,
+  index,
+  machineName,
+  metricLabel,
+  name,
+  nodeName,
+  state,
+  usage,
+  vmid,
+}) {
+  const hasUsage = state === "on" && usage !== null;
+  const detail = state === "off" ? "關機" : hasUsage ? `${metricLabel} ${usage}%` : "暫無資料";
+  const tone = state === "off" ? styles.heatOff : hasUsage ? styles[`heat_${heatLevel(usage)}`] : styles.heatUnavailable;
+  return <article className={`${styles.heatCell} ${tone}`} title={`${name}\n${email ?? ""}\n${nodeName} · VM ${vmid ?? "—"}\n${detail}`} aria-label={`${name}，${detail}`}>
+    <span className={styles.studentNumber}>{String(index + 1).padStart(2, "0")}</span>
+    <div><strong>{name}</strong><small>{vmid ? `VM ${vmid}` : machineName || "尚未建立"}</small></div>
+    <b>{state === "off" ? "關機" : hasUsage ? `${usage}%` : "暫無資料"}</b>
+  </article>;
+});
+
 function StudentMachines({ item }) {
   const [selectedNodeId, setSelectedNodeId] = useState(() => String(item.nodes[0]?.id ?? ""));
   const [metric, setMetric] = useState("cpu");
+  const [usageByVmid, setUsageByVmid] = useState({});
+  const [usageStatus, setUsageStatus] = useState("loading");
+  const [collectedAt, setCollectedAt] = useState(null);
+  const usageByVmidRef = useRef(null);
 
   useEffect(() => {
     if (!item.nodes.some((node) => String(node.id) === selectedNodeId)) {
@@ -507,30 +504,67 @@ function StudentMachines({ item }) {
     }
   }, [item.nodes, selectedNodeId]);
 
+  useEffect(() => {
+    let active = true;
+    let timer = null;
+    usageByVmidRef.current = null;
+    setUsageByVmid({});
+    setUsageStatus("loading");
+    setCollectedAt(null);
+
+    async function loadUsage() {
+      try {
+        const response = await TeachingClassesService.resourceUsage(item.id);
+        if (!active) return;
+        const nextUsage = mergeResourceUsageByVmid(usageByVmidRef.current ?? {}, response?.items);
+        if (usageByVmidRef.current === null || nextUsage !== usageByVmidRef.current) {
+          usageByVmidRef.current = nextUsage;
+          startTransition(() => {
+            setUsageByVmid(nextUsage);
+            setCollectedAt(response?.collected_at ? new Date(response.collected_at) : new Date());
+          });
+        }
+        setUsageStatus("ready");
+      } catch {
+        if (active) setUsageStatus("error");
+      } finally {
+        if (active) timer = window.setTimeout(loadUsage, 10_000);
+      }
+    }
+
+    loadUsage();
+    return () => {
+      active = false;
+      if (timer) window.clearTimeout(timer);
+    };
+  }, [item.id]);
+
   const selectedNode = item.nodes.find((node) => String(node.id) === selectedNodeId) ?? item.nodes[0];
   const cells = useMemo(() => item.students.map((student, index) => {
     const machine = student.machines.find((candidate) => String(candidate.machine_node_id) === String(selectedNode?.id));
-    const key = `${student.id}:${selectedNode?.id}`;
-    const on = machineIsOn(machine, `${key}:power`);
+    const runtime = usageByVmid[String(machine?.vmid)] ?? null;
+    const state = machineRuntimeState(machine, runtime);
     return {
       student,
       machine,
       index,
-      on,
-      usage: on ? readUsage(machine, metric, `${key}:${metric}`) : null,
+      state,
+      usage: state === "on" ? usageForMetric(runtime, metric) : null,
     };
-  }), [item.students, metric, selectedNode?.id]);
+  }), [item.students, metric, selectedNode?.id, usageByVmid]);
 
-  const activeCells = cells.filter((cell) => cell.on);
-  const average = activeCells.length ? Math.round(activeCells.reduce((total, cell) => total + cell.usage, 0) / activeCells.length) : 0;
-  const highUsage = activeCells.filter((cell) => cell.usage >= 80).length;
+  const activeCells = cells.filter((cell) => cell.state === "on");
+  const measuredCells = activeCells.filter((cell) => cell.usage !== null);
+  const average = measuredCells.length ? Math.round(measuredCells.reduce((total, cell) => total + cell.usage, 0) / measuredCells.length) : null;
+  const highUsage = measuredCells.filter((cell) => cell.usage >= 80).length;
   const metricInfo = RESOURCE_METRICS[metric];
+  const badgeText = usageStatus === "loading" ? "讀取即時資料" : usageStatus === "error" ? "更新失敗" : "每 10 秒更新";
 
   return <div className={styles.stack}>
     <section className={`${styles.card} ${styles.heatmapCard}`}>
       <div className={styles.heatmapHeader}>
         <div><span className={styles.heatmapEyebrow}>即時資源概覽</span><h2>學生使用率熱力圖</h2><p>每格代表一位學生；沒有顏色表示關機，顏色越深表示使用量越高。</p></div>
-        <span className={styles.prototypeBadge}><MIcon name="science" size={15} />模擬資料</span>
+        <span className={usageStatus === "error" ? styles.prototypeBadge : styles.liveBadge}><MIcon name={usageStatus === "error" ? "sync_problem" : "sensors"} size={15} />{badgeText}</span>
       </div>
 
       <div className={styles.heatmapToolbar}>
@@ -550,23 +584,26 @@ function StudentMachines({ item }) {
 
       {selectedNode && item.students.length ? <>
         <div className={styles.heatmapSummary}>
-          <div><span className={styles.selectedMachineIcon}><MIcon name={selectedNode.resource_type === "lxc" ? "deployed_code" : "dns"} size={20} /></span><div><strong>{selectedNode.name}</strong><small>{selectedNode.role || "課堂機器"} · {metricInfo.label} 使用量</small></div></div>
-          <dl><div><dt>開機</dt><dd>{activeCells.length}<small>/{cells.length}</small></dd></div><div><dt>平均</dt><dd>{average}<small>%</small></dd></div><div><dt>高負載</dt><dd>{highUsage}<small> 人</small></dd></div></dl>
+          <div><span className={styles.selectedMachineIcon}><MIcon name={selectedNode.resource_type === "lxc" ? "deployed_code" : "dns"} size={20} /></span><div><strong>{selectedNode.name}</strong><small>{selectedNode.role || "課堂機器"} · {metricInfo.label} 使用量{collectedAt ? ` · ${collectedAt.toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit", second: "2-digit" })} 更新` : ""}</small></div></div>
+          <dl><div><dt>開機</dt><dd>{activeCells.length}<small>/{cells.length}</small></dd></div><div><dt>平均</dt><dd>{average ?? "—"}{average !== null && <small>%</small>}</dd></div><div><dt>高負載</dt><dd>{highUsage}<small> 人</small></dd></div></dl>
         </div>
 
         <div className={styles.heatGrid} aria-label={`${selectedNode.name} ${metricInfo.label} 學生使用率`}>
-          {cells.map(({ student, machine, index, on, usage }) => {
-            const name = student.full_name || student.email || `學生 ${index + 1}`;
-            const detail = on ? `${metricInfo.label} ${usage}%` : "關機";
-            return <article key={student.id} className={`${styles.heatCell} ${on ? styles[`heat_${heatLevel(usage)}`] : styles.heatOff}`} title={`${name}\n${student.email ?? ""}\n${selectedNode.name} · VM ${machine?.vmid ?? "—"}\n${detail}`} aria-label={`${name}，${detail}`}>
-              <span className={styles.studentNumber}>{String(index + 1).padStart(2, "0")}</span>
-              <div><strong>{name}</strong><small>{machine?.vmid ? `VM ${machine.vmid}` : "尚未建立"}</small></div>
-              <b>{on ? `${usage}%` : "關機"}</b>
-            </article>;
-          })}
+          {cells.map(({ student, machine, index, state, usage }) => <StudentHeatCell
+            key={student.id}
+            email={student.email}
+            index={index}
+            machineName={machine?.name}
+            metricLabel={metricInfo.label}
+            name={student.full_name || student.email || `學生 ${index + 1}`}
+            nodeName={selectedNode.name}
+            state={state}
+            usage={usage}
+            vmid={machine?.vmid}
+          />)}
         </div>
 
-        <div className={styles.heatLegend} aria-label="熱力圖圖例"><span><i className={styles.heatOff} />關機</span><span className={styles.legendScale}>低<i className={styles.heat_1} /><i className={styles.heat_2} /><i className={styles.heat_3} /><i className={styles.heat_4} /><i className={styles.heat_5} />高</span><span>使用率</span></div>
+        <div className={styles.heatLegend} aria-label="熱力圖圖例"><span><i className={styles.heatOff} />關機</span><span><i className={styles.heatUnavailable} />暫無資料</span><span className={styles.legendScale}>低<i className={styles.heat_1} /><i className={styles.heat_2} /><i className={styles.heat_3} /><i className={styles.heat_4} /><i className={styles.heat_5} />高</span><span>使用率</span></div>
       </> : <EmptyState icon="grid_view" title={selectedNode ? "班級目前沒有學生。" : "尚未設定課堂機器。"} />}
     </section>
   </div>;

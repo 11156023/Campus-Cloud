@@ -9,6 +9,7 @@ export default function ClassCreateDialog({ item = null, onClose, onCreated, onU
     name: item?.name ?? "",
     code: item?.code ?? "",
     term: item?.term ?? "114-1",
+    location: item?.location ?? "",
     startDate: item?.startDate ?? item?.start_date ?? "2026-09-01",
     endDate: item?.endDate ?? item?.end_date ?? "2027-01-31",
     weekday: item?.weekday ?? 1,
@@ -42,6 +43,7 @@ export default function ClassCreateDialog({ item = null, onClose, onCreated, onU
         name: form.name.trim(),
         code: form.code.trim() || `CLASS-${Date.now().toString().slice(-8)}`,
         term: form.term,
+        location: form.location.trim() || null,
         start_date: form.startDate,
         end_date: form.endDate,
         weekday: Number(form.weekday),
@@ -76,6 +78,7 @@ export default function ClassCreateDialog({ item = null, onClose, onCreated, onU
               <label className={`${styles.field} ${styles.createNameField}`}><span>班級名稱</span><input value={form.name} onChange={(event) => update("name", event.target.value)} placeholder="Linux 系統管理｜114-1" autoFocus /></label>
               <label className={styles.field}><span>班級代碼</span><input value={form.code} onChange={(event) => update("code", event.target.value)} placeholder="CS-LINUX-1141" /></label>
               <label className={styles.field}><span>學期</span><input value={form.term} onChange={(event) => update("term", event.target.value)} /></label>
+              <label className={styles.field}><span>上課地點</span><input value={form.location} onChange={(event) => update("location", event.target.value)} placeholder="例如：電腦教室 A" /></label>
               <label className={styles.field}><span>開始日期</span><input type="date" value={form.startDate} onChange={(event) => update("startDate", event.target.value)} /></label>
               <label className={styles.field}><span>結束日期</span><input type="date" value={form.endDate} onChange={(event) => update("endDate", event.target.value)} /></label>
             </div>

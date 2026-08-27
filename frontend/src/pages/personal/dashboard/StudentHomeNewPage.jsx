@@ -333,6 +333,137 @@ function LoadingState() {
   );
 }
 
+function formatScheduleTime(value) {
+  if (!value) return "";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "";
+  return new Intl.DateTimeFormat("zh-TW", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(parsed);
+}
+
+function normalizeSchedule(row) {
+  return {
+    ...row,
+    schedule: {
+      state: row.state,
+      label: row.label,
+      time: `${formatScheduleTime(row.start_at)}–${formatScheduleTime(row.end_at)}`,
+      teacher: row.teacher,
+      place: row.location,
+    },
+  };
+}
+
+function reminderStorageKey(user) {
+  return `skylab:student-reminders:v1:${user?.id ?? user?.email ?? "student"}`;
+}
+
+function ReminderCenter({ reminders = [], user, onNavigate }) {
+  const [open, setOpen] = useState(false);
+  const [readIds, setReadIds] = useState(() => {
+    try {
+      const stored = JSON.parse(window.localStorage.getItem(reminderStorageKey(user)) ?? "[]");
+      return Array.isArray(stored) ? stored : [];
+    } catch {
+      return [];
+    }
+  });
+  const rootRef = useRef(null);
+  const unreadCount = reminders.filter((item) => !readIds.includes(item.id)).length;
+
+  useEffect(() => {
+    window.localStorage.setItem(reminderStorageKey(user), JSON.stringify(readIds));
+  }, [readIds, user]);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const close = (event) => {
+      if (event.type === "keydown" && event.key !== "Escape") return;
+      if (event.type === "mousedown" && rootRef.current?.contains(event.target)) return;
+      setOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    document.addEventListener("keydown", close);
+    return () => {
+      document.removeEventListener("mousedown", close);
+      document.removeEventListener("keydown", close);
+    };
+  }, [open]);
+
+  const openReminder = (reminder) => {
+    setReadIds((current) => current.includes(reminder.id) ? current : [...current, reminder.id]);
+    setOpen(false);
+    onNavigate(reminder.target);
+  };
+
+  return (
+    <div className={styles.reminderCenter} ref={rootRef} data-guide="home-reminders">
+      <button
+        type="button"
+        className={`${styles.reminderButton} ${open ? styles.reminderButtonOpen : ""}`}
+        onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
+        aria-haspopup="dialog"
+      >
+        <MIcon name="notifications" size={17} />
+        <span>提醒</span>
+        {unreadCount > 0 && <span className={styles.reminderCount}>{unreadCount}</span>}
+      </button>
+
+      {open && (
+        <section className={styles.reminderPopover} role="dialog" aria-label="近期提醒">
+          <div className={styles.reminderHeader}>
+            <div><p className={styles.eyebrow}>近期事項</p><h2>提醒</h2></div>
+            <span>{unreadCount > 0 ? `${unreadCount} 則未讀` : "全部已讀"}</span>
+          </div>
+          <div className={styles.reminderList}>
+            {reminders.length === 0 && (
+              <div className={styles.reminderEmpty}>
+                <MIcon name="notifications_none" size={25} />
+                <strong>目前沒有新提醒</strong>
+                <span>機器期限、審核結果與近期課堂任務會出現在這裡。</span>
+              </div>
+            )}
+            {reminders.map((reminder) => {
+              const unread = !readIds.includes(reminder.id);
+              return (
+                <button
+                  type="button"
+                  key={reminder.id}
+                  className={`${styles.reminderItem} ${unread ? styles.reminderItemUnread : ""}`}
+                  onClick={() => openReminder(reminder)}
+                >
+                  <span className={`${styles.reminderIcon} ${styles[reminder.tone]}`}>
+                    <MIcon name={reminder.icon} size={19} />
+                  </span>
+                  <span className={styles.reminderContent}>
+                    <strong>{reminder.title}</strong>
+                    <small>{reminder.description}</small>
+                    <time>{reminder.time_label}</time>
+                  </span>
+                  {unread && <span className={styles.unreadDot} aria-label="未讀" />}
+                  <MIcon name="chevron_right" size={18} />
+                </button>
+              );
+            })}
+          </div>
+          <button
+            type="button"
+            className={styles.reminderFooter}
+            onClick={() => setReadIds(reminders.map((item) => item.id))}
+            disabled={unreadCount === 0}
+          >
+            全部標為已讀<MIcon name="done_all" size={17} />
+          </button>
+        </section>
+      )}
+    </div>
+  );
+}
+
 export default function StudentHomeNewPage({ courseView = false }) {
   const navigate = useNavigate();
   const { pathId } = useParams();
@@ -347,6 +478,7 @@ export default function StudentHomeNewPage({ courseView = false }) {
     roomDetail: null,
     aiAssignments: [],
     practiceMachines: [],
+    reminders: [],
   });
   const [quickTemplates, setQuickTemplates] = useState([]);
   const [templatesLoading, setTemplatesLoading] = useState(!courseView);
@@ -356,10 +488,6 @@ export default function StudentHomeNewPage({ courseView = false }) {
   const [machinePickerOpen, setMachinePickerOpen] = useState(false);
   const [activePracticeResource, setActivePracticeResource] = useState(null);
   const [openingMachineId, setOpeningMachineId] = useState(null);
-
-  const firstName = user?.full_name?.trim()?.split(/\s+/)[0]
-    ?? user?.email?.split("@")[0]
-    ?? "同學";
 
   const todayLabel = useMemo(
     () => new Intl.DateTimeFormat("zh-TW", {
@@ -374,22 +502,30 @@ export default function StudentHomeNewPage({ courseView = false }) {
     let cancelled = false;
 
     async function loadStudentHome() {
-      const [pathsResult, resourcesResult] = await Promise.allSettled([
+      const [pathsResult, resourcesResult, scheduleResult, remindersResult] = await Promise.allSettled([
         CoursesService.listPaths(),
         ResourcesService.list(),
+        CoursesService.listSchedule(),
+        courseView ? Promise.resolve([]) : CoursesService.listReminders(),
       ]);
 
       if (cancelled) return;
 
-      const paths = pathsResult.status === "fulfilled" && Array.isArray(pathsResult.value)
+      const catalogPaths = pathsResult.status === "fulfilled" && Array.isArray(pathsResult.value)
         ? pathsResult.value
         : [];
+      const schedulePaths = scheduleResult.status === "fulfilled" && Array.isArray(scheduleResult.value)
+        ? scheduleResult.value.map(normalizeSchedule)
+        : [];
+      const paths = courseView ? catalogPaths : schedulePaths;
       const resources = resourcesResult.status === "fulfilled" && Array.isArray(resourcesResult.value)
         ? resourcesResult.value
         : [];
-      const activePath = courseView && pathId
-        ? paths.find((path) => String(path.id) === String(pathId)) ?? chooseCurrentPath(paths)
+      let activePath = courseView && pathId
+        ? catalogPaths.find((path) => String(path.id) === String(pathId)) ?? chooseCurrentPath(catalogPaths)
         : chooseCurrentPath(paths);
+      const scheduledVersion = schedulePaths.find((path) => String(path.id) === String(activePath?.id));
+      if (activePath && scheduledVersion) activePath = { ...activePath, schedule: scheduledVersion.schedule };
       let pathDetail = null;
       let roomDetail = null;
       let aiAssignments = [];
@@ -425,7 +561,9 @@ export default function StudentHomeNewPage({ courseView = false }) {
       if (!cancelled) {
         setView({
           loading: false,
-          hasError: pathsResult.status === "rejected" && resourcesResult.status === "rejected",
+          hasError: courseView
+            ? pathsResult.status === "rejected" && resourcesResult.status === "rejected"
+            : scheduleResult.status === "rejected",
           paths,
           resources,
           activePath,
@@ -433,6 +571,9 @@ export default function StudentHomeNewPage({ courseView = false }) {
           roomDetail,
           aiAssignments,
           practiceMachines,
+          reminders: remindersResult.status === "fulfilled" && Array.isArray(remindersResult.value)
+            ? remindersResult.value
+            : [],
         });
       }
     }
@@ -638,13 +779,14 @@ export default function StudentHomeNewPage({ courseView = false }) {
           <section className={styles.todaySchedule} aria-labelledby="today-schedule-title" data-guide="home-schedule">
             <div className={styles.scheduleHeading}>
               <div>
-                <p className={styles.eyebrow}>今日課表</p>
+                <p className={styles.eyebrow}>今日課表 · {todayLabel}</p>
                 <h2 id="today-schedule-title">
                   {view.paths.length > 0 ? `目前有 ${view.paths.length} 堂課` : "目前沒有課程"}
                 </h2>
               </div>
               <div className={styles.scheduleActions}>
                 {view.paths.some((path) => path.schedule?.state === "now") && <span>有一堂正在進行</span>}
+                <ReminderCenter reminders={view.reminders} user={user} onNavigate={navigate} />
               </div>
             </div>
             {view.paths.length > 0 ? (

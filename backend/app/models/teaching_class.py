@@ -33,6 +33,7 @@ class TeachingClass(SQLModel, table=True):
     name: str = Field(max_length=255)
     code: str = Field(max_length=80)
     term: str = Field(max_length=80)
+    location: str | None = Field(default=None, max_length=255)
     start_date: date
     end_date: date
     weekday: int = Field(ge=0, le=6, description="Monday=0")
