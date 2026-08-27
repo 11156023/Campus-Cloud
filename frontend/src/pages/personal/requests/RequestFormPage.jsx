@@ -62,7 +62,41 @@ const formatDateOnly = (iso) => new Date(iso).toLocaleDateString("zh-TW", {
   month: "2-digit",
   day: "2-digit",
 });
-const formatOstemplate = (v) => v.split("/").pop()?.replace(".tar.zst", "") ?? v;
+const OS_DISPLAY_NAMES = {
+  ubuntu: "Ubuntu",
+  debian: "Debian",
+  alpine: "Alpine",
+  centos: "CentOS",
+  rockylinux: "Rocky Linux",
+  almalinux: "AlmaLinux",
+  fedora: "Fedora",
+  archlinux: "Arch Linux",
+  opensuse: "openSUSE",
+  gentoo: "Gentoo",
+  devuan: "Devuan",
+  nixos: "NixOS",
+};
+/* 範本名稱結尾加上 -GPU 代表此作業系統需要 GPU */
+const GPU_MARKER_RE = /-gpu$/i;
+const osNameNeedsGpu = (name) => GPU_MARKER_RE.test(String(name ?? "").trim());
+const stripGpuMarker = (name) => String(name ?? "").trim().replace(GPU_MARKER_RE, "");
+const withGpuTag = (label, needsGpu) => (needsGpu ? `${label}（需 GPU）` : label);
+const parseLxcImage = (v) => {
+  const file = v.split("/").pop() ?? v;
+  const base = file.replace(/\.tar\.(zst|gz|xz|bz2)$/, "");
+  // 檔名慣例：<distro>-<version>-<variant>_<build>_<arch>，如 ubuntu-22.04-standard_22.04-1_amd64
+  // -GPU 可加在副檔名前或版本段前：..._amd64-GPU.tar.zst / ubuntu-22.04-standard-GPU_...
+  const pkgRaw = base.split("_")[0];
+  const needsGpu = osNameNeedsGpu(base) || osNameNeedsGpu(pkgRaw);
+  const pkg = stripGpuMarker(pkgRaw).replace(/-(standard|default|base|minimal)$/, "");
+  const [distro, ...rest] = pkg.split("-");
+  const displayName = OS_DISPLAY_NAMES[distro.toLowerCase()];
+  const label = displayName
+    ? (rest.length ? `${displayName} ${rest.join(" ")}` : displayName)
+    : stripGpuMarker(base);
+  return { label, needsGpu };
+};
+const formatOstemplate = (v) => parseLxcImage(v).label;
 const toDateTimeLocalValue = (value) => {
   if (!value) return "";
   const date = value instanceof Date ? value : new Date(value);
@@ -87,6 +121,7 @@ const fromDateInputValue = (value, endOfDay = false) => {
   return date.toISOString();
 };
 const GPU_OPTIONS_DEBOUNCE_MS = 300;
+const ADVISE_DEBOUNCE_MS = 500;
 const formatVramMb = (mb) => (mb >= 1024 ? `${Number.isInteger(mb / 1024) ? mb / 1024 : (mb / 1024).toFixed(1)} GB` : `${mb} MB`);
 const gpuLabel = (gpu) => {
   /* SR-IOV vGPU 以 framebuffer 可切數為上限（capacity_count），非 VF 插槽數 */
@@ -146,8 +181,8 @@ const MSG = {
   passwordMinLen:   "密碼至少需要 8 個字符",
   reasonRequired:   "申請原因為必填項",
   reasonMinLen:     "申請原因至少需要 10 個字符",
-  templateRequired: "範本為必填項",
   osRequired:       "作業系統為必填項",
+  gpuRequired:      "此作業系統需要 GPU，請選擇一張 GPU",
   usernameRequired: "使用者名稱為必填項",
   startRequired:    "請選擇開始日期",
   endRequired:      "請選擇結束日期",
@@ -174,6 +209,11 @@ export default function RequestFormPage({ onBack, className }) {
 
   /* Form state */
   const [resourceType, setResourceType] = useState("lxc");
+  const [advice, setAdvice]                   = useState(null);
+  const [adviceLoading, setAdviceLoading]     = useState(false);
+  const [advisorDisabled, setAdvisorDisabled] = useState(false);
+  /* 自動模式的統一作業系統選擇；選了 OS 即決定型別（advise 退為提示） */
+  const [autoOsChoice, setAutoOsChoice]       = useState("");
   const [mode, setMode]                 = useState("scheduled");
   const [form, setForm] = useState({
     hostname:         "",
@@ -255,7 +295,24 @@ export default function RequestFormPage({ onBack, className }) {
     vmTemplates.find((t) => String(t.vmid) === String(form.template_id)) || null;
   const isWindowsVm = resourceType === "vm" && Boolean(selectedVmTemplate?.is_windows);
 
-  const canLoadGpu = resourceType === "vm";
+  /* 是否已完成作業系統選擇（型別確定後，帳密欄位才顯示） */
+  const osChosen = resourceType === "vm"
+    ? Boolean(form.template_id)
+    : Boolean(selectedTplId || form.ostemplate);
+
+  /* 所選作業系統是否標記需要 GPU（範本名稱 / 映像檔名結尾 -GPU） */
+  const selectedOsNeedsGpu = useMemo(() => {
+    if (resourceType === "vm") {
+      const tpl = vmTemplates.find((t) => String(t.vmid) === String(form.template_id));
+      return tpl ? osNameNeedsGpu(tpl.name) : false;
+    }
+    if (selectedTplId) {
+      const tpl = lxcSysTemplates.find((t) => t.id === selectedTplId);
+      return tpl ? osNameNeedsGpu(tpl.name) : false;
+    }
+    return form.ostemplate ? parseLxcImage(form.ostemplate).needsGpu : false;
+  }, [resourceType, vmTemplates, form.template_id, selectedTplId, lxcSysTemplates, form.ostemplate]);
+  const canLoadGpu = resourceType === "vm" && selectedOsNeedsGpu;
   const gpuWindowReady = Boolean(mode === "scheduled" && form.start_at && form.end_at);
   const selectedGpuProfiles = useMemo(() => {
     if (!form.gpu_mapping_id) return [];
@@ -274,10 +331,10 @@ export default function RequestFormPage({ onBack, className }) {
     : "";
 
   useEffect(() => {
-    if (resourceType !== "vm" && form.gpu_mapping_id) {
+    if ((resourceType !== "vm" || !selectedOsNeedsGpu) && form.gpu_mapping_id) {
       setForm((prev) => ({ ...prev, gpu_mapping_id: "", gpu_mdev_profile: "" }));
     }
-  }, [resourceType, form.gpu_mapping_id]);
+  }, [resourceType, selectedOsNeedsGpu, form.gpu_mapping_id]);
 
   useEffect(() => {
     if (!canLoadGpu) {
@@ -339,6 +396,47 @@ export default function RequestFormPage({ onBack, className }) {
     gpuOptionsRequestKey,
   ]);
 
+  /* ── 自動判斷：依申請原因/規格即時呼叫 advise，自動切換建議型別 ── */
+  useEffect(() => {
+    if (advisorDisabled) return undefined;
+    const reasonText = form.reason.trim();
+    if (!reasonText && !form.gpu_mapping_id) {
+      setAdvice(null);
+      return undefined;
+    }
+    let cancelled = false;
+    const timeoutId = window.setTimeout(() => {
+      setAdviceLoading(true);
+      VmRequestsService.advise({
+        reason: reasonText || null,
+        cores: Number(form.cores) || null,
+        memory: Number(form.memory) || null,
+        gpu_mapping_id: form.gpu_mapping_id || null,
+      })
+        .then((res) => {
+          if (cancelled) return;
+          setAdvice(res);
+          /* 已選作業系統時型別由 OS 決定，advise 僅作提示 */
+          if (!autoOsChoice) setResourceType(res.resource_type);
+        })
+        .catch((err) => {
+          if (cancelled) return;
+          /* 管理員停用 advisor 時後端回 400：隱藏自動選項並退回手動 */
+          if (err?.status === 400) {
+            setAdvisorDisabled(true);
+            setAdvice(null);
+          }
+        })
+        .finally(() => {
+          if (!cancelled) setAdviceLoading(false);
+        });
+    }, ADVISE_DEBOUNCE_MS);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [advisorDisabled, autoOsChoice, form.reason, form.cores, form.memory, form.gpu_mapping_id]);
+
   function set(key, val) {
     setForm((prev) => ({ ...prev, [key]: val }));
     if (errors[key]) setErrors((prev) => ({ ...prev, [key]: "" }));
@@ -377,6 +475,11 @@ export default function RequestFormPage({ onBack, className }) {
     if (!prefill) return;
     const nextResourceType = prefill.resource_type === "vm" ? "vm" : "lxc";
     setResourceType(nextResourceType);
+    if (nextResourceType === "vm") {
+      setAutoOsChoice(prefill.vm_template_id ? `vm:${prefill.vm_template_id}` : "");
+    } else {
+      setAutoOsChoice(prefill.lxc_os_image ? `img:${prefill.lxc_os_image}` : "");
+    }
     if (isPrivileged && (prefill.mode === "scheduled" || prefill.mode === "immediate")) {
       setMode(prefill.mode);
     } else if (!isPrivileged) {
@@ -447,10 +550,11 @@ export default function RequestFormPage({ onBack, className }) {
     else if (form.reason.trim().length < 10) errs.reason = MSG.reasonMinLen;
 
     if (resourceType === "lxc" && !selectedTplId && !form.ostemplate)
-      errs.ostemplate = MSG.templateRequired;
+      errs.ostemplate = MSG.osRequired;
     if (resourceType === "vm") {
       if (!form.template_id)            errs.template_id = MSG.osRequired;
       if (!isWindowsVm && !form.username.trim()) errs.username = MSG.usernameRequired;
+      if (selectedOsNeedsGpu && !form.gpu_mapping_id) errs.gpu_mapping_id = MSG.gpuRequired;
     }
 
     if (mode === "scheduled") {
@@ -529,6 +633,7 @@ export default function RequestFormPage({ onBack, className }) {
 
       const body = {
         resource_type: resourceType,
+        requested_mode: advisorDisabled ? "manual" : "auto",
         mode,
         hostname:  form.hostname,
         password:  form.password,
@@ -543,7 +648,7 @@ export default function RequestFormPage({ onBack, className }) {
                 ? {
                     /* 範本系統克隆路徑：帶 PVE VMID，免映像檔 */
                     template_id: selectedTpl.pve_vmid,
-                    os_info: selectedTpl.name,
+                    os_info: stripGpuMarker(selectedTpl.name),
                   }
                 : {
                     ostemplate: form.ostemplate,
@@ -555,8 +660,9 @@ export default function RequestFormPage({ onBack, className }) {
               ...(isWindowsVm ? {} : { username: form.username }),
               disk_size: form.disk_size,
               os_info:
-                vmTemplates.find((t) => String(t.vmid) === String(form.template_id))?.name ||
-                null,
+                stripGpuMarker(
+                  vmTemplates.find((t) => String(t.vmid) === String(form.template_id))?.name ?? "",
+                ) || null,
             }),
         ...(selectedGpuId ? { gpu_mapping_id: selectedGpuId } : {}),
         ...(selectedGpuId && form.gpu_mdev_profile
@@ -599,6 +705,33 @@ export default function RequestFormPage({ onBack, className }) {
     if (tpl.default_memory) set("memory", Math.min(32768, Math.max(512, tpl.default_memory)));
     if (tpl.default_disk)   set("rootfs_size", Math.max(8, tpl.default_disk));
     if (!form.hostname.trim()) set("hostname", normalizeHostname(tpl.name));
+  }
+
+  /* ── 自動模式：統一作業系統選擇 → 直接決定型別與對應欄位 ── */
+  function handleAutoOsSelect(value) {
+    setAutoOsChoice(value);
+    if (errors.template_id || errors.ostemplate) {
+      setErrors((prev) => ({ ...prev, template_id: "", ostemplate: "" }));
+    }
+    if (!value) return;
+    const [kind, ...rest] = value.split(":");
+    const id = rest.join(":"); // volid 本身含冒號（storage:vztmpl/...）
+    if (kind === "vm") {
+      setResourceType("vm");
+      setSelectedTplId("");
+      set("ostemplate", "");
+      handleSelectVmTemplate(id);
+    } else if (kind === "tpl") {
+      setResourceType("lxc");
+      set("template_id", "");
+      set("ostemplate", "");
+      handleSelectSysTemplate(id);
+    } else if (kind === "img") {
+      setResourceType("lxc");
+      setSelectedTplId("");
+      set("template_id", "");
+      set("ostemplate", id);
+    }
   }
 
   const animCls = closing ? styles.animSlideOutRight : (className ?? "");
@@ -645,151 +778,84 @@ export default function RequestFormPage({ onBack, className }) {
               </div>
             )}
 
-            {/* ── 資源類型 ── */}
+            {/* ── 資源設定（型別由作業系統選擇 + 規則引擎自動決定，學生免選 QEMU/LXC） ── */}
             <div className={styles.formSection}>
-              <h2 className={styles.sectionTitle}>類型</h2>
-              <div className={styles.typeToggle}>
-                {[
-                  { key: "lxc", label: "LXC 容器",      icon: "dashboard" },
-                  { key: "vm",  label: "虛擬機", icon: "computer"  },
-                ].map((t) => (
-                  <button
-                    key={t.key}
-                    type="button"
-                    className={`${styles.typeBtn} ${resourceType === t.key ? styles.typeBtnActive : ""}`}
-                    onClick={() => setResourceType(t.key)}
-                  >
-                    <MIcon name={t.icon} size={16} />
-                    {t.label}
-                  </button>
-                ))}
-              </div>
-            </div>
+              <h2 className={styles.sectionTitle}>資源設定</h2>
 
-            {/* ── LXC 設定 ── */}
-            {resourceType === "lxc" && (
-              <div className={styles.formSection}>
-                <h2 className={styles.sectionTitle}>容器設定</h2>
+              <p className={styles.adviceBox}>
+                需要 GPU、圖形介面（GUI）或 Windows 時，請選擇「虛擬機範本」的作業系統；
+                一般輕量服務（網站、資料庫、開發環境）選容器範本或映像檔即可。
+              </p>
+              {!advisorDisabled && (adviceLoading || advice) && (
+                <p className={styles.adviceBox}>
+                  {adviceLoading
+                    ? "正在依申請內容判斷合適的類型…"
+                    : (() => {
+                        const label = (t) => (t === "vm" ? "虛擬機" : "LXC 容器");
+                        const text = `系統建議使用「${label(advice.resource_type)}」：${advice.reasons.join("；")}`;
+                        return osChosen && advice.resource_type !== resourceType
+                          ? `${text}（您選擇的作業系統屬於「${label(resourceType)}」，將依作業系統建立）`
+                          : text;
+                      })()}
+                </p>
+              )}
 
-                <FieldGroup label="容器名稱" required error={errors.hostname}>
-                  <input
-                    className={styles.input}
-                    placeholder="project-alpha-web"
-                    value={form.hostname}
-                    onChange={(e) => set("hostname", e.target.value)}
-                    onBlur={(e) => set("hostname", normalizeHostname(e.target.value))}
-                  />
-                </FieldGroup>
+              <FieldGroup label="資源名稱" required error={errors.hostname}>
+                <input
+                  className={styles.input}
+                  placeholder="project-alpha-web"
+                  value={form.hostname}
+                  onChange={(e) => set("hostname", e.target.value)}
+                  onBlur={(e) => set("hostname", normalizeHostname(e.target.value))}
+                />
+              </FieldGroup>
 
-                <FieldGroup label="範本（選填）"
-                  hint={selectedTpl
-                    ? "將從範本克隆建立，免選映像檔；登入帳密沿用範本內建設定"
-                    : "從範本系統選擇可用範本，或留空改用作業系統映像檔建立"}>
-                  {selectedTpl ? (
-                    <div className={styles.templateSelected}>
-                      <MIcon name="layers" size={16} />
-                      <div className={styles.templateSelectedMeta}>
-                        <span className={styles.templateSelectedName}>{selectedTpl.name}</span>
-                        <span className={styles.templateSelectedSlug}>
-                          v{selectedTpl.version}
-                          {selectedTpl.description ? ` · ${selectedTpl.description}` : ""}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        className={styles.templateClearBtn}
-                        onClick={() => setSelectedTplId("")}
-                        title="清除"
-                      >
-                        <MIcon name="close" size={16} />
-                      </button>
-                    </div>
-                  ) : (
-                    <SelectField
-                      value={selectedTplId}
-                      onChange={handleSelectSysTemplate}
-                      disabled={sysTplLoading}
-                    >
-                      <option value="">
-                        {sysTplLoading ? "載入中…" : "不使用範本（從映像檔建立）"}
-                      </option>
-                      {lxcSysTemplates.map((t) => (
-                        <option key={t.id} value={t.id}>
-                          {t.name}（v{t.version}）
+              <FieldGroup label="作業系統" required
+                error={errors.template_id || errors.ostemplate}
+                hint={osChosen
+                  ? `將建立為「${resourceType === "vm" ? "虛擬機" : "LXC 容器"}」`
+                  : "虛擬機與容器的作業系統一起列出，選擇後由系統自動決定建立方式"}>
+                <SelectField
+                  value={autoOsChoice}
+                  onChange={handleAutoOsSelect}
+                  disabled={vmLoading || lxcLoading || sysTplLoading}
+                  placeholder={(vmLoading || lxcLoading || sysTplLoading) ? "載入中…" : "選擇作業系統"}
+                >
+                  {vmTemplates.length > 0 && (
+                    <optgroup label="虛擬機範本">
+                      {vmTemplates.map((t) => (
+                        <option key={`vm-${t.vmid}`} value={`vm:${t.vmid}`}>
+                          {withGpuTag(stripGpuMarker(t.name), osNameNeedsGpu(t.name))}
                         </option>
                       ))}
-                      {!sysTplLoading && lxcSysTemplates.length === 0 && (
-                        <option value="__empty__" disabled>目前沒有可用的 LXC 範本</option>
-                      )}
-                    </SelectField>
+                    </optgroup>
                   )}
-                </FieldGroup>
-
-                {!selectedTpl && (
-                  <FieldGroup label="作業系統映像檔" required error={errors.ostemplate}
-                    hint="請從已上傳到節點的映像檔中選擇">
-                    <SelectField
-                      value={form.ostemplate}
-                      onChange={(v) => set("ostemplate", v)}
-                      disabled={lxcLoading}
-                      placeholder={lxcLoading ? "載入中…" : "選擇映像檔"}
-                    >
-                      {lxcTemplates.map((t) => (
-                        <option key={t.volid} value={t.volid}>{formatOstemplate(t.volid)}</option>
+                  {lxcSysTemplates.length > 0 && (
+                    <optgroup label="容器範本（克隆建立）">
+                      {lxcSysTemplates.map((t) => (
+                        <option key={`tpl-${t.id}`} value={`tpl:${t.id}`}>
+                          {withGpuTag(`${stripGpuMarker(t.name)}（v${t.version}）`, osNameNeedsGpu(t.name))}
+                        </option>
                       ))}
-                      {!lxcLoading && lxcTemplates.length === 0 && (
-                        <option value="" disabled>目前沒有可用映像檔</option>
-                      )}
-                    </SelectField>
-                  </FieldGroup>
-                )}
+                    </optgroup>
+                  )}
+                  {lxcTemplates.length > 0 && (
+                    <optgroup label="容器映像檔">
+                      {lxcTemplates.map((t) => {
+                        const img = parseLxcImage(t.volid);
+                        return (
+                          <option key={`img-${t.volid}`} value={`img:${t.volid}`}>
+                            {withGpuTag(img.label, img.needsGpu)}
+                          </option>
+                        );
+                      })}
+                    </optgroup>
+                  )}
+                </SelectField>
+              </FieldGroup>
 
-                <FieldGroup label="Root 密碼" required error={errors.password}
-                  hint={selectedTpl
-                    ? "克隆建立的容器沿用範本內建帳密，此密碼僅作平台紀錄"
-                    : "LXC 容器登入帳號固定為 root，僅需設定密碼"}>
-                  <input
-                    className={styles.input}
-                    type="password"
-                    placeholder="至少 8 個字元"
-                    value={form.password}
-                    onChange={(e) => set("password", e.target.value)}
-                  />
-                </FieldGroup>
-              </div>
-            )}
-
-            {/* ── VM 設定 ── */}
-            {resourceType === "vm" && (
-              <div className={styles.formSection}>
-                <h2 className={styles.sectionTitle}>虛擬機設定</h2>
-
-                <FieldGroup label="虛擬機名稱" required error={errors.hostname}>
-                  <input
-                    className={styles.input}
-                    placeholder="web-server-01"
-                    value={form.hostname}
-                    onChange={(e) => set("hostname", e.target.value)}
-                    onBlur={(e) => set("hostname", normalizeHostname(e.target.value))}
-                  />
-                </FieldGroup>
-
-                <FieldGroup label="作業系統" required error={errors.template_id}>
-                  <SelectField
-                    value={form.template_id}
-                    onChange={handleSelectVmTemplate}
-                    disabled={vmLoading}
-                    placeholder={vmLoading ? "載入中…" : "選擇作業系統"}
-                  >
-                    {vmTemplates.map((t) => (
-                      <option key={t.vmid} value={t.vmid}>{t.name}</option>
-                    ))}
-                    {!vmLoading && vmTemplates.length === 0 && (
-                      <option value="" disabled>目前沒有可用範本</option>
-                    )}
-                  </SelectField>
-                </FieldGroup>
-
+              {/* 帳密欄位：選定作業系統（型別確定）後才顯示 */}
+              {osChosen && resourceType === "vm" && (
                 <div className={styles.formGrid}>
                   {!isWindowsVm && (
                     <FieldGroup label="使用者名稱" required error={errors.username}>
@@ -801,7 +867,6 @@ export default function RequestFormPage({ onBack, className }) {
                       />
                     </FieldGroup>
                   )}
-
                   <FieldGroup
                     label="密碼"
                     required
@@ -819,8 +884,22 @@ export default function RequestFormPage({ onBack, className }) {
                     />
                   </FieldGroup>
                 </div>
-              </div>
-            )}
+              )}
+              {osChosen && resourceType === "lxc" && (
+                <FieldGroup label="密碼" required error={errors.password}
+                  hint={selectedTpl
+                    ? "克隆建立的容器沿用範本內建帳密，此密碼僅作平台紀錄"
+                    : "LXC 容器登入帳號固定為 root，僅需設定密碼"}>
+                  <input
+                    className={styles.input}
+                    type="password"
+                    placeholder="至少 8 個字元"
+                    value={form.password}
+                    onChange={(e) => set("password", e.target.value)}
+                  />
+                </FieldGroup>
+              )}
+            </div>
 
             {/* ── 硬體資源配置 ── */}
             <div className={styles.formSection}>
@@ -886,33 +965,38 @@ export default function RequestFormPage({ onBack, className }) {
               })()}
             </div>
 
-            {/* ── GPU（VM only）── */}
-            {resourceType === "vm" && (
+            {/* ── GPU（僅所選作業系統標記 -GPU 時顯示）── */}
+            {resourceType === "vm" && selectedOsNeedsGpu && (
               <div className={styles.formSection}>
-                <h2 className={styles.sectionTitle}>GPU 加速（選填）</h2>
+                <h2 className={styles.sectionTitle}>GPU 加速</h2>
 
                 {!canLoadGpu && mode === "scheduled" && (
                   <p className={styles.fieldHint}>請先選擇租借時段，再載入該時段可用的 GPU。</p>
                 )}
                 {!gpuLoading && gpuOptions.length === 0 && (
-                  <p className={styles.fieldHint}>此時段目前沒有可用 GPU，可改選其他時段或不使用 GPU。</p>
+                  <p className={styles.fieldHint}>此時段目前沒有可用 GPU，請改選其他時段或其他作業系統。</p>
                 )}
 
                 <FieldGroup
                   label="選擇 GPU"
+                  required
+                  error={errors.gpu_mapping_id}
                   hint="GPU 會依所選時段重新計算可用性，送出前仍會再做一次即時檢查"
                 >
                   <SelectField
                     value={form.gpu_mapping_id || "__none__"}
-                    onChange={(v) => setForm((prev) => ({
-                      ...prev,
-                      gpu_mapping_id: v === "__none__" ? "" : v,
-                      gpu_mdev_profile: "",
-                    }))}
+                    onChange={(v) => {
+                      setForm((prev) => ({
+                        ...prev,
+                        gpu_mapping_id: v === "__none__" ? "" : v,
+                        gpu_mdev_profile: "",
+                      }));
+                      if (errors.gpu_mapping_id) setErrors((prev) => ({ ...prev, gpu_mapping_id: "" }));
+                    }}
                     disabled={gpuLoading || gpuOptions.length === 0}
                     placeholder={!canLoadGpu ? "請先選擇時段" : undefined}
                   >
-                    <option value="__none__">不需要 GPU</option>
+                    <option value="__none__">請選擇 GPU</option>
                     {gpuOptions.map((gpu) => (
                       <option key={gpu.mapping_id} value={gpu.mapping_id} disabled={gpu.available_count <= 0}>
                         {gpuLabel(gpu)}
@@ -924,15 +1008,13 @@ export default function RequestFormPage({ onBack, className }) {
                 {selectedGpuProfiles.length > 0 && (
                   <FieldGroup
                     label="vGPU 規格"
-                    hint="依需要的 GPU 記憶體選擇；不選擇時系統會自動配最小可用規格"
+                    hint="依需要的 GPU 記憶體選擇；預設為最小可用規格"
                   >
                     <SelectField
-                      value={form.gpu_mdev_profile || "__none__"}
-                      onChange={(v) => set("gpu_mdev_profile", v === "__none__" ? "" : v)}
+                      value={form.gpu_mdev_profile || smallestCreatableProfile?.mdev_type || ""}
+                      onChange={(v) => set("gpu_mdev_profile", v)}
+                      placeholder={smallestCreatableProfile ? undefined : "無可建立的規格（記憶體不足）"}
                     >
-                      <option value="__none__">
-                        {`自動 — 最小可用規格${smallestCreatableProfile ? `（${formatVramMb(smallestCreatableProfile.vram_mb)}）` : ""}`}
-                      </option>
                       {selectedGpuProfiles.map((p) => (
                         <option key={p.mdev_type} value={p.mdev_type} disabled={!p.creatable}>
                           {`${p.name || p.mdev_type} — ${formatVramMb(p.vram_mb)}`}
