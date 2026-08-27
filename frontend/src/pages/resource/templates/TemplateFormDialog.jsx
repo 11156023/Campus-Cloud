@@ -76,7 +76,6 @@ export default function TemplateFormDialog({ template, onClose, onSaved }) {
   const [attachBusy, setAttachBusy] = useState(false);
   // 建立模式：暫存檔案，create 成功後補上傳
   const [pendingIcon, setPendingIcon] = useState(null);
-  const [pendingIconUrl, setPendingIconUrl] = useState(null);
   const [pendingAttachments, setPendingAttachments] = useState([]);
   const iconInputRef = useRef(null);
   const attachInputRef = useRef(null);
@@ -97,14 +96,6 @@ export default function TemplateFormDialog({ template, onClose, onSaved }) {
       cancelled = true;
     };
   }, [isEdit, isAdmin, template?.id]);
-
-  // 暫存 icon 的預覽 objectURL 隨值變動/卸載時釋放
-  useEffect(
-    () => () => {
-      if (pendingIconUrl) URL.revokeObjectURL(pendingIconUrl);
-    },
-    [pendingIconUrl],
-  );
 
   // 來源機類型決定可否設定 GPU（hostpci 僅 qemu 支援）
   const selectedResource = resources.find((r) => String(r.vmid) === sourceVmid);
@@ -150,9 +141,7 @@ export default function TemplateFormDialog({ template, onClose, onSaved }) {
       return;
     }
     if (!isEdit) {
-      if (pendingIconUrl) URL.revokeObjectURL(pendingIconUrl);
       setPendingIcon(file);
-      setPendingIconUrl(URL.createObjectURL(file));
       if (iconInputRef.current) iconInputRef.current.value = "";
       return;
     }
@@ -172,9 +161,7 @@ export default function TemplateFormDialog({ template, onClose, onSaved }) {
 
   const handleIconRemove = async () => {
     if (!isEdit) {
-      if (pendingIconUrl) URL.revokeObjectURL(pendingIconUrl);
       setPendingIcon(null);
-      setPendingIconUrl(null);
       return;
     }
     setIconBusy(true);
@@ -306,7 +293,8 @@ export default function TemplateFormDialog({ template, onClose, onSaved }) {
     }
   };
 
-  const shownIconUrl = safeTemplateIconUrl(isEdit ? iconUrl : pendingIconUrl);
+  const shownIconUrl = isEdit ? safeTemplateIconUrl(iconUrl) : null;
+  const hasIcon = isEdit ? Boolean(shownIconUrl) : Boolean(pendingIcon);
   const shownAttachments = isEdit
     ? attachments
     : pendingAttachments.map((file, idx) => ({
@@ -503,6 +491,13 @@ export default function TemplateFormDialog({ template, onClose, onSaved }) {
           <div className={styles.iconUploadRow}>
             {shownIconUrl ? (
               <img className={styles.iconThumb} src={shownIconUrl} alt="範本 icon" />
+            ) : pendingIcon ? (
+              <>
+                <span className={styles.iconThumb}>
+                  <MIcon name="image" size={20} />
+                </span>
+                <span className={styles.fieldHint}>{pendingIcon.name}</span>
+              </>
             ) : (
               <span className={styles.iconThumb} />
             )}
@@ -520,9 +515,9 @@ export default function TemplateFormDialog({ template, onClose, onSaved }) {
               onClick={() => iconInputRef.current?.click()}
             >
               <MIcon name="upload" size={14} />
-              {iconBusy ? "處理中…" : shownIconUrl ? "更換圖片" : "上傳圖片"}
+              {iconBusy ? "處理中…" : hasIcon ? "更換圖片" : "上傳圖片"}
             </button>
-            {shownIconUrl && (
+            {hasIcon && (
               <button
                 type="button"
                 className={styles.btnSecondary}

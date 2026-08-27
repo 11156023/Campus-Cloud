@@ -10,12 +10,9 @@ import {
 /** 範本 icon URL 白名單：僅接受本服務的 icon 端點或本地 blob 預覽。
  * icon_url 來自 API 資料，直接進 <img src> 前先驗證格式（防 XSS）。 */
 const ICON_URL_RE = /^\/api\/v1\/templates\/[0-9a-fA-F-]{36}\/icon(\?v=\d+)?$/;
-// createObjectURL 產生的本地預覽：blob:<origin>/<uuid>
-const BLOB_URL_RE = /^blob:https?:\/\/[^\s/]+\/[0-9a-fA-F-]{36}$/;
 
 export function safeTemplateIconUrl(url) {
   if (typeof url !== "string") return null;
-  if (BLOB_URL_RE.test(url)) return url;
   return ICON_URL_RE.test(url) ? url : null;
 }
 
