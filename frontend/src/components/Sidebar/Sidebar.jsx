@@ -270,11 +270,6 @@ export default function Sidebar({ collapsed, mobileOpen, onToggle, onClose }) {
   const { user, logout } = useAuth();
   const isAdmin = Boolean(user?.is_superuser || user?.role === "admin");
   const canTeach = isAdmin || user?.role === "teacher";
-  const visibleTopItems = isAdmin
-    ? [{ key: "dashboard", label: "管理首頁", icon: "dashboard" }]
-    : user?.role === "teacher"
-      ? [{ key: "dashboard", label: "教師首頁", icon: "dashboard" }]
-      : topItems;
   const visibleNavGroups = navGroups
     .map((group) => ({
       ...group,
@@ -315,7 +310,7 @@ export default function Sidebar({ collapsed, mobileOpen, onToggle, onClose }) {
 
       {/* ===== Main nav ===== */}
       <nav className={styles.nav}>
-        {visibleTopItems.map((item) => (
+        {topItems.map((item) => (
           <button
             key={item.key}
             type="button"
