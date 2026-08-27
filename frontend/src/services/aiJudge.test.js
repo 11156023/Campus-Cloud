@@ -25,6 +25,70 @@ beforeEach(() => {
 });
 
 describe("AiJudgeService persistent sessions", () => {
+  test("blank 建立請求會帶上評分表名稱與多選環境", async () => {
+    await AiJudgeService.createSession("class-1", {
+      title: "期中環境檢查",
+      creationMode: "blank",
+      rubricName: "期中評分表",
+      environmentKeys: ["python", "linux"],
+      selectedFileId: null,
+    });
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toContain("/api/v1/teaching-classes/class-1/judge/sessions/");
+    expect(JSON.parse(init.body)).toEqual({
+      title: "期中環境檢查",
+      selected_file_id: null,
+      creation_mode: "blank",
+      rubric_name: "期中評分表",
+      environment_keys: ["python", "linux"],
+    });
+  });
+
+  test("existing 建立請求只綁定已保存的評分表", async () => {
+    await AiJudgeService.createSession("class-1", {
+      title: "既有文件檢查",
+      creationMode: "existing",
+      selectedFileId: "file-1",
+    });
+
+    const [, init] = fetchMock.mock.calls[0];
+    expect(JSON.parse(init.body)).toEqual({
+      title: "既有文件檢查",
+      selected_file_id: "file-1",
+      creation_mode: "existing",
+    });
+  });
+
+  test("釘選使用 server-owned is_pinned 欄位", async () => {
+    await AiJudgeService.updateSession("class-1", "check-1", { is_pinned: true });
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toContain("/judge/sessions/check-1");
+    expect(init.method).toBe("PATCH");
+    expect(JSON.parse(init.body)).toEqual({ is_pinned: true });
+  });
+
+  test("複製檢查使用 class-scoped fork endpoint，不傳 rubric snapshot", async () => {
+    await AiJudgeService.forkSession("class-1", "check-1");
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toContain(
+      "/api/v1/teaching-classes/class-1/judge/sessions/check-1/fork",
+    );
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body)).toEqual({});
+  });
+
+  test("評分表保存請求會帶 optimistic revision", async () => {
+    const analysis = { items: [], total_items: 0 };
+    await AiJudgeService.updateFileAnalysis("class-1", "file-1", analysis, 7);
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toContain("/judge/files/file-1/analysis");
+    expect(JSON.parse(init.body)).toEqual({ analysis, expected_revision: 7 });
+  });
+
   test("只送出一則新訊息，不回傳 client history", async () => {
     await AiJudgeService.sendSessionMessage("class-1", "session-1", "檢查 nginx");
 
@@ -34,6 +98,16 @@ describe("AiJudgeService persistent sessions", () => {
     );
     expect(init.method).toBe("POST");
     expect(JSON.parse(init.body)).toEqual({ content: "檢查 nginx" });
+  });
+
+  test("AI 提案請求可攜帶目前評分表 revision", async () => {
+    await AiJudgeService.sendSessionMessage("class-1", "check-1", "補充檢查步驟", 4);
+
+    const [, init] = fetchMock.mock.calls[0];
+    expect(JSON.parse(init.body)).toEqual({
+      content: "補充檢查步驟",
+      analysis_revision: 4,
+    });
   });
 
   test("session script endpoint 不接受 client rubric snapshot", async () => {

@@ -134,7 +134,12 @@ async function readResponseMessage(res) {
   let message = `HTTP ${res.status}`;
   try {
     const body = await res.json();
-    message = body?.detail ?? body?.message ?? message;
+    const rawMessage = body?.detail ?? body?.message;
+    if (typeof rawMessage === "string") {
+      message = rawMessage;
+    } else if (rawMessage && typeof rawMessage.message === "string") {
+      message = rawMessage.message;
+    }
   } catch {
     // 若 body 不是 JSON 就用預設訊息
   }

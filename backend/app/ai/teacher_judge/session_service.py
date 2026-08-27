@@ -10,6 +10,11 @@ from datetime import datetime, timezone
 from fastapi import HTTPException
 from sqlmodel import Session, desc, func, select
 
+from app.ai.teacher_judge.file_service import (
+    _stored_path,
+    _unlink_if_exists,
+    clone_file_asset,
+)
 from app.ai.teacher_judge.schemas import (
     TeacherJudgeRubricChatMessage,
     TeacherJudgeSessionMessagePublic,
@@ -55,14 +60,14 @@ def redact_message_content(value: str) -> str:
 
 def require_selected_file(db: Session, item: TeacherJudgeSession) -> TeacherJudgeFile:
     if not item.selected_file_id:
-        raise HTTPException(status_code=409, detail="Session 尚未選擇評分表。")
+        raise HTTPException(status_code=409, detail="這項檢查尚未選擇評分表。")
     file = db.get(TeacherJudgeFile, item.selected_file_id)
     if (
         not file
         or file.teaching_class_id != item.teaching_class_id
         or file.status != TeacherJudgeFileStatus.active
     ):
-        raise HTTPException(status_code=409, detail="Session 選定的評分表已無法使用。")
+        raise HTTPException(status_code=409, detail="這項檢查選定的評分表已無法使用。")
     return file
 
 
@@ -80,7 +85,7 @@ def get_session(
 ) -> TeacherJudgeSession:
     item = db.get(TeacherJudgeSession, session_id)
     if not item or item.teaching_class_id != class_id:
-        raise HTTPException(status_code=404, detail="Teacher Judge session not found")
+        raise HTTPException(status_code=404, detail="找不到這項檢查。")
     return item
 
 
@@ -126,7 +131,7 @@ def delete_session_data(db: Session, item: TeacherJudgeSession) -> None:
 
 def ensure_active(item: TeacherJudgeSession) -> None:
     if item.status == TeacherJudgeSessionStatus.archived:
-        raise HTTPException(status_code=409, detail="已封存的 session 為唯讀。")
+        raise HTTPException(status_code=409, detail="已封存的檢查為唯讀。")
 
 
 def validate_selected_file(
@@ -142,7 +147,7 @@ def validate_selected_file(
     ):
         raise HTTPException(
             status_code=400,
-            detail="Selected rubric file does not belong to this teaching class",
+            detail="選擇的評分表來源不屬於這個班級。",
         )
 
 
@@ -174,7 +179,13 @@ def session_public(db: Session, item: TeacherJudgeSession) -> TeacherJudgeSessio
         title=item.title,
         status=item.status.value,
         selected_file_id=str(item.selected_file_id) if item.selected_file_id else None,
-        selected_file_name=file.original_filename if file else None,
+        selected_file_name=(file.display_name or file.original_filename) if file else None,
+        selected_file_item_count=(
+            len(file.analysis_json.get("items", []))
+            if file and isinstance(file.analysis_json, dict)
+            and isinstance(file.analysis_json.get("items"), list)
+            else None
+        ),
         template_key=file.template_key if file else None,
         summary=item.summary,
         message_count=message_count,
@@ -184,7 +195,70 @@ def session_public(db: Session, item: TeacherJudgeSession) -> TeacherJudgeSessio
         created_at=item.created_at.isoformat(),
         updated_at=item.updated_at.isoformat(),
         last_activity_at=item.last_activity_at.isoformat(),
+        pinned_at=item.pinned_at.isoformat() if item.pinned_at else None,
     )
+
+
+def _fork_title(db: Session, class_id: uuid.UUID, title: str) -> str:
+    base = f"{title}（副本）"
+    existing = {
+        row.title
+        for row in db.exec(
+            select(TeacherJudgeSession).where(
+                TeacherJudgeSession.teaching_class_id == class_id
+            )
+        )
+    }
+    if base not in existing:
+        return base
+    for index in range(2, 1000):
+        candidate = f"{title}（副本 {index}）"
+        if candidate not in existing:
+            return candidate
+    raise HTTPException(status_code=409, detail="無法建立檢查副本，請先重新命名原檢查。")
+
+
+def fork_session_data(
+    db: Session,
+    source: TeacherJudgeSession,
+    *,
+    title: str | None,
+    created_by: uuid.UUID | None,
+) -> TeacherJudgeSession:
+    """Clone editable settings only; history and execution evidence stay behind."""
+    cloned_file: TeacherJudgeFile | None = None
+    try:
+        if source.selected_file_id:
+            source_file = db.get(TeacherJudgeFile, source.selected_file_id)
+            if (
+                source_file is None
+                or source_file.teaching_class_id != source.teaching_class_id
+                or source_file.status != TeacherJudgeFileStatus.active
+            ):
+                raise HTTPException(status_code=409, detail="原檢查的評分表已無法複製。")
+            cloned_file = clone_file_asset(
+                session=db,
+                source=source_file,
+                teaching_class_id=source.teaching_class_id,
+                created_by=created_by,
+            )
+        clone = TeacherJudgeSession(
+            teaching_class_id=source.teaching_class_id,
+            title=(title.strip() if title else _fork_title(db, source.teaching_class_id, source.title)),
+            status=TeacherJudgeSessionStatus.active,
+            selected_file_id=cloned_file.id if cloned_file else None,
+            summary="",
+            created_by=created_by,
+        )
+        db.add(clone)
+        db.commit()
+        db.refresh(clone)
+        return clone
+    except Exception:
+        db.rollback()
+        if cloned_file and cloned_file.original_filename:
+            _unlink_if_exists(_stored_path(cloned_file.id, cloned_file.original_filename))
+        raise
 
 
 def message_public(

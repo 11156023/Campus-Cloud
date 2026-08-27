@@ -38,8 +38,8 @@ class TeacherJudgeFile(SQLModel, table=True):
             "teaching_class_id",
             "original_filename",
             unique=True,
-            postgresql_where=sa.text("status = 'active'"),
-            sqlite_where=sa.text("status = 'active'"),
+            postgresql_where=sa.text("status = 'active' AND original_filename IS NOT NULL"),
+            sqlite_where=sa.text("status = 'active' AND original_filename IS NOT NULL"),
         ),
     )
 
@@ -61,9 +61,16 @@ class TeacherJudgeFile(SQLModel, table=True):
             index=True,
         ),
     )
-    original_filename: str = Field(max_length=255)
-    file_hash: str = Field(max_length=64, index=True)
+    original_filename: str | None = Field(default=None, max_length=255)
+    file_hash: str | None = Field(default=None, max_length=64, index=True)
     template_key: str = Field(max_length=50, index=True)
+    source_type: str = Field(default="uploaded", max_length=20, index=True)
+    display_name: str = Field(default="評分表", max_length=255)
+    environment_keys: list[str] = Field(
+        default_factory=list,
+        sa_column=Column(sa.JSON, nullable=False),
+    )
+    analysis_revision: int = Field(default=1, nullable=False)
     analysis_json: dict[str, Any] = Field(
         default_factory=dict,
         sa_column=Column(sa.JSON, nullable=False),

@@ -30,6 +30,8 @@ if [[ -f "$PID_FILE" ]]; then
 fi
 
 cd "$PROJECT_ROOT"
+# flashinfer JIT compile 需要 ninja 等工具，必須讓 venv/bin 在 PATH 中
+export PATH="$PROJECT_ROOT/.venv/bin:$PATH"
 nohup "$PYTHON_BIN" main.py single --env-file .env.interface "$@" >> "$MAIN_LOG" 2>&1 &
 PID="$!"
 echo "$PID" > "$PID_FILE"

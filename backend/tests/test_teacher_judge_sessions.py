@@ -8,8 +8,10 @@ import pytest
 from fastapi import HTTPException
 from sqlmodel import Session, SQLModel, create_engine, select
 
-from app.ai.teacher_judge import session_service
+from app.ai.teacher_judge import file_service, session_service
 from app.ai.teacher_judge.schemas import (
+    TeacherJudgeRubricAnalysis,
+    TeacherJudgeSessionCreateRequest,
     TeacherJudgeSessionMessageCreateRequest,
 )
 from app.api.routes import teacher_judge_sessions
@@ -65,6 +67,29 @@ def test_archived_session_is_read_only() -> None:
         session_service.ensure_active(item)
 
     assert exc_info.value.status_code == 409
+
+
+def test_session_creation_mode_contract_is_explicit() -> None:
+    with pytest.raises(ValueError):
+        TeacherJudgeSessionCreateRequest(
+            title="Blank without rubric",
+            creation_mode="blank",
+            environment_keys=["linux"],
+        )
+
+    with pytest.raises(ValueError):
+        TeacherJudgeSessionCreateRequest(
+            title="Existing without file",
+            creation_mode="existing",
+        )
+
+    with pytest.raises(ValueError):
+        TeacherJudgeSessionCreateRequest(
+            title="Existing with blank fields",
+            creation_mode="existing",
+            selected_file_id=uuid.uuid4(),
+            rubric_name="should not be sent",
+        )
 
 
 def test_chat_can_start_without_selected_file() -> None:
@@ -124,6 +149,75 @@ def test_delete_session_data_removes_owned_records_but_keeps_shared_file() -> No
     assert db.get(TeacherJudgeFile, rubric_file.id) is not None
 
 
+def test_fork_created_session_clones_rubric_without_history() -> None:
+    db = _session()
+    class_id = uuid.uuid4()
+    owner_id = uuid.uuid4()
+    rubric_file = file_service.create_blank_file(
+        session=db,
+        teaching_class_id=class_id,
+        created_by=owner_id,
+        display_name="原始評分表",
+        environment_keys=["python"],
+    )
+    db.commit()
+    source = TeacherJudgeSession(
+        teaching_class_id=class_id,
+        title="原始檢查",
+        selected_file_id=rubric_file.id,
+        summary="不要複製這段摘要",
+        status=TeacherJudgeSessionStatus.archived,
+    )
+    db.add(source)
+    db.commit()
+    db.refresh(source)
+    db.add(
+        TeacherJudgeSessionMessage(
+            session_id=source.id,
+            role=TeacherJudgeMessageRole.user,
+            content="歷史對話",
+        )
+    )
+    db.commit()
+
+    clone = session_service.fork_session_data(
+        db,
+        source,
+        title=None,
+        created_by=uuid.uuid4(),
+    )
+
+    assert clone.id != source.id
+    assert clone.title == "原始檢查（副本）"
+    assert clone.status == TeacherJudgeSessionStatus.active
+    assert clone.summary == ""
+    assert clone.selected_file_id != source.selected_file_id
+    cloned_file = db.get(TeacherJudgeFile, clone.selected_file_id)
+    source_file = db.get(TeacherJudgeFile, source.selected_file_id)
+    assert cloned_file is not None and source_file is not None
+    assert cloned_file.id != source_file.id
+    assert cloned_file.source_type == "created"
+    assert cloned_file.analysis_json == source_file.analysis_json
+    assert session_service.session_public(db, clone).message_count == 0
+    assert session_service.session_public(db, clone).script_count == 0
+    assert session_service.session_public(db, clone).run_count == 0
+
+    file_service.update_file_analysis(
+        session=db,
+        teaching_class_id=class_id,
+        file_id=cloned_file.id,
+        analysis=TeacherJudgeRubricAnalysis(
+            items=[],
+            total_items=0,
+            summary="只改副本",
+        ),
+        expected_revision=1,
+    )
+    source_file_after = db.get(TeacherJudgeFile, source_file.id)
+    assert source_file_after is not None
+    assert source_file_after.analysis_json["summary"] == ""
+
+
 @pytest.mark.asyncio
 async def test_message_without_rubric_is_saved_and_uses_general_chat(
     monkeypatch: pytest.MonkeyPatch,
@@ -159,6 +253,45 @@ async def test_message_without_rubric_is_saved_and_uses_general_chat(
     assert result.assistant_message.content == "可以，先描述目標環境。"
     assert result.rubric_proposal is None
     assert len(db.exec(select(TeacherJudgeSessionMessage)).all()) == 2
+
+
+@pytest.mark.asyncio
+async def test_message_rejects_stale_rubric_revision_before_ai_call(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    db = _session()
+    class_id = uuid.uuid4()
+    rubric_file = _file(db, class_id)
+    item = TeacherJudgeSession(
+        teaching_class_id=class_id,
+        title="Revision guard",
+        selected_file_id=rubric_file.id,
+    )
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    monkeypatch.setattr(teacher_judge_sessions, "_access", lambda *args: None)
+
+    async def should_not_call_ai(*args, **kwargs):
+        raise AssertionError("stale requests must fail before AI call")
+
+    monkeypatch.setattr(teacher_judge_sessions, "chat_with_rubric", should_not_call_ai)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await teacher_judge_sessions.create_message(
+            class_id,
+            item.id,
+            TeacherJudgeSessionMessageCreateRequest(
+                content="請更新評分表",
+                analysis_revision=99,
+            ),
+            db,
+            SimpleNamespace(id=uuid.uuid4()),
+        )
+
+    assert exc_info.value.status_code == 409
+    assert exc_info.value.detail["code"] == "teacher_judge_analysis_revision_conflict"
+    assert db.exec(select(TeacherJudgeSessionMessage)).all() == []
 
 
 def test_message_content_redacts_common_secrets() -> None:
