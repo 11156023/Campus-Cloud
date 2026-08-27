@@ -5,9 +5,7 @@
   @include flex-column;
   gap: $spacing-16;
   width: 100%;
-  max-width: 1100px;
   padding: $spacing-8 $spacing-16 $spacing-32;
-  margin-inline: auto;
 
   @include respond-to(md) { padding: 0 0 $spacing-32; }
 }

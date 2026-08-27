@@ -254,7 +254,7 @@
 @media (max-width: 720px) { .pageHeader, .workspaceHeader, .cardHeader, .toolbar, .integrationStrip, .confirmBar { align-items: flex-start; flex-direction: column; } .formGrid, .studentTools, .weekDetail, .weekBuilder { grid-template-columns: 1fr; } .csvArea { padding-top: 16px; padding-left: 0; border-top: 1px solid var(--color-border); border-left: 0; } .compactSelect { width: 100%; min-width: 0; } .ruleGrid { grid-template-columns: 1fr; } .integrationStrip .btnSecondary { align-self: stretch; } }
 
 /* Product-design pass: calm, task-led teacher workspace. */
-.page { width: 100%; max-width: 1440px; margin: 0 auto; gap: 20px; }
+.page { width: 100%; gap: 20px; }
 .pageHeader { min-height: 76px; padding-bottom: 16px; border-bottom: 1px solid var(--color-border); }
 .pageHeading { gap: 7px; }
 .pageTitle { font-size: clamp(25px, 2.2vw, 32px); font-weight: 650; letter-spacing: -.025em; }
