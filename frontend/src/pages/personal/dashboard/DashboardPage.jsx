@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../../contexts/AuthContext";
 import { useDragScroll } from "../../../hooks/useDragScroll";
-import { TemplatesService, safeTemplateIconUrl } from "../../../services/templates";
+import { QuickPracticeService } from "../../../services/quickPractice";
+import { safeTemplateIconUrl } from "../../../services/templates";
 import MIcon from "../../../components/MIcon";
 import LoadingState from "../../../components/LoadingState/LoadingState";
 import styles from "./DashboardPage.module.scss";
@@ -144,17 +145,13 @@ export default function DashboardPage() {
     el?.scrollBy({ left: dir * el.clientWidth * 0.8, behavior: "smooth" });
   };
 
-  /* 快速入門：撈範本系統中可用（ready）的範本；LXC 走秒開流程，VM 導向範本克隆 */
+  /* 快速入門：已發布且允許快速練習的多機環境 */
   const [templates, setTemplates] = useState([]);
   const [tplLoading, setTplLoading] = useState(true);
   useEffect(() => {
     const controller = new AbortController();
-    TemplatesService.list({ signal: controller.signal })
-      .then((res) => setTemplates(
-        (res?.data ?? []).filter(
-          (t) => t.status === "ready" && t.pve_exists !== false,
-        ),
-      ))
+    QuickPracticeService.listTemplates({ signal: controller.signal })
+      .then(setTemplates)
       .catch((err) => {
         if (!err?.cancelled) setTemplates([]);
       })
@@ -240,14 +237,14 @@ export default function DashboardPage() {
         <SectionHeader
           icon="bolt"
           title="快速入門"
-          desc="選擇範本一鍵克隆練習環境"
+          desc="選擇固定配置的多機環境，一次建立整組練習機器"
         />
 
         {tplLoading ? (
           <LoadingState text="載入範本中…" />
         ) : templates.length === 0 ? (
           <p className={styles.sectionEmpty}>
-            目前沒有可用的範本。範本由老師或管理員在「範本管理」建立後即會出現在這裡。
+            目前沒有可用的環境。老師或管理員在「多機環境模板」發布並開放快速練習後，就會顯示在這裡。
           </p>
         ) : (
           <div className={styles.templateGrid}>
@@ -255,18 +252,12 @@ export default function DashboardPage() {
               <TemplateCard
                 key={t.id}
                 name={t.name}
-                desc={t.description || "由範本克隆建立，數秒內完成佈建。"}
+                desc={t.description || `包含 ${t.nodes.length} 台固定配置機器，啟動後自動核准。`}
                 icon="layers"
                 logo={safeTemplateIconUrl(t.icon_url) || undefined}
                 accent={TEMPLATE_ACCENT}
-                categoryTitle={`${t.resource_type === "lxc" ? "LXC" : "VM"} · v${t.version}`}
-                onSelect={() =>
-                  navigate(
-                    t.resource_type === "lxc"
-                      ? `/quick-template/${t.id}`
-                      : `/templates?clone=${t.id}`,
-                  )
-                }
+                categoryTitle={`${t.nodes.length} 台 · v${t.version}`}
+                onSelect={() => navigate(`/quick-template/${t.id}`)}
               />
             ))}
           </div>

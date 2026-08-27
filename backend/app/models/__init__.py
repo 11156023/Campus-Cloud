@@ -59,6 +59,7 @@ from .proxmox_config import (
 from .proxmox_connection import ProxmoxConnection
 from .proxmox_node import ProxmoxNode
 from .proxmox_storage import ProxmoxStorage
+from .quick_practice import QuickPracticeSession, QuickPracticeSessionMachine
 from .quota_config import QuotaConfig
 from .resource import Resource
 from .resource_network import ResourceNetwork
@@ -186,6 +187,8 @@ __all__ = [
     "CourseEnvironmentVersionStatus",
     "CourseEnvironmentNode",
     "ClassCapacityReservation",
+    "QuickPracticeSession",
+    "QuickPracticeSessionMachine",
     # Reverse Proxy Rules
     "ReverseProxyRule",
     # Batch Provision

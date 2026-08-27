@@ -7,7 +7,7 @@ import TerminalDialog from "../resources/TerminalDialog";
 import VncDialog from "../resources/VncDialog";
 import { CoursesService } from "../../../services/courses";
 import { ResourcesService } from "../../../services/resources";
-import { TemplatesService } from "../../../services/templates";
+import { QuickPracticeService } from "../../../services/quickPractice";
 import styles from "./StudentHomeNewPage.module.scss";
 import dashboardStyles from "./DashboardPage.module.scss";
 
@@ -588,15 +588,8 @@ export default function StudentHomeNewPage({ courseView = false }) {
     if (courseView) return undefined;
     const controller = new AbortController();
     setTemplatesLoading(true);
-    TemplatesService.list({ signal: controller.signal })
-      .then((response) => {
-        const available = (response?.data ?? []).filter(
-          (template) => template.resource_type === "lxc"
-            && template.status === "ready"
-            && template.pve_exists !== false,
-        );
-        setQuickTemplates(available.slice(0, 3));
-      })
+    QuickPracticeService.listTemplates({ signal: controller.signal })
+      .then((available) => setQuickTemplates(available.slice(0, 3)))
       .catch((error) => {
         if (!error?.cancelled) setQuickTemplates([]);
       })
@@ -1118,7 +1111,7 @@ export default function StudentHomeNewPage({ courseView = false }) {
               <p className={styles.eyebrow}>免等待人工審核</p>
               <h2 id="quick-template-title">快速練習環境</h2>
             </div>
-            <span>選一個輕量容器，填名稱與密碼就能開始</span>
+            <span>選擇固定配置的多機環境，整組啟動並受練習時限管理</span>
           </div>
 
           {templatesLoading ? (
@@ -1144,7 +1137,7 @@ export default function StudentHomeNewPage({ courseView = false }) {
                   <div className={dashboardStyles.templateBody}>
                     <h4 className={dashboardStyles.templateName}>{template.name}</h4>
                     <p className={dashboardStyles.templateDesc}>
-                      {template.description || "由範本快速建立，適合臨時練習、指令測試與輕量開發。"}
+                      {template.description || `包含 ${template.nodes.length} 台機器，適合臨時練習與課後操作。`}
                     </p>
                   </div>
                   <div className={dashboardStyles.templateFooter}>
@@ -1161,7 +1154,7 @@ export default function StudentHomeNewPage({ courseView = false }) {
               <span><MIcon name="inventory_2" size={23} /></span>
               <div>
                 <strong>目前沒有可快速建立的模板</strong>
-                <p>老師或管理員發布輕量容器模板後，就會顯示在這裡。</p>
+                <p>老師發布可供快速練習的多機環境後，就會顯示在這裡。</p>
               </div>
             </div>
           )}
