@@ -15,6 +15,8 @@ describe("CreateCheckChooser", () => {
 
     expect(html).toContain("從零開始建立");
     expect(html).toContain("使用已有評分文件");
+    expect(html).toContain("重構");
+    expect(html).not.toContain("複製檢查");
     expect(html).toContain("返回目前檢查");
     expect(html).toContain("立即開啟空白評分表");
     expect(html).not.toContain('role="dialog"');

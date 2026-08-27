@@ -168,7 +168,7 @@ def test_selected_file_cannot_be_claimed_by_another_session() -> None:
 
     assert exc_info.value.status_code == 409
     assert exc_info.value.detail["code"] == "teacher_judge_file_in_use"
-    assert "複製檢查" in exc_info.value.detail["message"]
+    assert "重構" in exc_info.value.detail["message"]
 
 
 def test_create_session_rejects_a_source_owned_by_another_session(
@@ -200,7 +200,7 @@ def test_create_session_rejects_a_source_owned_by_another_session(
         )
 
     assert exc_info.value.status_code == 409
-    assert "複製檢查" in exc_info.value.detail["message"]
+    assert "重構" in exc_info.value.detail["message"]
     assert len(db.exec(select(TeacherJudgeSession)).all()) == 1
 
 

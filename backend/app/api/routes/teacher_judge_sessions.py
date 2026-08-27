@@ -80,7 +80,7 @@ def _selected_file_conflict() -> HTTPException:
         status_code=409,
         detail={
             "code": "teacher_judge_file_in_use",
-            "message": "這份評分表已被其他檢查使用；請使用「複製檢查」建立獨立副本，或上傳新的評分表。",
+            "message": "這份評分表已被其他檢查使用；請使用「重構」建立獨立副本，或上傳新的評分表。",
         },
     )
 

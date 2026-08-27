@@ -589,7 +589,7 @@ export default function AiJudgeRubricEditorPage() {
         </div>
       </header>
 
-      {readOnly && <div className={styles.readOnlyNotice}><MIcon name="lock" size={17} />這項檢查已封存，只能查看內容與複製成新檢查。</div>}
+      {readOnly && <div className={styles.readOnlyNotice}><MIcon name="lock" size={17} />這項檢查已封存，只能查看內容；需要修改請先「重構」成新檢查。</div>}
 
       <div className={styles.layout}>
         <section className={styles.mainColumn}>

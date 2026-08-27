@@ -92,7 +92,7 @@ describe("AiJudgeService persistent sessions", () => {
     expect(JSON.parse(init.body)).toEqual({ is_pinned: true });
   });
 
-  test("複製檢查使用 class-scoped fork endpoint，不傳 rubric snapshot", async () => {
+  test("重構使用 class-scoped fork endpoint，不傳 rubric snapshot", async () => {
     await AiJudgeService.forkSession("class-1", "check-1");
 
     const [url, init] = fetchMock.mock.calls[0];
