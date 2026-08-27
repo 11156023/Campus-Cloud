@@ -10,6 +10,7 @@ import useAutoRefresh from "../../../hooks/useAutoRefresh";
 import { ResourcesService } from "../../../services/resources";
 import TerminalDialog from "../../personal/resources/TerminalDialog";
 import VncDialog from "../../personal/resources/VncDialog";
+import { ENVIRONMENT_GROUP_PREVIEW } from "../../../mocks/environmentGroups";
 
 /* ── Constants ── */
 const STATUS_MAP = {
@@ -77,6 +78,82 @@ function StatusBadge({ status }) {
     <span className={`${styles.badge} ${styles[`badge_${s.color}`]}`}>
       {s.label}
     </span>
+  );
+}
+
+function EnvironmentMachineRow({ machine }) {
+  const type = TYPE_MAP[machine.type] ?? { label: machine.type, icon: "computer" };
+  return (
+    <tr className={`${styles.tr} ${styles.environmentMachineRow}`}>
+      <td className={`${styles.td} ${styles.checkCell}`} />
+      <td className={styles.td}>
+        <div className={`${styles.nameCell} ${styles.environmentMachineName}`}>
+          <span className={styles.machineBranch} aria-hidden="true">└</span>
+          <div className={styles.nameIcon}><MIcon name={type.icon} size={18} /></div>
+          <div>
+            <div className={styles.namePrimary}>{machine.name}</div>
+            <div className={styles.nameSub}>{machine.role} · {type.label}</div>
+          </div>
+        </div>
+      </td>
+      <td className={styles.td}>
+        <div className={styles.envPrimary}>{machine.os}</div>
+        <div className={styles.envSub}>介面預覽</div>
+      </td>
+      <td className={styles.td}><StatusBadge status={machine.status} /></td>
+      <td className={styles.td}><span className={styles.mono}>{machine.ip}</span></td>
+      <td className={styles.td}><span className={styles.noAction}>依環境統一管理</span></td>
+      <td className={styles.td}>{machine.node}</td>
+      <td className={styles.td}>
+        <button type="button" className={styles.consoleBtn} disabled title="接上真實機器 API 後開放">
+          <MIcon name={machine.type === "lxc" ? "terminal" : "desktop_windows"} size={14} />
+          {machine.type === "lxc" ? "終端機" : "控制台"}
+        </button>
+      </td>
+    </tr>
+  );
+}
+
+function EnvironmentGroupRows({ group }) {
+  const [expanded, setExpanded] = useState(true);
+  const running = group.machines.filter((machine) => machine.status === "running").length;
+  const allRunning = running === group.machines.length;
+  return (
+    <>
+      <tr className={`${styles.tr} ${styles.environmentGroupRow}`}>
+        <td className={`${styles.td} ${styles.checkCell}`} />
+        <td className={styles.td}>
+          <button
+            type="button"
+            className={styles.environmentToggle}
+            aria-expanded={expanded}
+            onClick={() => setExpanded((value) => !value)}
+          >
+            <MIcon name={expanded ? "expand_more" : "chevron_right"} size={20} />
+            <span className={styles.environmentIcon}><MIcon name={group.kind === "course" ? "school" : "bolt"} size={19} /></span>
+            <span><strong>{group.kindLabel}｜{group.title}</strong><small>{group.machines.length} 台機器 · 介面預覽</small></span>
+          </button>
+        </td>
+        <td className={styles.td}>
+          <div className={styles.envPrimary}>{group.kind === "course" ? "課程多機環境" : "快速練習環境"}</div>
+          <div className={styles.envSub}>整組建立與關機</div>
+        </td>
+        <td className={styles.td}>
+          <span className={`${styles.badge} ${styles[`badge_${allRunning ? "success" : "info"}`]}`}>{running}/{group.machines.length} 執行中</span>
+        </td>
+        <td className={styles.td}><span className={styles.noAction}>展開查看</span></td>
+        <td className={styles.td}><strong className={styles.environmentTiming}>{group.timingLabel}</strong></td>
+        <td className={styles.td}>{group.nodeLabel}</td>
+        <td className={styles.td}>
+          <button type="button" className={styles.consoleBtn} onClick={() => setExpanded((value) => !value)}>
+            <MIcon name="dns" size={14} />{expanded ? "收合機器" : "使用機器"}
+          </button>
+        </td>
+      </tr>
+      {expanded && group.machines.map((machine) => (
+        <EnvironmentMachineRow key={machine.id} machine={machine} />
+      ))}
+    </>
   );
 }
 
@@ -523,9 +600,13 @@ export default function ResourceMgmtPage() {
 
       {/* ── 內容 ── */}
       <div className={styles.content}>
+        <div className={styles.previewNotice} role="note">
+          <MIcon name="science" size={17} />
+          <span><strong>環境群組介面預覽</strong>目前先用假資料確認條列操作，真實機器控制尚未啟用。</span>
+        </div>
         {error ? (
           <ErrorState onRetry={fetchResources} />
-        ) : !loading && resources.length === 0 ? (
+        ) : !loading && resources.length === 0 && ENVIRONMENT_GROUP_PREVIEW.length === 0 ? (
           <EmptyState />
         ) : (
           <div className={styles.tableWrap}>
@@ -550,16 +631,19 @@ export default function ResourceMgmtPage() {
               <tbody>
                 {loading
                   ? [0, 1, 2, 3].map((i) => <SkeletonRow key={i} />)
-                  : resources.map((r, index) => (
-                      <ResourceRow
-                        key={resourceRowKey(r, index)}
-                        resource={r}
-                        onUpdated={handleUpdated}
-                        onDeleted={handleDeleted}
-                        selected={selectedVmids.has(r.vmid)}
-                        onToggleSelect={toggleSelect}
-                      />
-                    ))}
+                  : <>
+                      {ENVIRONMENT_GROUP_PREVIEW.map((group) => <EnvironmentGroupRows key={group.id} group={group} />)}
+                      {resources.map((r, index) => (
+                        <ResourceRow
+                          key={resourceRowKey(r, index)}
+                          resource={r}
+                          onUpdated={handleUpdated}
+                          onDeleted={handleDeleted}
+                          selected={selectedVmids.has(r.vmid)}
+                          onToggleSelect={toggleSelect}
+                        />
+                      ))}
+                    </>}
               </tbody>
             </table>
           </div>
