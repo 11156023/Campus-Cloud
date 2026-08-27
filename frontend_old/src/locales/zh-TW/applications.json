@@ -107,7 +107,7 @@
     "description": "從 community-scripts 下載腳本，以無人值守方式部署服務容器。",
     "scriptPath": "腳本路徑",
     "hostname": "主機名稱",
-    "password": "Root 密碼",
+    "password": "密碼",
     "passwordPlaceholder": "至少 5 個字元",
     "cores": "核心",
     "ram": "記憶體",
