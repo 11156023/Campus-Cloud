@@ -1,14 +1,14 @@
 """範本擴充：密碼/GPU 政策欄位、icon、附件表
 
 Revision ID: tplext01
-Revises: gpumdev01
+Revises: gpumdev02
 Create Date: 2026-08-26
 """
 import sqlalchemy as sa
 from alembic import op
 
 revision = "tplext01"
-down_revision = "gpumdev01"
+down_revision = "gpumdev02"
 branch_labels = None
 depends_on = None
 
