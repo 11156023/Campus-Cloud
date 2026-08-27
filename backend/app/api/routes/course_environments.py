@@ -86,6 +86,7 @@ class EnvironmentCreate(BaseModel):
     code: str = Field(min_length=1, max_length=80)
     name: str = Field(min_length=1, max_length=255)
     description: str | None = Field(default=None, max_length=2000)
+    usage_scope: Literal["course", "quick_practice", "both"] = "course"
     nodes: list[EnvironmentNodeIn] = Field(min_length=1, max_length=3)
     edges: list[EnvironmentEdgeIn] = Field(default_factory=list, max_length=6)
 
@@ -237,6 +238,7 @@ def _serialize_version(
         "code": environment.code,
         "name": environment.name,
         "description": environment.description,
+        "usage_scope": environment.usage_scope,
         "version": version.version,
         "status": version.status,
         "configuration_hash": version.configuration_hash,
@@ -293,7 +295,11 @@ def list_published_environments(
     session: SessionDep, current_user: InstructorUser
 ) -> list[dict[str, Any]]:
     result = []
-    query = select(CourseEnvironment).order_by(col(CourseEnvironment.updated_at).desc())
+    query = (
+        select(CourseEnvironment)
+        .where(CourseEnvironment.usage_scope.in_(["course", "both"]))
+        .order_by(col(CourseEnvironment.updated_at).desc())
+    )
     if not current_user.is_superuser and current_user.role != "admin":
         query = query.where(CourseEnvironment.owner_id == current_user.id)
     for environment in session.exec(query).all():
@@ -337,6 +343,7 @@ def create_environment(
         code=body.code.strip(),
         name=body.name.strip(),
         description=body.description,
+        usage_scope=body.usage_scope,
     )
     version = CourseEnvironmentVersion(environment_id=environment.id, version=1)
     session.add(environment)
@@ -367,6 +374,7 @@ def update_environment(
     environment.code = body.code.strip()
     environment.name = body.name.strip()
     environment.description = body.description
+    environment.usage_scope = body.usage_scope
     environment.updated_at = get_datetime_utc()
     _replace_nodes(session, version, body.nodes, body.edges)
     session.add(environment)

@@ -385,6 +385,37 @@
   p { margin: 0; }
 }
 
+.machineList {
+  display: flex;
+  flex-direction: column;
+  margin-top: 12px;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+}
+
+.machineList article {
+  display: grid;
+  grid-template-columns: 24px 36px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+}
+
+.machineList article + article { border-top: 1px solid var(--color-divider); }
+.machineList article > div { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
+.machineList article strong { font-size: 13px; }
+.machineList article small { color: var(--color-text-muted); font-size: 10px; }
+.machineIndex { color: var(--color-text-muted); font-size: 11px; text-align: center; }
+.machineIcon { display: grid; width: 36px; height: 36px; place-items: center; border-radius: 9px; color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 9%, var(--color-surface)); }
+.machineSpec { color: var(--color-text-secondary); font-size: 11px; white-space: nowrap; }
+.environmentTotal { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px; color: var(--color-text-muted); font-size: 11px; }
+.environmentTotal strong { color: var(--color-text-primary); font-size: 12px; }
+.ruleList { display: grid; gap: 9px; margin-top: 12px; }
+.ruleList p { display: grid; grid-template-columns: 24px minmax(0, 1fr); align-items: flex-start; gap: 8px; margin: 0; color: var(--color-primary); }
+.ruleList p span { display: flex; flex-direction: column; gap: 2px; color: var(--color-text-secondary); font-size: 11px; }
+.ruleList p strong { color: var(--color-text-primary); font-size: 12px; }
+
 /* ── Actions ── */
 .actions {
   display: flex;

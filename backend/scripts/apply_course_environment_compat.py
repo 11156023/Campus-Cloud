@@ -19,6 +19,8 @@ NEW_TABLE_NAMES = [
     "course_environment_nodes",
     "course_environment_edges",
     "class_capacity_reservations",
+    "quick_practice_sessions",
+    "quick_practice_session_machines",
 ]
 logger = logging.getLogger(__name__)
 
@@ -38,6 +40,11 @@ def apply() -> None:
     new_tables = [SQLModel.metadata.tables[name] for name in NEW_TABLE_NAMES]
     SQLModel.metadata.create_all(engine, tables=new_tables, checkfirst=True)
 
+    _add_column(
+        "course_environments",
+        "usage_scope",
+        "usage_scope VARCHAR(24) NOT NULL DEFAULT 'course'",
+    )
     _add_column(
         "course_environment_nodes",
         "position_x",

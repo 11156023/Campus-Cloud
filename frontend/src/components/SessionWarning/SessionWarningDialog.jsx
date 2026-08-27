@@ -2,7 +2,7 @@
  * SessionWarningDialog
  * 練習階段警告對話框，依 warn_reason 分兩種：
  * - auto_stop：VM 即將自動關機（課程時段緩衝或練習額度）。
- *   練習額度型可自助延長；時段型由排程決定，不能延長（can_extend=false）。
+ *   練習額度與課堂時段型都可由機器擁有者自助延長。
  * - expiry：VM 即將到期停用。無法自助延長，須向管理員申請。
  */
 import { useState } from "react";

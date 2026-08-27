@@ -10,4 +10,3 @@ export default function MIcon({ name, size = 20, className, ...rest }) {
     </span>
   );
 }
-
