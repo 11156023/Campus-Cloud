@@ -90,6 +90,7 @@ def _to_public(req: VMRequest, user_override=None) -> VMRequestPublic:
         disk_size=req.disk_size,
         username=req.username,
         gpu_mapping_id=req.gpu_mapping_id,
+        gpu_mdev_profile=req.gpu_mdev_profile,
         requested_mode=req.requested_mode,
         auto_decision_reason=req.auto_decision_reason,
         status=req.status,
@@ -298,6 +299,7 @@ def _prepare_quick_template_request(
     request_in.start_at = now
     request_in.end_at = now + timedelta(hours=QUICK_TEMPLATE_DURATION_HOURS)
     request_in.gpu_mapping_id = None
+    request_in.gpu_mdev_profile = None
 
 
 def _validate_lxc_template_clone(
@@ -363,10 +365,33 @@ def create(
             )
         elif not request_in.ostemplate:
             raise BadRequestError("LXC request requires ostemplate or template_id")
-    if request_in.resource_type == "vm" and (
-        not request_in.template_id or not request_in.username
-    ):
-        raise BadRequestError("VM request requires template_id and username")
+    if request_in.resource_type == "vm":
+        if not request_in.template_id:
+            raise BadRequestError("VM request requires template_id")
+        # Windows 範本帳號由 cloudbase-init 設定檔固定，前端不送 username
+        if not request_in.username:
+            from app.services.proxmox import provisioning_service  # noqa: PLC0415
+
+            if not provisioning_service.is_windows_template(request_in.template_id):
+                raise BadRequestError("VM request requires username")
+
+    # ---------- GPU / vGPU 規格 ----------
+    if request_in.gpu_mdev_profile and not request_in.gpu_mapping_id:
+        raise BadRequestError("指定 vGPU 規格時必須同時選擇 GPU")
+    if request_in.gpu_mapping_id and request_in.gpu_mdev_profile:
+        from app.services.proxmox import gpu_service  # noqa: PLC0415
+
+        try:
+            gpu_detail = gpu_service.get_gpu_mapping(request_in.gpu_mapping_id)
+        except Exception:
+            gpu_detail = None  # PVE 暫時查不到時不擋單，provision 前會再驗
+        if gpu_detail is not None and gpu_detail.profiles:
+            known = {p.mdev_type for p in gpu_detail.profiles}
+            if request_in.gpu_mdev_profile not in known:
+                raise BadRequestError(
+                    f"GPU '{request_in.gpu_mapping_id}' 沒有 "
+                    f"vGPU 規格 '{request_in.gpu_mdev_profile}'"
+                )
 
     # ---------- mode validation ----------
     mode = getattr(request_in, "mode", "scheduled") or "scheduled"

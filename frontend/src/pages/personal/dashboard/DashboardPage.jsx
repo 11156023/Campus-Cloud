@@ -3,7 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../../contexts/AuthContext";
 import { useDragScroll } from "../../../hooks/useDragScroll";
 import { QuickPracticeService } from "../../../services/quickPractice";
+import { safeTemplateIconUrl } from "../../../services/templates";
 import MIcon from "../../../components/MIcon";
+import LoadingState from "../../../components/LoadingState/LoadingState";
 import styles from "./DashboardPage.module.scss";
 import { COURSES } from "./dashboard.data";
 
@@ -239,7 +241,7 @@ export default function DashboardPage() {
         />
 
         {tplLoading ? (
-          <p className={styles.sectionEmpty}>載入範本中…</p>
+          <LoadingState text="載入範本中…" />
         ) : templates.length === 0 ? (
           <p className={styles.sectionEmpty}>
             目前沒有可用的環境。老師或管理員在「多機環境模板」發布並開放快速練習後，就會顯示在這裡。
@@ -252,6 +254,7 @@ export default function DashboardPage() {
                 name={t.name}
                 desc={t.description || `包含 ${t.nodes.length} 台固定配置機器，啟動後自動核准。`}
                 icon="layers"
+                logo={safeTemplateIconUrl(t.icon_url) || undefined}
                 accent={TEMPLATE_ACCENT}
                 categoryTitle={`${t.nodes.length} 台 · v${t.version}`}
                 onSelect={() => navigate(`/quick-template/${t.id}`)}

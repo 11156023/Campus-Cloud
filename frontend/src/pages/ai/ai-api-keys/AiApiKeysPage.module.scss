@@ -387,12 +387,6 @@
   line-height: $line-height-base;
 }
 
-.loadingText {
-  font-size: $font-size-14;
-  color: var(--color-text-muted);
-  padding: $spacing-16 0;
-}
-
 /* ── Animations ── */
 @keyframes fadeIn {
   from { opacity: 0; }

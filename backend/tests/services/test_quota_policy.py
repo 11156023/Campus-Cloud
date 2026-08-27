@@ -90,3 +90,33 @@ class TestCheckQuotaDelta:
     def test_negative_delta_always_passes(self) -> None:
         usage = QuotaUsage(cpu_cores=8, memory_mb=16384, disk_gb=100, instances=5)
         assert check_quota_delta(usage, self._quota(), delta_cores=-2) == []
+
+    def test_unlimited_field_skips_check(self) -> None:
+        """上限 0 = 無限制：該欄位不執法，其他欄位照常。"""
+        quota = EffectiveQuota(
+            max_cpu_cores=0, max_memory_mb=16384, max_disk_gb=100, max_instances=5
+        )
+        usage = QuotaUsage(cpu_cores=999, memory_mb=16384, disk_gb=0, instances=0)
+        assert check_quota_delta(usage, quota, delta_cores=1000) == []
+        violations = check_quota_delta(
+            usage, quota, delta_cores=1000, delta_memory_mb=1
+        )
+        assert len(violations) == 1
+        assert "記憶體" in violations[0]
+
+    def test_all_unlimited_passes_everything(self) -> None:
+        quota = EffectiveQuota(
+            max_cpu_cores=0, max_memory_mb=0, max_disk_gb=0, max_instances=0
+        )
+        usage = QuotaUsage(
+            cpu_cores=10_000, memory_mb=10_000_000, disk_gb=100_000, instances=999
+        )
+        violations = check_quota_delta(
+            usage,
+            quota,
+            delta_cores=1,
+            delta_memory_mb=1,
+            delta_disk_gb=1,
+            delta_instances=1,
+        )
+        assert violations == []

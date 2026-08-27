@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import LoadingState from "../../../components/LoadingState/LoadingState";
 import MIcon from "../../../components/MIcon";
 import { useAuth } from "../../../contexts/AuthContext";
 import { useConfirm } from "../../../components/ConfirmDialog/ConfirmProvider";
@@ -642,6 +643,7 @@ export default function CourseCmsPage() {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [tab, setTab] = useState(searchParams.get("tab") === "progress" ? "progress" : "editor");
+  const [pathsLoading, setPathsLoading] = useState(true);
   const [paths, setPaths] = useState([]);
   const [rooms, setRooms] = useState([]);
   const [templates, setTemplates] = useState([]);
@@ -653,7 +655,10 @@ export default function CourseCmsPage() {
     user?.role === "admin" || user?.role === "teacher" || user?.is_superuser === true;
 
   const reloadPaths = useCallback(() => {
-    CourseAdminService.listPaths().then(setPaths).catch(() => {});
+    CourseAdminService.listPaths()
+      .then(setPaths)
+      .catch(() => {})
+      .finally(() => setPathsLoading(false));
   }, []);
 
   function changeTab(nextTab) {
@@ -725,7 +730,9 @@ export default function CourseCmsPage() {
         </div>
       </div>
 
-      {tab === "editor" ? (
+      {pathsLoading ? (
+        <LoadingState fullPage />
+      ) : tab === "editor" ? (
         <div className={styles.editorLayout}>
           <PathColumn
             paths={paths}

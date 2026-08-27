@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import styles from "./GatewayPage.module.scss";
 import MIcon from "../../../components/MIcon";
+import LoadingState from "../../../components/LoadingState/LoadingState";
 import ConfigCodeEditor from "./ConfigCodeEditor";
 import { useConfirm } from "../../../components/ConfirmDialog/ConfirmProvider";
 import EmptyState from "../../../components/EmptyState/EmptyState";
@@ -346,7 +347,7 @@ function ServiceTab({ service, gatewayReady, host, onDirtyChange }) {
   }
 
   if (loading) {
-    return <div className={styles.loading}>載入 {service} 狀態...</div>;
+    return <LoadingState text={`載入 ${service} 狀態...`} />;
   }
 
   return (
@@ -479,7 +480,7 @@ export default function GatewayPage() {
 
       <div className={styles.content}>
         {loading ? (
-          <div className={styles.loading}>載入 Gateway 設定...</div>
+          <LoadingState fullPage text="載入 Gateway 設定..." />
         ) : activeTab === "connection" ? (
           <ConnectionTab config={config} onConfigChange={setConfig} />
         ) : (

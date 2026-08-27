@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import LoadingState from "../../components/LoadingState/LoadingState";
 import MIcon from "../../components/MIcon";
 import { CourseEnvironmentsService } from "../../services/courseEnvironments";
 import EmptyState from "../../components/EmptyState/EmptyState";
@@ -43,14 +44,14 @@ export default function CourseTemplateManagementPage() {
         <div className={styles.pillTabs}>{[["all", "全部"], ["published", "已發布"], ["draft", "草稿"]].map(([key, label]) => <button type="button" key={key} className={status === key ? styles.pillActive : ""} onClick={() => setStatus(key)}>{label}</button>)}</div>
       </div>
       {error && <p className={styles.errorMessage}>{error}</p>}
-      <div className={styles.listSummary}><span>{loading ? "正在讀取…" : `顯示 ${rows.length} 個可重複使用的多機環境`}</span><span>同一份多機環境可套用到正式課程或快速練習</span></div><div className={styles.tableWrap}><table className={styles.table}><thead><tr><th>環境名稱</th><th>每位學生的機器</th><th>資源合計</th><th>版本</th><th>提供方式</th><th>使用班級</th><th>狀態</th><th /></tr></thead><tbody>{rows.map((template) => <tr key={template.id} className={styles.rowLink} onClick={() => navigate(`/course-template-management/${template.id}`)}>
+      <div className={styles.listSummary}><span>{loading ? "正在讀取…" : `顯示 ${rows.length} 個可重複使用的多機環境`}</span><span>同一份多機環境可套用到正式課程或快速練習</span></div>{loading ? <LoadingState /> : <><div className={styles.tableWrap}><table className={styles.table}><thead><tr><th>環境名稱</th><th>每位學生的機器</th><th>資源合計</th><th>版本</th><th>提供方式</th><th>使用班級</th><th>狀態</th><th /></tr></thead><tbody>{rows.map((template) => <tr key={template.id} className={styles.rowLink} onClick={() => navigate(`/course-template-management/${template.id}`)}>
         <td><strong>{template.name}</strong><small>{template.code}<br />{template.description}</small></td>
         <td><strong>{template.nodes.length} 台／每位學生</strong><small>{template.nodes.map((node) => node.name).join("、")}</small></td>
         <td>{template.nodes.reduce((sum, node) => sum + node.cpu, 0)} CPU · {template.nodes.reduce((sum, node) => sum + node.memory, 0)} GB RAM</td><td>v{template.version}</td><td>{USAGE_LABEL[template.usageScope] ?? "正式課程"}</td><td>{template.classes} 個班級</td>
         <td><span className={`${styles.statusBadge} ${styles[`status_${template.status}`]}`}>{STATUS_LABEL[template.status]}</span></td>
         <td><button type="button" className={styles.iconBtn} aria-label="開啟模板"><MIcon name="chevron_right" size={19} /></button></td>
       </tr>)}</tbody></table></div>
-      {!rows.length && <EmptyState icon="view_quilt" title="沒有符合條件的多機環境。" />}
+      {!rows.length && <EmptyState icon="view_quilt" title="沒有符合條件的多機環境。" />}</>}
     </section>
   </div>;
 }

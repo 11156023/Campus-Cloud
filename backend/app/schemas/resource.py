@@ -48,6 +48,7 @@ ResourceStatus = Literal[
     "running",
     "stopped",
     "paused",
+    "deleting",
     "failed",
     "deleted",
     "unknown",
@@ -116,6 +117,8 @@ class TemplateSchema(BaseModel):
     volid: str
     format: str
     size: int
+    # 看得到此模板的節點（跨連線彙總）；申請只能落在這些節點上
+    nodes: list[str] = []
 
 
 class VMTemplateSchema(BaseModel):
@@ -124,6 +127,13 @@ class VMTemplateSchema(BaseModel):
     vmid: int
     name: str
     node: str
+    ostype: str | None = None
+    # Windows 範本帳號由 cloudbase-init 設定檔固定，前端不顯示帳號欄位
+    is_windows: bool = False
+    # 範本自身的規格：前端以此帶入預設值；磁碟為克隆下限（不可縮小）
+    cores: int | None = None
+    memory_mb: int | None = None
+    disk_gb: int | None = None
 
 
 class NextVMIDSchema(BaseModel):
@@ -212,6 +222,7 @@ class ResourcePublic(BaseModel):
     expiry_date: date | None = None
     ip_address: str | None = None
     ssh_public_key: str | None = None
+    has_login_password: bool = False
     cpu: float | None = None
     maxcpu: int | None = None
     mem: int | None = None
@@ -250,11 +261,12 @@ class ExtendSessionResponse(BaseModel):
 
 
 class SSHKeyResponse(BaseModel):
-    """SSH 金鑰回應"""
+    """SSH 金鑰與登入密碼回應"""
 
     vmid: int
     ssh_public_key: str | None = None
     ssh_private_key: str | None = None
+    login_password: str | None = None
 
 
 # ===== Monitoring Schemas =====

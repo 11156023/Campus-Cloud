@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../../contexts/AuthContext";
 import styles from "./ResourcesPage.module.scss";
 import MIcon from "../../../components/MIcon";
 import PowerMenu from "../../../components/PowerMenu/PowerMenu";
@@ -27,6 +28,7 @@ const STATUS_MAP = {
   running:      { label: "執行中",   color: "success", icon: "play_circle"    },
   stopped:      { label: "已關機",   color: "muted",   icon: "stop_circle"    },
   paused:       { label: "已暫停",   color: "muted",   icon: "pause_circle"   },
+  deleting:     { label: "刪除中",   color: "danger",  icon: "hourglass_empty"},
   failed:       { label: "建立失敗", color: "danger",  icon: "error_outline"  },
   deleted:      { label: "已刪除",   color: "danger",  icon: "delete_forever" },
   unknown:      { label: "狀態未知", color: "muted",   icon: "help_outline"   },
@@ -211,6 +213,9 @@ function resourceRowKey(resource, index) {
 /* ── Resource row ── */
 function ResourceRow({ resource, onUpdated, onDeleted }) {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  /* VMID 是系統內部編號，僅管理員／老師看得到 */
+  const showVmid = user?.is_superuser || user?.role === "admin" || user?.role === "teacher";
   const [actionLoading, setActionLoading] = useState(null);
   const [deleteConfirm, setDeleteConfirm]  = useState(false);
   const [deleting, setDeleting]            = useState(false);
@@ -259,7 +264,7 @@ function ResourceRow({ resource, onUpdated, onDeleted }) {
             {resource.vmid > 0
               ? <button type="button" className={styles.nameLink} onClick={() => navigate(`/my-resources/${resource.vmid}`)}>{resource.name}</button>
               : <strong>{resource.name}</strong>}
-            <small>{type.label}{resource.vmid > 0 ? ` · VMID ${resource.vmid}` : ""}</small>
+            <small>{type.label}{showVmid && resource.vmid > 0 ? ` · VMID ${resource.vmid}` : ""}</small>
           </div>
         </div>
       </td>
@@ -281,7 +286,7 @@ function ResourceRow({ resource, onUpdated, onDeleted }) {
         </div> : <span className={styles.deletedNote}>{STATUS_MAP[resource.status]?.label ?? resource.status}</span>}
       </td>
     </tr>
-    {deleteConfirm && createPortal(<ConfirmModal title="確定刪除資源？" desc={`「${resource.name}」（VMID ${resource.vmid}）刪除後無法復原。`} confirmLabel="刪除" danger loading={deleting} onConfirm={handleDelete} onClose={() => setDeleteConfirm(false)} />, document.body)}
+    {deleteConfirm && createPortal(<ConfirmModal title="確定刪除資源？" desc={`「${resource.name}」${showVmid ? `（VMID ${resource.vmid}）` : ""}刪除後無法復原。`} confirmLabel="刪除" danger loading={deleting} onConfirm={handleDelete} onClose={() => setDeleteConfirm(false)} />, document.body)}
     {consoleOpen && isLxc && createPortal(<TerminalDialog resource={resource} onClose={() => setConsoleOpen(false)} />, document.body)}
     {consoleOpen && !isLxc && createPortal(<VncDialog resource={resource} onClose={() => setConsoleOpen(false)} />, document.body)}
   </>;
@@ -373,6 +378,7 @@ function ErrorState({ onRetry }) {
 
 /* ── Page ── */
 export default function ResourcesPage() {
+  const navigate = useNavigate();
   const [resources, setResources] = useState([]);
   const [quickSessions, setQuickSessions] = useState([]);
   const [pending, setPending]     = useState([]);
@@ -437,9 +443,16 @@ export default function ResourcesPage() {
     setResources((prev) => prev.filter((r) => r.vmid !== vmid));
   }
 
-  const environmentGroups = buildEnvironmentGroups(resources, quickSessions);
+  // 建立中申請會同時出現在 pending 與資源 API；先移除 placeholder，避免重複列。
+  const pendingRequestIds = new Set(pending.map((request) => String(request.id)));
+  const resourcesForDisplay = resources.filter((resource) => !(
+    resource.is_placeholder
+    && resource.request_id != null
+    && pendingRequestIds.has(String(resource.request_id))
+  ));
+  const environmentGroups = buildEnvironmentGroups(resourcesForDisplay, quickSessions);
   const grouped = groupedResourceKeys(environmentGroups);
-  const visibleResources = resources.filter((resource) => (
+  const visibleResources = resourcesForDisplay.filter((resource) => (
     !grouped.vmids.has(resource.vmid)
     && !grouped.requestIds.has(String(resource.request_id))
   ));
@@ -452,6 +465,14 @@ export default function ResourcesPage() {
           <h1 className={styles.pageTitle}>我的資源</h1>
           <p className={styles.pageSubtitle}>查看與管理申請通過的虛擬機和容器</p>
         </div>
+        <button
+          type="button"
+          className={styles.btnPrimary}
+          onClick={() => navigate("/my-requests", { state: { create: true } })}
+        >
+          <MIcon name="add" size={16} />
+          申請資源
+        </button>
       </div>
 
       {/* 我的配額用量（模組 E） */}

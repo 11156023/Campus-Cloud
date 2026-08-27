@@ -921,6 +921,11 @@ def test_select_request_placement_falls_back_when_reserved_node_is_unavailable(
     placement_request = SimpleNamespace()
 
     monkeypatch.setattr(
+        "app.services.proxmox.provisioning_service.placement_support"
+        ".allowed_template_nodes_for_request",
+        lambda request: None,
+    )
+    monkeypatch.setattr(
         "app.services.proxmox.provisioning_service.placement_advisor._load_cluster_state",
         lambda: ([], []),
     )
@@ -1080,6 +1085,12 @@ def test_reserved_target_node_prefers_admin_storage_profile(
                 candidate=True,
             ),
         ],
+    )
+    # 此測試只驗證管理員儲存設定的選點優先序；模板節點可見性另有專屬測試。
+    monkeypatch.setattr(
+        "app.services.vm.placement_service.placement_support"
+        ".allowed_template_nodes_for_request",
+        lambda request: None,
     )
 
     selection = vm_request_placement_service.select_reserved_target_node(

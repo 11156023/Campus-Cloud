@@ -4,6 +4,7 @@ import { useAuth } from "./contexts/AuthContext";
 import DashboardLayout from "./layout/DashboardLayout";
 import LoginPage from "./pages/login/LoginPage";
 import MIcon from "./components/MIcon";
+import { LoadingSpinner } from "./components/LoadingState/LoadingState";
 import { AuthSessionStatus } from "./services/authSession";
 import styles from "./App.module.scss";
 
@@ -66,7 +67,7 @@ function AuthBootstrapState({ unavailable = false, retrying = false, onRetry }) 
             <MIcon name="cloud_off" size={42} />
           </span>
         ) : (
-          <span className={styles.spinner} aria-hidden="true" />
+          <LoadingSpinner size={42} />
         )}
         <h1 className={styles.authStateTitle}>
           {unavailable ? "暫時無法連線" : "正在驗證登入狀態"}
@@ -131,11 +132,15 @@ function App() {
           <Route path="/account"              element={<AccountSettingsPage />} />
 
           {/* 資源 */}
-          <Route path="/resource-mgmt"  element={<ResourceMgmtPage />} />
-          <Route path="/resource-mgmt/:vmid" element={<ResourceDetailPage backTo="/resource-mgmt" />} />
-          <Route path="/request-review" element={<RequestReviewPage />} />
-          <Route path="/gpu-mgmt"       element={<GpuMgmtPage />} />
-          <Route path="/batch-review"   element={<BatchReviewPage />} />
+          {isAdmin && (
+            <>
+              <Route path="/resource-mgmt"  element={<ResourceMgmtPage />} />
+              <Route path="/resource-mgmt/:vmid" element={<ResourceDetailPage backTo="/resource-mgmt" />} />
+              <Route path="/request-review" element={<RequestReviewPage />} />
+              <Route path="/gpu-mgmt"       element={<GpuMgmtPage />} />
+              <Route path="/batch-review"   element={<BatchReviewPage />} />
+            </>
+          )}
           <Route path="/templates"      element={<TemplatesPage />} />
 
           {/* AI */}
@@ -173,18 +178,26 @@ function App() {
           <Route path="/class-management/:classId/:section" element={<ClassWorkspacePage />} />
 
           {/* 系統管理 */}
-          <Route path="/admin"     element={<AdminPage />} />
-          <Route path="/settings"  element={<SettingsPage />} />
-          <Route path="/quotas"    element={<QuotasPage />} />
-          <Route path="/ip-management" element={<IpManagementPage />} />
-          <Route path="/monitoring" element={<MonitoringPage />} />
-          <Route path="/audit"     element={<AuditPage />} />
+          {isAdmin && (
+            <>
+              <Route path="/admin"     element={<AdminPage />} />
+              <Route path="/settings"  element={<SettingsPage />} />
+              <Route path="/quotas"    element={<QuotasPage />} />
+              <Route path="/ip-management" element={<IpManagementPage />} />
+              <Route path="/monitoring" element={<MonitoringPage />} />
+              <Route path="/audit"     element={<AuditPage />} />
+            </>
+          )}
           <Route path="/jobs"      element={<JobsPage />} />
 
           {/* 網路 */}
           <Route path="/firewall"       element={<FirewallPage />} />
-          <Route path="/domain"         element={<DomainPage />} />
-          <Route path="/gateway"        element={<GatewayPage />} />
+          {isAdmin && (
+            <>
+              <Route path="/domain"         element={<DomainPage />} />
+              <Route path="/gateway"        element={<GatewayPage />} />
+            </>
+          )}
           <Route path="/reverse-proxy"  element={<ReverseProxyPage />} />
 
           {/* fallback */}

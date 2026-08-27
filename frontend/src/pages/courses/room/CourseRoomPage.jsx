@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import rehypeSanitize from "rehype-sanitize";
 import { VncScreen } from "react-vnc";
+import LoadingState from "../../../components/LoadingState/LoadingState";
 import MIcon from "../../../components/MIcon";
 import { useToast } from "../../../hooks/useToast";
 import { AuthStorage } from "../../../services/auth";
@@ -49,7 +50,7 @@ function VncPanel({ vmid }) {
         if (cancelled) return;
         const ticket = data.ticket ?? "";
         if (!ticket) {
-          setError("無法取得 VNC ticket");
+          setError("無法建立遠端畫面連線，請稍後再試");
           return;
         }
         const apiUrl = new URL(
@@ -289,7 +290,7 @@ export default function CourseRoomPage() {
   );
 
   if (error) return <div className={styles.stateText}>{error}</div>;
-  if (!room) return <div className={styles.stateText}>載入中…</div>;
+  if (!room) return <LoadingState fullPage />;
 
   const showLab = room.has_lab;
   const running = deployment?.status === "running" && deployment?.vmid;

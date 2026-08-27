@@ -1,9 +1,11 @@
-"""Guest 內檔案寫入：QEMU 走 guest agent file-write，LXC 走 node SSH pct push。
+"""Guest 內檔案寫入與指令執行：QEMU 走 guest agent，LXC 走 node SSH pct。
 
 - QEMU：POST /nodes/{node}/qemu/{vmid}/agent/file-write。內容自行 base64
   並帶 ``encode=0``（二進位安全）。前置 agent ping，失敗回可讀 400。
+  指令執行走 agent exec + exec-status 輪詢。
 - LXC：SSH 到容器所在節點本身（``pct`` 只能操作本機容器），SFTP 寫暫存檔
-  → ``pct push --perms`` → 清理暫存。憑節點歸屬路由到正確連線的帳密。
+  → ``pct push --perms`` → 清理暫存；指令執行走 ``pct exec``。
+  憑節點歸屬路由到正確連線的帳密。
 """
 
 from __future__ import annotations
@@ -11,6 +13,7 @@ from __future__ import annotations
 import base64
 import logging
 import shlex
+import time
 import uuid
 from typing import Any
 
@@ -54,6 +57,82 @@ def write_file_qemu(node: str, vmid: int, path: str, content: bytes) -> None:
         file=path, content=encoded, encode=0
     )
     logger.info("Wrote %d bytes to %s on VM %s via guest agent", len(content), path, vmid)
+
+
+def ping_qemu_agent(node: str, vmid: int) -> bool:
+    """agent ping；未回應回 False（不丟例外），供開機後輪詢等待用。"""
+    try:
+        get_proxmox_api_for_node(node).nodes(node).qemu(vmid).agent("ping").post()
+        return True
+    except Exception:
+        return False
+
+
+def get_osinfo_qemu(node: str, vmid: int) -> dict[str, Any] | None:
+    """agent get-osinfo；失敗回 None（舊版 agent 不支援此指令）。
+
+    正常回傳如 {"id": "mswindows", "name": "Microsoft Windows", ...}。
+    """
+    try:
+        resp = (
+            get_proxmox_api_for_node(node)
+            .nodes(node)
+            .qemu(vmid)
+            .agent("get-osinfo")
+            .get()
+        )
+    except Exception:
+        return None
+    if isinstance(resp, dict):
+        result = resp.get("result", resp)
+        if isinstance(result, dict):
+            return result
+    return None
+
+
+def exec_qemu(
+    node: str,
+    vmid: int,
+    command: list[str],
+    *,
+    timeout: float = 60.0,
+    poll_interval: float = 1.0,
+) -> tuple[int, str, str]:
+    """透過 guest agent 在 VM 內執行指令，輪詢至結束。
+
+    回傳 (exitcode, stdout, stderr)；PVE 端已解碼 out-data/err-data。
+    agent 未回應丟 AppError(400)，逾時丟 AppError(504)。
+    """
+    _ping_agent(node, vmid)
+    api = get_proxmox_api_for_node(node).nodes(node).qemu(vmid)
+    started = api.agent("exec").post(command=command)
+    pid = int(started["pid"])
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        status = api.agent("exec-status").get(pid=pid)
+        if status.get("exited"):
+            return (
+                int(status.get("exitcode", -1)),
+                str(status.get("out-data") or ""),
+                str(status.get("err-data") or ""),
+            )
+        time.sleep(poll_interval)
+    raise AppError(f"VM {vmid} 的 guest 指令執行逾時（{timeout:.0f}s）", 504)
+
+
+def exec_lxc(
+    node: str, vmid: int, command: str, *, timeout: float = 60.0
+) -> tuple[int, str, str]:
+    """SSH 到容器所在節點，以 ``pct exec`` 在容器內執行 shell 指令。"""
+    client = _node_ssh_client(node)
+    try:
+        return exec_command(
+            client,
+            f"pct exec {int(vmid)} -- /bin/sh -c {shlex.quote(command)}",
+            timeout=timeout,
+        )
+    finally:
+        client.close()
 
 
 def _node_ssh_client(node: str | None = None) -> Any:

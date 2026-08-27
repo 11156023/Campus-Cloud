@@ -109,12 +109,6 @@
   line-height: $line-height-base;
 }
 
-.loading {
-  padding: $spacing-32;
-  color: var(--color-text-secondary);
-  text-align: center;
-}
-
 .panelStack {
   @include flex-column;
   gap: $spacing-16;

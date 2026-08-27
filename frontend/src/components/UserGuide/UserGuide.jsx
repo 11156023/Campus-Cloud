@@ -115,7 +115,7 @@ const PAGE_GUIDES = {
       {
         selector: '[data-guide="resource-card"]',
         title: "一張卡片就是一台機器",
-        text: "VMID 是系統中的機器編號；IP 是連線位置；右上角狀態顯示能否使用。點機器名稱可看完整資訊。",
+        text: "IP 是機器的連線位置；右上角狀態顯示能否使用。點機器名稱可看完整資訊。",
       },
       {
         selector: '[data-guide="resource-console"]',

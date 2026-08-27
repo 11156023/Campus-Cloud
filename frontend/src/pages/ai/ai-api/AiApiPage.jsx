@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import styles from "./AiApiPage.module.scss";
 import MIcon from "../../../components/MIcon";
+import LoadingState from "../../../components/LoadingState/LoadingState";
 import SharedEmptyState from "../../../components/EmptyState/EmptyState";
 import { AiApiService } from "../../../services/aiApi";
 import { useConfirm } from "../../../components/ConfirmDialog/ConfirmProvider";
@@ -377,7 +378,7 @@ function MyUsageTab() {
       </div>
 
       {loading ? (
-        <div className={styles.loadingText}>載入中…</div>
+        <LoadingState />
       ) : (
         <>
           {/* Proxy usage */}
@@ -614,7 +615,7 @@ export default function AiApiPage() {
               <p className={styles.panelDesc}>查看、複製、刷新或刪除金鑰。</p>
             </div>
             {loading ? (
-              <div className={styles.loadingText}>載入中…</div>
+              <LoadingState />
             ) : credentials.length === 0 ? (
               <EmptyState
                 icon="vpn_key"
@@ -640,7 +641,7 @@ export default function AiApiPage() {
               <p className={styles.panelDesc}>近期申請狀態。</p>
             </div>
             {loading ? (
-              <div className={styles.loadingText}>載入中…</div>
+              <LoadingState />
             ) : requests.length === 0 ? (
               <EmptyState
                 icon="history"

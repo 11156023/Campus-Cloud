@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 from time import monotonic, perf_counter
 from typing import Any
 
+import httpx
 from fastapi import APIRouter, HTTPException
 
 from app.ai.template_recommendation.config import settings
@@ -201,7 +202,9 @@ def _resolve_chat_gpu_options(request: ChatRequest, session: SessionDep) -> list
     for option in options:
         mapping_id = str(option.get("mapping_id") or "")
         reserved = int(reserved_counts.get(mapping_id, 0))
-        device_count = int(option.get("device_count") or 0)
+        capacity_count = int(
+            option.get("capacity_count") or option.get("device_count") or 0
+        )
         used_count = int(option.get("used_count") or 0)
         available_count = int(option.get("available_count") or 0)
         if reserved <= 0:
@@ -209,7 +212,7 @@ def _resolve_chat_gpu_options(request: ChatRequest, session: SessionDep) -> list
             continue
 
         updated = dict(option)
-        updated["used_count"] = min(device_count, used_count + reserved)
+        updated["used_count"] = min(capacity_count, used_count + reserved)
         updated["available_count"] = max(0, available_count - reserved)
         adjusted.append(updated)
 
@@ -328,6 +331,12 @@ async def chat(
         except Exception:
             # 記錄失敗 log 時出錯不得掩蓋原始錯誤
             pass
+        if isinstance(exc, httpx.HTTPError):
+            logger.error("vLLM upstream error: %s", exc)
+            raise HTTPException(
+                status_code=502,
+                detail="上游 AI 服務錯誤，請確認 vLLM 伺服器與模型設定（VLLM_BASE_URL / VLLM_MODEL_NAME）。",
+            ) from exc
         raise
 
 
@@ -422,6 +431,12 @@ async def recommend(
         except Exception:
             # 記錄失敗 log 時出錯不得掩蓋原始錯誤
             pass
+        if isinstance(exc, httpx.HTTPError):
+            logger.error("vLLM upstream error: %s", exc)
+            raise HTTPException(
+                status_code=502,
+                detail="上游 AI 服務錯誤，請確認 vLLM 伺服器與模型設定（VLLM_BASE_URL / VLLM_MODEL_NAME）。",
+            ) from exc
         raise
 
 

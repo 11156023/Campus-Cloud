@@ -1,6 +1,7 @@
 import { useContext, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import MIcon from "../../../components/MIcon";
+import LoadingState from "../../../components/LoadingState/LoadingState";
 import { useToast } from "../../../hooks/useToast";
 import { LayoutContext } from "../../../layout/DashboardLayout";
 import { QuickPracticeService } from "../../../services/quickPractice";
@@ -52,7 +53,11 @@ export default function QuickTemplateFormPage() {
   }
 
   if (loading) {
-    return <div className={styles.page}><div className={styles.notFound}><MIcon name="hourglass_empty" size={40} /><h2>載入快速練習環境中…</h2></div></div>;
+    return (
+      <div className={styles.page}>
+        <LoadingState fullPage text="載入快速練習環境中…" />
+      </div>
+    );
   }
 
   if (!template) {

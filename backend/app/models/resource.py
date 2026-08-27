@@ -75,6 +75,10 @@ class Resource(SQLModel, table=True):
         default=None,
         description="OpenSSH public key",
     )
+    login_password_encrypted: str | None = Field(
+        default=None,
+        description="Encrypted per-clone login password",
+    )
     created_at: datetime = Field(
         sa_column=Column(DateTime(timezone=True), nullable=False),
         description="Created time",

@@ -97,13 +97,6 @@
   color: var(--color-text-muted);
 }
 
-.stateText {
-  padding: $spacing-32 $spacing-16;
-  text-align: center;
-  color: var(--color-text-muted);
-  font-size: $font-size-14;
-}
-
 .empty {
   @include flex-column;
   align-items: center;
@@ -376,5 +369,24 @@
       color: var(--color-text-muted);
       cursor: not-allowed;
     }
+  }
+}
+
+.field .unlimitedToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: $spacing-4;
+  font-size: $font-size-12;
+  font-weight: $font-weight-400;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  user-select: none;
+
+  input[type="checkbox"] {
+    width: auto;
+    padding: 0;
+    margin: 0;
+    accent-color: var(--color-primary);
+    cursor: pointer;
   }
 }

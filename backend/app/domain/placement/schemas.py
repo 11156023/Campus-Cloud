@@ -40,6 +40,10 @@ class PlacementRequest(BaseModel):
     )
     gpu_required: int = Field(default=0, ge=0, le=16)
     gpu_mapping_id: str | None = Field(default=None, max_length=128)
+    # 模板節點約束：LXC 帶 vztmpl volid、VM 克隆帶範本 VMID。
+    # placement 據此把候選節點限制在「拿得到模板」的節點上。
+    ostemplate: str | None = Field(default=None, max_length=512)
+    template_vmid: int | None = Field(default=None, ge=1)
 
     @model_validator(mode="before")
     @classmethod

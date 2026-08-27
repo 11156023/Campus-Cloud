@@ -293,7 +293,7 @@ function DangerZoneTab() {
       <div className={`${styles.card} ${styles.dangerCard}`}>
         <h2 className={styles.cardTitle}>刪除帳號</h2>
         <p className={styles.dangerDesc}>
-          你的帳號與所有相關資料將被<strong>永久刪除</strong>，此操作無法復原。若你仍持有已開通的資源，後端會拒絕刪除，請先清除資源。
+          你的帳號與所有相關資料將被<strong>永久刪除</strong>，此操作無法復原。若你仍持有已開通的資源，系統會拒絕刪除，請先清除資源。
         </p>
         <div className={styles.formActions}>
           <button type="button" className={styles.btnDanger} onClick={() => setShowConfirm(true)}>
