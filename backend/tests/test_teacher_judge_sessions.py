@@ -6,6 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 from fastapi import HTTPException
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, SQLModel, create_engine, select
 
 from app.ai.teacher_judge import file_service, session_service
@@ -102,7 +103,7 @@ def test_chat_can_start_without_selected_file() -> None:
     assert session_service.selected_file_for_chat(db, item) is None
 
 
-def test_delete_session_data_removes_owned_records_but_keeps_shared_file() -> None:
+def test_delete_session_data_removes_owned_records_and_private_file() -> None:
     db = _session()
     class_id = uuid.uuid4()
     rubric_file = _file(db, class_id)
@@ -146,7 +147,85 @@ def test_delete_session_data_removes_owned_records_but_keeps_shared_file() -> No
     assert db.get(TeacherJudgeScriptArtifact, artifact.id) is None
     assert not db.exec(select(TeacherJudgeScriptRun)).all()
     assert not db.exec(select(TeacherJudgeSessionMessage)).all()
-    assert db.get(TeacherJudgeFile, rubric_file.id) is not None
+    assert db.get(TeacherJudgeFile, rubric_file.id) is None
+
+
+def test_selected_file_cannot_be_claimed_by_another_session() -> None:
+    db = _session()
+    class_id = uuid.uuid4()
+    rubric_file = _file(db, class_id)
+    owner = TeacherJudgeSession(
+        teaching_class_id=class_id,
+        title="Owner",
+        selected_file_id=rubric_file.id,
+    )
+    db.add(owner)
+    db.commit()
+    db.refresh(owner)
+
+    with pytest.raises(HTTPException) as exc_info:
+        session_service.ensure_selected_file_available(db, rubric_file.id)
+
+    assert exc_info.value.status_code == 409
+    assert exc_info.value.detail["code"] == "teacher_judge_file_in_use"
+    assert "複製檢查" in exc_info.value.detail["message"]
+
+
+def test_create_session_rejects_a_source_owned_by_another_session(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    db = _session()
+    class_id = uuid.uuid4()
+    rubric_file = _file(db, class_id)
+    db.add(
+        TeacherJudgeSession(
+            teaching_class_id=class_id,
+            title="Owner",
+            selected_file_id=rubric_file.id,
+        )
+    )
+    db.commit()
+    monkeypatch.setattr(teacher_judge_sessions, "_access", lambda *args: None)
+
+    with pytest.raises(HTTPException) as exc_info:
+        teacher_judge_sessions.create_session(
+            class_id,
+            TeacherJudgeSessionCreateRequest(
+                title="Should fail",
+                creation_mode="existing",
+                selected_file_id=rubric_file.id,
+            ),
+            db,
+            SimpleNamespace(id=uuid.uuid4()),
+        )
+
+    assert exc_info.value.status_code == 409
+    assert "複製檢查" in exc_info.value.detail["message"]
+    assert len(db.exec(select(TeacherJudgeSession)).all()) == 1
+
+
+def test_selected_file_unique_index_allows_only_one_session_owner() -> None:
+    db = _session()
+    class_id = uuid.uuid4()
+    rubric_file = _file(db, class_id)
+    db.add(
+        TeacherJudgeSession(
+            teaching_class_id=class_id,
+            title="First",
+            selected_file_id=rubric_file.id,
+        )
+    )
+    db.commit()
+    db.add(
+        TeacherJudgeSession(
+            teaching_class_id=class_id,
+            title="Second",
+            selected_file_id=rubric_file.id,
+        )
+    )
+
+    with pytest.raises(IntegrityError):
+        db.commit()
 
 
 def test_fork_created_session_clones_rubric_without_history() -> None:

@@ -248,6 +248,20 @@ def test_blank_file_has_created_source_metadata() -> None:
     assert file.analysis_json["items"] == []
 
 
+def test_blank_file_accepts_postgresql_environment() -> None:
+    session = _session()
+    file = file_service.create_blank_file(
+        session=session,
+        teaching_class_id=uuid.uuid4(),
+        created_by=uuid.uuid4(),
+        display_name="PostgreSQL 評分表",
+        environment_keys=["postgresql"],
+    )
+
+    assert file.template_key == "postgresql"
+    assert file.environment_keys == ["postgresql"]
+
+
 def test_analysis_update_requires_current_revision() -> None:
     session = _session()
     teaching_class_id = uuid.uuid4()
@@ -487,3 +501,45 @@ async def test_delete_file_keeps_linked_script_with_snapshot(
     assert db_artifact.source_file_id is None
     assert db_artifact.script_content == SAFE_SCRIPT
     assert db_artifact.source_file_snapshot_json["original_filename"] == "rubric.pdf"
+
+
+def test_delete_file_clears_session_source_reference_and_bytes(
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(file_service, "DATA_ROOT", tmp_path)
+    session = _session()
+    teaching_class_id = uuid.uuid4()
+    saved_file = file_service.save_analyzed_file(
+        session=session,
+        teaching_class_id=teaching_class_id,
+        uploaded_by=uuid.uuid4(),
+        original_filename="rubric.pdf",
+        file_hash="a" * 64,
+        template_key="linux",
+        file_bytes=b"source bytes",
+        analysis=_analysis(),
+        conflict_strategy=None,
+    )
+    owner = TeacherJudgeSession(
+        teaching_class_id=teaching_class_id,
+        title="Owns source",
+        selected_file_id=uuid.UUID(saved_file.id),
+    )
+    session.add(owner)
+    session.commit()
+
+    stored_path = tmp_path / f"{saved_file.id}.pdf"
+    assert stored_path.read_bytes() == b"source bytes"
+
+    file_service.delete_file(
+        session=session,
+        teaching_class_id=teaching_class_id,
+        file_id=uuid.UUID(saved_file.id),
+    )
+
+    assert session.get(TeacherJudgeFile, uuid.UUID(saved_file.id)) is None
+    refreshed_owner = session.get(TeacherJudgeSession, owner.id)
+    assert refreshed_owner is not None
+    assert refreshed_owner.selected_file_id is None
+    assert not stored_path.exists()

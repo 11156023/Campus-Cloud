@@ -7,6 +7,7 @@ import uuid
 
 from fastapi import APIRouter, HTTPException, Query
 from sqlalchemy import case
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import col, desc, select
 
 from app.ai.teacher_judge.file_service import create_blank_file
@@ -32,6 +33,7 @@ from app.ai.teacher_judge.session_service import (
     bounded_history,
     delete_session_data,
     ensure_active,
+    ensure_selected_file_available,
     fork_session_data,
     get_session,
     maybe_summarize,
@@ -64,6 +66,23 @@ router = APIRouter(
     prefix="/teaching-classes/{teaching_class_id}/judge/sessions",
     tags=["teacher-judge"],
 )
+
+
+def _is_selected_file_conflict(exc: IntegrityError) -> bool:
+    message = str(exc.orig or exc).lower()
+    return "uq_teacher_judge_sessions_selected_file" in message or (
+        "teacher_judge_sessions" in message and "selected_file_id" in message
+    )
+
+
+def _selected_file_conflict() -> HTTPException:
+    return HTTPException(
+        status_code=409,
+        detail={
+            "code": "teacher_judge_file_in_use",
+            "message": "這份評分表已被其他檢查使用；請使用「複製檢查」建立獨立副本，或上傳新的評分表。",
+        },
+    )
 
 
 def _access(db: SessionDep, class_id: uuid.UUID, user: InstructorUser) -> None:
@@ -122,6 +141,8 @@ def create_session(
             selected_file_id = rubric.id
         else:
             validate_selected_file(session, teaching_class_id, selected_file_id)
+            if selected_file_id is not None:
+                ensure_selected_file_available(session, selected_file_id)
         item = TeacherJudgeSession(
             teaching_class_id=teaching_class_id,
             title=payload.title.strip(),
@@ -132,6 +153,11 @@ def create_session(
         session.commit()
         session.refresh(item)
         return session_public(session, item)
+    except IntegrityError as exc:
+        session.rollback()
+        if not _is_selected_file_conflict(exc):
+            raise
+        raise _selected_file_conflict() from exc
     except Exception:
         session.rollback()
         raise
@@ -184,6 +210,12 @@ def update_session(
         item.title = payload.title.strip()
     if "selected_file_id" in changes:
         validate_selected_file(session, teaching_class_id, payload.selected_file_id)
+        if payload.selected_file_id is not None:
+            ensure_selected_file_available(
+                session,
+                payload.selected_file_id,
+                exclude_session_id=item.id,
+            )
         item.selected_file_id = payload.selected_file_id
     from app.models.base import get_datetime_utc
 
@@ -199,7 +231,13 @@ def update_session(
     item.updated_at = get_datetime_utc()
     item.last_activity_at = item.updated_at
     session.add(item)
-    session.commit()
+    try:
+        session.commit()
+    except IntegrityError as exc:
+        session.rollback()
+        if not _is_selected_file_conflict(exc):
+            raise
+        raise _selected_file_conflict() from exc
     session.refresh(item)
     return session_public(session, item)
 

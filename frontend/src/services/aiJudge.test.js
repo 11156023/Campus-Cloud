@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
-import { AiJudgeService } from "./aiJudge";
+import { AiJudgeService, TEMPLATE_OPTIONS, getTemplateLabel } from "./aiJudge";
 
 function fakeStorage() {
   const values = new Map();
@@ -25,6 +25,11 @@ beforeEach(() => {
 });
 
 describe("AiJudgeService persistent sessions", () => {
+  test("評分環境提供 PostgreSQL 模板", () => {
+    expect(TEMPLATE_OPTIONS.map((option) => option.key)).toContain("postgresql");
+    expect(getTemplateLabel("postgresql")).toBe("PostgreSQL");
+  });
+
   test("blank 建立請求會帶上評分表名稱與多選環境", async () => {
     await AiJudgeService.createSession("class-1", {
       title: "期中環境檢查",
@@ -42,6 +47,19 @@ describe("AiJudgeService persistent sessions", () => {
       creation_mode: "blank",
       rubric_name: "期中評分表",
       environment_keys: ["python", "linux"],
+    });
+  });
+
+  test("直接建立空白檢查使用可在編輯頁修改的預設值", async () => {
+    await AiJudgeService.createBlankSession("class-1");
+
+    const [, init] = fetchMock.mock.calls[0];
+    expect(JSON.parse(init.body)).toEqual({
+      title: "未命名檢查",
+      selected_file_id: null,
+      creation_mode: "blank",
+      rubric_name: "空白評分表",
+      environment_keys: ["n8n"],
     });
   });
 

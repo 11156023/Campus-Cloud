@@ -8,7 +8,7 @@ from sqlmodel import Session, select
 
 from app.models.teacher_judge_template_command import TeacherJudgeTemplateCommand
 
-SUPPORTED_TEMPLATE_KEYS = {"linux", "python", "n8n"}
+SUPPORTED_TEMPLATE_KEYS = {"linux", "python", "n8n", "postgresql"}
 
 
 def get_enabled_template_commands(

@@ -14,9 +14,10 @@ const SCRIPT_GENERATION_TIMEOUT_MS = 7 * 60 * 1000;
 
 /** 評分環境模板選項 */
 export const TEMPLATE_OPTIONS = [
-  { key: "linux", label: "一般 Linux/LXC" },
-  { key: "python", label: "Python" },
   { key: "n8n", label: "n8n" },
+  { key: "python", label: "Python" },
+  { key: "postgresql", label: "PostgreSQL" },
+  { key: "linux", label: "一般 Linux/LXC" },
 ];
 
 export function getTemplateLabel(templateKey) {
@@ -60,6 +61,20 @@ export const AiJudgeService = {
     if (rubricName !== undefined) payload.rubric_name = rubricName;
     if (environmentKeys !== undefined) payload.environment_keys = environmentKeys;
     return apiPost(`/api/v1/teaching-classes/${classId}/judge/sessions/`, payload);
+  },
+
+  createBlankSession(classId, {
+    title = "未命名檢查",
+    rubricName = "空白評分表",
+    environmentKeys = ["n8n"],
+  } = {}) {
+    return this.createSession(classId, {
+      title,
+      selectedFileId: null,
+      creationMode: "blank",
+      rubricName,
+      environmentKeys,
+    });
   },
 
   getSession(classId, sessionId) {

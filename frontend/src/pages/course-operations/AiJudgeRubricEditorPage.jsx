@@ -597,7 +597,13 @@ export default function AiJudgeRubricEditorPage() {
               <div className={styles.environmentGrid}>
                 {TEMPLATE_OPTIONS.map((option) => {
                   const checked = environmentKeys.includes(option.key);
-                  return <label key={option.key} className={`${styles.environmentOption} ${checked ? styles.environmentOptionSelected : ""}`}><input type="checkbox" checked={checked} disabled={readOnly} onChange={() => toggleEnvironment(option.key)} /><span className={styles.checkVisual}><MIcon name={checked ? "check" : "add"} size={16} /></span><span><b>{option.label}</b><small>{option.key === "linux" ? "常見 Linux 指令與服務" : option.key === "python" ? "Python 執行環境與套件" : "n8n 工作流程服務"}</small></span></label>;
+                  const description = {
+                    n8n: "n8n 工作流程與服務",
+                    python: "Python 執行環境與套件",
+                    postgresql: "PostgreSQL 資料庫服務",
+                    linux: "常見 Linux 指令與服務",
+                  }[option.key];
+                  return <label key={option.key} className={`${styles.environmentOption} ${checked ? styles.environmentOptionSelected : ""}`}><input type="checkbox" checked={checked} disabled={readOnly} onChange={() => toggleEnvironment(option.key)} /><span className={styles.checkVisual}><MIcon name={checked ? "check" : "add"} size={16} /></span><span><b>{option.label}</b><small>{description}</small></span></label>;
                 })}
               </div>
               <p className={styles.helperText}>{environmentKeys.length ? `目前以「${getTemplateLabel(environmentKeys[0])}」產生 AI 偵測建議；其他環境會保留在候選清單。` : "請至少選擇一個環境。"}</p>

@@ -448,6 +448,13 @@
   min-width: 0;
 }
 
+.analysisAside {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: $spacing-16;
+}
+
 /* ── 統計 ── */
 .statsGrid {
   display: grid;
@@ -1136,7 +1143,7 @@
 /* ── Teacher workspace ── */
 .sessionWorkspace {
   display: grid;
-  grid-template-columns: minmax(220px, 260px) minmax(0, 1fr) minmax(260px, 310px);
+  grid-template-columns: minmax(220px, 260px) minmax(0, 1fr);
   gap: $spacing-16;
   align-items: start;
 }
@@ -1287,8 +1294,6 @@
 .renameDialog { width: min(420px, calc(100vw - 28px)); }
 
 .sourceRail {
-  position: sticky;
-  top: $spacing-16;
   display: flex;
   min-width: 0;
   flex-direction: column;
@@ -1312,13 +1317,8 @@
   gap: 2px;
 }
 
-.sourceRailActions > .iconBtn:first-child {
-  display: none;
-}
-
 .sourceRailHead h3 { margin: 0; font-size: $font-size-16; }
 .sourceRailHead p { margin: 3px 0 0; color: var(--color-text-muted); font-size: $font-size-12; }
-.sourceDrawerTrigger { display: none; }
 .sourceList { display: flex; flex-direction: column; gap: $spacing-8; }
 .sourceRow { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3px; align-items: start; padding: 4px; border: 1px solid transparent; border-radius: $radius-8; }
 .sourceRow:hover { background: var(--color-hover); }
@@ -1336,14 +1336,72 @@
 .sourceEmpty { display: flex; flex-direction: column; align-items: center; gap: $spacing-8; padding: $spacing-16 0; color: var(--color-text-muted); text-align: center; }
 .sourceEmpty p { margin: 0; font-size: $font-size-12; }
 
-.sourceBackdrop {
-  display: none;
-}
-
 .modalHeader { display: flex; align-items: flex-start; justify-content: space-between; gap: $spacing-16; margin-bottom: $spacing-16; }
 .modalHeader h2 { margin: 0; font-size: $font-size-18; }.modalHeader p { margin: 4px 0 0; color: var(--color-text-secondary); font-size: $font-size-12; }
 .createCheckDialog { width: min(620px, calc(100vw - 28px)); max-height: min(720px, calc(100vh - 28px)); overflow-y: auto; }
-.createCheckDialog form { display: flex; flex-direction: column; gap: $spacing-16; }
+.createCheckDialog form,
+.createCheckPanel form { display: flex; flex-direction: column; gap: $spacing-16; }
+.createCheckPanel,
+.createChooser {
+  min-width: 0;
+  padding: clamp(20px, 3vw, 32px);
+  border: 1px solid var(--color-border);
+  border-radius: $radius-12;
+  background: var(--color-surface);
+}
+.createCheckPanel { max-width: 760px; }
+.inlineBackButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 $spacing-16;
+  padding: 0;
+  border: 0;
+  color: var(--color-text-secondary);
+  background: transparent;
+  font: inherit;
+  font-size: $font-size-12;
+  cursor: pointer;
+}
+.inlineBackButton:hover:not(:disabled) { color: var(--color-primary); }
+.inlineBackButton:disabled { opacity: .55; cursor: not-allowed; }
+.createChooser { display: flex; min-height: 440px; flex-direction: column; justify-content: center; gap: $spacing-24; }
+.createChooserHeader { display: flex; align-items: flex-start; justify-content: space-between; gap: $spacing-16; }
+.createChooserHeading { max-width: 62ch; }
+.createChooserHeading h2 { margin: 0; color: var(--color-text-primary); font-size: clamp(20px, 2.4vw, 26px); }
+.createChooserHeading p { margin: $spacing-8 0 0; color: var(--color-text-secondary); font-size: $font-size-14; line-height: 1.55; }
+.createChoiceGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: $spacing-16; }
+.createChoice {
+  display: flex;
+  min-width: 0;
+  min-height: 250px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: $spacing-16;
+  padding: clamp(20px, 3vw, 30px);
+  border: 1px solid var(--color-border);
+  border-radius: $radius-12;
+  color: var(--color-text-primary);
+  background: var(--color-surface);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color $transition-base, background $transition-base, box-shadow $transition-base, transform $transition-base;
+}
+.createChoice:hover {
+  border-color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 4%, var(--color-surface));
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+.createChoice:disabled { opacity: .65; cursor: wait; }
+.createChoice:focus-visible,
+.inlineBackButton:focus-visible { outline: 3px solid color-mix(in srgb, var(--color-primary) 28%, transparent); outline-offset: 3px; }
+.createChoiceIcon { display: grid; width: 54px; height: 54px; place-items: center; border-radius: $radius-12; color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 11%, transparent); }
+.createChoiceCopy { display: flex; flex: 1; flex-direction: column; gap: $spacing-8; }
+.createChoiceCopy strong { font-size: $font-size-18; line-height: 1.3; }
+.createChoiceCopy small { max-width: 36ch; color: var(--color-text-secondary); font-size: $font-size-14; line-height: 1.6; }
+.createChoiceAction { display: inline-flex; align-items: center; gap: 6px; color: var(--color-primary-dark); font-size: $font-size-14; font-weight: $font-weight-700; }
 .dialogField { display: flex; flex-direction: column; gap: 6px; color: var(--color-text-secondary); font-size: $font-size-12; font-weight: $font-weight-500; }
 .dialogField input { min-height: 38px; padding: 8px 10px; border: 1px solid var(--color-border); border-radius: $radius-8; color: var(--color-text-primary); background: var(--color-surface); font: inherit; font-size: $font-size-14; outline: none; }
 .dialogField input:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 12%, transparent); }
@@ -1434,69 +1492,25 @@
   .sessionList {
     max-height: 240px;
   }
-
-  .sourceRail {
-    position: fixed;
-    z-index: 30;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    width: min(320px, calc(100vw - 48px));
-    border-radius: $radius-12 0 0 $radius-12;
-    overflow-y: auto;
-    transform: translateX(110%);
-    transition: transform $transition-base;
-  }
-
-  .sourceRailOpen {
-    transform: translateX(0);
-  }
-
-  .sourceRailActions > .iconBtn:first-child,
-  .sourceDrawerTrigger {
-    display: inline-flex;
-  }
-
-  .sourceDrawerTrigger {
-    align-items: center;
-    justify-content: space-between;
-    gap: $spacing-8;
-    width: 100%;
-    min-height: 40px;
-    padding: 8px 10px;
-    border: 1px solid var(--color-border);
-    border-radius: $radius-8;
-    color: var(--color-text-primary);
-    background: var(--color-surface);
-    font-size: $font-size-14;
-    text-align: left;
-    cursor: pointer;
-  }
-
-  .sourceBackdrop {
-    position: fixed;
-    z-index: 29;
-    inset: 0;
-    display: block;
-    border: 0;
-    background: rgb(15 23 42 / 30%);
-  }
 }
 
 @media (max-width: 700px) {
   .sessionWorkspace { grid-template-columns: 1fr; }
   .sessionSidebar { position: static; }
   .sessionMain { min-width: 0; }
-  .sourceRail {
-    top: auto;
-    right: 0;
-    bottom: 0;
-    width: 100%;
-    max-height: min(78vh, 620px);
-    border-radius: $radius-12 $radius-12 0 0;
-    transform: translateY(110%);
-  }
-  .sourceRailOpen { transform: translateY(0); }
+  .createChooser { min-height: 0; padding: $spacing-16; }
+  .createChooserHeader { flex-direction: column; }
+  .createChooserHeader .btnSecondary { width: 100%; }
+  .createChoiceGrid { grid-template-columns: 1fr; }
+  .createChoice { min-height: 190px; padding: $spacing-16; }
+  .createCheckPanel { padding: $spacing-16; }
+  .existingPickerHead { align-items: flex-start; flex-direction: column; }
+  .uploadSourceButton { width: 100%; justify-content: center; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .createChoice { transition-duration: .01ms; }
+  .createChoice:hover { transform: none; }
 }
 
 /* ── 表單欄位 ── */
