@@ -77,6 +77,41 @@ export function JobRow({ job, onClick }) {
   );
 }
 
+/* 提醒 tone（後端 courses/reminders 的 tone 欄位）→ JobRow 色調 class */
+const REMINDER_TONE_CLASS = {
+  success: "toneSuccess",
+  warning: "toneWarning",
+  danger:  "toneDanger",
+};
+
+/** 提醒列：機器期限、審核結果與近期課堂任務，樣式與 JobRow 一致 */
+export function ReminderRow({ reminder, unread = false, onClick }) {
+  const tone = REMINDER_TONE_CLASS[reminder.tone] ?? "toneInfo";
+
+  return (
+    <button type="button" className={styles.jobRow} onClick={() => onClick(reminder)}>
+      <span className={`${styles.jobRowIcon} ${styles[tone]}`}>
+        <MIcon name={reminder.icon || "notifications"} size={16} />
+      </span>
+      <span className={styles.jobRowBody}>
+        <span className={styles.jobRowHead}>
+          <span className={styles.jobRowTitle} title={reminder.title}>{reminder.title}</span>
+          {unread && <span className={styles.unreadDot} aria-label="未讀" />}
+        </span>
+        {reminder.description && (
+          <span className={styles.jobRowMessage} title={reminder.description}>
+            {reminder.description}
+          </span>
+        )}
+        <span className={styles.jobRowFoot}>
+          <span>{unread ? "未讀" : "已讀"}</span>
+          <span>{reminder.time_label}</span>
+        </span>
+      </span>
+    </button>
+  );
+}
+
 export function JobEmpty({ message = "目前沒有任務" }) {
   return (
     <div className={styles.jobEmpty}>

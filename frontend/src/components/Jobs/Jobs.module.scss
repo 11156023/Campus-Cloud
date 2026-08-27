@@ -264,6 +264,47 @@
   color: var(--color-text-muted);
 }
 
+/* 提醒列的未讀點（標題列右側） */
+.unreadDot {
+  flex-shrink: 0;
+  margin-left: auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-primary);
+}
+
+/* 提醒 subheader 右側的「全部已讀」小動作 */
+.markAllBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: $radius-8;
+  font-size: 11px;
+  font-weight: $font-weight-500;
+  color: var(--color-primary);
+  cursor: pointer;
+  transition: background $transition-base;
+
+  &:hover:not(:disabled) {
+    background: var(--color-hover);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: .4;
+  }
+}
+
+/* 任務區與提醒區之間的分隔 */
+.popoverSection {
+  flex-shrink: 0;
+  margin-top: $spacing-4;
+  padding-top: $spacing-4;
+  border-top: 1px solid var(--color-divider);
+}
+
 .jobEmpty {
   @include flex-column;
   align-items: center;
