@@ -33,7 +33,9 @@ describe("safeTemplateIconUrl", () => {
   test("接受本服務 icon 端點與 blob 預覽，拒絕其他來源", () => {
     const good = "/api/v1/templates/0b7f8a3e-1234-4abc-9def-0123456789ab/icon?v=123";
     expect(safeTemplateIconUrl(good)).toBe(good);
-    expect(safeTemplateIconUrl("blob:http://x/abc")).toBe("blob:http://x/abc");
+    const blob = "blob:http://localhost:5173/0b7f8a3e-1234-4abc-9def-0123456789ab";
+    expect(safeTemplateIconUrl(blob)).toBe(blob);
+    expect(safeTemplateIconUrl("blob:http://x/abc")).toBeNull();
     expect(safeTemplateIconUrl(null)).toBeNull();
     expect(safeTemplateIconUrl("javascript:alert(1)")).toBeNull();
     expect(safeTemplateIconUrl("https://evil.example/icon.svg")).toBeNull();
