@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import styles from "./ResourceDetailPage.module.scss";
+import LoadingState from "../../../../components/LoadingState/LoadingState";
 import { useAuth } from "../../../../contexts/AuthContext";
 import { ResourcesService } from "../../../../services/resources";
 import { SpecChangeRequestsService } from "../../../../services/specChangeRequests";
@@ -81,7 +82,7 @@ export default function SpecificationsTab({ vmid }) {
   };
 
   if (error) return <p className={styles.stateText}>無法載入資源配置</p>;
-  if (!config) return <p className={styles.stateText}>載入中…</p>;
+  if (!config) return <LoadingState />;
 
   return (
     <div className={styles.tabStack}>

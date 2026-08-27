@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import styles from "./AiApiReviewPage.module.scss";
 import MIcon from "../../../components/MIcon";
+import LoadingState from "../../../components/LoadingState/LoadingState";
 import SharedEmptyState from "../../../components/EmptyState/EmptyState";
 import { AiApiService } from "../../../services/aiApi";
 import { useToast } from "../../../hooks/useToast";
@@ -222,7 +223,7 @@ export default function AiApiReviewPage() {
 
       <div className={styles.content}>
         {loading ? (
-          <div className={styles.loadingText}>載入中…</div>
+          <LoadingState fullPage />
         ) : filtered.length === 0 ? (
           <EmptyState tab={activeTab} />
         ) : (

@@ -98,9 +98,12 @@ class GPUOptionContext(BaseModel):
     node: str = ""
     available_count: int = 0
     device_count: int = 0
+    capacity_count: int = 0
     used_count: int = 0
     total_vram_mb: int = 0
     used_vram_mb: int = 0
+    per_instance_vram_mb: int = 0
+    mdev_profile: str = ""
     has_mdev: bool = False
     is_sriov: bool = False
 

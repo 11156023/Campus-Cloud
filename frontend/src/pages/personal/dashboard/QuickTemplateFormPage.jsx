@@ -2,6 +2,7 @@ import { useContext, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import styles from "./QuickTemplateFormPage.module.scss";
 import MIcon from "../../../components/MIcon";
+import LoadingState from "../../../components/LoadingState/LoadingState";
 import AiSidePanel from "../requests/AiSidePanel";
 import { useToast } from "../../../hooks/useToast";
 import { LayoutContext } from "../../../layout/DashboardLayout";
@@ -201,10 +202,7 @@ export default function QuickTemplateFormPage() {
   if (tplLoading) {
     return (
       <div className={styles.page}>
-        <div className={styles.notFound}>
-          <MIcon name="hourglass_empty" size={40} />
-          <h2>載入範本中…</h2>
-        </div>
+        <LoadingState fullPage text="載入範本中…" />
       </div>
     );
   }

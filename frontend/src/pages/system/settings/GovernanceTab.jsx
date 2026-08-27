@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import styles from "./SettingsPage.module.scss";
+import LoadingState from "../../../components/LoadingState/LoadingState";
 import { GovernanceService } from "../../../services/governance";
 import { useToast } from "../../../hooks/useToast";
 
@@ -132,7 +133,7 @@ export default function GovernanceTab() {
     }
   }
 
-  if (!form) return <div className={styles.loading}>載入治理設定...</div>;
+  if (!form) return <LoadingState text="載入治理設定..." />;
 
   return (
     <form className={styles.panelStack} onSubmit={handleSave}>

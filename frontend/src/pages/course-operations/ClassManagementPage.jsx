@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import LoadingState from "../../components/LoadingState/LoadingState";
 import MIcon from "../../components/MIcon";
 import EmptyState from "../../components/EmptyState/EmptyState";
 import { TeachingClassesService } from "../../services/teachingClasses";
@@ -101,7 +102,7 @@ export default function ClassManagementPage() {
       <div className={styles.pillTabs}>{FILTERS.map(([key, label]) => <button type="button" key={key} className={status === key ? styles.pillActive : ""} onClick={() => setStatus(key)}>{label}</button>)}</div>
     </div>
 
-    {loading ? <div className={styles.classLoading}><span />正在讀取班級…</div> : rows.length ? <section className={styles.classCardGrid}>
+    {loading ? <LoadingState fullPage text="正在讀取班級…" /> : rows.length ? <section className={styles.classCardGrid}>
       {rows.map((item) => {
         const setupReady = [item.students > 0, item.nodes.length > 0].filter(Boolean).length;
         const progress = item.status === "planning" ? setupReady / 2 * 100 : item.totalMachines ? item.readyMachines / item.totalMachines * 100 : 0;

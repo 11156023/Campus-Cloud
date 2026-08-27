@@ -9,14 +9,6 @@
   }
 }
 
-.pageLoading {
-  @include flex-center;
-  flex: 1;
-  min-height: 240px;
-  color: var(--color-text-muted);
-  font-size: $font-size-14;
-}
-
 .pageHeader {
   @include flex-between;
   flex-wrap: wrap;
@@ -612,13 +604,6 @@
 }
 
 /* ── 節點趨勢 ── */
-.trendLoading {
-  @include flex-center;
-  height: 200px;
-  color: var(--color-text-muted);
-  font-size: $font-size-14;
-}
-
 .trendGrid {
   display: grid;
   grid-template-columns: 1fr;

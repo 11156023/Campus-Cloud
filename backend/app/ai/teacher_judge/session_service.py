@@ -45,8 +45,12 @@ _SENSITIVE_PATTERNS = (
         r"(?i)\b(password|passwd|token|secret|api[_-]?key|authorization)\b"
         r"(\s*[:=]\s*)([^\s,;]+)"
     ),
+    # 有界量詞避免 polynomial ReDoS（CodeQL py/polynomial-redos）：
+    # header 詞彙固定為大寫（RSA/EC/OPENSSH/ENCRYPTED…），本體長度設上限
     re.compile(
-        r"-----BEGIN [^-]*PRIVATE KEY-----.*?-----END [^-]*PRIVATE KEY-----", re.DOTALL
+        r"-----BEGIN [A-Z ]{0,40}PRIVATE KEY-----"
+        r"[\s\S]{0,16384}?"
+        r"-----END [A-Z ]{0,40}PRIVATE KEY-----"
     ),
 )
 

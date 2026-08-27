@@ -921,6 +921,11 @@ def test_select_request_placement_falls_back_when_reserved_node_is_unavailable(
     placement_request = SimpleNamespace()
 
     monkeypatch.setattr(
+        "app.services.proxmox.provisioning_service.placement_support"
+        ".allowed_template_nodes_for_request",
+        lambda request: None,
+    )
+    monkeypatch.setattr(
         "app.services.proxmox.provisioning_service.placement_advisor._load_cluster_state",
         lambda: ([], []),
     )

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import styles from "./ResourceDetailPage.module.scss";
 import MIcon from "../../../../components/MIcon";
+import LoadingState from "../../../../components/LoadingState/LoadingState";
 import RrdChart from "../../../../components/RrdChart/RrdChart";
 import { ResourcesService } from "../../../../services/resources";
 
@@ -97,7 +98,7 @@ export default function MonitoringTab({ vmid }) {
     };
   }, [vmid, timeframe]);
 
-  if (!current) return <p className={styles.stateText}>載入監控資料中…</p>;
+  if (!current) return <LoadingState text="載入監控資料中…" />;
 
   const cpuPct = current.cpu ? (current.cpu * 100).toFixed(2) : "0.00";
   const memPct =

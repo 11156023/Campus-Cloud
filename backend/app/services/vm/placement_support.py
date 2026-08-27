@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import logging
+import re
+import threading
+import time
 import uuid
 from datetime import UTC, datetime, timedelta
 
@@ -24,11 +28,18 @@ from app.domain.placement.storage import (
     reserve_storage_pool,
     select_best_storage_for_request,
 )
+from app.exceptions import NotFoundError
+from app.infrastructure.proxmox import (
+    get_connection_id_for_node,
+    get_nodes_for_connection,
+)
 from app.models import VMRequest
 from app.repositories import proxmox_storage as proxmox_storage_repo
-from app.services.proxmox import gpu_service
+from app.services.proxmox import gpu_service, proxmox_service
 
 GIB = 1024**3
+
+logger = logging.getLogger(__name__)
 
 
 def utc_now() -> datetime:
@@ -207,7 +218,11 @@ def node_can_host_request(
     gpu_required: int,
     has_managed_storage: bool,
     allowed_gpu_nodes: set[str] | None = None,
+    allowed_nodes: set[str] | None = None,
 ) -> bool:
+    # 模板節點白名單（None = 不受限；空集合 = 模板在任何節點都拿不到）
+    if allowed_nodes is not None and node.node not in allowed_nodes:
+        return False
     if gpu_required > 0:
         if allowed_gpu_nodes is not None:
             if node.node not in allowed_gpu_nodes:
@@ -239,6 +254,111 @@ def allowed_gpu_nodes_for_request(request: PlacementRequest) -> set[str] | None:
         for node, count in gpu_service.get_gpu_node_counts(mapping_id=mapping_id).items()
         if count > 0
     }
+
+
+_TEMPLATE_NODES_CACHE_TTL_SECONDS = 60.0
+# cache value: (timestamp, 模板可見節點集合或 None, 模板是否標記需要 GPU)
+_template_nodes_cache: dict[tuple[str, str], tuple[float, set[str] | None, bool]] = {}
+_template_nodes_cache_lock = threading.Lock()
+
+# 範本名稱／映像檔名以 -GPU 結尾（副檔名或版本段前）代表該作業系統需要 GPU
+_GPU_MARKER_RE = re.compile(r"-gpu(?=[_.]|$)", re.IGNORECASE)
+
+
+def _template_needs_gpu(name: str) -> bool:
+    return bool(_GPU_MARKER_RE.search(str(name or "").strip()))
+
+
+def _gpu_capable_nodes() -> set[str]:
+    return {
+        node
+        for node, count in gpu_service.get_gpu_node_counts().items()
+        if count > 0
+    }
+
+
+def allowed_template_nodes_for_request(request: PlacementRequest) -> set[str] | None:
+    """模板決定的候選節點白名單；None = 不受模板限制。
+
+    - LXC + ostemplate：只有 iso_storage 看得到該 vztmpl 的節點可選。
+    - VM + template_vmid：clone 不可跨連線，限制在範本所屬連線的節點；
+      範本已不存在時回空集合（無可行節點，讓 placement 明確失敗）。
+    - 名稱標記 -GPU 的模板且未指定 GPU mapping 時，再縮限到有 GPU 的
+      節點（有指定 mapping 時交由 allowed_gpu_nodes 過濾，不重複處理）。
+    - PVE 查詢異常時回 None（寧可放行讓後續建立報錯，也不因暫時性
+      故障把整個排程判成不可行）。
+    """
+    resource_type = str(request.resource_type)
+    if resource_type == "lxc" and request.ostemplate:
+        cache_key = ("lxc", str(request.ostemplate))
+    elif resource_type == "vm" and request.template_vmid:
+        cache_key = ("vm", str(request.template_vmid))
+    else:
+        return None
+
+    now = time.monotonic()
+    allowed: set[str] | None
+    needs_gpu = False
+    cached_hit = False
+    with _template_nodes_cache_lock:
+        cached = _template_nodes_cache.get(cache_key)
+        if cached and (now - cached[0]) < _TEMPLATE_NODES_CACHE_TTL_SECONDS:
+            allowed = set(cached[1]) if cached[1] is not None else None
+            needs_gpu = cached[2]
+            cached_hit = True
+
+    if not cached_hit:
+        try:
+            if cache_key[0] == "lxc":
+                node_map = proxmox_service.get_lxc_template_node_map()
+                # 整張映射為空多半是所有節點查詢都失敗，視同不受限
+                allowed = node_map.get(cache_key[1], set()) if node_map else None
+                needs_gpu = _template_needs_gpu(cache_key[1])
+            else:
+                try:
+                    template = proxmox_service.find_vm_template(int(cache_key[1]))
+                except NotFoundError:
+                    allowed = set()
+                    template = None
+                else:
+                    template_node = str(template.get("node") or "")
+                    if template_node:
+                        connection_nodes = get_nodes_for_connection(
+                            get_connection_id_for_node(template_node)
+                        )
+                        allowed = connection_nodes or {template_node}
+                    else:
+                        allowed = None
+                needs_gpu = _template_needs_gpu(
+                    str((template or {}).get("name") or "")
+                )
+        except Exception as exc:
+            logger.warning(
+                "Unable to resolve template nodes for %s %s: %s",
+                cache_key[0],
+                cache_key[1],
+                exc,
+            )
+            allowed = None
+            needs_gpu = False
+
+        with _template_nodes_cache_lock:
+            _template_nodes_cache[cache_key] = (
+                time.monotonic(),
+                set(allowed) if allowed is not None else None,
+                needs_gpu,
+            )
+
+    if needs_gpu and not str(request.gpu_mapping_id or "").strip():
+        try:
+            gpu_nodes = _gpu_capable_nodes()
+        except Exception as exc:
+            logger.warning("Unable to resolve GPU-capable nodes: %s", exc)
+            gpu_nodes = None
+        if gpu_nodes is not None:
+            allowed = gpu_nodes if allowed is None else (allowed & gpu_nodes)
+
+    return set(allowed) if allowed is not None else None
 
 
 def release_request_from_capacities(
@@ -378,6 +498,7 @@ def build_plan(
         has_managed_storage=has_managed_storage,
     )
     allowed_gpu_nodes = allowed_gpu_nodes_for_request(request)
+    allowed_nodes = allowed_template_nodes_for_request(request)
     placements: dict[str, int] = {item.node: 0 for item in working_nodes}
     remaining = request.instance_count
 
@@ -392,6 +513,7 @@ def build_plan(
                 gpu_required=request.gpu_required,
                 has_managed_storage=has_managed_storage,
                 allowed_gpu_nodes=allowed_gpu_nodes,
+                allowed_nodes=allowed_nodes,
             ):
                 continue
             storage_selection: StorageSelection | None = None
@@ -652,6 +774,18 @@ def to_placement_request(db_request: VMRequest) -> PlacementRequest:
     )
     if disk_gb <= 0:
         disk_gb = 20 if db_request.resource_type == "vm" else 8
+    # LXC 帶 template_id 時走克隆路徑（節點由範本釘死），不帶 ostemplate 約束
+    ostemplate = (
+        getattr(db_request, "ostemplate", None)
+        if db_request.resource_type == "lxc"
+        and not getattr(db_request, "template_id", None)
+        else None
+    )
+    template_vmid = (
+        getattr(db_request, "template_id", None)
+        if db_request.resource_type == "vm"
+        else None
+    )
     return PlacementRequest(
         resource_type=db_request.resource_type,
         cpu_cores=int(db_request.cores or 1),
@@ -660,4 +794,6 @@ def to_placement_request(db_request: VMRequest) -> PlacementRequest:
         instance_count=1,
         gpu_required=1 if bool(getattr(db_request, "gpu_mapping_id", None)) else 0,
         gpu_mapping_id=getattr(db_request, "gpu_mapping_id", None),
+        ostemplate=ostemplate,
+        template_vmid=template_vmid,
     )

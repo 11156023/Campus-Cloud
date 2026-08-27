@@ -4,6 +4,7 @@ import MIcon from "../../../components/MIcon";
 import SharedEmptyState from "../../../components/EmptyState/EmptyState";
 import { useToast } from "../../../hooks/useToast";
 import useAutoRefresh from "../../../hooks/useAutoRefresh";
+import LoadingState from "../../../components/LoadingState/LoadingState";
 import { AiApiService } from "../../../services/aiApi";
 import { DeletionRequestsService } from "../../../services/deletionRequests";
 import { SpecChangeRequestsService } from "../../../services/specChangeRequests";
@@ -56,12 +57,16 @@ function formatRange(startAt, endAt) {
   return `${formatDateTime(startAt)} - ${formatDateTime(endAt)}`;
 }
 
+const CONSUMED_REQUEST_MARKERS = [
+  "Resource deleted by user",
+  "Resource deleted (orphan DB cleanup)",
+  "Resource converted to template",
+];
+
 function isDeletedApprovedVm(request) {
   return (
-    request?.review_comment === "Resource deleted by user" ||
-    request?.review_comment === "Resource deleted (orphan DB cleanup)" ||
-    request?.resource_warning === "Resource deleted by user" ||
-    request?.resource_warning === "Resource deleted (orphan DB cleanup)"
+    CONSUMED_REQUEST_MARKERS.includes(request?.review_comment) ||
+    CONSUMED_REQUEST_MARKERS.includes(request?.resource_warning)
   );
 }
 
@@ -483,7 +488,7 @@ export default function RequestReviewPage() {
         <div className={styles.reviewGrid}>
           <section className={styles.listPane}>
             {loading ? (
-              <div className={styles.stateBox}>讀取申請中...</div>
+              <LoadingState text="讀取申請中..." />
             ) : error ? (
               <div className={styles.stateBox}>
                 <span>{error}</span>
@@ -561,7 +566,7 @@ export default function RequestReviewPage() {
                   <p>{selected.reason}</p>
                 </div>
 
-                {contextLoading && <div className={styles.stateBox}>讀取資源評估中...</div>}
+                {contextLoading && <LoadingState text="讀取資源評估中..." />}
                 {contextError && selected.source === "vm" && (
                   <div className={`${styles.stateBox} ${styles.stateError}`}>
                     {contextError}

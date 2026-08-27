@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import styles from "./AiJudgePanel.module.scss";
+import LoadingState from "../../components/LoadingState/LoadingState";
 import MIcon from "../../components/MIcon";
 import { useToast } from "../../hooks/useToast";
 import useAutoRefresh from "../../hooks/useAutoRefresh";
@@ -1064,8 +1065,7 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
              <strong>正在生成受管檢查腳本</strong>
           </p>
           <p>
-             AI 正在依目前評分項目與環境命令產生 Python 檢查腳本，系統會接著執行 hard policy 與 AI
-            reviewer 審查。
+            AI 正在依目前評分項目產生收集腳本，完成後系統會接著進行安全規則檢查與 AI 複核。
           </p>
         </div>
       )}
@@ -1085,7 +1085,7 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
           </h4>
         </div>
         {filesLoading ? (
-          <p className={styles.mutedText}>載入評分表中...</p>
+          <LoadingState text="載入評分表中..." />
         ) : filesError ? (
           <p className={styles.dangerText}>載入評分表失敗，請稍後再試。</p>
         ) : files.length === 0 ? (
@@ -1144,7 +1144,7 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
                上傳評分文件（可選）
             </h4>
             <p className={styles.mutedText}>
-              可以先聊天再上傳；上傳後會分析並自動綁定到目前檢查。
+              可以先聊天再上傳；上傳後會分析並自動綁定到目前這次檢查。
             </p>
             <div className={styles.templateRow}>
               <span className={styles.fieldLabel}>評分環境</span>
@@ -1452,13 +1452,13 @@ function ScriptsTab({ classId, sessionId, readOnly = false, onScriptApproved }) 
     <div className={styles.tabBody}>
       <div className={styles.sectionHead}>
         <div>
-          <h3 className={styles.sectionTitle}>檢查腳本</h3>
-          <p className={styles.sectionDesc}>管理班級內由評分表產生的受管 Python 檢查腳本。</p>
+          <h3 className={styles.sectionTitle}>收集腳本</h3>
+          <p className={styles.sectionDesc}>管理班級內由評分表產生的受管收集腳本。</p>
         </div>
       </div>
 
       {loading ? (
-        <p className={styles.mutedText}>載入腳本中...</p>
+        <LoadingState text="載入腳本中..." />
       ) : error ? (
         <div className={styles.card}>
           <div className={styles.cardHead}>
@@ -1491,7 +1491,7 @@ function ScriptsTab({ classId, sessionId, readOnly = false, onScriptApproved }) 
                   </span>
                 </span>
                 <span className={styles.fileMeta}>
-                  v{script.version} · {script.template_key} · {formatDateTime(script.updated_at)}
+                  v{script.version} · {getTemplateLabel(script.template_key)} · {formatDateTime(script.updated_at)}
                 </span>
               </button>
             ))}
@@ -1540,8 +1540,8 @@ function ScriptsTab({ classId, sessionId, readOnly = false, onScriptApproved }) 
               </div>
 
               <div className={styles.reviewGrid}>
-                <ReviewPanel title="Hard policy（靜態）" result={selected.policy_check_result_json} />
-                <ReviewPanel title="AI reviewer" result={selected.ai_review_result_json} />
+                <ReviewPanel title="規則檢查（靜態）" result={selected.policy_check_result_json} />
+                <ReviewPanel title="AI 檢查" result={selected.ai_review_result_json} />
               </div>
 
               <pre className={styles.codeBlock}>{selected.script_content}</pre>
@@ -1591,10 +1591,10 @@ const REASON_LABELS = {
   missing_ip: "缺少 IP",
   missing_ssh_key: "缺少 SSH 金鑰",
   owner_mismatch: "資源擁有者不一致",
-  missing_db_resource: "資料庫無資源",
+  missing_db_resource: "找不到對應資源",
   invalid_resource_type: "類型不可執行",
-  python_missing: "缺少 python3",
-  execution_nonzero: "檢查腳本執行失敗",
+  python_missing: "機器缺少腳本執行環境",
+  execution_nonzero: "腳本執行失敗",
   result_too_large: "結果過大",
   invalid_json: "JSON 格式錯誤",
   executor_error: "執行器錯誤",
@@ -1844,7 +1844,7 @@ function ExecutionTab({ classId, sessionId, readOnly = false, members }) {
           <thead>
             <tr>
               <th className={styles.checkCol} />
-              <th>機器名稱</th>
+              <th>機器編號</th>
               <th>成員</th>
               <th>類型</th>
               <th>狀態</th>
@@ -1874,7 +1874,7 @@ function ExecutionTab({ classId, sessionId, readOnly = false, members }) {
                     <div>{member.full_name ?? "-"}</div>
                     <div className={styles.fileMeta}>{member.email}</div>
                   </td>
-                  <td className={styles.typeCell}>{member.vm_type ?? "-"}</td>
+                  <td className={styles.typeCell}>{member.vm_type ? (member.vm_type === "lxc" ? "LXC" : "VM") : "-"}</td>
                   <td>
                     <span className={`${styles.badge} ${styles.badge_success}`}>運行中</span>
                   </td>
@@ -1914,7 +1914,7 @@ function ExecutionTab({ classId, sessionId, readOnly = false, members }) {
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th>VMID</th>
+                  <th>編號</th>
                   <th>成員</th>
                   <th>來源節點</th>
                   <th>執行狀態</th>
@@ -1942,7 +1942,7 @@ function ExecutionTab({ classId, sessionId, readOnly = false, members }) {
                       <td>
                         <div className={styles.monoCell}>{proxmoxNode ?? "-"}</div>
                         <div className={`${styles.fileMeta} ${styles.typeCell}`}>
-                          {resourceType ?? "-"}
+                          {resourceType ? (resourceType === "lxc" ? "LXC" : "VM") : "-"}
                         </div>
                       </td>
                       <td>
@@ -2074,7 +2074,7 @@ function ExecutionTab({ classId, sessionId, readOnly = false, members }) {
             {effectiveScript && (
               <p className={styles.fileMeta}>
                 即將使用：{effectiveScript.name} v{effectiveScript.version}（
-                {effectiveScript.template_key}）
+                {getTemplateLabel(effectiveScript.template_key)}）
               </p>
             )}
 
@@ -2143,7 +2143,7 @@ function LegacyAiJudgePanel({ classId, members }) {
       if (requestVersion === requestVersionRef.current) {
         setSessions([]);
         setActiveSessionId(null);
-        toast.error(err?.message ?? "載入檢查失敗");
+        toast.error(err?.message ?? "載入檢查清單失敗");
       }
     } finally {
       if (requestVersion === requestVersionRef.current) setSessionsLoading(false);
@@ -2260,9 +2260,9 @@ function LegacyAiJudgePanel({ classId, members }) {
           </div>
           <div className={styles.sessionList}>
             {sessionsLoading ? (
-              <p className={styles.mutedText}>載入中...</p>
+              <LoadingState />
             ) : sessions.length === 0 ? (
-              <p className={styles.mutedText}>目前沒有檢查。</p>
+              <p className={styles.mutedText}>目前沒有檢查紀錄。</p>
             ) : (
               sessions.map((item) => (
                 <button
@@ -2289,7 +2289,7 @@ function LegacyAiJudgePanel({ classId, members }) {
             <div className={styles.card}>
               <p className={styles.mutedText}>
                 {sessionStatus === "active"
-                  ? "請新增或選擇一個檢查。"
+                  ? "請新增或選擇一項檢查。"
                   : "請選擇已封存的檢查查看歷史。"}
               </p>
             </div>

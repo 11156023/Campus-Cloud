@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import styles from "./AdminPage.module.scss";
 import MIcon from "../../../components/MIcon";
+import LoadingState from "../../../components/LoadingState/LoadingState";
 import SharedEmptyState from "../../../components/EmptyState/EmptyState";
 import { useAuth } from "../../../contexts/AuthContext";
 import { useToast } from "../../../hooks/useToast";
@@ -346,7 +347,7 @@ export default function AdminPage() {
 
       <div className={styles.content}>
         {loading ? (
-          <div className={styles.loading}>載入使用者...</div>
+          <LoadingState fullPage text="載入使用者..." />
         ) : visibleUsers.length === 0 ? (
           <EmptyState hasQuery={Boolean(query.trim())} />
         ) : (

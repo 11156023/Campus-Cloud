@@ -97,7 +97,7 @@ export default function AvailabilityPanel({ draft, startAt, endAt, onChange, onH
   /* ── Fetch ── */
   const draftReady = isDraftReady(draft);
   const draftKey = draftReady
-    ? `${draft.resource_type}|${draft.cores}|${draft.memory}|${draft.disk_size ?? ""}|${draft.rootfs_size ?? ""}|${draft.gpu_required ?? 0}|${draft.gpu_mapping_id ?? ""}`
+    ? `${draft.resource_type}|${draft.cores}|${draft.memory}|${draft.disk_size ?? ""}|${draft.rootfs_size ?? ""}|${draft.gpu_required ?? 0}|${draft.gpu_mapping_id ?? ""}|${draft.ostemplate ?? ""}|${draft.template_id ?? ""}`
     : null;
 
   useEffect(() => {

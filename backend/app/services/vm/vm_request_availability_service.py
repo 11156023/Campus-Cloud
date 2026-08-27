@@ -104,6 +104,8 @@ def assess_existing_request(
         instance_count=1,
         gpu_required=1 if db_request.gpu_mapping_id else 0,
         gpu_mapping_id=db_request.gpu_mapping_id,
+        ostemplate=getattr(db_request, "ostemplate", None),
+        template_id=getattr(db_request, "template_id", None),
         days=days,
         timezone=timezone,
         policy_role=role,
@@ -129,6 +131,11 @@ def validate_request_window(
     if end_at <= start_at:
         raise BadRequestError("end_at must be later than start_at")
 
+    ostemplate, template_vmid = _template_constraints(
+        resource_type=cast(str, request_in.resource_type),
+        ostemplate=getattr(request_in, "ostemplate", None),
+        template_id=getattr(request_in, "template_id", None),
+    )
     placement_request = PlacementRequest(
         resource_type=cast(str, request_in.resource_type),
         cpu_cores=int(getattr(request_in, "cores", 1) or 1),
@@ -141,6 +148,8 @@ def validate_request_window(
         instance_count=1,
         gpu_required=1 if bool(getattr(request_in, "gpu_mapping_id", None)) else 0,
         gpu_mapping_id=getattr(request_in, "gpu_mapping_id", None),
+        ostemplate=ostemplate,
+        template_vmid=template_vmid,
     )
     selection = vm_request_placement_service.select_reserved_target_node_for_request(
         session=session,
@@ -177,6 +186,11 @@ def assess_request_window(
         duration_hours += 1
     duration_days = round(duration_seconds / 86400, 2)
 
+    ostemplate, template_vmid = _template_constraints(
+        resource_type=cast(str, request_in.resource_type),
+        ostemplate=request_in.ostemplate,
+        template_id=request_in.template_id,
+    )
     placement_request = PlacementRequest(
         resource_type=cast(str, request_in.resource_type),
         cpu_cores=int(request_in.cores or 1),
@@ -192,6 +206,8 @@ def assess_request_window(
             1 if request_in.gpu_mapping_id else 0,
         ),
         gpu_mapping_id=request_in.gpu_mapping_id,
+        ostemplate=ostemplate,
+        template_vmid=template_vmid,
     )
     selection = vm_request_placement_service.select_reserved_target_node_for_request(
         session=session,
@@ -658,6 +674,9 @@ def _lightweight_fit_nodes(
         disk_bytes=required_disk,
         has_managed_storage=has_managed_storage,
     )
+    allowed_template_nodes = placement_support.allowed_template_nodes_for_request(
+        request
+    )
     working_nodes = [item.model_copy(deep=True) for item in adjusted_nodes]
     working_storage = deepcopy(storage_pools_by_node)
     placed_nodes: list[str] = []
@@ -673,6 +692,7 @@ def _lightweight_fit_nodes(
                 gpu_required=request.gpu_required,
                 has_managed_storage=has_managed_storage,
                 allowed_gpu_nodes=allowed_gpu_nodes,
+                allowed_nodes=allowed_template_nodes,
             ):
                 continue
 
@@ -721,6 +741,7 @@ def _lightweight_fit_nodes(
             gpu_required=request.gpu_required,
             has_managed_storage=has_managed_storage,
             allowed_gpu_nodes=allowed_gpu_nodes,
+            allowed_nodes=allowed_template_nodes,
         )
         if chosen_storage is not None:
             reserve_storage_pool(
@@ -819,7 +840,29 @@ def _resolve_timezone(value: str) -> ZoneInfo:
         raise BadRequestError("Invalid timezone") from exc
 
 
+def _template_constraints(
+    *,
+    resource_type: str,
+    ostemplate: str | None,
+    template_id: int | None,
+) -> tuple[str | None, int | None]:
+    """對齊 placement_support.to_placement_request 的模板約束規則。
+
+    LXC 帶 template_id 時為克隆路徑（節點由範本釘死），不帶 ostemplate 約束。
+    """
+    if resource_type == "lxc" and ostemplate and not template_id:
+        return str(ostemplate), None
+    if resource_type == "vm" and template_id:
+        return None, int(template_id)
+    return None, None
+
+
 def _to_placement_request(request_in: VMRequestAvailabilityRequest) -> PlacementRequest:
+    ostemplate, template_vmid = _template_constraints(
+        resource_type=cast(str, request_in.resource_type),
+        ostemplate=request_in.ostemplate,
+        template_id=request_in.template_id,
+    )
     return PlacementRequest(
         resource_type=cast(str, request_in.resource_type),
         cpu_cores=int(request_in.cores),
@@ -835,6 +878,8 @@ def _to_placement_request(request_in: VMRequestAvailabilityRequest) -> Placement
             1 if request_in.gpu_mapping_id else 0,
         ),
         gpu_mapping_id=request_in.gpu_mapping_id,
+        ostemplate=ostemplate,
+        template_vmid=template_vmid,
     )
 
 

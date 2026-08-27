@@ -35,7 +35,7 @@ export default function SubnetBanner() {
     <div className={styles.banner}>
       <MIcon name="warning_amber" size={16} />
       <span className={styles.text}>
-        子網尚未配置，VM/LXC 建立功能已停用。
+        {isAdmin ? "子網尚未配置，VM/LXC 建立功能已停用。" : "目前無法建立虛擬機或容器，請聯繫系統管理員完成網路設定。"}
         {isAdmin && (
           <Link to="/ip-management" className={styles.link}>
             前往設定

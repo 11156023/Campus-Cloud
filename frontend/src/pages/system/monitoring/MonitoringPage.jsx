@@ -1,6 +1,7 @@
 import { Fragment, useCallback, useEffect, useState } from "react";
 import styles from "./MonitoringPage.module.scss";
 import MIcon from "../../../components/MIcon";
+import LoadingState from "../../../components/LoadingState/LoadingState";
 import EmptyState from "../../../components/EmptyState/EmptyState";
 import RrdChart from "../../../components/RrdChart/RrdChart";
 import MiningIncidentsPanel from "./MiningIncidentsPanel";
@@ -112,7 +113,7 @@ function NodeTrends({ node, timeframe }) {
   }, [node, timeframe]);
 
   if (data === null) {
-    return <div className={styles.trendLoading}>載入趨勢中…</div>;
+    return <LoadingState text="載入趨勢中…" />;
   }
 
   return (
@@ -178,7 +179,7 @@ function AlertsCard() {
       </div>
 
       {alerts === null ? (
-        <p className={styles.cardEmpty}>載入中…</p>
+        <LoadingState />
       ) : alerts.length === 0 ? (
         <EmptyState icon="notifications_off" title="目前沒有活動告警" />
       ) : (
@@ -298,7 +299,7 @@ export default function MonitoringPage() {
   }, [load]);
 
   if (loading) {
-    return <div className={styles.pageLoading}>載入監控資料中…</div>;
+    return <LoadingState fullPage text="載入監控資料中…" />;
   }
 
   if (error || !overview) {

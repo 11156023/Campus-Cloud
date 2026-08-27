@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import styles from "./AuditPage.module.scss";
 import MIcon from "../../../components/MIcon";
+import LoadingState from "../../../components/LoadingState/LoadingState";
 import SharedEmptyState from "../../../components/EmptyState/EmptyState";
 import { useToast } from "../../../hooks/useToast";
 import { downloadBlob } from "../../../services/api";
@@ -235,7 +236,7 @@ export default function AuditPage() {
 
       <div className={styles.content}>
         {loading ? (
-          <div className={styles.loading}>載入稽核日誌...</div>
+          <LoadingState fullPage text="載入稽核日誌..." />
         ) : logs.length === 0 ? (
           <EmptyState hasFilter={hasFilter} />
         ) : (
@@ -255,7 +256,7 @@ export default function AuditPage() {
                       <td className={`${styles.td} ${styles.tdNowrap}`}>{formatTime(log.created_at)}</td>
                       <td className={styles.td}>
                         <div className={styles.userCell}>
-                          <span>{log.user_full_name ?? "—"}</span>
+                          <span>{log.user_full_name ?? (log.user_email ? "—" : "系統")}</span>
                           <span className={styles.userEmail}>{log.user_email ?? ""}</span>
                         </div>
                       </td>
