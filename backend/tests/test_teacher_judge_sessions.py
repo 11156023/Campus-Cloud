@@ -318,7 +318,7 @@ async def test_message_without_rubric_is_saved_and_uses_general_chat(
     monkeypatch.setattr(teacher_judge_sessions, "_access", lambda *args: None)
     monkeypatch.setattr(teacher_judge_sessions, "chat_with_rubric", fake_chat)
     monkeypatch.setattr(
-        teacher_judge_sessions, "get_enabled_template_commands", lambda *args: []
+        teacher_judge_sessions, "get_enabled_template_commands", lambda *args, **kwargs: []
     )
 
     result = await teacher_judge_sessions.create_message(
@@ -360,7 +360,7 @@ async def test_refine_message_uses_the_rubric_polish_prompt_mode(
     monkeypatch.setattr(teacher_judge_sessions, "_access", lambda *args: None)
     monkeypatch.setattr(teacher_judge_sessions, "chat_with_rubric", fake_chat)
     monkeypatch.setattr(
-        teacher_judge_sessions, "get_enabled_template_commands", lambda *args: []
+        teacher_judge_sessions, "get_enabled_template_commands", lambda *args, **kwargs: []
     )
 
     result = await teacher_judge_sessions.create_message(
@@ -483,7 +483,7 @@ async def test_summary_runs_only_on_tenth_completed_turn(
 
     monkeypatch.setattr(session_service, "chat_with_rubric", fake_chat)
     monkeypatch.setattr(
-        session_service, "get_enabled_template_commands", lambda *args: []
+        session_service, "get_enabled_template_commands", lambda *args, **kwargs: []
     )
 
     for index in range(9):
@@ -544,7 +544,7 @@ async def test_summary_failure_preserves_previous_value(
 
     monkeypatch.setattr(session_service, "chat_with_rubric", fail_chat)
     monkeypatch.setattr(
-        session_service, "get_enabled_template_commands", lambda *args: []
+        session_service, "get_enabled_template_commands", lambda *args, **kwargs: []
     )
     await session_service.maybe_summarize(db, item, rubric_file)
 

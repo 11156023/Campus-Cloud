@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from time import perf_counter
 from typing import Any, Literal, cast
 
@@ -35,10 +36,67 @@ from app.models.teacher_judge_template_command import TeacherJudgeTemplateComman
 
 logger = logging.getLogger(__name__)
 
+_PYTHON_ENTRYPOINT_PATTERN = re.compile(r"\b[\w.-]+\.py\b", re.IGNORECASE)
+_PYTHON_EXECUTION_INTENT_PATTERN = re.compile(
+    r"報錯|錯誤|例外|執行|啟動|運行|error|exception|traceback|stderr|exit\s+code",
+    re.IGNORECASE,
+)
+_PYTHON_COMMAND_PATTERN = re.compile(
+    r"\b(?:uv\s+run\s+)?python(?:3(?:\.\d+)?)?\s+[^\r\n]*?\b[\w.-]+\.py\b",
+    re.IGNORECASE,
+)
+_WORKING_DIRECTORY_PATTERN = re.compile(
+    r"(?:cwd|工作目錄)\s*(?:=|:|：|為|是)\s*"
+    r"(?:[A-Za-z]:[\\/][^\s，。；]+|/[^\s，。；]+|\.\.?[\\/][^\s，。；]*|\.)",
+    re.IGNORECASE,
+)
+_EXIT_CRITERIA_PATTERN = re.compile(
+    r"exit\s+code\s*(?:為|是|=|:|：)?\s*0|return\s*code\s*(?:為|是|=|:|：)?\s*0|"
+    r"正常結束|未捕捉例外|沒有(?:報錯|錯誤|例外)|無(?:報錯|錯誤|例外)",
+    re.IGNORECASE,
+)
+_LONG_RUNNING_CRITERIA_PATTERN = re.compile(
+    r"(?:常駐|持續執行|不會結束).{0,30}(?:timeout|逾時|秒|分鐘|連接埠|port)|"
+    r"(?:timeout|逾時|秒|分鐘|連接埠|port).{0,30}(?:常駐|持續執行|不會結束)",
+    re.IGNORECASE,
+)
+
 
 async def close_http_client() -> None:
     """Close Teacher Judge AI client; kept for older callers/tests."""
     await teacher_judge_client.aclose()
+
+
+def _is_python_entrypoint_execution_check(text: str) -> bool:
+    return bool(
+        _PYTHON_ENTRYPOINT_PATTERN.search(text)
+        and _PYTHON_EXECUTION_INTENT_PATTERN.search(text)
+    )
+
+
+def _has_complete_python_execution_contract(text: str) -> bool:
+    return bool(
+        _PYTHON_COMMAND_PATTERN.search(text)
+        and _WORKING_DIRECTORY_PATTERN.search(text)
+        and (
+            _EXIT_CRITERIA_PATTERN.search(text)
+            or _LONG_RUNNING_CRITERIA_PATTERN.search(text)
+        )
+    )
+
+
+def _find_python_entrypoint_command(
+    template_commands: list[TeacherJudgeTemplateCommand] | None,
+) -> TeacherJudgeTemplateCommand | None:
+    return next(
+        (
+            command
+            for command in template_commands or []
+            if command.template_key == "python"
+            and command.command_key == "python.run_entrypoint"
+        ),
+        None,
+    )
 
 
 
@@ -122,6 +180,50 @@ def _normalize_rubric_items(
             template_key=template_key,
             template_commands=template_commands,
         )
+        item_text = "\n".join(
+            value
+            for value in (
+                title,
+                description,
+                str(detection_method or ""),
+                str(fallback or ""),
+            )
+            if value
+        )
+        if _is_python_entrypoint_execution_check(item_text):
+            entrypoint_command = _find_python_entrypoint_command(template_commands)
+            if entrypoint_command is None:
+                detectable = "manual"
+                check_steps = []
+                detection_method = "平台目前尚未啟用受控 Python 程式入口執行能力"
+                fallback = (
+                    "請先啟用 python.run_entrypoint command catalog；啟用後仍需提供"
+                    "工作目錄、實際 Python 命令／參數與結束判準。"
+                )
+            else:
+                check_steps = [
+                    TeacherJudgeRubricCheckStep(
+                        template_key="python",
+                        command_key=entrypoint_command.command_key,
+                        command_label=entrypoint_command.command_label,
+                    )
+                ]
+                if _has_complete_python_execution_contract(item_text):
+                    detectable = "auto"
+                    detection_method = (
+                        "透過平台 Python 能力，在指定工作目錄以受控 timeout 執行命令，收集 exit code、"
+                        "stdout、stderr 與未捕捉例外，並依評分表的結束判準判定"
+                    )
+                else:
+                    detectable = "partial"
+                    detection_method = (
+                        "不受主要評分環境限制；平台可執行 Python 程式並收集 exit code、stdout、stderr 與 timeout，"
+                        "但目前缺少安全執行與判定所需資訊"
+                    )
+                    fallback = (
+                        "請老師提供 main.py 的工作目錄、實際 Python 命令／虛擬環境與參數，"
+                        "並說明程式應正常結束，或會持續執行且應觀察多久。"
+                    )
         if template_commands is not None and detectable == "auto" and not check_steps:
             detectable = "partial"
             detection_method = (

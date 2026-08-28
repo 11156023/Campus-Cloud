@@ -2,10 +2,40 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, test } from "vitest";
 import {
   CreateCheckChooser,
+  RubricStats,
   getSelectedRubricSource,
   getVisibleRubricSources,
   resolveActiveSessionId,
 } from "./AiJudgePanel";
+
+describe("RubricStats", () => {
+  const items = [
+    { id: "auto", detectable: "auto" },
+    { id: "partial", detectable: "partial" },
+    { id: "manual-1", detectable: "manual" },
+    { id: "manual-2", detectable: "manual" },
+  ];
+
+  test("顯示目前可自動偵測比例與重新評估動作", () => {
+    const html = renderToStaticMarkup(
+      <RubricStats items={items} onReassess={() => {}} />,
+    );
+
+    expect(html).toContain("可自動偵測（25%）");
+    expect(html).toContain("部分可偵測（25%）");
+    expect(html).toContain("評估結果已更新");
+    expect(html).toContain("重新評估");
+  });
+
+  test("評分項目異動後明確標示舊結果需要重新評估", () => {
+    const html = renderToStaticMarkup(
+      <RubricStats items={items} needsReview onReassess={() => {}} />,
+    );
+
+    expect(html).toContain("需要重新評估");
+    expect(html).toContain("下方顯示上次結果");
+  });
+});
 
 describe("CreateCheckChooser", () => {
   test("以頁內兩個選項呈現，不使用 dialog", () => {

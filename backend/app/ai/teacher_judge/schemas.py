@@ -60,6 +60,10 @@ class TeacherJudgeRubricAnalysis(BaseModel):
     auto_count: int = Field(default=0)
     partial_count: int = Field(default=0)
     manual_count: int = Field(default=0)
+    detectability_needs_review: bool = Field(
+        default=False,
+        description="評分項目異動後，既有可偵測性結果是否需要重新評估。",
+    )
     summary: str = Field(default="", description="AI 整體說明（繁體中文）")
     raw_text: str = Field(
         default="", description="解析後的原始文件文字（供後續對話使用）"

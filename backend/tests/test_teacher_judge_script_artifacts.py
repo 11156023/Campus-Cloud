@@ -162,6 +162,9 @@ async def test_generate_script_content_sends_commands_feedback_and_safety_prompt
     assert "run_command()" in system_prompt
     assert "只負責" in system_prompt
     assert "不要建立 class" in system_prompt
+    assert "python.run_entrypoint" in system_prompt
+    assert "不得搜尋檔案系統或猜路徑" in system_prompt
+    assert "exit code、stdout、stderr" in system_prompt
     assert user_payload["template_commands"][0]["command_key"] == "n8n.port_check"
     assert user_payload["previous_review_feedback"]["policy_issues"] == [
         "禁止使用 shell=True 執行指令"

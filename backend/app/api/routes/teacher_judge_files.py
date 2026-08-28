@@ -108,7 +108,9 @@ async def upload_class_teacher_judge_file(
         conflict_strategy=conflict_strategy,
     )
 
-    template_commands = get_enabled_template_commands(session, template_key)
+    template_commands = get_enabled_template_commands(
+        session, template_key, include_cross_template=True
+    )
     try:
         analysis, metrics = await analyze_rubric(
             raw_text,

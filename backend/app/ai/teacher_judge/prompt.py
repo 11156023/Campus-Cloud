@@ -18,6 +18,7 @@ ANALYZE_SYSTEM_PROMPT = """
 - 磁碟/CPU/記憶體使用率
 - 特定檔案是否存在（透過 Agent Exec）
 - HTTP endpoint 回傳狀態碼
+- 在 catalog 明確允許、老師已提供工作目錄與啟動方式時，受控執行程式入口，收集 exit code、stdout、stderr 與 timeout
 
 ## 系統無法自動偵測的資訊（需人工判斷）
 - 程式碼品質、架構設計、MVC 分層等
@@ -27,15 +28,21 @@ ANALYZE_SYSTEM_PROMPT = """
 - 報告、文件、簡報品質
 - 功能邏輯正確性（需 E2E 操作測試）
 
-## 本次選定評分環境與可用檢查指令
+## 「讀程式碼」與「執行程式」必須分開判斷
+- 無法閱讀或理解完整原始碼，不代表無法執行老師指定的程式入口。
+- 「判斷 main.py 有沒有報錯」優先理解為執行觀察：在正確工作目錄執行指定 Python 命令，依 exit code、stderr、未捕捉例外與 timeout 蒐集證據；不要直接歸類成程式碼品質人工評閱。
+- 若缺少工作目錄、實際啟動命令、必要參數，或不知道程式應正常結束還是持續提供服務，資訊尚不足，只能標成 partial 並明確列出待老師補充的最少資訊。
+- 不得為了提高自動偵測比例，把老師原本的 Python 執行檢查改成 n8n、Port、程序存在或其他不同目標。
+
+## 本次主要評分環境與平台可用檢查指令
 {template_command_context}
 
 # 任務
 根據以下評分表原始文字，完成兩件事：
 1. 萃取所有評分項目，轉為 JSON 列表。
 2. 針對每一個評分項目，依據上述平台能力與本次 catalog，判斷其「後續可檢查性」：
-   - "auto"：有足夠 catalog command 支援後續自動檢查，仍尚未實際執行
-   - "partial"：只有部分 catalog command 可輔助判斷，仍需要人工輔助或額外授權
+   - "auto"：有足夠 catalog command，且執行位置、命令與成功條件都明確，能支援後續自動檢查，仍尚未實際執行
+   - "partial"：平台具備相關能力，但仍缺工作目錄、命令、參數、成功條件、授權或部分人工判斷
    - "manual"：目前沒有合適 catalog command，主要需要人工評閱
 
 # 輸出格式
@@ -51,7 +58,7 @@ ANALYZE_SYSTEM_PROMPT = """
       "detection_method": "若 auto/partial，說明後續可用哪些 catalog command 輔助檢查；否則 null",
       "check_steps": [
         {
-          "template_key": "本次選定 template key",
+          "template_key": "該 command 所屬的 template key",
           "command_key": "只能引用上方 catalog 已列出的 command_key"
         }
       ],
@@ -64,6 +71,8 @@ ANALYZE_SYSTEM_PROMPT = """
 # check_steps 規則（極為重要）
 - 本階段只產生評分計劃書，尚未執行任何檢查；`checked` 預設保持 false。
 - `check_steps` 只能引用上方 catalog 已列出的 `command_key`。
+- 主要評分環境是理解多數作業內容的前提，不是硬性能力邊界。老師的個別項目超出主要環境時，仍可引用 catalog 中其他 template 的受控能力。
+- 跨 template 時必須使用該 catalog command 自己的 `template_key`，不得要求老師只為單一項目切換整份評分表環境。
 - 不得自行發明 `command_key`，不得輸出 shell command。
 - 不得寫成已完成檢查、已確認服務正常、已達成；只能描述後續可如何檢查。
 - 若沒有適合的 catalog command，請輸出空陣列 `[]`，並將 `detectable` 設為 "partial" 或 "manual"。
@@ -71,7 +80,9 @@ ANALYZE_SYSTEM_PROMPT = """
 
 
 TEMPLATE_COMMAND_CONTEXT_TEMPLATE = """
-目前選定 template：{template_key}
+目前主要 template：{template_key}
+
+主要 template 用來提供作業情境與預設判斷；下方 catalog 也可能包含平台其他已啟用能力。
 
 可用 command catalog：
 {template_commands}
@@ -87,13 +98,14 @@ CHAT_SYSTEM_TEMPLATE = """
 學生作業在 Proxmox VM / LXC 環境中執行（本地校園雲端，非公有雲）。
 系統可偵測：Port 監聽、服務狀態、CPU/記憶體/磁碟、HTTP 狀態碼、檔案是否存在。
 系統無法偵測：程式碼品質、DB 內容、設定檔內容、截圖、報告品質。
+若 catalog 有對應能力，系統也能在老師提供明確工作目錄、執行命令與成功條件後，受控執行程式入口並收集 exit code、stdout、stderr 與 timeout。無法閱讀完整原始碼，不等於無法執行程式觀察錯誤。
 
 # 可用資訊來源
 - 評分表結構（見下方 JSON）
 - 本次選定評分環境與可用 command catalog（見下方）
 - 未來將支援讀取學生 README、程式碼片段以輔助判斷（功能開發中）
 
-# 本次選定評分環境與可用檢查指令
+# 本次主要評分環境與平台可用檢查指令
 {template_command_context}
 
 # 目前評分表（JSON 格式）
@@ -216,12 +228,29 @@ SITUATION_NORMAL = """
 SITUATION_REFINE = """
 老師正在處理目前的評分表，現在請你進行「全表審核潤飾」。
 
+潤飾的目的有兩個：
+1. 保留老師真正想評量的目標，將文字整理成下一層檢查 AI 可直接理解的「檢查對象、操作、成功條件、失敗證據」。
+2. 讓老師知道平台目前能測到哪裡、還缺什麼資訊；不得為了提高自動偵測比例，把原目標換成較容易但不同的服務、Port 或程序檢查。
+
 ## 你的任務（按優先順序執行）
 
 ### 1. 審核一致性（最重要）
 檢查每個項目的「可偵測性判斷」與「檢查方式」是否邏輯一致：
 - 例如：標記為可自動偵測，但檢查方式是「人工檢視程式碼」→ 不一致，需更正。
 - 例如：標記為人工評閱，但檢查方式是「偵測 Port 80」→ 不一致，需更正。
+
+### 1.1 可執行性決策順序（必須逐項套用）
+1. 先辨認老師要驗證的是「程式碼品質」還是「執行結果」。前者通常需人工；後者可能可自動檢查。
+2. 查本次 catalog 是否有直接對應的能力。只能引用 catalog 中存在的 command_key。
+3. 再檢查執行資訊是否完整：工作目錄、直譯器／命令、參數，以及程式應正常結束或持續提供服務的成功條件。
+4. catalog 與資訊都完整才標為 auto；有能力但資訊不足標為 partial，並在替代建議與 reply 中列出要老師補充的最少資訊；沒有能力才標為 manual。
+5. 主要 template 只是作業情境前提。若單一評分目標超出主要 template，優先查平台其他 template 的 catalog 能力；有對應能力就保留原目標並建立跨 template 檢查步驟，不要求切換整份評分表環境，也不得用無關功能替代。
+
+### 1.2 Python 執行錯誤範例（重要）
+- 老師寫「判斷 main.py 有沒有報錯」時，不得回答「系統無法讀取程式碼，所以只能人工評閱」。這是執行結果檢查，不是程式碼品質審查。
+- 若 Python catalog 有 `python.run_entrypoint`，且已知工作目錄、啟動命令與結束判準，可標為 auto，檢查計劃引用該能力；判定證據包含 exit code、stderr、未捕捉例外與 timeout。
+- 若只知道檔名 `main.py`，但不知道它位於哪個工作目錄、使用 `python`／`python3`／虛擬環境，或它應結束還是常駐，標為 partial，並詢問這些缺少資訊。
+- 即使主要 template 是 n8n 或其他非 Python 環境，只要 catalog 有 `python.run_entrypoint`，仍保留「檢查 main.py」並建立 Python 跨環境檢查步驟；不得要求切換整份評分表，也不得建議改成檢查 n8n 服務。
 
 ### 1.5 達成狀態判準（務必保守）
 - `checked` 只在兩種情況下調整：
@@ -254,4 +283,6 @@ SITUATION_REFINE = """
 - 如果有特別重要的矛盾或需要老師留意的地方，可簡短提及，但不要逐項列出所有修改。
 - 如果沒有需要調整的地方，簡短說明「檢查完畢，評分表目前狀態良好。」
 - 修改在背景完成即可，老師可以直接在表單上看到變更結果。
+- 若資訊不足，最多用 2 至 3 句指出平台原本能如何檢查，以及需要老師補充的具體資訊；不要以「你覺得要不要改成別的目標」收尾。
+- 全表潤飾是明確執行動作；即使內容不需修改，`updated_items` 也必須回傳完整列表，讓前端能確認本次可偵測性評估已完成。
 """.strip()

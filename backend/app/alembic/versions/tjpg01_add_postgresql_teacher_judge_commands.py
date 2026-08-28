@@ -11,6 +11,7 @@ import uuid
 
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.dialects import postgresql
 
 revision = "tjpg01_postgresql_commands"
 down_revision = "tjux01_teacher_judge_workspace"
@@ -57,8 +58,7 @@ def upgrade() -> None:
         sa.column("requires_confirmation", sa.Boolean()),
         sa.column("enabled", sa.Boolean()),
     )
-    op.bulk_insert(
-        command_table,
+    insert_stmt = postgresql.insert(command_table).values(
         [
             {
                 "id": uuid.uuid4(),
@@ -73,7 +73,12 @@ def upgrade() -> None:
                 "enabled": True,
             }
             for command_key, command_label, category, command_template, description in COMMANDS
-        ],
+        ]
+    )
+    op.execute(
+        insert_stmt.on_conflict_do_nothing(
+            index_elements=["template_key", "command_key"],
+        )
     )
 
 

@@ -456,6 +456,69 @@
 }
 
 /* ── 統計 ── */
+.assessmentSummary {
+  @include flex-column;
+  gap: $spacing-16;
+}
+
+.assessmentHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: $spacing-16;
+
+  > div {
+    min-width: 0;
+  }
+
+  p {
+    margin: 4px 0 0;
+    color: var(--color-text-muted);
+    font-size: $font-size-12;
+    line-height: $line-height-base;
+  }
+
+  @media (max-width: 520px) {
+    align-items: stretch;
+    flex-direction: column;
+
+    button {
+      justify-content: center;
+      width: 100%;
+    }
+  }
+}
+
+.assessmentTitleRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: $spacing-8;
+
+  h4 {
+    margin: 0;
+    color: var(--color-text-primary);
+    font-size: $font-size-16;
+  }
+}
+
+.assessmentStatus_current,
+.assessmentStatus_stale {
+  @include badge-base;
+  padding: 3px 9px;
+  white-space: nowrap;
+}
+
+.assessmentStatus_current {
+  background: color-mix(in srgb, #28a745 12%, transparent);
+  color: #28a745;
+}
+
+.assessmentStatus_stale {
+  background: color-mix(in srgb, var(--color-primary-dark) 12%, transparent);
+  color: var(--color-primary-dark);
+}
+
 .statsGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

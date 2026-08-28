@@ -351,7 +351,9 @@ async def create_message(
             is_refine=payload.is_refine,
             template_key=file.template_key if file else "linux",
             template_commands=get_enabled_template_commands(
-                session, file.template_key if file else "linux"
+                session,
+                file.template_key if file else "linux",
+                include_cross_template=True,
             ),
         )
         # Without a selected rubric the conversation is general assistance only;

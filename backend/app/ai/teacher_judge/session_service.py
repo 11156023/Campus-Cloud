@@ -401,7 +401,9 @@ async def maybe_summarize(
             rubric_context,
             is_refine=False,
             template_key=template_key,
-            template_commands=get_enabled_template_commands(db, template_key),
+            template_commands=get_enabled_template_commands(
+                db, template_key, include_cross_template=True
+            ),
         )
     except Exception:
         return

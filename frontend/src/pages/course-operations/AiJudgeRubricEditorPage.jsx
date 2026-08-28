@@ -613,7 +613,7 @@ export default function AiJudgeRubricEditorPage() {
                   return <label key={option.key} className={`${styles.environmentOption} ${checked ? styles.environmentOptionSelected : ""}`}><input type="checkbox" checked={checked} disabled={readOnly} onChange={() => toggleEnvironment(option.key)} /><span className={styles.checkVisual}><MIcon name={checked ? "check" : "add"} size={16} /></span><span><b>{option.label}</b><small>{description}</small></span></label>;
                 })}
               </div>
-              <p className={styles.helperText}>{environmentKeys.length ? `目前以「${getTemplateLabel(environmentKeys[0])}」產生 AI 偵測建議；其他環境會保留在候選清單。` : "請至少選擇一個環境。"}</p>
+              <p className={styles.helperText}>{environmentKeys.length ? `目前以「${getTemplateLabel(environmentKeys[0])}」作為主要評分情境；個別項目仍可使用平台其他已啟用的受控檢查能力。` : "請至少選擇一個環境。"}</p>
             </fieldset>
             <div className={styles.backendStatus}><MIcon name="dns" size={18} /><div><b>後端環境判斷：尚未啟用</b><span>目前只保存你選擇的候選環境，尚未連線探測班級機器。</span></div><span className={styles.statusTag}>預留串接位置</span></div>
           </section>
