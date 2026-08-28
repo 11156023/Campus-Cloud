@@ -7,7 +7,7 @@ import {
   assignmentsUntilToday,
   buildPracticeMachines,
   practiceMachineActionLabel,
-} from "./StudentHomeNewPage";
+} from "./StudentHomePage";
 
 describe("assignmentsUntilToday", () => {
   it("保留今天以前的所有任務、排除未來任務並依日期排列", () => {

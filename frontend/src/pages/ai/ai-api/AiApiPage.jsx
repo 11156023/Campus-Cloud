@@ -6,6 +6,7 @@ import SharedEmptyState from "../../../components/EmptyState/EmptyState";
 import { AiApiService } from "../../../services/aiApi";
 import { useConfirm } from "../../../components/ConfirmDialog/ConfirmProvider";
 import { useToast } from "../../../hooks/useToast";
+import PageHeader from "../../../components/PageHeader/PageHeader";
 
 /* ── helpers ── */
 const DURATION_OPTIONS = [
@@ -502,15 +503,11 @@ export default function AiApiPage() {
   return (
     <div className={styles.page}>
       {/* ── Header ── */}
-      <div className={styles.pageHeader}>
-        <div className={styles.pageHeading}>
-          <div className={styles.titleRow}>
-            <h1 className={styles.pageTitle}>AI API 金鑰申請與管理</h1>
-            <span className={styles.breadcrumb}>SkyLab AI API</span>
-          </div>
-          <p className={styles.pageSubtitle}>申請、管理與查詢 AI API 金鑰。</p>
-        </div>
-      </div>
+      <PageHeader
+        title="AI API 金鑰申請與管理"
+        titleExtra={<span className={styles.breadcrumb}>SkyLab AI API</span>}
+        subtitle="申請、管理與查詢 AI API 金鑰。"
+      />
 
       {/* ── Stat cards ── */}
       <div className={styles.statRow} data-guide="ai-stats">

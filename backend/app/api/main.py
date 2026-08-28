@@ -24,6 +24,7 @@ from app.api.routes import (
     monitoring,
     private,
     proxmox_config,
+    quick_practice,
     quotas,
     resource_details,
     resources,
@@ -60,6 +61,7 @@ api_router.include_router(teaching_classes.router)
 api_router.include_router(courses.router)
 api_router.include_router(course_admin.router)
 api_router.include_router(course_environments.router)
+api_router.include_router(quick_practice.router)
 api_router.include_router(ldap_config.router)
 api_router.include_router(mining_incidents.router)
 api_router.include_router(ai.router)

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../../contexts/AuthContext";
 import styles from "./RequestsPage.module.scss";
 import { VmRequestsService } from "../../../services/vmRequests";
@@ -8,6 +8,7 @@ import useAutoRefresh from "../../../hooks/useAutoRefresh";
 import RequestFormPage from "./RequestFormPage";
 import MIcon from "../../../components/MIcon";
 import SharedEmptyState from "../../../components/EmptyState/EmptyState";
+import PageHeader from "../../../components/PageHeader/PageHeader";
 
 /* ── Constants ── */
 const STATUS_MAP = {
@@ -41,10 +42,22 @@ function canCancel(req) {
   );
 }
 
+/* 機器已建立（vmid 已寫回）但排程器後續維運失敗：
+   後端 retry 會拒絕這種狀態，只能到「我的資源」操作或刪除該機器 */
+function isProvisionedButFailed(req) {
+  return (
+    req.status === "approved" &&
+    req.vmid != null &&
+    req.provisioning_status === "failed"
+  );
+}
 /* approved 在 UI 上再依開通進度細分（vmid 為空時 provisioning_status 反映開通流程） */
 function getDisplayStatus(req) {
   if (req.status === "approved") {
-    if (req.vmid != null)                    return { label: "已開通",   color: "success" };
+    if (req.vmid != null) {
+      if (req.provisioning_status === "failed") return { label: "機器異常", color: "danger" };
+      return { label: "已開通", color: "success" };
+    }
     if (req.provisioning_status === "failed") return { label: "開通失敗", color: "danger" };
     if (req.provisioning_status === "running") return { label: "開通中", color: "info" };
     return { label: "已核准", color: "success" };
@@ -164,6 +177,7 @@ function ConfirmModal({ title, desc, confirmLabel = "確定", danger = false, lo
 /* ── RequestRow ── */
 function RequestRow({ req, onUpdated }) {
   const toast = useToast();
+  const navigate = useNavigate();
   const { user } = useAuth();
   /* VMID 是系統內部編號，僅管理員／老師看得到 */
   const showVmid = user?.is_superuser || user?.role === "admin" || user?.role === "teacher";
@@ -179,7 +193,8 @@ function RequestRow({ req, onUpdated }) {
   const endFmt    = formatDatetime(req.end_at);
 
   const showRejection = req.status === "rejected" && req.review_comment;
-  const showFailure = canRetry(req) && req.provisioning_status === "failed" && req.provisioning_error;
+  const showFailure =
+    (canRetry(req) || isProvisionedButFailed(req)) && req.provisioning_error;
   const hasDetail =
     formItems.length > 0 || req.reason || startFmt || showRejection || showFailure;
 
@@ -252,7 +267,12 @@ function RequestRow({ req, onUpdated }) {
                 撤銷
               </button>
             )}
-            {hasDetail && (
+            {isProvisionedButFailed(req) && (
+              <button type="button" className={styles.retryBtn} onClick={() => navigate("/my-resources")}>
+                <MIcon name="inventory_2" size={13} />
+                前往我的資源
+              </button>
+            )}            {hasDetail && (
               <button
                 type="button"
                 className={`${styles.expandBtn} ${expanded ? styles.expandBtnOpen : ""}`}
@@ -288,7 +308,11 @@ function RequestRow({ req, onUpdated }) {
               {showFailure && (
                 <div className={styles.reviewComment}>
                   <MIcon name="error_outline" size={13} />
-                  <span>{req.provisioning_error}</span>
+                  <span>
+                    {req.provisioning_error}
+                    {isProvisionedButFailed(req) &&
+                      "（機器已建立，此申請無法重試；請到「我的資源」開機或刪除這台機器。）"}
+                  </span>
                 </div>
               )}
             </div>
@@ -432,16 +456,12 @@ export default function RequestsPage() {
       className={`${styles.page} ${returning ? styles.animSlideInLeft : ""}`}
       onAnimationEnd={returning ? () => setReturning(false) : undefined}
     >
-      <div className={styles.pageHeader}>
-        <div className={styles.pageHeading}>
-          <h1 className={styles.pageTitle}>我的申請</h1>
-          <p className={styles.pageSubtitle}>管理你的虛擬機與容器申請</p>
-        </div>
+      <PageHeader title="我的申請" subtitle="管理你的虛擬機與容器申請">
         <button type="button" className={styles.btnPrimary} onClick={() => setView(VIEW_CREATE)} data-guide="request-create">
           <MIcon name="add" size={16} />
           申請資源
         </button>
-      </div>
+      </PageHeader>
 
       <div className={styles.content} data-guide="request-list">
         {error ? (

@@ -18,6 +18,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from app.schemas.course import CourseReminderStudent
+
 
 class JobKind(str, enum.Enum):
     vm_request = "vm_request"
@@ -70,6 +72,10 @@ class JobsListResponse(BaseModel):
     items: list[JobItem]
     total: int
     active_count: int
+    reminders: list[CourseReminderStudent] | None = Field(
+        default=None,
+        description="/ws/jobs 推送時附帶的個人提醒；REST 端點不填（None）",
+    )
 
 
 class JobDetail(BaseModel):

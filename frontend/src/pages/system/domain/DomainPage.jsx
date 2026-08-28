@@ -5,6 +5,7 @@ import LoadingState from "../../../components/LoadingState/LoadingState";
 import EmptyState from "../../../components/EmptyState/EmptyState";
 import { useToast } from "../../../hooks/useToast";
 import { CloudflareService } from "../../../services/cloudflare";
+import PageHeader from "../../../components/PageHeader/PageHeader";
 
 const DNS_TYPES = ["A", "AAAA", "CNAME", "TXT", "MX", "NS", "SRV"];
 
@@ -357,13 +358,7 @@ export default function DomainPage() {
 
   return (
     <div className={styles.page}>
-      <div className={styles.pageHeader}>
-        <div className={styles.pageHeading}>
-          <h1 className={styles.pageTitle}>網域管理</h1>
-          <p className={styles.pageSubtitle}>
-            用同一個工作台完成 Cloudflare 供應商連線、Zone 檢視，以及 DNS record 的新增、調整與刪除。
-          </p>
-        </div>
+      <PageHeader title="網域管理" subtitle="用同一個工作台完成 Cloudflare 供應商連線、Zone 檢視，以及 DNS record 的新增、調整與刪除。">
         <div className={styles.headerActions} data-guide="domain-connect">
           <button
             type="button"
@@ -382,7 +377,7 @@ export default function DomainPage() {
             連線設定
           </button>
         </div>
-      </div>
+      </PageHeader>
 
       {config && (
         <div className={styles.configBar} data-guide="domain-status">

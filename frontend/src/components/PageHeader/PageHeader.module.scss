@@ -1,0 +1,52 @@
+@use "../../assets/styles/variables" as *;
+@use "../../assets/styles/mixins" as *;
+
+.pageHeader {
+  @include flex-between;
+  flex-wrap: wrap;
+  gap: $spacing-16;
+}
+
+.pageHeading {
+  @include flex-column;
+  gap: $spacing-4;
+  min-width: 0;
+}
+
+/* leading（返回鍵等）與標題區同排靠左 */
+.headingRow {
+  display: flex;
+  align-items: center;
+  gap: $spacing-8;
+  min-width: 0;
+}
+
+.eyebrow {
+  margin: 0;
+  color: var(--color-primary);
+  font-size: $font-size-12;
+  font-weight: $font-weight-700;
+  letter-spacing: 0.04em;
+}
+
+.titleRow {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: $spacing-8;
+}
+
+.pageTitle {
+  font-size: $font-size-24;
+  font-weight: $font-weight-700;
+  color: var(--color-text-primary);
+
+  @include respond-to(sm) {
+    font-size: $font-size-28;
+  }
+}
+
+.pageSubtitle {
+  font-size: $font-size-14;
+  color: var(--color-text-secondary);
+}

@@ -32,6 +32,7 @@ import { useTheme } from "../../../contexts/ThemeContext";
 import useAutoRefresh from "../../../hooks/useAutoRefresh";
 import styles from "./FirewallPage.module.scss";
 import MIcon from "../../../components/MIcon";
+import PageHeader from "../../../components/PageHeader/PageHeader";
 
 /* ─── 常數 ──────────────────────────────────────────────── */
 const GATEWAY_KEY   = "gateway";
@@ -195,11 +196,7 @@ export default function FirewallPage() {
   return (
     <div className={styles.page}>
       {/* ── Header ── */}
-      <div className={styles.pageHeader}>
-        <div className={styles.pageHeading}>
-          <h1 className={styles.pageTitle}>防火牆</h1>
-          <p className={styles.pageSubtitle}>管理 VM 之間與對外的網路連線規則</p>
-        </div>
+      <PageHeader title="防火牆" subtitle="管理 VM 之間與對外的網路連線規則">
         <div className={styles.headerActions}>
           <button
             type="button"
@@ -211,7 +208,7 @@ export default function FirewallPage() {
             新增連線
           </button>
         </div>
-      </div>
+      </PageHeader>
 
       {/* ── Content ── */}
       <div className={styles.content}>

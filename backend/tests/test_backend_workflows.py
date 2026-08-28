@@ -1086,6 +1086,12 @@ def test_reserved_target_node_prefers_admin_storage_profile(
             ),
         ],
     )
+    # 此測試只驗證管理員儲存設定的選點優先序；模板節點可見性另有專屬測試。
+    monkeypatch.setattr(
+        "app.services.vm.placement_service.placement_support"
+        ".allowed_template_nodes_for_request",
+        lambda request: None,
+    )
 
     selection = vm_request_placement_service.select_reserved_target_node(
         session=db,

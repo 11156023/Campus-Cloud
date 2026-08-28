@@ -11,6 +11,7 @@ import { apiGet } from "../../../services/api";
 import AiSidePanel from "./AiSidePanel";
 import AvailabilityPanel from "../../../components/AvailabilityPanel/AvailabilityPanel";
 import MIcon from "../../../components/MIcon";
+import PageHeader from "../../../components/PageHeader/PageHeader";
 
 /* Hostname normalization — preserves alphanumeric, replaces others with hyphen */
 function normalizeHostname(value) {
@@ -739,16 +740,12 @@ export default function RequestFormPage({ onBack, className }) {
   return (
     <div className={`${styles.formPage} ${animCls}`}>
       {/* ── 頁首 ── */}
-      <div className={styles.formPageHeader}>
-        <div className={styles.pageHeading}>
-          <h1 className={styles.pageTitle}>申請虛擬機 / 容器</h1>
-          <p className={styles.pageSubtitle}>填寫申請表單後送出，待管理員審核通過後會自動建立資源</p>
-        </div>
+      <PageHeader title="申請虛擬機 / 容器" subtitle="填寫申請表單後送出，待管理員審核通過後會自動建立資源">
         <button type="button" className={styles.backBtn} onClick={handleBack}>
           <MIcon name="arrow_back" size={18} />
           返回
         </button>
-      </div>
+      </PageHeader>
 
       {/* ── 主體：表單 + AI 側欄 ── */}
       <div className={styles.formPageBody}>

@@ -521,19 +521,76 @@ def test_class_resource_start_is_allowed_only_inside_class_window(monkeypatch):
     )
 
 
-def test_individual_cannot_extend_class_resource(monkeypatch):
+def test_student_can_extend_owned_class_resource(monkeypatch):
+    user_id = uuid.uuid4()
+    current_stop = datetime(2026, 8, 25, 7, 30, tzinfo=UTC)
+    saved = {}
     monkeypatch.setattr(
         resource_service.resource_repo,
         "get_resource_by_vmid",
         lambda **_kwargs: SimpleNamespace(
-            user_id=uuid.uuid4(),
+            user_id=user_id,
             teaching_class_id=uuid.uuid4(),
+            request_id=None,
+            auto_stop_at=current_stop,
+            auto_stop_reason="window_grace",
+        ),
+    )
+    monkeypatch.setattr(
+        resource_service.resource_repo,
+        "set_auto_stop",
+        lambda **kwargs: saved.update(kwargs),
+    )
+    monkeypatch.setattr(
+        resource_service,
+        "get_schedule_policy",
+        lambda **_kwargs: SimpleNamespace(practice_session_hours=3),
+    )
+    monkeypatch.setattr(
+        resource_service,
+        "_utc_now",
+        lambda: datetime(2026, 8, 25, 7, 0, tzinfo=UTC),
+    )
+    monkeypatch.setattr(
+        resource_service.audit_service,
+        "log_action",
+        lambda **_kwargs: None,
+    )
+
+    result = resource_service.extend_session(
+        session=object(),
+        vmid=702,
+        user_id=user_id,
+    )
+
+    assert result.extended_minutes == 180
+    assert result.auto_stop_at == current_stop + timedelta(hours=3)
+    assert saved["auto_stop_reason"] == "practice_quota"
+
+
+def test_quick_practice_session_keeps_fixed_time_limit(monkeypatch):
+    user_id = uuid.uuid4()
+    request = SimpleNamespace(request_kind="quick_template")
+
+    class SessionWithRequest:
+        def get(self, _model, _key):
+            return request
+
+    monkeypatch.setattr(
+        resource_service.resource_repo,
+        "get_resource_by_vmid",
+        lambda **_kwargs: SimpleNamespace(
+            user_id=user_id,
+            teaching_class_id=None,
+            request_id=uuid.uuid4(),
+            auto_stop_at=datetime(2026, 8, 25, 7, 30, tzinfo=UTC),
+            auto_stop_reason="practice_quota",
         ),
     )
 
-    with pytest.raises(BadRequestError, match="cannot be extended"):
+    with pytest.raises(BadRequestError, match="fixed time limit"):
         resource_service.extend_session(
-            session=object(),
-            vmid=702,
-            user_id=uuid.uuid4(),
+            session=SessionWithRequest(),
+            vmid=703,
+            user_id=user_id,
         )

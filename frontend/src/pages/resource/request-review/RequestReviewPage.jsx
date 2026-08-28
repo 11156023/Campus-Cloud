@@ -9,6 +9,7 @@ import { AiApiService } from "../../../services/aiApi";
 import { DeletionRequestsService } from "../../../services/deletionRequests";
 import { SpecChangeRequestsService } from "../../../services/specChangeRequests";
 import { VmRequestsService } from "../../../services/vmRequests";
+import PageHeader from "../../../components/PageHeader/PageHeader";
 
 const TABS = [
   { key: "pending", label: "待審核", icon: "pending_actions" },
@@ -409,14 +410,7 @@ export default function RequestReviewPage() {
 
   return (
     <div className={styles.page}>
-      <div className={styles.pageHeader}>
-        <div className={styles.pageHeading}>
-          <h1 className={styles.pageTitle}>申請審核</h1>
-          <p className={styles.pageSubtitle}>
-            集中查看建立、規格調整、AI API 金鑰與刪除請求；刪除資源不會扣除原本已通過的審核數量
-          </p>
-        </div>
-      </div>
+      <PageHeader title="申請審核" subtitle="集中查看建立、規格調整、AI API 金鑰與刪除請求；刪除資源不會扣除原本已通過的審核數量" />
 
       <div className={styles.statRow}>
         <div className={styles.statCard}>

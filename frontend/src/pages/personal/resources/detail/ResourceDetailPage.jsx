@@ -8,6 +8,7 @@ import SpecificationsTab from "./SpecificationsTab";
 import SnapshotsTab from "./SnapshotsTab";
 import AuditLogsTab from "./AuditLogsTab";
 import AdvancedSettingsTab from "./AdvancedSettingsTab";
+import PageHeader from "../../../../components/PageHeader/PageHeader";
 
 const TABS = [
   { key: "overview",       label: "總覽",     icon: "info" },
@@ -29,8 +30,8 @@ export default function ResourceDetailPage({ backTo = "/my-resources" }) {
 
   return (
     <div className={styles.page}>
-      <div className={styles.pageHeader}>
-        <div className={styles.pageHeading}>
+      <PageHeader
+        leading={
           <button
             type="button"
             className={styles.backBtn}
@@ -39,11 +40,9 @@ export default function ResourceDetailPage({ backTo = "/my-resources" }) {
           >
             <MIcon name="arrow_back" size={20} />
           </button>
-          <h1 className={styles.pageTitle}>
-            資源詳情 <span className={styles.vmidText}>#{vmid}</span>
-          </h1>
-        </div>
-      </div>
+        }
+        title={<>資源詳情 <span className={styles.vmidText}>#{vmid}</span></>}
+      />
 
       <div className={styles.tabs}>
         {TABS.map((t) => (

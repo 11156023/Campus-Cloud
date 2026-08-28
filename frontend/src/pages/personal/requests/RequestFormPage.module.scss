@@ -97,27 +97,6 @@
   }
 }
 
-.formPageHeader {
-  @include flex-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: $spacing-16;
-  flex-shrink: 0;
-
-  @include respond-to(lg) {
-    grid-column: 1 / -1;
-    grid-row: 1;
-    position: sticky;
-    top: var(--layout-py);
-    z-index: 3;
-    height: var(--form-header-h);
-  }
-
-  h1{
-    font-size: $font-size-28;
-  }
-}
-
 /* 浮動 AI Tab（底部居中膠囊）*/
 .aiFloatingTab {
   position: fixed;

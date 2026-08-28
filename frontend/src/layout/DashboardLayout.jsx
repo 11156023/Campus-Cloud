@@ -2,6 +2,7 @@
 import { Outlet } from "react-router-dom";
 import { Suspense } from "react";
 import MIcon from "../components/MIcon";
+import LoadingState from "../components/LoadingState/LoadingState";
 import Sidebar from "../components/Sidebar/Sidebar";
 import AiFloatingChat from "../components/AiFloatingChat/AiFloatingChat";
 import ClassroomStudentLayer from "../components/Classroom/ClassroomStudentLayer";
@@ -72,7 +73,13 @@ export default function DashboardLayout() {
               </div>
               <SubnetBanner />
               <ErrorBoundary>
-                <Suspense fallback={<div className={styles.routeLoading}>載入頁面中…</div>}>
+                <Suspense
+                  fallback={
+                    <div className={styles.routeLoading}>
+                      <LoadingState text="載入頁面中…" />
+                    </div>
+                  }
+                >
                   <Outlet />
                 </Suspense>
               </ErrorBoundary>

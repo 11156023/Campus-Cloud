@@ -1,6 +1,4 @@
 .page { display: flex; flex: 1; flex-direction: column; gap: 24px; min-width: 0; padding: 8px 16px; color: var(--color-text-primary); }
-.pageHeader { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
-.pageHeading { display: flex; flex-direction: column; gap: 4px; }
 .titleLine { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
 .pageTitle { margin: 0; color: var(--color-text-primary); font-size: 24px; font-weight: 700; }
 .pageSubtitle { margin: 0; color: var(--color-text-secondary); font-size: 14px; }
@@ -251,12 +249,10 @@
 
 @media (min-width: 768px) { .page { padding: 0; } .pageTitle { font-size: 28px; } }
 @media (max-width: 1050px) { .templateChoices { grid-template-columns: 1fr; } .splitContent, .twoColumns { grid-template-columns: 1fr; } .weekTimeline { grid-template-columns: repeat(4, minmax(200px, 1fr)); } }
-@media (max-width: 720px) { .pageHeader, .workspaceHeader, .cardHeader, .toolbar, .integrationStrip, .confirmBar { align-items: flex-start; flex-direction: column; } .formGrid, .studentTools, .weekDetail, .weekBuilder { grid-template-columns: 1fr; } .csvArea { padding-top: 16px; padding-left: 0; border-top: 1px solid var(--color-border); border-left: 0; } .compactSelect { width: 100%; min-width: 0; } .ruleGrid { grid-template-columns: 1fr; } .integrationStrip .btnSecondary { align-self: stretch; } }
+@media (max-width: 720px) { .workspaceHeader, .cardHeader, .toolbar, .integrationStrip, .confirmBar { align-items: flex-start; flex-direction: column; } .formGrid, .studentTools, .weekDetail, .weekBuilder { grid-template-columns: 1fr; } .csvArea { padding-top: 16px; padding-left: 0; border-top: 1px solid var(--color-border); border-left: 0; } .compactSelect { width: 100%; min-width: 0; } .ruleGrid { grid-template-columns: 1fr; } .integrationStrip .btnSecondary { align-self: stretch; } }
 
 /* Product-design pass: calm, task-led teacher workspace. */
-.page { width: 100%; max-width: 1440px; margin: 0 auto; gap: 20px; }
-.pageHeader { min-height: 76px; padding-bottom: 16px; border-bottom: 1px solid var(--color-border); }
-.pageHeading { gap: 7px; }
+.page { width: 100%; gap: 20px; }
 .pageTitle { font-size: clamp(25px, 2.2vw, 32px); font-weight: 650; letter-spacing: -.025em; }
 .pageSubtitle { max-width: 760px; line-height: 1.6; }
 .pageKicker { color: var(--color-primary); font-size: 10px; font-weight: 750; letter-spacing: .12em; }
@@ -427,6 +423,31 @@
 .overviewCardHeader { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; padding: 10px 18px; border-bottom: 1px solid var(--color-border); }
 .overviewCardHeader h2 { margin: 0; font-size: 14px; font-weight: 650; }
 .overviewCardHeader button { display: inline-flex; align-items: center; gap: 4px; padding: 5px 0; border: 0; color: var(--color-primary); background: transparent; font: inherit; font-size: 11px; font-weight: 600; cursor: pointer; }
+.machineAccessCard { grid-column: 1 / -1; }
+.machineAccessTitle { display: flex; min-width: 0; align-items: center; gap: 10px; }
+.machineAccessTitle > div { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
+.machineAccessTitle small { color: var(--color-text-muted); font-size: 10px; }
+.machineAccessTitle em { padding: 3px 7px; border-radius: 999px; color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 9%, var(--color-surface)); font-size: 9px; font-style: normal; font-weight: 650; white-space: nowrap; }
+.machineAccessIcon { display: grid; width: 32px; height: 32px; flex: 0 0 auto; place-items: center; border-radius: 8px; color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 9%, var(--color-surface)); }
+.machineAccessHeaderActions { display: flex; align-items: center; gap: 12px; }
+.overviewCardHeader button.machineAccessPrimary { min-height: 32px; padding: 0 11px; border-radius: 7px; color: var(--color-text-on-primary); background: var(--color-primary); }
+.machineAccessSummary { display: flex; min-height: 46px; align-items: center; gap: 16px; padding: 9px 18px; color: var(--color-text-secondary); font-size: 11px; }
+.machineAccessSummary > span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.machineAccessSummary p { margin: 0 0 0 auto; color: var(--color-text-muted); }
+.machineAccessStatus i { width: 7px; height: 7px; border-radius: 50%; background: var(--color-success); box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-success) 12%, transparent); }
+.machineAccessList { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-top: 1px solid var(--color-border); }
+.machineAccessList article { display: grid; min-width: 0; grid-template-columns: 34px minmax(0, 1fr) auto; align-items: center; gap: 9px; padding: 13px 16px; }
+.machineAccessList article + article { border-left: 1px solid var(--color-divider); }
+.machineAccessList article > div { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
+.machineAccessList article strong, .machineAccessList article small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.machineAccessList article strong { font-size: 12px; font-weight: 650; }
+.machineAccessList article small { color: var(--color-text-muted); font-size: 9px; }
+.machineAccessMachineIcon { display: grid; width: 34px; height: 34px; place-items: center; border-radius: 8px; color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 8%, var(--color-surface)); }
+.machineRunning, .machineStopped { padding: 3px 7px; border-radius: 999px; font-size: 9px; font-weight: 650; white-space: nowrap; }
+.machineRunning { color: var(--color-success); background: color-mix(in srgb, var(--color-success) 10%, transparent); }
+.machineStopped { color: var(--color-text-muted); background: var(--color-hover); }
+.machineAccessList article > button { grid-column: 2 / -1; min-height: 28px; border: 1px solid var(--color-border); border-radius: 7px; color: var(--color-primary); background: var(--color-surface); font-size: 10px; cursor: pointer; }
+.machineAccessList article > button:hover { background: color-mix(in srgb, var(--color-primary) 6%, var(--color-surface)); }
 .classFacts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .classFacts > div { display: flex; min-width: 0; flex-direction: column; gap: 3px; padding: 12px 18px; border-bottom: 1px solid var(--color-divider); }
 .classFacts > div:nth-child(odd) { border-right: 1px solid var(--color-divider); }
@@ -560,6 +581,8 @@
 @media (max-width: 1050px) {
   .workflowTabsBar .workspaceTabs button { flex: 0 0 auto; }
   .overviewDetailGrid { grid-template-columns: 1fr; }
+  .machineAccessList { grid-template-columns: 1fr; }
+  .machineAccessList article + article { border-top: 1px solid var(--color-divider); border-left: 0; }
   .classroomStudentRow { grid-template-columns: minmax(180px, .8fr) 70px minmax(0, 1.5fr); }
   .classroomMachines { grid-template-columns: repeat(2, minmax(130px, 1fr)); }
   .machineWorkspaceHeader { align-items: flex-start; flex-direction: column; }
@@ -584,6 +607,10 @@
   .setupSummary .btnPrimary { grid-column: 1 / -1; width: 100%; }
   .setupChecklist { grid-template-columns: 1fr; }
   .setupChecklist > div + div { border-top: 1px solid var(--color-border); border-left: 0; }
+  .machineAccessCard .overviewCardHeader { align-items: flex-start; flex-direction: column; }
+  .machineAccessHeaderActions { width: 100%; justify-content: space-between; }
+  .machineAccessSummary { align-items: flex-start; flex-direction: column; gap: 7px; }
+  .machineAccessSummary p { margin-left: 0; }
   .persistentFeedback { margin-inline: 18px; }
   .stepTabs { align-self: stretch; }
   .stepTabs button { flex: 1; min-width: 0; }
@@ -649,8 +676,6 @@
 
 /* 班級管理 / 環境模板：頁面外框對齊其他列表頁（滿版寬度、無標題分隔線、玻璃卡片） */
 .page.listPage { max-width: none; margin: 0; gap: 24px; }
-.listPage .pageHeader { min-height: 0; padding-bottom: 0; border-bottom: 0; }
-.listPage .pageHeading { gap: 4px; }
 .listPage .pageTitle { font-size: 24px; font-weight: 700; letter-spacing: normal; }
 .listPage .pageSubtitle { max-width: none; line-height: 1.5; }
 .listPage .card {

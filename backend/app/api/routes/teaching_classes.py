@@ -667,6 +667,8 @@ def select_course(
     environment = session.get(CourseEnvironment, version.environment_id)
     if environment is None:
         raise NotFoundError("Course environment not found")
+    if environment.usage_scope not in {"course", "both"}:
+        raise BadRequestError("此環境僅供快速練習，不能套用到正式課程")
     require_teaching_access(current_user, environment.owner_id)
     source_nodes = list(
         session.exec(
