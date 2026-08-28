@@ -165,12 +165,12 @@ export default function TeacherDashboardPage() {
     <div className={styles.mainGrid}>
       <section className={styles.panel}>
         <div className={styles.panelHeader}><div><span className={styles.eyebrow}>學習成果</span><h2>學生 Checkpoint 完成度</h2><p>以學生實際完成的題目與 checkpoint 統計，不混入機器建立狀態。</p></div><button type="button" className={styles.textButton} onClick={() => navigate("/course-cms?tab=progress")}>完整進度<MIcon name="arrow_forward" size={16} /></button></div>
-        <div className={styles.checkpointList}>{loading ? <LoadingState text="正在讀取 checkpoint…" /> : reports.length ? reports.map((item) => <CheckpointRow key={item.path.id} item={item} onOpen={() => navigate(`/course-cms?tab=progress&pathId=${item.path.id}`)} />) : <EmptyState icon="checklist" title="尚無 checkpoint 資料" description="先建立並發布教學內容，學生完成後會在這裡彙整。" action={<button type="button" className={styles.btnSecondary} onClick={() => navigate("/course-cms")}>建立教學內容</button>} />}</div>
+        <div className={styles.checkpointList}>{loading ? <LoadingState text="正在讀取 checkpoint…" /> : reports.length ? reports.map((item) => <CheckpointRow key={item.path.id} item={item} onOpen={() => navigate(`/course-cms?tab=progress&pathId=${item.path.id}`)} />) : <EmptyState icon="checklist" title="尚無 checkpoint 資料" action={<button type="button" className={styles.btnSecondary} onClick={() => navigate("/course-cms")}>建立教學內容</button>} />}</div>
       </section>
 
       <aside className={styles.panel}>
         <div className={styles.panelHeader}><div><span className={styles.eyebrow}>跟進學生</span><h2>尚未完成 Checkpoint</h2><p>優先列出完成度較低的學生。</p></div></div>
-        <div className={styles.studentList}>{loading ? <LoadingState text="正在讀取學生進度…" /> : incompleteStudents.length ? incompleteStudents.map((student) => <button key={`${student.pathId}-${student.user_id}`} type="button" onClick={() => navigate(`/course-cms?tab=progress&pathId=${student.pathId}`)}><span className={styles.studentAvatar}>{(student.user_name ?? student.user_email ?? "學").slice(0, 1)}</span><span><strong>{student.user_name ?? student.user_email}</strong><small>{student.pathTitle} · {student.completed_questions}/{student.total_questions}</small></span><em>{Math.round(student.progress_percent)}%</em></button>) : <EmptyState icon="verified" title={reports.length ? "目前學生皆已完成" : "尚無學生進度"} description={reports.length ? "沒有需要跟進的 checkpoint。" : "學生開始作答後會顯示於此。"} />}</div>
+        <div className={styles.studentList}>{loading ? <LoadingState text="正在讀取學生進度…" /> : incompleteStudents.length ? incompleteStudents.map((student) => <button key={`${student.pathId}-${student.user_id}`} type="button" onClick={() => navigate(`/course-cms?tab=progress&pathId=${student.pathId}`)}><span className={styles.studentAvatar}>{(student.user_name ?? student.user_email ?? "學").slice(0, 1)}</span><span><strong>{student.user_name ?? student.user_email}</strong><small>{student.pathTitle} · {student.completed_questions}/{student.total_questions}</small></span><em>{Math.round(student.progress_percent)}%</em></button>) : <EmptyState icon="verified" title={reports.length ? "目前學生皆已完成" : "尚無學生進度"} />}</div>
       </aside>
     </div>
 
@@ -179,7 +179,7 @@ export default function TeacherDashboardPage() {
       <div className={styles.classList}>{loading ? <LoadingState text="正在讀取班級…" /> : upcoming.length ? upcoming.map(({ item, session }) => {
         const ready = item.totalMachines ? Math.round(item.readyMachines / item.totalMachines * 100) : 0;
         return <button type="button" key={item.id} className={styles.classRow} onClick={() => navigate(`/class-management/${item.id}`)}><span className={styles.classDate}><strong>{session.toLocaleDateString("zh-TW", { month: "numeric", day: "numeric" })}</strong><small>{String(item.start_time ?? "").slice(0, 5)}</small></span><span className={styles.classMain}><strong>{item.name}</strong><small>{item.students} 位學生 · 每位 {item.nodes.length} 台機器</small></span><span className={styles.classState}><em className={styles[`status_${item.status}`]}>{CLASS_STATUS[item.status] ?? item.status}</em><small>{item.status === "active" ? `${ready}% 機器就緒` : item.status === "planning" ? "繼續完成班級設定" : "查看目前進度"}</small></span><MIcon name="chevron_right" size={19} /></button>;
-      }) : <EmptyState icon="event_available" title="尚無近期班級" description="建立第一個班級，把學生、環境與任務一次設定完成。" action={<button type="button" className={styles.btnPrimary} onClick={() => navigate("/class-setup")}>一鍵建立班級</button>} />}</div>
+      }) : <EmptyState icon="event_available" title="尚無近期班級" action={<button type="button" className={styles.btnPrimary} onClick={() => navigate("/class-setup")}>一鍵建立班級</button>} />}</div>
     </section>
   </div>;
 }

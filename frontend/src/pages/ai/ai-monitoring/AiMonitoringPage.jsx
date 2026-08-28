@@ -85,10 +85,8 @@ function isOkStatus(status) {
   );
 }
 
-function EmptyState({ icon, title, desc }) {
-  return (
-    <SharedEmptyState icon={icon} title={title} description={desc} />
-  );
+function EmptyState({ icon, title }) {
+  return <SharedEmptyState icon={icon} title={title} />;
 }
 
 function StatusBadge({ status }) {
@@ -292,7 +290,6 @@ export default function AiMonitoringPage() {
             <EmptyState
               icon="groups"
               title="尚無使用者用量資料"
-              desc="使用者呼叫 AI 服務後,統計資料會出現在這裡"
             />
           ) : (
             <div className={styles.tableWrap}>
@@ -336,7 +333,6 @@ export default function AiMonitoringPage() {
           <EmptyState
             icon="analytics"
             title="尚無呼叫紀錄"
-            desc={`此時段內沒有 ${tab === "proxy" ? "Proxy" : "Template"} 呼叫紀錄`}
           />
         ) : (
           <div className={styles.tableWrap}>

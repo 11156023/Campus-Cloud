@@ -290,7 +290,6 @@ export default function ClassSetupPage() {
             <EmptyState
               icon="view_quilt"
               title="目前沒有已發布的上課模板"
-              description="請先建立並發布模板；發布完成後會自動帶你回來。"
               action={
                 <button type="button" className={styles.btnPrimary} onClick={createTemplate}>
                   <MIcon name="add" size={16} />現在建立模板

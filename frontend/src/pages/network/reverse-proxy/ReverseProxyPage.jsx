@@ -322,7 +322,6 @@ export default function ReverseProxyPage() {
           <EmptyState
             icon="swap_horiz"
             title="還沒有任何網址"
-            description="幫 VM 裡的網站或服務取一個好記的網址，別人不用記一長串數字，直接輸入網址就能打開。"
           />
         ) : (
           <>

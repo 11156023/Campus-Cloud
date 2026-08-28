@@ -27,7 +27,6 @@ function EmptyState({ variant, canConfigure, onConfigure }) {
       <SharedEmptyState
         icon="lan"
         title="尚未設定子網"
-        description="建立子網設定後，系統將自動為虛擬機與容器分配 IP 位址"
         action={
           canConfigure ? (
             <button type="button" className={styles.btnPrimary} onClick={onConfigure}>

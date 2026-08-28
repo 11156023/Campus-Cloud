@@ -26,16 +26,8 @@ function fmtTime(iso) {
   return iso ? new Date(iso).toLocaleString("zh-TW") : "尚未審核";
 }
 
-function EmptyState({ tab }) {
-  const text = {
-    pending:  "目前沒有符合條件的 AI API 申請",
-    approved: "目前沒有已通過的 AI API 申請",
-    rejected: "目前沒有已拒絕的 AI API 申請",
-    all:      "目前沒有任何 AI API 申請紀錄",
-  };
-  return (
-    <SharedEmptyState icon="assignment_turned_in" title="尚無資料" description={text[tab]} />
-  );
+function EmptyState() {
+  return <SharedEmptyState icon="assignment_turned_in" title="尚無資料" />;
 }
 
 /* ── Review Dialog ── */

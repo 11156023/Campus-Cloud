@@ -6,7 +6,7 @@ import styles from "./EmptyState.module.scss";
  * 預設外觀對齊「課程學習」頁：置中圖示 + 一行灰字。
  *
  * @param {string}  icon        MIcon 圖示名稱（如 "school"、"inbox"）
- * @param {number}  iconSize    圖示大小，預設 32
+ * @param {number}  iconSize    圖示大小，預設 44
  * @param {string}  title       主要訊息（單行）
  * @param {string}  description 次要說明（可選，多一行）
  * @param {node}    action      行動按鈕等（可選）
@@ -14,7 +14,7 @@ import styles from "./EmptyState.module.scss";
  */
 export default function EmptyState({
   icon = "inbox",
-  iconSize = 32,
+  iconSize = 44,
   title,
   description,
   action,
