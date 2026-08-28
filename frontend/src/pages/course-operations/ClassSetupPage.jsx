@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import MIcon from "../../components/MIcon";
+import PageHeader from "../../components/PageHeader/PageHeader";
+import EmptyState from "../../components/EmptyState/EmptyState";
+import LoadingState from "../../components/LoadingState/LoadingState";
 import { CourseEnvironmentsService } from "../../services/courseEnvironments";
 import { TeachingClassesService } from "../../services/teachingClasses";
 import styles from "./ClassSetupPage.module.scss";
@@ -206,11 +209,13 @@ export default function ClassSetupPage() {
   }
 
   const taskCount = useMemo(() => weeks.filter((week) => String(week.title ?? "").trim()).length, [weeks]);
-  if (loading) return <div className={styles.loading}>正在恢復班級設定…</div>;
+  if (loading) return <LoadingState fullPage text="正在恢復班級設定…" />;
 
   return <div className={styles.page}>
     <button type="button" className={styles.backLink} onClick={() => navigate("/class-management")}><MIcon name="arrow_back" size={18} />返回班級</button>
-    <header className={styles.header}><div><span className={styles.eyebrow}>一鍵建立班級</span><h1>{item?.name || "建立完整課程班級"}</h1><p>依序完成課表、學生、環境與每週任務；每一步都會保存到正式班級。</p></div><span className={styles.saveState}><MIcon name="cloud_done" size={16} />{classId ? "班級草稿已建立" : "第一步後開始自動保存"}</span></header>
+    <PageHeader eyebrow="一鍵建立班級" title={item?.name || "建立完整課程班級"} subtitle="依序完成課表、學生、環境與每週任務；每一步都會保存到正式班級。">
+      <span className={styles.saveState}><MIcon name="cloud_done" size={16} />{classId ? "班級草稿已建立" : "第一步後開始自動保存"}</span>
+    </PageHeader>
 
     <nav className={styles.stepper} aria-label="建立班級流程">{STEPS.map(([key, label, hint], index) => {
       const number = index + 1;
@@ -282,14 +287,16 @@ export default function ClassSetupPage() {
               ))}
             </div>
           ) : (
-            <div className={styles.empty}>
-              <MIcon name="view_quilt" size={28} />
-              <strong>目前沒有已發布的上課模板</strong>
-              <p>請先建立並發布模板；發布完成後會自動帶你回來。</p>
-              <button type="button" className={styles.btnPrimary} onClick={createTemplate}>
-                <MIcon name="add" size={16} />現在建立模板
-              </button>
-            </div>
+            <EmptyState
+              icon="view_quilt"
+              title="目前沒有已發布的上課模板"
+              description="請先建立並發布模板；發布完成後會自動帶你回來。"
+              action={
+                <button type="button" className={styles.btnPrimary} onClick={createTemplate}>
+                  <MIcon name="add" size={16} />現在建立模板
+                </button>
+              }
+            />
           )}
 
           {selectedTemplate && (
