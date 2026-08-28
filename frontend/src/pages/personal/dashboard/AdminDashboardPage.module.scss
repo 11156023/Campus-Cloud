@@ -6,6 +6,11 @@
   width: 100%;
   flex-direction: column;
   gap: $spacing-24;
+  padding: $spacing-8 $spacing-16;
+
+  @include respond-to(md) {
+    padding: 0;
+  }
 }
 .sectionHeading p {
   margin: 0;
@@ -152,7 +157,7 @@
   align-items: center;
   gap: 6px;
   color: var(--color-text-muted);
-  font-size: 10px;
+  font-size: $font-size-10;
 }
 .assistantFooter button {
   min-height: 28px;
@@ -161,7 +166,7 @@
   border-radius: $radius-pill;
   color: var(--color-text-secondary);
   background: var(--color-surface);
-  font-size: 10px;
+  font-size: $font-size-10;
   cursor: pointer;
 }
 .assistantFooter button:hover:not(:disabled) {
@@ -272,7 +277,7 @@
 .issueList small {
   @include text-truncate;
   color: var(--color-text-muted);
-  font-size: 10px;
+  font-size: $font-size-10;
 }
 .issueList em {
   display: grid;

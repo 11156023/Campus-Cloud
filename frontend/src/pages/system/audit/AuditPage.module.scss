@@ -163,44 +163,23 @@
 
 /* ── Table ── */
 .tableWrap {
-  @include glass-surface($shadow: var(--shadow-sm));
-  border-radius: $radius-16;
-  overflow: hidden;
+  @include table-wrap;
 }
 
 .table {
-  width: 100%;
-  border-collapse: collapse;
+  @include table-base;
 }
 
 .th {
-  padding: $spacing-8 $spacing-16;
-  font-size: $font-size-12;
-  font-weight: $font-weight-500;
-  color: var(--color-text-muted);
-  text-align: left;
-  background: var(--color-hover);
-  border-bottom: 1px solid var(--color-border);
-  white-space: nowrap;
+  @include table-th;
 }
 
 .tr {
-  transition: background $transition-base;
-
-  &:not(:last-child) {
-    border-bottom: 1px solid var(--color-divider);
-  }
-
-  &:hover {
-    background: var(--color-hover);
-  }
+  @include table-tr;
 }
 
 .td {
-  padding: $spacing-8 $spacing-16;
-  font-size: $font-size-14;
-  color: var(--color-text-primary);
-  vertical-align: middle;
+  @include table-td;
 }
 
 .tdNowrap {

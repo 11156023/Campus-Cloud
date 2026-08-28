@@ -196,7 +196,7 @@
 
 .btnDanger {
   background: var(--color-danger);
-  color: #fff;
+  color: var(--color-text-on-primary);
 
   &:hover:not(:disabled) {
     box-shadow: var(--shadow-sm);
@@ -233,9 +233,9 @@
   flex-shrink: 0;
 }
 
-.badge_success { background: color-mix(in srgb, #28a745 12%, transparent); color: #28a745; }
+.badge_success { background: color-mix(in srgb, var(--color-success) 12%, transparent); color: var(--color-success); }
 .badge_info    { background: color-mix(in srgb, var(--color-primary-dark) 12%, transparent); color: var(--color-primary-dark); }
-.badge_danger  { background: color-mix(in srgb, #dc3545 12%, transparent); color: #dc3545; }
+.badge_danger  { background: color-mix(in srgb, var(--color-danger) 12%, transparent); color: var(--color-danger); }
 .badge_muted   { background: var(--color-hover); color: var(--color-text-muted); }
 
 /* ── 工作台雙欄 ── */

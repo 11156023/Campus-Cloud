@@ -63,7 +63,7 @@
 .btnDanger {
   @extend %btn-base;
   background: var(--color-danger);
-  color: #fff;
+  color: var(--color-text-on-primary);
 
   &:hover:not(:disabled) { opacity: 0.9; }
 }
@@ -96,40 +96,23 @@
 
 /* ── Table ── */
 .tableWrap {
-  background: var(--color-surface-glass);
-  backdrop-filter: blur(12px) saturate(1.4);
-  -webkit-backdrop-filter: blur(12px) saturate(1.4);
-  border: 1px solid var(--color-surface-glass-border);
-  border-radius: $radius-16;
-  box-shadow: var(--shadow-sm);
-  overflow-x: auto;
+  @include table-wrap;
 }
 
-.table { width: 100%; border-collapse: collapse; }
+.table {
+  @include table-base;
+}
 
 .th {
-  padding: $spacing-8 $spacing-16;
-  font-size: $font-size-12;
-  font-weight: $font-weight-500;
-  color: var(--color-text-muted);
-  text-align: left;
-  background: var(--color-hover);
-  border-bottom: 1px solid var(--color-border);
-  white-space: nowrap;
+  @include table-th;
 }
 
 .tr {
-  transition: background $transition-base;
-
-  &:not(:last-child) { border-bottom: 1px solid var(--color-divider); }
-  &:hover { background: var(--color-hover); }
+  @include table-tr;
 }
 
 .td {
-  padding: $spacing-8 $spacing-16;
-  font-size: $font-size-14;
-  color: var(--color-text-primary);
-  vertical-align: middle;
+  @include table-td;
 }
 
 .userCell {
@@ -171,7 +154,7 @@
   background: currentColor;
 }
 
-.badge_pending  { background: color-mix(in srgb, #f59e0b 14%, transparent); color: #d97706; }
+.badge_pending  { background: color-mix(in srgb, var(--color-pending) 14%, transparent); color: var(--color-pending); }
 .badge_approved { background: color-mix(in srgb, var(--color-success) 12%, transparent); color: var(--color-success); }
 .badge_rejected { background: color-mix(in srgb, var(--color-danger)  12%, transparent); color: var(--color-danger); }
 
@@ -220,24 +203,20 @@
 .dialogOverlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.45);
+  background: var(--color-overlay);
   backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: 300;
   animation: fadeIn 0.15s ease;
 }
 
 .dialog {
   width: 90%;
-  max-width: 480px;
-  background: var(--color-surface-glass);
-  backdrop-filter: blur(12px) saturate(1.4);
-  -webkit-backdrop-filter: blur(12px) saturate(1.4);
-  border: 1px solid var(--color-surface-glass-border);
+  max-width: 640px;
+  @include glass-surface($shadow: var(--shadow-lg));
   border-radius: $radius-16;
-  box-shadow: var(--shadow-lg);
   @include flex-column;
   gap: $spacing-16;
   padding: $spacing-24;

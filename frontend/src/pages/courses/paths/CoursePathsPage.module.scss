@@ -3,7 +3,7 @@
 
 .page {
   @include flex-column;
-  gap: $spacing-16;
+  gap: $spacing-24;
   width: 100%;
   padding: $spacing-8 $spacing-16 $spacing-32;
 

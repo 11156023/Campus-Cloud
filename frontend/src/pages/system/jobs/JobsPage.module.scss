@@ -79,13 +79,13 @@
 }
 
 .statIconBusy {
-  background: color-mix(in srgb, #3b82f6 12%, transparent);
-  color: #2563eb;
+  background: color-mix(in srgb, var(--color-info) 12%, transparent);
+  color: var(--color-info);
 }
 
 .statIconErr {
-  background: color-mix(in srgb, #dc3545 12%, transparent);
-  color: #dc3545;
+  background: color-mix(in srgb, var(--color-danger) 12%, transparent);
+  color: var(--color-danger);
 }
 
 .statInfo {
@@ -177,44 +177,23 @@
 }
 
 .tableWrap {
-  @include glass-surface($shadow: var(--shadow-sm));
-  border-radius: $radius-16;
-  overflow: hidden;
+  @include table-wrap;
 }
 
 .table {
-  width: 100%;
-  border-collapse: collapse;
+  @include table-base;
 }
 
 .th {
-  padding: $spacing-8 $spacing-16;
-  font-size: $font-size-12;
-  font-weight: $font-weight-500;
-  color: var(--color-text-muted);
-  text-align: left;
-  background: var(--color-hover);
-  border-bottom: 1px solid var(--color-border);
-  white-space: nowrap;
+  @include table-th;
 }
 
 .tr {
-  transition: background $transition-base;
-
-  &:not(:last-child) {
-    border-bottom: 1px solid var(--color-divider);
-  }
-
-  &:hover {
-    background: var(--color-hover);
-  }
+  @include table-tr;
 }
 
 .td {
-  padding: $spacing-8 $spacing-16;
-  font-size: $font-size-14;
-  color: var(--color-text-primary);
-  vertical-align: middle;
+  @include table-td;
 }
 
 .nameCell {
@@ -263,7 +242,7 @@
 .badge_running   { background: color-mix(in srgb, var(--color-info)    14%, transparent); color: var(--color-info); }
 .badge_completed { background: color-mix(in srgb, var(--color-success) 12%, transparent); color: var(--color-success); }
 .badge_failed    { background: color-mix(in srgb, var(--color-danger)  12%, transparent); color: var(--color-danger); }
-.badge_blocked   { background: color-mix(in srgb, #f59e0b 14%, transparent); color: #d97706; }
+.badge_blocked   { background: color-mix(in srgb, var(--color-pending) 14%, transparent); color: var(--color-pending); }
 .badge_cancelled { background: var(--color-hover); color: var(--color-text-muted); }
 .badge_unknown   { background: var(--color-hover); color: var(--color-text-muted); }
 

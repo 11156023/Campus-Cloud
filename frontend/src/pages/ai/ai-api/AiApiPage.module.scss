@@ -378,8 +378,8 @@
 
 .badge_active   { background: color-mix(in srgb, var(--color-success) 12%, transparent); color: var(--color-success); }
 .badge_inactive { background: var(--color-hover); color: var(--color-text-muted); }
-.badge_expired  { background: color-mix(in srgb, #f59e0b 14%, transparent); color: #d97706; }
-.badge_pending  { background: color-mix(in srgb, #f59e0b 14%, transparent); color: #d97706; }
+.badge_expired  { background: var(--color-hover); color: var(--color-text-muted); }
+.badge_pending  { background: color-mix(in srgb, var(--color-pending) 14%, transparent); color: var(--color-pending); }
 .badge_approved { background: color-mix(in srgb, var(--color-success) 12%, transparent); color: var(--color-success); }
 .badge_rejected { background: color-mix(in srgb, var(--color-danger)  12%, transparent); color: var(--color-danger); }
 

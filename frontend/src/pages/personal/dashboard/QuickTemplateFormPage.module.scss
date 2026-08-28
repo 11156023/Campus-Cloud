@@ -6,7 +6,12 @@
   gap: $spacing-24;
   width: 100%;
   min-height: 100%;
+  padding: $spacing-8 $spacing-16;
   animation: slideInRight 0.18s ease-out;
+
+  @include respond-to(md) {
+    padding: 0;
+  }
 }
 
 @keyframes slideInRight {
@@ -273,7 +278,7 @@
 }
 
 .required {
-  color: #e94f4f;
+  color: var(--color-danger);
   margin-left: 2px;
 }
 
@@ -285,7 +290,7 @@
 
 .fieldError {
   font-size: $font-size-12;
-  color: #e94f4f;
+  color: var(--color-danger);
   margin: 0;
 }
 
@@ -303,7 +308,7 @@
   box-sizing: border-box;
 
   &:focus { border-color: var(--color-primary); }
-  &::placeholder { color: var(--color-text-muted, #888); }
+  &::placeholder { color: var(--color-text-muted); }
 }
 
 /* ── Option grid (3-col button group) ── */
@@ -405,7 +410,7 @@
 .machineList article + article { border-top: 1px solid var(--color-divider); }
 .machineList article > div { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
 .machineList article strong { font-size: 13px; }
-.machineList article small { color: var(--color-text-muted); font-size: 10px; }
+.machineList article small { color: var(--color-text-muted); font-size: $font-size-10; }
 .machineIndex { color: var(--color-text-muted); font-size: 11px; text-align: center; }
 .machineIcon { display: grid; width: 36px; height: 36px; place-items: center; border-radius: 9px; color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 9%, var(--color-surface)); }
 .machineSpec { color: var(--color-text-secondary); font-size: 11px; white-space: nowrap; }

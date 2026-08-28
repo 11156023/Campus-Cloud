@@ -4,7 +4,7 @@
 /* ── Page ─────────────────────────────────────────── */
 .page {
   @include flex-column;
-  gap: $spacing-16;
+  gap: $spacing-24;
   padding: $spacing-8 $spacing-16;
   flex: 1;
 
@@ -289,7 +289,7 @@ $spacing-16: 12px;
   flex-shrink: 0;
 
   &.active  { background: var(--color-success); }
-  &.unknown { background: var(--color-text-muted, #888); }
+  &.unknown { background: var(--color-text-muted); }
 }
 
 .rowActions {
@@ -350,8 +350,8 @@ $spacing-16: 12px;
   border-radius: $radius-pill;
   font-size: $font-size-12;
   font-weight: $font-weight-500;
-  background: color-mix(in srgb, #0891b2 12%, transparent);
-  color: #0891b2;
+  background: color-mix(in srgb, var(--color-info) 12%, transparent);
+  color: var(--color-info);
 }
 
 .adminBody {
@@ -377,8 +377,8 @@ $spacing-16: 12px;
   background: var(--color-hover);
   color: var(--color-text-secondary);
 
-  &.running { background: color-mix(in srgb, #16a34a 15%, transparent); color: #16a34a; }
-  &.unknown { background: var(--color-hover); color: var(--color-text-muted, #888); }
+  &.running { background: color-mix(in srgb, var(--color-success) 15%, transparent); color: var(--color-success); }
+  &.unknown { background: var(--color-hover); color: var(--color-text-muted); }
 }
 
 .statsGrid {
@@ -427,7 +427,7 @@ $spacing-16: 12px;
 }
 
 .numActive { color: var(--color-primary); }
-.numZero   { color: var(--color-text-muted, #888); }
+.numZero   { color: var(--color-text-muted); }
 
 .entrySection {
   @include flex-column;
@@ -498,7 +498,7 @@ $spacing-16: 12px;
 
 .btnDanger {
   background: var(--color-danger);
-  color: #fff;
+  color: var(--color-text-on-primary);
 
   &:hover:not(:disabled) {
     box-shadow: var(--shadow-sm);
@@ -673,9 +673,9 @@ $spacing-16: 12px;
 }
 
 .noticeDanger {
-  border: 1px solid color-mix(in srgb, #dc3545 30%, transparent);
-  background: color-mix(in srgb, #dc3545 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-danger) 30%, transparent);
+  background: color-mix(in srgb, var(--color-danger) 8%, transparent);
   color: var(--color-text-secondary);
 
-  strong { color: #dc3545; }
+  strong { color: var(--color-danger); }
 }

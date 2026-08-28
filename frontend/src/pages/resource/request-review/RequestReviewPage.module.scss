@@ -87,8 +87,8 @@
 }
 
 .statIconBusy {
-  background: color-mix(in srgb, #f59e0b 14%, transparent);
-  color: #d97706;
+  background: color-mix(in srgb, var(--color-pending) 14%, transparent);
+  color: var(--color-pending);
 }
 
 .statIconDanger {
@@ -220,9 +220,9 @@
 }
 
 .stateError {
-  color: #dc3545;
-  border-color: color-mix(in srgb, #dc3545 35%, var(--color-border));
-  background: color-mix(in srgb, #dc3545 8%, var(--color-surface));
+  color: var(--color-danger);
+  border-color: color-mix(in srgb, var(--color-danger) 35%, var(--color-border));
+  background: color-mix(in srgb, var(--color-danger) 8%, var(--color-surface));
 }
 
 /* ── Empty state ── */
@@ -259,38 +259,20 @@
 }
 
 .tableWrap {
-  @include glass-surface($shadow: var(--shadow-sm));
-  border-radius: $radius-16;
-  overflow: hidden;
+  @include table-wrap;
 }
 
 .table {
-  width: 100%;
-  border-collapse: collapse;
+  @include table-base;
 }
 
 .th {
-  padding: $spacing-8 $spacing-16;
-  font-size: $font-size-12;
-  font-weight: $font-weight-500;
-  color: var(--color-text-muted);
-  text-align: left;
-  background: var(--color-hover);
-  border-bottom: 1px solid var(--color-border);
-  white-space: nowrap;
+  @include table-th;
 }
 
 .tr {
+  @include table-tr;
   cursor: pointer;
-  transition: background $transition-base;
-
-  &:not(:last-child) {
-    border-bottom: 1px solid var(--color-divider);
-  }
-
-  &:hover {
-    background: var(--color-hover);
-  }
 }
 
 .trActive {
@@ -299,10 +281,7 @@
 }
 
 .td {
-  padding: $spacing-8 $spacing-16;
-  font-size: $font-size-14;
-  color: var(--color-text-primary);
-  vertical-align: middle;
+  @include table-td;
 }
 
 .nameCell {
@@ -405,18 +384,18 @@
 }
 
 .badge_info {
-  color: #0d6efd;
-  background: color-mix(in srgb, #0d6efd 12%, transparent);
+  color: var(--color-info);
+  background: color-mix(in srgb, var(--color-info) 12%, transparent);
 }
 
 .badge_success {
-  color: #28a745;
-  background: color-mix(in srgb, #28a745 12%, transparent);
+  color: var(--color-success);
+  background: color-mix(in srgb, var(--color-success) 12%, transparent);
 }
 
 .badge_danger {
-  color: #dc3545;
-  background: color-mix(in srgb, #dc3545 10%, transparent);
+  color: var(--color-danger);
+  background: color-mix(in srgb, var(--color-danger) 10%, transparent);
 }
 
 .badge_muted {
@@ -515,8 +494,8 @@
   span {
     padding: 4px 8px;
     border-radius: $radius-pill;
-    color: #b7791f;
-    background: color-mix(in srgb, #ffc107 18%, transparent);
+    color: var(--color-pending);
+    background: color-mix(in srgb, var(--color-pending) 18%, transparent);
   }
 }
 
@@ -566,16 +545,16 @@
 
 .btnApprove {
   @extend %review-btn;
-  background: color-mix(in srgb, #28a745 12%, transparent);
-  color: #28a745;
+  background: color-mix(in srgb, var(--color-success) 12%, transparent);
+  color: var(--color-success);
 
-  &:hover { background: color-mix(in srgb, #28a745 20%, transparent); }
+  &:hover { background: color-mix(in srgb, var(--color-success) 20%, transparent); }
 }
 
 .btnReject {
   @extend %review-btn;
-  background: color-mix(in srgb, #dc3545 10%, transparent);
-  color: #dc3545;
+  background: color-mix(in srgb, var(--color-danger) 10%, transparent);
+  color: var(--color-danger);
 
-  &:hover { background: color-mix(in srgb, #dc3545 18%, transparent); }
+  &:hover { background: color-mix(in srgb, var(--color-danger) 18%, transparent); }
 }
