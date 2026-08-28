@@ -75,11 +75,11 @@
 .powerMenuIconOk { line-height: 1; color: var(--color-success); }
 
 .powerMenuItemWarn {
-  color: #dc3545;
-  &:hover:not(:disabled) { background: color-mix(in srgb, #dc3545 8%, transparent); }
+  color: var(--color-danger);
+  &:hover:not(:disabled) { background: color-mix(in srgb, var(--color-danger) 8%, transparent); }
 }
 
 .powerMenuItemDanger {
-  color: #dc3545;
-  &:hover:not(:disabled) { background: color-mix(in srgb, #dc3545 8%, transparent); }
+  color: var(--color-danger);
+  &:hover:not(:disabled) { background: color-mix(in srgb, var(--color-danger) 8%, transparent); }
 }

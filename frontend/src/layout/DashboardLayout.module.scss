@@ -88,8 +88,8 @@
   @include flex-center;
   padding: $spacing-8;
   background: var(--color-sidebar-glass);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: var(--sidebar-backdrop-filter);
+  -webkit-backdrop-filter: var(--sidebar-backdrop-filter);
   border: 1px solid var(--color-sidebar-glass-border);
   border-radius: $radius-8;
   box-shadow: var(--shadow-sm);
