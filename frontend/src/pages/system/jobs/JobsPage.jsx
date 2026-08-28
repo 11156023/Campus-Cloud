@@ -7,6 +7,7 @@ import { JobsService } from "../../../services/jobs";
 import JobDetailDialog from "../../../components/Jobs/JobDetailDialog";
 import { useToast } from "../../../hooks/useToast";
 import useAutoRefresh from "../../../hooks/useAutoRefresh";
+import PageHeader from "../../../components/PageHeader/PageHeader";
 
 const COLUMNS = ["任務", "類型", "狀態", "進度", "建立時間", "更新時間", "申請人"];
 
@@ -109,12 +110,7 @@ export default function JobsPage() {
 
   return (
     <div className={styles.page}>
-      <div className={styles.pageHeader}>
-        <div className={styles.pageHeading}>
-          <h1 className={styles.pageTitle}>背景任務</h1>
-          <p className={styles.pageSubtitle}>追蹤部署、申請與資源配置等長時間執行的任務</p>
-        </div>
-      </div>
+      <PageHeader title="背景任務" subtitle="追蹤部署、申請與資源配置等長時間執行的任務" />
 
       <div className={styles.statRow}>
         <div className={styles.statCard}>

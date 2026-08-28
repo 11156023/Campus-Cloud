@@ -12,32 +12,10 @@
   padding: $spacing-8 $spacing-16 $spacing-32;
   flex: 1;
   width: 100%;
-  max-width: 1600px;
   min-width: 0;
-  margin-inline: auto;
 
   @include respond-to(md) {
     padding: 0 0 $spacing-32;
-  }
-}
-
-.pageHeader {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: $spacing-16;
-
-  h1 {
-    margin: 2px 0 4px;
-    font-size: $font-size-24;
-    color: var(--color-text-primary);
-
-    @include respond-to(sm) { font-size: $font-size-28; }
-  }
-
-  > div > p:last-child {
-    color: var(--color-text-secondary);
-    font-size: $font-size-14;
   }
 }
 
@@ -362,7 +340,8 @@
   cursor: pointer;
   transition: transform $transition-base, background $transition-base, color $transition-base;
 
-  &:hover { transform: translateY(-1px); }
+  &:hover:not(:disabled) { transform: translateY(-1px); }
+  &:disabled { cursor: not-allowed; opacity: .4; }
 }
 
 .primaryButton {
@@ -372,7 +351,7 @@
   background: var(--color-primary);
   color: var(--color-text-on-primary);
 
-  &:hover { background: var(--color-primary-dark); }
+  &:hover:not(:disabled) { background: var(--color-primary-dark); }
 }
 
 .secondaryButton {
@@ -382,7 +361,7 @@
   background: color-mix(in srgb, var(--color-primary) 9%, var(--color-surface));
   color: var(--color-primary);
 
-  &:hover {
+  &:hover:not(:disabled) {
     background: color-mix(in srgb, var(--color-primary) 15%, var(--color-surface));
   }
 }
@@ -963,6 +942,131 @@
   to { background-position-x: -220%; }
 }
 
+/* ── Template card ── */
+.templateCard {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: $spacing-16;
+  border-radius: $radius-12;
+  @include glass-surface($shadow: none);
+  text-align: left;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: transform $transition-base, border-color $transition-base, box-shadow $transition-base;
+
+  &::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 120px;
+    height: 120px;
+    background: radial-gradient(
+      circle at top right,
+      color-mix(in srgb, var(--accent-color) 12%, transparent),
+      transparent 70%
+    );
+    pointer-events: none;
+    opacity: 0.6;
+    transition: opacity $transition-base;
+  }
+
+  &:hover {
+    transform: translateY(-3px);
+    border-color: color-mix(in srgb, var(--accent-color) 50%, var(--color-border));
+    box-shadow: 0 8px 20px color-mix(in srgb, var(--accent-color) 18%, transparent);
+
+    &::before { opacity: 1; }
+    .templateLogo {
+      transform: scale(1.05);
+      border-color: color-mix(in srgb, var(--accent-color) 40%, var(--color-border));
+    }
+    .templateAction {
+      color: var(--accent-color);
+      gap: 8px;
+    }
+  }
+}
+
+.templateHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: $spacing-8;
+  position: relative;
+  z-index: 1;
+}
+
+.templateLogo {
+  @include flex-center;
+  width: 44px;
+  height: 44px;
+  border-radius: $radius-12;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  color: var(--accent-color);
+  flex-shrink: 0;
+  overflow: hidden;
+  transition: transform $transition-base, border-color $transition-base;
+
+  img {
+    width: 28px;
+    height: 28px;
+    object-fit: contain;
+  }
+}
+
+.templateCategoryChip {
+  @include badge-base;
+  padding: 2px 8px;
+  background: color-mix(in srgb, var(--accent-color) 12%, transparent);
+  color: var(--accent-color);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.templateBody {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  position: relative;
+  z-index: 1;
+}
+
+.templateName {
+  font-size: $font-size-14;
+  font-weight: $font-weight-700;
+  color: var(--color-text-primary);
+}
+
+.templateDesc {
+  font-size: $font-size-12;
+  color: var(--color-text-secondary);
+  line-height: $line-height-base;
+  @include text-clamp(2);
+}
+
+.templateFooter {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 4px;
+  position: relative;
+  z-index: 1;
+}
+
+.templateAction {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: $font-size-12;
+  font-weight: $font-weight-500;
+  color: var(--color-text-muted);
+  transition: color $transition-base, gap $transition-base;
+}
+
 .needGrid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 520px));
@@ -1001,25 +1105,25 @@
   height: 42px;
 }
 
-.violet {
-  background: color-mix(in srgb, #7c61c9 12%, transparent);
-  color: #7c61c9;
+.needIcon_primary {
+  background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+  color: var(--color-primary);
 }
 
-.amber {
-  background: color-mix(in srgb, var(--color-warning) 12%, transparent);
-  color: var(--color-warning);
+.needIcon_info {
+  background: color-mix(in srgb, var(--color-info) 12%, transparent);
+  color: var(--color-info);
 }
 
 .needBadge {
   padding: 3px 8px;
-  background: color-mix(in srgb, #7c61c9 10%, transparent);
-  color: #7c61c9;
+  background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+  color: var(--color-primary);
 }
 
-.needBadge.waiting {
-  background: color-mix(in srgb, var(--color-warning) 11%, transparent);
-  color: var(--color-warning);
+.needBadge_info {
+  background: color-mix(in srgb, var(--color-info) 11%, transparent);
+  color: var(--color-info);
 }
 
 .researchCard { border-style: dashed; }
@@ -1077,20 +1181,6 @@
     color: var(--color-text-secondary);
     font-size: 13px;
   }
-}
-
-.scheduleHeading {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: $spacing-16;
-
-  h2 {
-    margin-top: 3px;
-    color: var(--color-text-primary);
-    font-size: $font-size-18;
-  }
-
 }
 
 .scheduleActions {
@@ -1277,214 +1367,6 @@
 .laterCourseIcon {
   background: color-mix(in srgb, var(--color-text-muted) 9%, transparent);
   color: var(--color-text-muted);
-}
-
-.reminderCenter {
-  position: relative;
-  z-index: 40;
-}
-
-.reminderButton {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 38px;
-  padding: 7px 10px;
-  border: 1px solid var(--color-border);
-  border-radius: $radius-pill;
-  background: var(--color-surface);
-  box-shadow: var(--shadow-sm);
-  color: var(--color-text-primary);
-  font: inherit;
-  font-size: $font-size-12;
-  font-weight: $font-weight-700;
-  cursor: pointer;
-  transition: border-color $transition-base, background $transition-base;
-
-  &:hover,
-  &.reminderButtonOpen {
-    border-color: color-mix(in srgb, var(--color-primary) 50%, var(--color-border));
-    background: var(--color-hover);
-  }
-}
-
-.reminderCount {
-  @include flex-center;
-  min-width: 20px;
-  height: 20px;
-  padding-inline: 5px;
-  border-radius: $radius-pill;
-  background: var(--color-danger);
-  color: white;
-  font-size: 10px;
-}
-
-.reminderPopover {
-  position: absolute;
-  top: calc(100% + 10px);
-  right: 0;
-  width: 390px;
-  max-width: calc(100vw - 32px);
-  overflow: hidden;
-  border: 1px solid var(--color-border);
-  border-radius: $radius-16;
-  background: var(--color-surface);
-  box-shadow: var(--shadow-xl);
-  text-align: left;
-  animation: reminderIn 150ms ease-out;
-}
-
-.reminderHeader {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: $spacing-16;
-  padding: $spacing-16;
-  border-bottom: 1px solid var(--color-divider);
-
-  h2 {
-    margin-top: 2px;
-    color: var(--color-text-primary);
-    font-size: $font-size-18;
-  }
-
-  > span {
-    color: var(--color-text-muted);
-    font-size: $font-size-12;
-  }
-}
-
-.reminderList {
-  @include flex-column;
-}
-
-.reminderEmpty {
-  @include flex-column;
-  align-items: center;
-  gap: 5px;
-  padding: $spacing-24 $spacing-16;
-  color: var(--color-text-muted);
-  text-align: center;
-
-  strong {
-    color: var(--color-text-primary);
-    font-size: 13px;
-  }
-
-  span {
-    max-width: 280px;
-    color: var(--color-text-secondary);
-    font-size: 11px;
-    line-height: 1.5;
-  }
-}
-
-.reminderItem {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  padding: 12px $spacing-16;
-  border: 0;
-  border-bottom: 1px solid var(--color-divider);
-  background: transparent;
-  color: var(--color-text-muted);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-
-  &:hover {
-    background: var(--color-hover);
-  }
-}
-
-.reminderItemUnread {
-  background: color-mix(in srgb, var(--color-primary) 4%, transparent);
-}
-
-.reminderIcon {
-  @include flex-center;
-  width: 38px;
-  height: 38px;
-  border-radius: $radius-12;
-  background: var(--color-hover);
-
-  &.warning {
-    background: color-mix(in srgb, var(--color-warning) 12%, transparent);
-  }
-
-  &.success {
-    background: color-mix(in srgb, var(--color-success) 12%, transparent);
-  }
-
-  &.danger {
-    background: color-mix(in srgb, var(--color-danger) 12%, transparent);
-  }
-}
-
-.reminderContent {
-  @include flex-column;
-  min-width: 0;
-  gap: 2px;
-
-  strong,
-  small {
-    @include text-truncate;
-  }
-
-  strong {
-    color: var(--color-text-primary);
-    font-size: 13px;
-  }
-
-  small {
-    color: var(--color-text-secondary);
-    font-size: 11px;
-  }
-
-  time {
-    margin-top: 2px;
-    color: var(--color-text-muted);
-    font-size: 10px;
-  }
-}
-
-.unreadDot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--color-primary);
-}
-
-.reminderFooter {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  min-height: 46px;
-  padding: 10px $spacing-16;
-  border: 0;
-  background: var(--color-surface);
-  color: var(--color-primary);
-  font: inherit;
-  font-size: $font-size-12;
-  font-weight: $font-weight-700;
-  cursor: pointer;
-
-  &:hover:not(:disabled) {
-    background: var(--color-hover);
-  }
-
-  &:disabled {
-    color: var(--color-text-muted);
-    cursor: default;
-  }
-}
-
-@keyframes reminderIn {
-  from { opacity: 0; transform: translateY(-5px) scale(0.98); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 @keyframes livePulse {
@@ -1682,7 +1564,7 @@
   }
 }
 
-@media (max-width: 575px) {
+@media (max-width: $breakpoint-sm) {
   .coursePageHeader {
     grid-template-columns: 1fr;
   }
@@ -1707,15 +1589,6 @@
 
   .scheduleActions > span {
     display: none;
-  }
-
-  .reminderPopover {
-    position: fixed;
-    top: 74px;
-    right: 16px;
-    left: 16px;
-    width: auto;
-    max-width: none;
   }
 
   .scheduleCard {

@@ -14,32 +14,6 @@
 }
 
 /* ── Header ── */
-.pageHeader {
-  @include flex-between;
-  flex-wrap: wrap;
-  gap: $spacing-16;
-}
-
-.pageHeading {
-  @include flex-column;
-  gap: $spacing-4;
-}
-
-.pageTitle {
-  font-size: $font-size-24;
-  font-weight: $font-weight-700;
-  color: var(--color-text-primary);
-
-  @include respond-to(sm) {
-    font-size: $font-size-28;
-  }
-}
-
-.pageSubtitle {
-  font-size: $font-size-14;
-  color: var(--color-text-secondary);
-}
-
 .pageActions {
   display: flex;
   align-items: center;
@@ -139,6 +113,151 @@
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: $spacing-16;
 }
+
+/* ── Resource list ── */
+.tableWrap {
+  @include glass-surface($shadow: var(--shadow-sm));
+  overflow-x: auto;
+  border-radius: $radius-16;
+}
+
+.table {
+  width: 100%;
+  min-width: 980px;
+  border-collapse: collapse;
+}
+
+.th {
+  padding: $spacing-8 $spacing-16;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  background: var(--color-hover);
+  font-size: $font-size-12;
+  font-weight: $font-weight-500;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.tr {
+  transition: background $transition-base;
+
+  &:not(:last-child) {
+    border-bottom: 1px solid var(--color-divider);
+  }
+
+  &:hover {
+    background: var(--color-hover);
+  }
+}
+
+.td {
+  padding: $spacing-8 $spacing-16;
+  color: var(--color-text-primary);
+  font-size: $font-size-14;
+  vertical-align: middle;
+
+  .badge {
+    margin-left: 0;
+  }
+}
+
+.nameCell {
+  display: flex;
+  min-width: 220px;
+  align-items: center;
+  gap: $spacing-8;
+
+  > div {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  strong, .nameLink {
+    overflow: hidden;
+    color: var(--color-text-primary);
+    font-size: $font-size-14;
+    font-weight: $font-weight-500;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  small {
+    color: var(--color-text-muted);
+    font-size: $font-size-12;
+  }
+}
+
+.nameIcon {
+  width: 34px;
+  height: 34px;
+  border-radius: $radius-8;
+  color: var(--color-primary);
+  background: var(--color-hover);
+  @include flex-center;
+  flex: 0 0 auto;
+}
+
+.nameLink {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--color-primary);
+    text-decoration: underline;
+  }
+}
+
+.envPrimary { color: var(--color-text-primary); font-size: $font-size-14; }
+.envSub, .muted { color: var(--color-text-muted); font-size: $font-size-12; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: $font-size-12; }
+.rowActions { display: flex; align-items: center; gap: $spacing-8; }
+.pendingRow { background: color-mix(in srgb, var(--color-info) 4%, var(--color-surface)); }
+
+.environmentGroupRow {
+  background: color-mix(in srgb, var(--color-primary) 5%, var(--color-surface));
+
+  &:hover { background: color-mix(in srgb, var(--color-primary) 8%, var(--color-surface)); }
+}
+
+.environmentMachineRow { background: color-mix(in srgb, var(--color-hover) 30%, var(--color-surface)); }
+
+.environmentToggle {
+  display: flex;
+  width: 100%;
+  min-width: 250px;
+  align-items: center;
+  gap: $spacing-8;
+  padding: 0;
+  border: 0;
+  color: var(--color-text-primary);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+
+  > :first-child { flex: 0 0 auto; color: var(--color-text-muted); }
+  > span:last-child { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
+  strong { overflow: hidden; font-size: $font-size-14; font-weight: $font-weight-500; text-overflow: ellipsis; white-space: nowrap; }
+  small { color: var(--color-text-muted); font-size: $font-size-12; }
+}
+
+.environmentIcon {
+  width: 34px;
+  height: 34px;
+  border-radius: $radius-8;
+  color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 11%, var(--color-surface));
+  @include flex-center;
+  flex: 0 0 auto;
+}
+
+.environmentMachineName { padding-left: $spacing-24; }
+.machineBranch { color: var(--color-border); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: $font-size-18; }
+.environmentTiming { color: var(--color-primary); font-size: $font-size-12; font-weight: $font-weight-500; white-space: nowrap; }
 
 /* ── Resource card ── */
 .card {

@@ -9,8 +9,9 @@ import { AuthSessionStatus } from "./services/authSession";
 import styles from "./App.module.scss";
 
 // 個人
-const DashboardPage = lazy(() => import("./pages/personal/dashboard/RoleDashboardPage"));
-const StudentHomeNewPage = lazy(() => import("./pages/personal/dashboard/StudentHomeNewPage"));
+const AdminDashboardPage = lazy(() => import("./pages/personal/dashboard/AdminDashboardPage"));
+const TeacherDashboardPage = lazy(() => import("./pages/personal/dashboard/TeacherDashboardPage"));
+const StudentHomePage = lazy(() => import("./pages/personal/dashboard/StudentHomePage"));
 const StudentCoursePage = lazy(() => import("./pages/personal/dashboard/StudentCoursePage"));
 const QuickTemplateFormPage = lazy(() => import("./pages/personal/dashboard/QuickTemplateFormPage"));
 const ResourcesPage = lazy(() => import("./pages/personal/resources/ResourcesPage"));
@@ -122,8 +123,18 @@ function App() {
           <Route index element={<Navigate to="/dashboard" replace />} />
 
           {/* 個人 */}
-          <Route path="/dashboard"            element={<DashboardPage />} />
-          <Route path="/dashboard-new"        element={<StudentHomeNewPage />} />
+          {/* 首頁依角色顯示：admin → 管理首頁、teacher → 教師首頁、其他 → 學生首頁 */}
+          <Route
+            path="/dashboard"
+            element={
+              isAdmin
+                ? <AdminDashboardPage />
+                : user?.role === "teacher"
+                  ? <TeacherDashboardPage />
+                  : <StudentHomePage />
+            }
+          />
+          <Route path="/dashboard-new"        element={<StudentHomePage />} />
           <Route path="/dashboard-new/course/:pathId" element={<StudentCoursePage />} />
           <Route path="/quick-template/:id"   element={<QuickTemplateFormPage />} />
           <Route path="/my-resources"         element={<ResourcesPage />} />

@@ -32,10 +32,11 @@ describe("CourseEnvironmentsService", () => {
   });
 
   test("payload stores memory in MB and pins the PVE template", () => {
-    expect(environmentPayload({
+    const payload = environmentPayload({
       code: "WEB",
       name: "Web Lab",
       description: "",
+      usageScope: "both",
       nodes: [{
         id: "web",
         sourceTemplateId: "tpl-id",
@@ -47,7 +48,10 @@ describe("CourseEnvironmentsService", () => {
         disk: 30,
         network: "lab-net",
       }],
-    }).nodes[0]).toEqual({
+    });
+
+    expect(payload.usage_scope).toBe("both");
+    expect(payload.nodes[0]).toEqual({
       node_key: "web",
       source_type: "template",
       source_template_id: "tpl-id",

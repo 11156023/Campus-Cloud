@@ -6,6 +6,7 @@ import SharedEmptyState from "../../../components/EmptyState/EmptyState";
 import { AiMonitoringService } from "../../../services/aiMonitoring";
 import { useToast } from "../../../hooks/useToast";
 import useAutoRefresh from "../../../hooks/useAutoRefresh";
+import PageHeader from "../../../components/PageHeader/PageHeader";
 
 function presetToRange(preset) {
   const end = new Date();
@@ -200,11 +201,7 @@ export default function AiMonitoringPage() {
 
   return (
     <div className={styles.page}>
-      <div className={styles.pageHeader}>
-        <div className={styles.pageHeading}>
-          <h1 className={styles.pageTitle}>AI API 使用監控</h1>
-          <p className={styles.pageSubtitle}>檢視 AI Proxy 與 Template 服務的呼叫紀錄與用量統計</p>
-        </div>
+      <PageHeader title="AI API 使用監控" subtitle="檢視 AI Proxy 與 Template 服務的呼叫紀錄與用量統計">
         <div className={styles.pageActions}>
           <div className={styles.segment}>
             {PRESETS.map((p) => (
@@ -219,7 +216,7 @@ export default function AiMonitoringPage() {
             ))}
           </div>
         </div>
-      </div>
+      </PageHeader>
 
       <div className={styles.statRow}>
         <div className={styles.statCard}>

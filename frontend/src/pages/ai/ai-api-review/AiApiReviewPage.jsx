@@ -7,6 +7,7 @@ import SharedEmptyState from "../../../components/EmptyState/EmptyState";
 import { AiApiService } from "../../../services/aiApi";
 import { useToast } from "../../../hooks/useToast";
 import useAutoRefresh from "../../../hooks/useAutoRefresh";
+import PageHeader from "../../../components/PageHeader/PageHeader";
 
 const TABS = [
   { key: "pending",  label: "待審核" },
@@ -201,12 +202,7 @@ export default function AiApiReviewPage() {
 
   return (
     <div className={styles.page}>
-      <div className={styles.pageHeader}>
-        <div className={styles.pageHeading}>
-          <h1 className={styles.pageTitle}>AI API 申請審核</h1>
-          <p className={styles.pageSubtitle}>審核申請並核發 API 存取參數。</p>
-        </div>
-      </div>
+      <PageHeader title="AI API 申請審核" subtitle="審核申請並核發 API 存取參數。" />
 
       <div className={styles.tabs}>
         {TABS.map((tab) => (

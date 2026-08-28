@@ -33,6 +33,7 @@ export function normalizeCourseEnvironment(item) {
     updatedAt: item.updated_at
       ? new Date(item.updated_at).toLocaleDateString("zh-TW")
       : "",
+    usageScope: item.usage_scope ?? "course",
     nodes: (item.nodes ?? []).map(normalizeNode),
     edges: (item.edges ?? []).map((edge) => ({
       ...edge,
@@ -51,6 +52,7 @@ export function environmentPayload(item) {
     code: item.code.trim(),
     name: item.name.trim(),
     description: item.description?.trim() || null,
+    usage_scope: item.usageScope ?? "course",
     nodes: item.nodes.map((node, index) => ({
       node_key: String(node.id || `node-${index + 1}`),
       source_type: node.sourceType ?? "template",

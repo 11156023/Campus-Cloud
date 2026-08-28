@@ -7,6 +7,7 @@ import { useConfirm } from "../../../components/ConfirmDialog/ConfirmProvider";
 import { useToast } from "../../../hooks/useToast";
 import useAutoRefresh from "../../../hooks/useAutoRefresh";
 import LoadingState from "../../../components/LoadingState/LoadingState";
+import PageHeader from "../../../components/PageHeader/PageHeader";
 
 const STATUS_LABELS = {
   pending_review: "待審核",
@@ -183,12 +184,7 @@ export default function BatchReviewPage() {
 
   return (
     <div className={styles.page}>
-      <div className={styles.pageHeader}>
-        <div className={styles.pageHeading}>
-          <h1 className={styles.pageTitle}>批量建立審核</h1>
-          <p className={styles.pageSubtitle}>審核教師提交的批次 VM 配置申請</p>
-        </div>
-      </div>
+      <PageHeader title="批量建立審核" subtitle="審核教師提交的批次 VM 配置申請" />
 
       <div className={styles.statRow}>
         <div className={styles.statCard}>

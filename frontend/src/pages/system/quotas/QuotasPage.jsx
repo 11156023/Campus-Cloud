@@ -7,6 +7,7 @@ import { QuotasService } from "../../../services/quotas";
 import { UsersService } from "../../../services/users";
 import { useConfirm } from "../../../components/ConfirmDialog/ConfirmProvider";
 import { useToast } from "../../../hooks/useToast";
+import PageHeader from "../../../components/PageHeader/PageHeader";
 
 // fallback：取消「無限制」勾選時回填的預設值；0 = 無限制
 const NUMBER_FIELDS = [
@@ -418,11 +419,7 @@ export default function QuotasPage() {
 
   return (
     <div className={styles.page}>
-      <div className={styles.pageHeader}>
-        <div className={styles.pageHeading}>
-          <h1 className={styles.pageTitle}>配額管理</h1>
-          <p className={styles.pageSubtitle}>全域預設值與個別使用者的資源上限覆寫</p>
-        </div>
+      <PageHeader title="配額管理" subtitle="全域預設值與個別使用者的資源上限覆寫">
         <button
           type="button"
           className={styles.btnPrimary}
@@ -431,7 +428,7 @@ export default function QuotasPage() {
           <MIcon name="add" size={16} />
           新增配額
         </button>
-      </div>
+      </PageHeader>
 
       {globalQuota && <GlobalQuotaCard config={globalQuota} onSaved={setGlobalQuota} />}
 

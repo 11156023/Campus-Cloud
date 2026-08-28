@@ -7,6 +7,7 @@ import { useConfirm } from "../../../components/ConfirmDialog/ConfirmProvider";
 import { useToast } from "../../../hooks/useToast";
 import useAutoRefresh from "../../../hooks/useAutoRefresh";
 import LoadingState from "../../../components/LoadingState/LoadingState";
+import PageHeader from "../../../components/PageHeader/PageHeader";
 
 const COLUMNS = ["Mapping", "描述", "節點 / PCI", "可用 / 總數", "使用中 VM", "狀態", "動作"];
 
@@ -162,12 +163,7 @@ export default function GpuMgmtPage() {
 
   return (
     <div className={styles.page}>
-      <div className={styles.pageHeader}>
-        <div className={styles.pageHeading}>
-          <h1 className={styles.pageTitle}>GPU 管理</h1>
-          <p className={styles.pageSubtitle}>查看叢集中所有 PCI Passthrough GPU 的指派狀態</p>
-        </div>
-      </div>
+      <PageHeader title="GPU 管理" subtitle="查看叢集中所有 PCI Passthrough GPU 的指派狀態" />
 
       <div className={styles.statRow}>
         <div className={styles.statCard}>

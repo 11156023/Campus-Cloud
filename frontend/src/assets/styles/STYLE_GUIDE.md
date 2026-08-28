@@ -263,6 +263,27 @@ import MIcon from "../components/MIcon";
 
 ---
 
+## 頁面版面（Page Layout）
+
+**頁面根容器（`.page`）一律滿寬**：不設 `max-width`、不使用 `margin: 0 auto` 置中，讓內容吃滿 DashboardLayout 的內容區。全站頁面留白因此一致，寬螢幕下不會出現「某些頁置中留白、某些頁滿寬」的落差。
+
+標準寫法：
+
+```scss
+.page {
+  @include flex-column;
+  gap: $spacing-24;
+  padding: $spacing-8 $spacing-16;
+  flex: 1;
+
+  @include respond-to(md) { padding: 0; }
+}
+```
+
+> **例外**：表單型窄頁（如 `AccountSettingsPage` 的 `max-width: 640px`）可限制寬度——輸入欄位拉滿寬螢幕反而難用。這類例外限於「單欄表單」頁面，一般內容頁請維持滿寬。
+
+---
+
 ## 元件樣式慣例
 
 ### 卡片（Card）

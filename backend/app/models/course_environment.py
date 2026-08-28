@@ -44,6 +44,11 @@ class CourseEnvironment(SQLModel, table=True):
     code: str = Field(max_length=80)
     name: str = Field(max_length=255)
     description: str | None = Field(default=None, max_length=2000)
+    usage_scope: str = Field(
+        default="course",
+        max_length=24,
+        description="course, quick_practice, or both",
+    )
     created_at: datetime = Field(
         default_factory=get_datetime_utc,
         sa_column=Column(DateTime(timezone=True), nullable=False),

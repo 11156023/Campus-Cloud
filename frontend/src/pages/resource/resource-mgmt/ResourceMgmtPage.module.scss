@@ -14,32 +14,6 @@
 }
 
 /* ── Header ── */
-.pageHeader {
-  @include flex-between;
-  flex-wrap: wrap;
-  gap: $spacing-16;
-}
-
-.pageHeading {
-  @include flex-column;
-  gap: $spacing-4;
-}
-
-.pageTitle {
-  font-size: $font-size-24;
-  font-weight: $font-weight-700;
-  color: var(--color-text-primary);
-
-  @include respond-to(sm) {
-    font-size: $font-size-28;
-  }
-}
-
-.pageSubtitle {
-  font-size: $font-size-14;
-  color: var(--color-text-secondary);
-}
-
 .pageActions {
   display: flex;
   align-items: center;
@@ -157,6 +131,36 @@
   @include flex-column;
 }
 
+.previewNotice {
+  display: flex;
+  align-items: center;
+  gap: $spacing-8;
+  margin-bottom: $spacing-8;
+  padding: $spacing-8 $spacing-16;
+  border: 1px solid color-mix(in srgb, var(--color-primary) 22%, var(--color-border));
+  border-radius: $radius-8;
+  color: var(--color-text-secondary);
+  background: color-mix(in srgb, var(--color-primary) 6%, var(--color-surface));
+  font-size: $font-size-12;
+
+  > :first-child {
+    flex: 0 0 auto;
+    color: var(--color-primary);
+  }
+
+  span {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: $spacing-8;
+  }
+
+  strong {
+    color: var(--color-text-primary);
+    font-weight: $font-weight-500;
+  }
+}
+
 /* ── Empty state ── */
 .empty {
   flex: 1;
@@ -230,6 +234,84 @@
   font-size: $font-size-14;
   color: var(--color-text-primary);
   vertical-align: middle;
+}
+
+.environmentGroupRow {
+  background: color-mix(in srgb, var(--color-primary) 5%, var(--color-surface));
+
+  &:hover {
+    background: color-mix(in srgb, var(--color-primary) 8%, var(--color-surface));
+  }
+}
+
+.environmentMachineRow {
+  background: color-mix(in srgb, var(--color-hover) 30%, var(--color-surface));
+}
+
+.environmentToggle {
+  display: flex;
+  width: 100%;
+  min-width: 230px;
+  align-items: center;
+  gap: $spacing-8;
+  padding: 0;
+  border: 0;
+  color: var(--color-text-primary);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+
+  > :first-child {
+    flex: 0 0 auto;
+    color: var(--color-text-muted);
+  }
+
+  > span:last-child {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  strong {
+    overflow: hidden;
+    font-size: $font-size-14;
+    font-weight: $font-weight-500;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  small {
+    color: var(--color-text-muted);
+    font-size: $font-size-12;
+  }
+}
+
+.environmentIcon {
+  width: 34px;
+  height: 34px;
+  border-radius: $radius-8;
+  color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 11%, var(--color-surface));
+  @include flex-center;
+  flex: 0 0 auto;
+}
+
+.environmentMachineName {
+  padding-left: 30px;
+}
+
+.machineBranch {
+  color: var(--color-border);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: $font-size-18;
+}
+
+.environmentTiming {
+  color: var(--color-primary);
+  font-size: $font-size-12;
+  font-weight: $font-weight-500;
+  white-space: nowrap;
 }
 
 /* ── Name cell ── */

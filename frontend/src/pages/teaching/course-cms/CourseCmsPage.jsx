@@ -13,6 +13,7 @@ import {
 import { TemplatesService } from "../../../services/templates";
 import { TeachingClassesService } from "../../../services/teachingClasses";
 import styles from "./CourseCmsPage.module.scss";
+import PageHeader from "../../../components/PageHeader/PageHeader";
 
 const DIFFICULTIES = [
   { key: "easy", label: "簡單" },
@@ -703,13 +704,7 @@ export default function CourseCmsPage() {
 
   return (
     <div className={styles.page}>
-      <div className={styles.pageHeader}>
-        <div className={styles.pageHeading}>
-          <h1 className={styles.pageTitle}>課程管理</h1>
-          <p className={styles.pageSubtitle}>
-            建立學習路徑 → 房間（綁定實驗模板）→ 任務與 Flag 題目，發布後學生即可學習
-          </p>
-        </div>
+      <PageHeader title="課程管理" subtitle="建立學習路徑 → 房間（綁定實驗模板）→ 任務與 Flag 題目，發布後學生即可學習">
         <div className={styles.tabs}>
           <button
             type="button"
@@ -728,7 +723,7 @@ export default function CourseCmsPage() {
             學生進度
           </button>
         </div>
-      </div>
+      </PageHeader>
 
       {pathsLoading ? (
         <LoadingState fullPage />

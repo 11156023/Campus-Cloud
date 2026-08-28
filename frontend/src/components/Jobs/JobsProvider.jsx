@@ -2,11 +2,26 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 import { toast } from "sonner";
 import { useAuth } from "../../contexts/AuthContext";
 import { AuthStorage } from "../../services/auth";
+import { CoursesService } from "../../services/courses";
 import { connectJobsWebSocket, JobsService } from "../../services/jobs";
 import JobDetailDialog from "./JobDetailDialog";
 import { JOB_KIND_LABEL } from "./JobRow";
 
 const NOTIFY_ONLY_MINE_KEY = "jobs:notifyOnlyMine";
+
+/* 沿用學生首頁提醒中心時代的 key，保留使用者既有的已讀紀錄 */
+function reminderStorageKey(user) {
+  return `skylab:student-reminders:v1:${user?.id ?? user?.email ?? "student"}`;
+}
+
+function loadReadReminderIds(user) {
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(reminderStorageKey(user)) ?? "[]");
+    return Array.isArray(stored) ? stored : [];
+  } catch {
+    return [];
+  }
+}
 
 /* 從 running/pending/blocked → 終態時觸發 toast */
 const TERMINAL_STATUSES = new Set(["completed", "failed", "blocked", "cancelled"]);
@@ -57,6 +72,8 @@ export default function JobsProvider({ children }) {
   const [notifyOnlyMine, setNotifyOnlyMineState] = useState(
     () => localStorage.getItem(NOTIFY_ONLY_MINE_KEY) === "1",
   );
+  const [reminders, setReminders] = useState(null); // 提醒；null = 尚未載入
+  const [readReminderIds, setReadReminderIds] = useState(() => loadReadReminderIds(user));
 
   const isAdmin = Boolean(user?.is_superuser || user?.role === "admin");
   const myUserId = user?.id ?? null;
@@ -92,6 +109,10 @@ export default function JobsProvider({ children }) {
       const all = snapshot?.items ?? [];
       setItems(all.filter((j) => j.status === "running"));
 
+      // /ws/jobs 的 snapshot 會附帶個人提醒（約每 30 秒重算一次）；
+      // 缺欄位（舊後端）時維持 REST 載入的結果
+      if (Array.isArray(snapshot?.reminders)) setReminders(snapshot.reminders);
+
       // ── Diff: 比對上一次 snapshot 的狀態，發 toast ──
       const prev = prevStatusMapRef.current;
       const next = new Map();
@@ -109,6 +130,49 @@ export default function JobsProvider({ children }) {
     });
   }, []);
 
+  /* 提醒（機器期限、審核結果、近期課堂任務）：登入後載入一次，popover 開啟時再刷新 */
+  const refreshReminders = useCallback(async () => {
+    try {
+      const res = await CoursesService.listReminders();
+      setReminders(Array.isArray(res) ? res : []);
+    } catch {
+      // 靜默失敗：沒有提醒權限或暫時取不到時，維持現有清單
+      setReminders((current) => current ?? []);
+    }
+  }, []);
+
+  /* 依身分（而非 user 物件引用）重載：token refresh 會換新 user 物件，不該重打 API */
+  useEffect(() => {
+    refreshReminders();
+    setReadReminderIds(loadReadReminderIds(user));
+  }, [refreshReminders, user?.id]);
+
+  const persistReadReminderIds = useCallback((ids) => {
+    setReadReminderIds(ids);
+    try {
+      window.localStorage.setItem(reminderStorageKey(user), JSON.stringify(ids));
+    } catch {
+      // localStorage 不可用時，已讀狀態僅本次瀏覽生效
+    }
+  }, [user]);
+
+  const markReminderRead = useCallback((id) => {
+    setReadReminderIds((current) => {
+      if (current.includes(id)) return current;
+      const next = [...current, id];
+      try {
+        window.localStorage.setItem(reminderStorageKey(user), JSON.stringify(next));
+      } catch {
+        // 同上，靜默降級
+      }
+      return next;
+    });
+  }, [user]);
+
+  const markAllRemindersRead = useCallback(() => {
+    persistReadReminderIds((reminders ?? []).map((item) => item.id));
+  }, [persistReadReminderIds, reminders]);
+
   const setNotifyOnlyMine = useCallback((next) => {
     setNotifyOnlyMineState(next);
     try {
@@ -120,7 +184,18 @@ export default function JobsProvider({ children }) {
 
   return (
     <JobsContext.Provider
-      value={{ items, isAdmin, notifyOnlyMine, setNotifyOnlyMine, openJob: setFocusJobId }}
+      value={{
+        items,
+        isAdmin,
+        notifyOnlyMine,
+        setNotifyOnlyMine,
+        openJob: setFocusJobId,
+        reminders,
+        readReminderIds,
+        refreshReminders,
+        markReminderRead,
+        markAllRemindersRead,
+      }}
     >
       {children}
       <JobDetailDialog jobId={focusJobId} onClose={() => setFocusJobId(null)} />

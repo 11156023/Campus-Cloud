@@ -8,6 +8,7 @@ import { useToast } from "../../../hooks/useToast";
 import { AccountService } from "../../../services/account";
 import { downscaleImage } from "../../../utils/image/downscaleImage";
 import AppearanceTab from "./AppearanceTab";
+import PageHeader from "../../../components/PageHeader/PageHeader";
 
 const TABS = [
   { key: "profile",    label: "個人資料", icon: "person" },
@@ -356,12 +357,7 @@ export default function AccountSettingsPage() {
 
   return (
     <div className={styles.page}>
-      <div className={styles.pageHeader}>
-        <div className={styles.pageHeading}>
-          <h1 className={styles.pageTitle}>帳號設定</h1>
-          <p className={styles.pageSubtitle}>管理你的個人資料、密碼、外觀與帳號安全</p>
-        </div>
-      </div>
+      <PageHeader title="帳號設定" subtitle="管理你的個人資料、密碼、外觀與帳號安全" />
 
       <div className={styles.tabs}>
         {TABS.map((tab) => (

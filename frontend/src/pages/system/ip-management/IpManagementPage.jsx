@@ -9,6 +9,7 @@ import { IpManagementService } from "../../../services/ipManagement";
 import { useConfirm } from "../../../components/ConfirmDialog/ConfirmProvider";
 import { useToast } from "../../../hooks/useToast";
 import useAutoRefresh from "../../../hooks/useAutoRefresh";
+import PageHeader from "../../../components/PageHeader/PageHeader";
 
 const COLUMNS = ["IP 位址", "用途", "VMID", "備註", "分配時間"];
 
@@ -165,11 +166,7 @@ export default function IpManagementPage() {
 
   return (
     <div className={styles.page}>
-      <div className={styles.pageHeader}>
-        <div className={styles.pageHeading}>
-          <h1 className={styles.pageTitle}>IP 管理</h1>
-          <p className={styles.pageSubtitle}>管理子網設定與所有 IP 位址分配</p>
-        </div>
+      <PageHeader title="IP 管理" subtitle="管理子網設定與所有 IP 位址分配">
         {isAdmin && !editing && (
           <div className={styles.pageActions}>
             <button
@@ -182,7 +179,7 @@ export default function IpManagementPage() {
             </button>
           </div>
         )}
-      </div>
+      </PageHeader>
 
       <div className={styles.statRow}>
         <div className={styles.statCard}>

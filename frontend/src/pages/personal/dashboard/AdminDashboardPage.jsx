@@ -10,6 +10,7 @@ import { MonitoringService } from "../../../services/monitoring";
 import { SpecChangeRequestsService } from "../../../services/specChangeRequests";
 import { VmRequestsService } from "../../../services/vmRequests";
 import styles from "./AdminDashboardPage.module.scss";
+import PageHeader from "../../../components/PageHeader/PageHeader";
 
 export function countRows(response) {
   if (Array.isArray(response)) return response.length;
@@ -84,9 +85,7 @@ export default function AdminDashboardPage() {
   }
 
   return <div className={styles.page}>
-    <header className={styles.header}>
-      <div><span className={styles.eyebrow}>管理首頁</span><h1>{name}，要處理哪一件事？</h1><p>直接詢問維運助手，或查看目前需要優先確認的問題。</p></div>
-    </header>
+    <PageHeader title={`${name}，要處理哪一件事？`} subtitle="直接詢問維運助手，或查看目前需要優先確認的問題。" />
 
     <section className={styles.attention} aria-labelledby="admin-attention-title">
       <div className={styles.sectionHeading}><div><span className={styles.eyebrow}>優先處理</span><h2 id="admin-attention-title">需要前往確認</h2></div><button type="button" onClick={() => navigate("/monitoring")}>開啟系統監控<MIcon name="arrow_forward" size={16} /></button></div>

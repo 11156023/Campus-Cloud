@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from datetime import timedelta
 from typing import Any
 
 from sqlmodel import Session, select
@@ -59,7 +60,12 @@ def update_global_quota(session: Session, data: dict[str, Any]) -> QuotaConfig:
     for key, value in data.items():
         if value is not None and hasattr(config, key):
             setattr(config, key, value)
-    config.updated_at = get_datetime_utc()
+    now = get_datetime_utc()
+    # Windows 的系統時鐘可能讓連續兩次 datetime.now() 取得相同值；API 的
+    # updated_at 必須保持單調遞增，否則快取與前端變更偵測會漏掉這次更新。
+    if config.updated_at is not None and now <= config.updated_at:
+        now = config.updated_at + timedelta(microseconds=1)
+    config.updated_at = now
     session.add(config)
     session.commit()
     session.refresh(config)
