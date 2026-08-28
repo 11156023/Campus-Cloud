@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import AiPveChat from "../../../components/AiPveChat/AiPveChat";
-import MIcon from "../../../components/MIcon";
+import PageHeader from "../../../components/PageHeader/PageHeader";
 import styles from "./AiPvePage.module.scss";
 
 export default function AiPvePage() {
@@ -15,16 +15,11 @@ export default function AiPvePage() {
   }, [location.pathname, navigate]);
 
   return (
-    <div className={styles.panel}>
-      <div className={styles.panelHeading}>
-        <h2 className={styles.panelTitle}>
-          <MIcon name="smart_toy" size={20} />
-          AI PVE 維運助手
-        </h2>
-        <p className={styles.panelDesc}>
-          管理員專用的全站 PVE 維運工具，可查詢 VM/LXC 與節點狀態，執行指令前會再次確認
-        </p>
-      </div>
+    <div className={styles.page}>
+      <PageHeader
+        title="AI PVE 維運助手"
+        subtitle="管理員專用的全站 PVE 維運工具，可查詢 VM/LXC 與節點狀態，執行指令前會再次確認"
+      />
       <AiPveChat initialPrompt={initialPromptRef.current} />
     </div>
   );
