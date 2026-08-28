@@ -134,8 +134,7 @@ function App() {
                   : <StudentHomePage />
             }
           />
-          <Route path="/dashboard-new"        element={<StudentHomePage />} />
-          <Route path="/dashboard-new/course/:pathId" element={<StudentCoursePage />} />
+          <Route path="/dashboard/course/:pathId" element={<StudentCoursePage />} />
           <Route path="/quick-template/:id"   element={<QuickTemplateFormPage />} />
           <Route path="/my-resources"         element={<ResourcesPage />} />
           <Route path="/my-resources/:vmid"   element={<ResourceDetailPage backTo="/my-resources" />} />

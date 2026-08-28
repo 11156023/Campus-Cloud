@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import rehypeSanitize from "rehype-sanitize";
 import { VncScreen } from "react-vnc";
@@ -180,6 +180,7 @@ function QuestionRow({ question, onSubmit, submitting }) {
 export default function CourseRoomPage() {
   const { roomId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const toast = useToast();
 
   const [room, setRoom] = useState(null);
@@ -302,7 +303,11 @@ export default function CourseRoomPage() {
         <button
           type="button"
           className={styles.backBtn}
-          onClick={() => navigate("/courses")}
+          onClick={() => navigate(location.state?.from ?? "/courses", {
+            state: location.state?.courseFrom
+              ? { from: location.state.courseFrom }
+              : undefined,
+          })}
         >
           <MIcon name="arrow_back" size={18} />
         </button>

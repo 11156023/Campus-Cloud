@@ -61,8 +61,8 @@ describe("buildPracticeMachines", () => {
 
 describe("practiceMachineActionLabel", () => {
   it("課堂機器只顯示自動開機狀態，不提供學生啟動操作", () => {
-    expect(practiceMachineActionLabel({ vmid: 218, status: "running" })).toBe("直接開啟");
-    expect(practiceMachineActionLabel({ vmid: 218, status: "stopped" })).toBe("等待自動開機");
+    expect(practiceMachineActionLabel({ vmid: 218, status: "running" })).toBe("進入機器");
+    expect(practiceMachineActionLabel({ vmid: 218, status: "stopped" })).toBe("啟動並進入");
     expect(practiceMachineActionLabel({ vmid: null, status: "pending" })).toBe("環境配置中");
   });
 });
