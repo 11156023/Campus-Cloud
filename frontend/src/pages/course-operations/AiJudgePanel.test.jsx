@@ -2,11 +2,14 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, test } from "vitest";
 import {
   CreateCheckChooser,
+  ChatPanel,
   RubricStats,
+  getRubricCheckTitle,
   getSelectedRubricSource,
   getVisibleRubricSources,
   resolveActiveSessionId,
 } from "./AiJudgePanel";
+import { RUBRIC_POLISH_PROMPT } from "../../services/aiJudge";
 
 describe("RubricStats", () => {
   const items = [
@@ -35,6 +38,25 @@ describe("RubricStats", () => {
     expect(html).toContain("需要重新評估");
     expect(html).toContain("下方顯示上次結果");
   });
+
+  test("refine 內部提示詞不會出現在聊天室，並提供清除內容按鈕", () => {
+    const html = renderToStaticMarkup(
+      <ChatPanel
+        messages={[
+          { role: "user", content: RUBRIC_POLISH_PROMPT },
+          { role: "assistant", content: "已完成潤飾，請確認提案。" },
+        ]}
+        onSendMessage={() => {}}
+        onClearMessages={() => {}}
+        isLoading={false}
+        hasRubric
+      />,
+    );
+
+    expect(html).not.toContain(RUBRIC_POLISH_PROMPT);
+    expect(html).toContain("已完成潤飾，請確認提案。");
+    expect(html).toContain("清除內容");
+  });
 });
 
 describe("CreateCheckChooser", () => {
@@ -50,6 +72,15 @@ describe("CreateCheckChooser", () => {
     expect(html).toContain("返回目前檢查");
     expect(html).toContain("立即開啟空白評分表");
     expect(html).not.toContain('role="dialog"');
+  });
+});
+
+describe("uploaded rubric naming", () => {
+  test("使用上傳檔名作為檢查名稱並限制長度", () => {
+    expect(getRubricCheckTitle({ name: "期中評分表.pdf" })).toBe("期中評分表.pdf");
+    expect(getRubricCheckTitle({ original_filename: "保存的評分表.docx" })).toBe("保存的評分表.docx");
+    expect(getRubricCheckTitle({ name: "  " })).toBe("未命名檢查");
+    expect(getRubricCheckTitle({ name: "a".repeat(300) })).toHaveLength(255);
   });
 });
 

@@ -181,10 +181,12 @@ async def test_analyze_rubric_injects_catalog_and_normalizes_check_steps(
         "rubric text",
         template_key="n8n",
         template_commands=[command],
+        environment_keys=["n8n", "python"],
     )
 
     system_prompt = captured_payload["messages"][0]["content"]
     assert "目前主要 template：n8n" in system_prompt
+    assert "老師選定的評分環境：n8n, python" in system_prompt
     assert "n8n.port_check" in system_prompt
     assert "ss -lntp" not in system_prompt
     assert "不得自行發明" in system_prompt

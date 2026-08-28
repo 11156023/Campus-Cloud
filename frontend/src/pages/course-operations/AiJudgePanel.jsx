@@ -6,6 +6,7 @@ import MIcon from "../../components/MIcon";
 import { useToast } from "../../hooks/useToast";
 import useAutoRefresh from "../../hooks/useAutoRefresh";
 import { downloadBlob } from "../../services/api";
+import { createRubricAnalysisAutosave } from "./rubricAnalysisAutosave";
 import {
   AiJudgeService,
   RUBRIC_POLISH_PROMPT,
@@ -13,6 +14,7 @@ import {
   TEMPLATE_OPTIONS,
   getTemplateLabel,
   rubricToContext,
+  shouldDisplayChatMessage,
 } from "../../services/aiJudge";
 
 /* ── 共用小元件 ─────────────────────────────────────────── */
@@ -39,6 +41,12 @@ function getDetectableInfo(detectable) {
 function formatDateTime(value) {
   if (!value) return "—";
   return new Date(value).toLocaleString("zh-TW");
+}
+
+export function getRubricCheckTitle(file) {
+  const name = file?.name || file?.original_filename || file?.display_name;
+  const title = String(name ?? "").trim();
+  return (title || "未命名檢查").slice(0, 255);
 }
 
 /* ── 評分表統計 ─────────────────────────────────────────── */
@@ -212,17 +220,24 @@ function RubricCard({ item, index, onChange, onDelete, disabled }) {
 
 /* ── 上傳區 ─────────────────────────────────────────────── */
 
-function RubricUploader({ onUpload, isLoading }) {
+function RubricUploader({ onUpload, onInvalidFile, isLoading }) {
   const [isDragging, setIsDragging] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
+
+  function selectFile(file) {
+    if (!file) return;
+    const ext = file.name.split(".").pop()?.toLowerCase();
+    if (ext !== "docx" && ext !== "pdf") {
+      onInvalidFile?.("只接受 .docx 或 .pdf 評分文件。");
+      return;
+    }
+    setSelectedFile(file);
+  }
 
   function handleDrop(e) {
     e.preventDefault();
     setIsDragging(false);
-    const file = e.dataTransfer.files?.[0];
-    if (!file) return;
-    const ext = file.name.split(".").pop()?.toLowerCase();
-    if (ext === "docx" || ext === "pdf") setSelectedFile(file);
+    selectFile(e.dataTransfer.files?.[0]);
   }
 
   return (
@@ -245,8 +260,8 @@ function RubricUploader({ onUpload, isLoading }) {
           className={styles.dropZoneInput}
           disabled={isLoading}
           onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) setSelectedFile(file);
+            selectFile(e.target.files?.[0]);
+            e.target.value = "";
           }}
         />
         {selectedFile ? (
@@ -306,15 +321,18 @@ function RubricUploader({ onUpload, isLoading }) {
 
 /* ── AI 對話面板 ────────────────────────────────────────── */
 
-function ChatPanel({
+export function ChatPanel({
   messages,
   onSendMessage,
+  onClearMessages = () => {},
   isLoading,
+  isClearing = false,
   disabled = false,
   hasRubric = false,
 }) {
   const [input, setInput] = useState("");
   const messagesEndRef = useRef(null);
+  const visibleMessages = messages.filter(shouldDisplayChatMessage);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -322,7 +340,7 @@ function ChatPanel({
 
   function send() {
     const content = input.trim();
-    if (!content || isLoading || disabled) return;
+    if (!content || isLoading || isClearing || disabled) return;
     onSendMessage(content);
     setInput("");
   }
@@ -330,7 +348,7 @@ function ChatPanel({
   return (
     <div className={styles.chatPanel}>
       <div className={styles.chatMessages}>
-        {messages.length === 0 ? (
+        {visibleMessages.length === 0 ? (
           <div className={styles.chatEmpty}>
             <MIcon name="smart_toy" size={32} />
             <p>{hasRubric ? "與 AI 對話來精煉你的評分表" : "先和 AI 討論你的檢查需求"}</p>
@@ -341,7 +359,7 @@ function ChatPanel({
             </p>
           </div>
         ) : (
-          messages.map((msg, i) => (
+          visibleMessages.map((msg, i) => (
             <div
               key={`${msg.role}-${i}`}
               className={`${styles.chatMsgRow} ${msg.role === "user" ? styles.chatMsgRow_user : ""}`}
@@ -383,15 +401,26 @@ function ChatPanel({
       </div>
 
       <div className={styles.chatInputArea}>
-        <button
-          type="button"
-          className={styles.btnSecondary}
-          disabled={isLoading || disabled || !hasRubric}
-          onClick={() => onSendMessage(RUBRIC_POLISH_PROMPT, true)}
-        >
-          <MIcon name="auto_fix_high" size={14} />
-          潤飾評分表
-        </button>
+        <div className={styles.chatActions}>
+          <button
+            type="button"
+            className={styles.btnSecondary}
+            disabled={isLoading || isClearing || disabled || !hasRubric}
+            onClick={() => onSendMessage(RUBRIC_POLISH_PROMPT, true)}
+          >
+            {isLoading ? <Spinner size={14} /> : <MIcon name="auto_fix_high" size={14} />}
+            潤飾評分表
+          </button>
+          <button
+            type="button"
+            className={styles.btnSecondary}
+            disabled={isLoading || isClearing || disabled || messages.length === 0}
+            onClick={onClearMessages}
+          >
+            {isClearing ? <Spinner size={14} /> : <MIcon name="delete_sweep" size={14} />}
+            清除內容
+          </button>
+        </div>
         <form
           className={styles.chatForm}
           onSubmit={(e) => {
@@ -414,12 +443,12 @@ function ChatPanel({
                 : "描述想檢查的環境或問題...（Shift+Enter 換行）"
             }
             rows={1}
-            disabled={isLoading || disabled}
+            disabled={isLoading || isClearing || disabled}
           />
           <button
             type="submit"
             className={styles.btnPrimary}
-            disabled={isLoading || disabled || !input.trim()}
+            disabled={isLoading || isClearing || disabled || !input.trim()}
             aria-label="送出"
           >
             <MIcon name="send" size={16} />
@@ -463,9 +492,10 @@ function CreateCheckForm({
   const toast = useToast();
   const requestVersionRef = useRef(0);
   const [mode, setMode] = useState(initialMode);
-  const [title, setTitle] = useState("");
   const [rubricName, setRubricName] = useState("");
-  const [environmentKeys, setEnvironmentKeys] = useState([]);
+  const [environmentKeys, setEnvironmentKeys] = useState(() => (
+    initialMode === "existing" ? ["linux"] : []
+  ));
   const [files, setFiles] = useState([]);
   const [selectedFileId, setSelectedFileId] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -498,19 +528,51 @@ function CreateCheckForm({
       : [...current, key]);
   }
 
+  function handleModeChange(nextMode) {
+    setMode(nextMode);
+    if (nextMode === "existing") {
+      setEnvironmentKeys((current) => current.length ? current : ["linux"]);
+    }
+  }
+
   async function uploadFile(file, conflictStrategy = null) {
     if (!file) return;
     const requestVersion = requestVersionRef.current;
     setUploading(true);
     setError("");
     try {
-      const result = await AiJudgeService.uploadFile(classId, file, environmentKeys[0] ?? "linux", conflictStrategy);
+      const result = await AiJudgeService.uploadFile(
+        classId,
+        file,
+        environmentKeys[0] ?? "linux",
+        conflictStrategy,
+        environmentKeys,
+      );
       if (requestVersion !== requestVersionRef.current) return;
       const uploaded = result.file ?? { ...result, analysis_json: result.analysis };
       setFiles((current) => [uploaded, ...current.filter((item) => item.id !== uploaded.id)]);
       setSelectedFileId(uploaded.id);
       setEnvironmentKeys(uploaded.environment_keys?.length ? uploaded.environment_keys : [uploaded.template_key]);
       setConflictFile(null);
+      if (!sourceOnly) {
+        setCreating(true);
+        try {
+          const created = await AiJudgeService.createSession(classId, {
+            title: getRubricCheckTitle({
+              name: file.name,
+              original_filename: uploaded.original_filename,
+              display_name: uploaded.display_name,
+            }),
+            creationMode: "existing",
+            selectedFileId: uploaded.id,
+          });
+          if (requestVersion === requestVersionRef.current) onCreated(created, "uploaded");
+        } catch (createError) {
+          setError(`AI 分析完成，但建立檢查失敗：${createError?.message ?? "請稍後再試"}`);
+        } finally {
+          setCreating(false);
+        }
+      }
     } catch (uploadError) {
       if (requestVersion !== requestVersionRef.current) return;
       if (uploadError?.status === 409) {
@@ -524,21 +586,9 @@ function CreateCheckForm({
     }
   }
 
-  async function upload(event) {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (!file) return;
-    const suffix = file.name.split(".").pop()?.toLowerCase();
-    if (!['docx', 'pdf'].includes(suffix)) {
-      setError("只接受 .docx 或 .pdf 評分文件。");
-      return;
-    }
-    await uploadFile(file);
-  }
-
   async function submit(event) {
     event.preventDefault();
-    if ((!sourceOnly && !title.trim()) || !mode) return;
+    if (!mode) return;
     if (mode === "blank" && (!rubricName.trim() || !environmentKeys.length)) return;
     if (mode === "existing" && !selectedFileId) return;
     setCreating(true);
@@ -552,7 +602,9 @@ function CreateCheckForm({
          onCreated(file, sourceOnly && mode === "blank" ? "source-blank" : "source");
       } else {
         const created = await AiJudgeService.createSession(classId, {
-          title,
+          title: mode === "blank"
+            ? getRubricCheckTitle({ name: rubricName })
+            : getRubricCheckTitle(files.find((entry) => entry.id === selectedFileId)),
           creationMode: mode,
           rubricName: mode === "blank" ? rubricName : undefined,
           environmentKeys: mode === "blank" ? environmentKeys : undefined,
@@ -569,14 +621,25 @@ function CreateCheckForm({
 
   const form = (
       <section className={embedded ? styles.createCheckPanel : `${styles.confirm} ${styles.createCheckDialog}`} role={embedded ? undefined : "dialog"} aria-modal={embedded ? undefined : "true"} aria-labelledby="create-check-title">
-        <div className={styles.modalHeader}><div>{embedded && <button type="button" className={styles.inlineBackButton} disabled={creating || uploading} onClick={onClose}><MIcon name="arrow_back" size={17} />返回建立方式</button>}<h2 id="create-check-title">{sourceOnly ? "新增評分表來源" : mode === "blank" ? "從零開始建立" : "使用已有評分文件"}</h2><p>{sourceOnly ? "建立或選用一份班級評分表，完成後會套用到目前檢查。" : mode === "blank" ? "建立空白評分表後，直接進入評分項目與 AI 助手編輯頁。" : "選擇已保存的評分表，或上傳文件交由 AI 分析。"}</p></div>{!embedded && <button type="button" className={styles.iconBtn} aria-label="關閉" disabled={creating || uploading} onClick={onClose}><MIcon name="close" size={18} /></button>}</div>
+        <div className={styles.modalHeader}><div>{embedded && <button type="button" className={styles.inlineBackButton} disabled={creating || uploading} onClick={onClose}><MIcon name="arrow_back" size={17} />返回建立方式</button>}<h2 id="create-check-title">{sourceOnly ? "新增評分表來源" : mode === "blank" ? "從零開始建立" : "使用已有評分文件"}</h2><p>{sourceOnly ? "建立或選用一份班級評分表，完成後會套用到目前檢查。" : mode === "blank" ? "建立空白評分表後，直接進入評分項目與 AI 助手編輯頁。" : "選擇已保存的評分表，或上傳文件交由 AI 分析；分析完成會自動開啟評分表頁面。"}</p></div>{!embedded && <button type="button" className={styles.iconBtn} aria-label="關閉" disabled={creating || uploading} onClick={onClose}><MIcon name="close" size={18} /></button>}</div>
         <form onSubmit={submit}>
-          {!sourceOnly && <label className={styles.dialogField}><span>檢查名稱</span><input autoFocus value={title} maxLength={255} placeholder="例如：期中 Python 環境檢查" onChange={(event) => setTitle(event.target.value)} /></label>}
-          {!embedded && <fieldset className={styles.modeFieldset}><legend>如何建立評分表？</legend><div className={styles.modeChoices}><label className={mode === "blank" ? styles.modeChoiceActive : styles.modeChoice}><input type="radio" name="creation-mode" checked={mode === "blank"} onChange={() => setMode("blank")} /><span><b>從零開始建立</b><small>建立空白評分表，接著手動新增項目或請 AI 產生初稿。</small></span></label><label className={mode === "existing" ? styles.modeChoiceActive : styles.modeChoice}><input type="radio" name="creation-mode" checked={mode === "existing"} onChange={() => setMode("existing")} /><span><b>使用已有評分文件</b><small>選擇班級已保存的評分表，或上傳 .docx／.pdf。</small></span></label></div></fieldset>}
-          {mode === "blank" && <div className={styles.modeFields}><label className={styles.dialogField}><span>評分表名稱</span><input autoFocus={sourceOnly} value={rubricName} maxLength={255} placeholder="例如：期中 Python 評分表" onChange={(event) => setRubricName(event.target.value)} /></label><fieldset className={styles.modeFieldset}><legend>評分環境（可複選）</legend><div className={styles.dialogChips}>{TEMPLATE_OPTIONS.map((option) => <label key={option.key} className={environmentKeys.includes(option.key) ? styles.dialogChipActive : styles.dialogChip}><input type="checkbox" checked={environmentKeys.includes(option.key)} onChange={() => toggleEnvironment(option.key)} />{option.label}</label>)}</div></fieldset></div>}
-           {mode === "existing" && <div className={styles.existingPicker}><div className={styles.existingPickerHead}><div><span>已保存評分表</span><small>每份來源只能綁定一個檢查；若要重構，請使用「重構」。</small></div><label className={styles.uploadSourceButton}><input type="file" accept=".docx,.pdf" disabled={uploading} onChange={upload} />{uploading ? <><Spinner size={14} />分析中…</> : <><MIcon name="upload_file" size={15} />上傳評分文件</>}</label></div>{files.length ? <div className={styles.existingList}>{files.map((file) => <label key={file.id} className={selectedFileId === file.id ? styles.existingRowActive : styles.existingRow}><input type="radio" name="saved-rubric" checked={selectedFileId === file.id} onChange={() => setSelectedFileId(file.id)} /><span><b>{file.display_name ?? file.original_filename ?? "未命名評分表"}</b><small>{(file.environment_keys?.length ? file.environment_keys : [file.template_key]).map(getTemplateLabel).join("、")} · {file.analysis_json?.items?.length ?? 0} 項 · {formatDateTime(file.updated_at)}</small></span></label>)}</div> : <p className={styles.mutedText}>尚未有可用的評分表，請上傳評分文件。</p>}{conflictFile && <div className={styles.conflictActions} role="alert"><span>「{conflictFile.name}」已存在：</span><button type="button" className={styles.btnSecondary} disabled={uploading} onClick={() => uploadFile(conflictFile, "copy")}>建立副本</button><button type="button" className={styles.btnDanger} disabled={uploading} onClick={() => uploadFile(conflictFile, "overwrite")}>覆蓋原本</button><button type="button" className={styles.iconBtn} aria-label="取消同名處理" onClick={() => setConflictFile(null)}><MIcon name="close" size={16} /></button></div>}</div>}
+          {!embedded && <fieldset className={styles.modeFieldset}><legend>如何建立評分表？</legend><div className={styles.modeChoices}><label className={mode === "blank" ? styles.modeChoiceActive : styles.modeChoice}><input type="radio" name="creation-mode" checked={mode === "blank"} onChange={() => handleModeChange("blank")} /><span><b>從零開始建立</b><small>建立空白評分表，接著手動新增項目或請 AI 產生初稿。</small></span></label><label className={mode === "existing" ? styles.modeChoiceActive : styles.modeChoice}><input type="radio" name="creation-mode" checked={mode === "existing"} onChange={() => handleModeChange("existing")} /><span><b>使用已有評分文件</b><small>選擇班級已保存的評分表，或上傳 .docx／.pdf；檢查名稱會使用文件名稱。</small></span></label></div></fieldset>}
+           {mode === "blank" && <div className={styles.modeFields}><label className={styles.dialogField}><span>評分表名稱</span><input autoFocus={sourceOnly} value={rubricName} maxLength={255} placeholder="例如：期中 Python 評分表" onChange={(event) => setRubricName(event.target.value)} /></label><fieldset className={styles.modeFieldset}><legend>評分環境（可複選）</legend><div className={styles.dialogChips}>{TEMPLATE_OPTIONS.map((option) => <label key={option.key} className={environmentKeys.includes(option.key) ? styles.dialogChipActive : styles.dialogChip}><input type="checkbox" checked={environmentKeys.includes(option.key)} onChange={() => toggleEnvironment(option.key)} />{option.label}</label>)}</div></fieldset></div>}
+           {mode === "existing" && <div className={styles.existingPicker}>
+             <div className={styles.uploadSourceBlock}>
+               <div className={styles.existingPickerHead}><div><span>上傳新的評分文件</span><small>支援 .docx／.pdf；分析完成後會以文件名稱建立檢查。</small></div></div>
+               <fieldset className={styles.modeFieldset}>
+                 <legend>評分環境（可複選）</legend>
+                 <p className={styles.uploadEnvironmentHint}>第一個選擇會作為 AI 分析的主要情境，其餘環境可提供跨環境檢查能力。</p>
+                 <div className={styles.dialogChips}>{TEMPLATE_OPTIONS.map((option) => <label key={option.key} className={environmentKeys.includes(option.key) ? styles.dialogChipActive : styles.dialogChip}><input type="checkbox" checked={environmentKeys.includes(option.key)} onChange={() => toggleEnvironment(option.key)} disabled={uploading || creating} />{option.label}</label>)}</div>
+               </fieldset>
+               <RubricUploader onUpload={(file) => uploadFile(file)} onInvalidFile={setError} isLoading={uploading || creating} />
+             </div>
+             <div className={styles.savedRubricBlock}><div className={styles.existingPickerHead}><div><span>或選擇已保存評分表</span><small>每份來源只能綁定一個檢查；若要重構，請使用「重構」。</small></div></div>{files.length ? <div className={styles.existingList}>{files.map((file) => <label key={file.id} className={selectedFileId === file.id ? styles.existingRowActive : styles.existingRow}><input type="radio" name="saved-rubric" checked={selectedFileId === file.id} onChange={() => setSelectedFileId(file.id)} /><span><b>{file.display_name ?? file.original_filename ?? "未命名評分表"}</b><small>{(file.environment_keys?.length ? file.environment_keys : [file.template_key]).map(getTemplateLabel).join("、")} · {file.analysis_json?.items?.length ?? 0} 項 · {formatDateTime(file.updated_at)}</small></span></label>)}</div> : <p className={styles.mutedText}>尚未有可用的評分表。</p>}</div>
+             {conflictFile && <div className={styles.conflictActions} role="alert"><span>「{conflictFile.name}」已存在：</span><button type="button" className={styles.btnSecondary} disabled={uploading || creating} onClick={() => uploadFile(conflictFile, "copy")}>建立副本</button><button type="button" className={styles.btnDanger} disabled={uploading || creating} onClick={() => uploadFile(conflictFile, "overwrite")}>覆蓋原本</button><button type="button" className={styles.iconBtn} aria-label="取消同名處理" onClick={() => setConflictFile(null)}><MIcon name="close" size={16} /></button></div>}
+           </div>}
           {error && <p className={styles.dialogError} role="alert">{error}</p>}
-          <div className={styles.modalActions}>{!embedded && <button type="button" className={styles.btnSecondary} disabled={creating || uploading} onClick={onClose}>取消</button>}<button type="submit" className={styles.btnPrimary} disabled={(!sourceOnly && !title.trim()) || !mode || (mode === "blank" ? !rubricName.trim() || !environmentKeys.length : !selectedFileId) || creating || uploading}>{creating ? <><Spinner size={15} />建立中…</> : sourceOnly ? "新增來源" : mode === "blank" ? "建立並開始編輯" : "建立檢查"}</button></div>
+          <div className={styles.modalActions}>{!embedded && <button type="button" className={styles.btnSecondary} disabled={creating || uploading} onClick={onClose}>取消</button>}{mode !== "existing" || sourceOnly ? <button type="submit" className={styles.btnPrimary} disabled={!mode || (mode === "blank" ? !rubricName.trim() || !environmentKeys.length : !selectedFileId) || creating || uploading}>{creating ? <><Spinner size={15} />建立中…</> : sourceOnly ? "新增來源" : mode === "blank" ? "建立並開始編輯" : "使用這份評分表"}</button> : <p className={styles.uploadAutoHint}>選擇檔案後按「上傳並分析」，完成後會自動開啟評分表。</p>}</div>
         </form>
       </section>
   );
@@ -760,6 +823,7 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
   const [messages, setMessages] = useState([]);
   const [isUploading, setIsUploading] = useState(false);
   const [isChatting, setIsChatting] = useState(false);
+  const [isClearingMessages, setIsClearingMessages] = useState(false);
   const [isReassessing, setIsReassessing] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isCreatingScript, setIsCreatingScript] = useState(false);
@@ -772,7 +836,42 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
   const [analysisTemplateKey, setAnalysisTemplateKey] = useState("linux");
   const [pendingProposal, setPendingProposal] = useState(null);
   const [pendingProposalIsReassessment, setPendingProposalIsReassessment] = useState(false);
+  const analysisRevisionsRef = useRef(new Map());
+  const autosaveRef = useRef(null);
+  const classIdRef = useRef(classId);
+  const toastRef = useRef(toast);
+  classIdRef.current = classId;
+  toastRef.current = toast;
   const readOnly = judgeSession?.status === "archived";
+
+  useEffect(() => {
+    const autosave = createRubricAnalysisAutosave({
+      async save({ fileId, analysis: nextAnalysis }) {
+        const updated = await AiJudgeService.updateFileAnalysis(
+          classIdRef.current,
+          fileId,
+          nextAnalysis,
+          analysisRevisionsRef.current.get(fileId),
+        );
+        analysisRevisionsRef.current.set(fileId, updated.analysis_revision);
+        setFiles((current) => current.map((entry) => (
+          entry.id === updated.id ? updated : entry
+        )));
+      },
+      onError(error) {
+        toastRef.current.error(error?.message ?? "更新評分表失敗");
+      },
+    });
+    autosaveRef.current = autosave;
+    return () => {
+      if (autosaveRef.current === autosave) autosaveRef.current = null;
+      if (autosave.isPending()) {
+        void autosave.flush().finally(() => autosave.dispose());
+      } else {
+        autosave.dispose();
+      }
+    };
+  }, []);
 
   /** silent = true 時不觸發 loading / error state，供背景自動刷新使用 */
   const fetchFiles = useCallback(async (silent = false) => {
@@ -816,12 +915,14 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
     if (!judgeSession?.selected_file_id || files.length === 0) return;
     const file = files.find((item) => item.id === judgeSession.selected_file_id);
     if (!file?.analysis_json) return;
+    if (sourceFileId === file.id && autosaveRef.current?.isPending()) return;
     setAnalysis(file.analysis_json);
     setUploadedFileName(file.original_filename || "rubric");
     setSourceFileId(file.id);
+    analysisRevisionsRef.current.set(file.id, file.analysis_revision);
     setAnalysisTemplateKey(file.template_key);
     setSelectedTemplateKey(file.template_key);
-  }, [files, judgeSession?.selected_file_id]);
+  }, [files, judgeSession?.selected_file_id, sourceFileId]);
 
   /** 重算統計欄位後套用新的項目清單 */
   function applyItems(base, nextItems) {
@@ -837,28 +938,19 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
   }
 
   /** 更新分析結果；persist 時同步寫回已保存的評分表 */
-  async function applyAnalysis(
+  function applyAnalysis(
     nextAnalysis,
-    { persist = false, detectabilityNeedsReview } = {},
+    { persist = false, immediate = false, detectabilityNeedsReview } = {},
   ) {
     const evaluatedAnalysis = typeof detectabilityNeedsReview === "boolean"
       ? { ...nextAnalysis, detectability_needs_review: detectabilityNeedsReview }
       : nextAnalysis;
     setAnalysis(evaluatedAnalysis);
     if (persist && sourceFileId) {
-      try {
-        const currentFile = files.find((item) => item.id === sourceFileId);
-        const file = await AiJudgeService.updateFileAnalysis(
-          classId,
-          sourceFileId,
-          evaluatedAnalysis,
-          currentFile?.analysis_revision,
-        );
-        setFiles((current) => current.map((item) => (item.id === file.id ? file : item)));
-      } catch (err) {
-        toast.error(err?.message ?? "更新評分表失敗");
-      }
+      autosaveRef.current?.schedule({ fileId: sourceFileId, analysis: evaluatedAnalysis });
+      if (immediate) return autosaveRef.current?.flush() ?? Promise.resolve(false);
     }
+    return Promise.resolve(true);
   }
 
   async function handleUpload(file, conflictStrategy) {
@@ -900,6 +992,7 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
       setAnalysis(response.analysis);
       setUploadedFileName(file.name || "rubric");
       setSourceFileId(uploadedFile.id);
+      analysisRevisionsRef.current.set(uploadedFile.id, uploadedFile.analysis_revision);
       setAnalysisTemplateKey(response.template_key ?? selectedTemplateKey);
       setFiles((current) => [
         uploadedFile,
@@ -933,6 +1026,7 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
     setAnalysis(file.analysis_json);
     setUploadedFileName(file.original_filename || "rubric");
     setSourceFileId(file.id);
+    analysisRevisionsRef.current.set(file.id, file.analysis_revision);
     setAnalysisTemplateKey(file.template_key);
     setSelectedTemplateKey(file.template_key);
     if (!judgeSession?.id) setMessages([]);
@@ -968,7 +1062,9 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
   async function handleSendMessage(content, isRefine = false, isReassessment = false) {
     if (!judgeSession?.id && !analysis) return;
     if (judgeSession?.status === "archived") return;
-    const newMessages = [...messages, { role: "user", content }];
+    if (autosaveRef.current && !(await autosaveRef.current.flush())) return;
+    const requestMessages = [...messages, { role: "user", content }];
+    const newMessages = isRefine ? messages : requestMessages;
     setMessages(newMessages);
     setIsChatting(true);
     try {
@@ -977,12 +1073,16 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
           classId,
           judgeSession.id,
           content,
-          files.find((file) => file.id === sourceFileId)?.analysis_revision,
+          analysisRevisionsRef.current.get(sourceFileId),
           { isRefine },
         );
         setMessages((current) => {
-          const withoutOptimistic = current.slice(0, -1);
-          return [...withoutOptimistic, response.user_message, response.assistant_message];
+          const baseMessages = isRefine ? current : current.slice(0, -1);
+          return [
+            ...baseMessages,
+            response.user_message,
+            response.assistant_message,
+          ].filter(shouldDisplayChatMessage);
         });
         setPendingProposal(response.rubric_proposal ?? null);
         setPendingProposalIsReassessment(Boolean(response.rubric_proposal && isReassessment));
@@ -992,17 +1092,19 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
         return;
       }
       const response = await AiJudgeService.chat({
-        messages: newMessages,
+        messages: requestMessages,
         rubricContext: rubricToContext(analysis),
         isRefine,
         templateKey: analysisTemplateKey,
       });
       setMessages((prev) => [...prev, { role: "assistant", content: response.reply }]);
       if (response.updated_items) {
-        await applyAnalysis(applyItems(analysis, response.updated_items), {
+        const saved = await applyAnalysis(applyItems(analysis, response.updated_items), {
           persist: true,
+          immediate: true,
           detectabilityNeedsReview: false,
         });
+        if (!saved) return;
         toast.success(isReassessment ? "重新評估完成" : "評估表已更新");
       } else if (isReassessment) {
         toast.error("AI 未回傳可套用的重新評估結果，原有百分比尚未更新，請稍後再試");
@@ -1017,10 +1119,12 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
 
   async function applyPendingProposal() {
     if (!pendingProposal) return;
-    await applyAnalysis(applyItems(analysis, pendingProposal), {
+    const saved = await applyAnalysis(applyItems(analysis, pendingProposal), {
       persist: true,
+      immediate: true,
       detectabilityNeedsReview: false,
     });
+    if (!saved) return;
     setPendingProposal(null);
     setPendingProposalIsReassessment(false);
     toast.success("已套用 AI 提出的評分項目修改");
@@ -1069,6 +1173,25 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
     }
   }
 
+  async function handleClearMessages() {
+    if (isClearingMessages || isChatting || !messages.length || readOnly) return;
+    setIsClearingMessages(true);
+    try {
+      if (judgeSession?.id) {
+        const updated = await AiJudgeService.clearSessionMessages(classId, judgeSession.id);
+        onSessionUpdated?.(updated);
+      }
+      setMessages([]);
+      setPendingProposal(null);
+      setPendingProposalIsReassessment(false);
+      toast.success("對話內容已清除");
+    } catch (err) {
+      toast.error(err?.message ?? "清除對話內容失敗");
+    } finally {
+      setIsClearingMessages(false);
+    }
+  }
+
   async function handleExport() {
     setIsExporting(true);
     try {
@@ -1085,6 +1208,7 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
   async function handleCreateScript() {
     setIsCreatingScript(true);
     try {
+      if (autosaveRef.current && !(await autosaveRef.current.flush())) return;
       const artifact = judgeSession?.id
         ? await AiJudgeService.createSessionScript(classId, judgeSession.id)
         : await AiJudgeService.createScript(classId, {
@@ -1303,7 +1427,9 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
             <ChatPanel
               messages={messages}
               onSendMessage={handleSendMessage}
+              onClearMessages={handleClearMessages}
               isLoading={isChatting}
+              isClearing={isClearingMessages}
               disabled={readOnly}
               hasRubric={Boolean(analysis)}
             />
@@ -2672,7 +2798,9 @@ function TeacherWorkspacePanel({ classId, members }) {
     setActiveSessionId(created.id);
     setActiveTab("rubrics");
     toast.success(`已建立「${created.title}」`);
-    if (mode === "blank") navigate(`/class-management/${classId}/ai/checks/${created.id}/edit`);
+    if (mode === "blank" || mode === "uploaded") {
+      navigate(`/class-management/${classId}/ai/checks/${created.id}/edit`);
+    }
   }
 
   async function runSessionAction(item, action) {

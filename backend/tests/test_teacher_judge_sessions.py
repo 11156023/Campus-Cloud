@@ -70,6 +70,50 @@ def test_archived_session_is_read_only() -> None:
     assert exc_info.value.status_code == 409
 
 
+def test_clear_messages_keeps_session(monkeypatch: pytest.MonkeyPatch) -> None:
+    db = _session()
+    class_id = uuid.uuid4()
+    item = TeacherJudgeSession(
+        teaching_class_id=class_id,
+        title="Clear chat",
+        summary="過時摘要",
+    )
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    db.add_all(
+        [
+            TeacherJudgeSessionMessage(
+                session_id=item.id,
+                role=TeacherJudgeMessageRole.user,
+                content="問題",
+            ),
+            TeacherJudgeSessionMessage(
+                session_id=item.id,
+                role=TeacherJudgeMessageRole.assistant,
+                content="回答",
+            ),
+        ]
+    )
+    db.commit()
+    monkeypatch.setattr(teacher_judge_sessions, "_access", lambda *args: None)
+
+    result = teacher_judge_sessions.clear_messages(
+        class_id,
+        item.id,
+        db,
+        SimpleNamespace(id=uuid.uuid4()),
+    )
+
+    assert result.id == str(item.id)
+    assert result.message_count == 0
+    assert result.title == "Clear chat"
+    refreshed = db.get(TeacherJudgeSession, item.id)
+    assert refreshed is not None
+    assert refreshed.summary == ""
+    assert db.exec(select(TeacherJudgeSessionMessage)).all() == []
+
+
 def test_session_creation_mode_contract_is_explicit() -> None:
     with pytest.raises(ValueError):
         TeacherJudgeSessionCreateRequest(
@@ -376,6 +420,7 @@ async def test_refine_message_uses_the_rubric_polish_prompt_mode(
 
     assert result.assistant_message.content == "檢查完畢，評分表目前狀態良好。"
     assert result.rubric_proposal is None
+    assert result.user_message.metadata_json["ui_hidden"] is True
 
 
 @pytest.mark.asyncio

@@ -845,8 +845,14 @@
   padding-top: $spacing-8;
   border-top: 1px solid var(--color-divider);
 
-  > button {
-    align-self: flex-start;
+}
+
+.chatActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $spacing-8;
+
+  button {
     min-height: 30px;
     padding: 4px 10px;
     font-size: $font-size-12;
@@ -1472,6 +1478,11 @@
 .modeChoices { display: grid; gap: $spacing-8; }.modeChoice, .modeChoiceActive { display: flex; gap: 9px; padding: 11px; border: 1px solid var(--color-border); border-radius: $radius-8; cursor: pointer; }.modeChoiceActive { border-color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 7%, transparent); }.modeChoice input, .modeChoiceActive input { margin-top: 3px; accent-color: var(--color-primary); }.modeChoice span, .modeChoiceActive span { display: flex; min-width: 0; flex-direction: column; gap: 3px; }.modeChoice b, .modeChoiceActive b { font-size: $font-size-14; }.modeChoice small, .modeChoiceActive small { color: var(--color-text-muted); font-size: $font-size-12; line-height: 1.4; }
 .modeFields { display: flex; flex-direction: column; gap: $spacing-16; }.dialogChips { display: flex; flex-wrap: wrap; gap: 7px; }.dialogChip, .dialogChipActive { display: inline-flex; align-items: center; gap: 5px; padding: 6px 9px; border: 1px solid var(--color-border); border-radius: 999px; color: var(--color-text-secondary); background: var(--color-surface); font-size: $font-size-12; cursor: pointer; }.dialogChipActive { border-color: var(--color-primary); color: var(--color-primary-dark); background: color-mix(in srgb, var(--color-primary) 9%, transparent); }.dialogChip input { accent-color: var(--color-primary); }
 .existingPicker { display: flex; flex-direction: column; gap: $spacing-8; }.existingPickerHead { display: flex; align-items: center; justify-content: space-between; gap: $spacing-8; color: var(--color-text-secondary); font-size: $font-size-12; font-weight: $font-weight-500; }.uploadSourceButton { display: inline-flex; align-items: center; gap: 5px; padding: 6px 8px; border: 1px solid var(--color-border); border-radius: $radius-8; color: var(--color-text-primary); background: var(--color-surface); font-size: $font-size-12; cursor: pointer; }.uploadSourceButton:hover { background: var(--color-hover); }.uploadSourceButton input { display: none; }.existingList { display: flex; max-height: 200px; flex-direction: column; gap: 5px; overflow-y: auto; }.existingRow, .existingRowActive { display: flex; gap: 8px; padding: 8px; border: 1px solid var(--color-border); border-radius: $radius-8; cursor: pointer; }.existingRowActive { border-color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 7%, transparent); }.existingRow input, .existingRowActive input { accent-color: var(--color-primary); }.existingRow span, .existingRowActive span { display: flex; min-width: 0; flex-direction: column; gap: 2px; }.existingRow b, .existingRowActive b { overflow: hidden; font-size: $font-size-12; text-overflow: ellipsis; white-space: nowrap; }.existingRow small, .existingRowActive small { color: var(--color-text-muted); font-size: $font-size-12; }.dialogError { margin: 0; color: var(--color-danger); font-size: $font-size-12; }
+.uploadSourceBlock,
+.savedRubricBlock { display: flex; flex-direction: column; gap: $spacing-8; }
+.uploadEnvironmentHint,
+.uploadAutoHint { margin: 4px 0 0; color: var(--color-text-muted); font-size: $font-size-12; line-height: 1.45; }
+.uploadAutoHint { flex: 1; }
 .conflictActions { display: flex; align-items: center; flex-wrap: wrap; gap: $spacing-8; padding: $spacing-8; border: 1px solid color-mix(in srgb, var(--color-danger) 30%, transparent); border-radius: $radius-8; background: color-mix(in srgb, var(--color-danger) 6%, transparent); font-size: $font-size-12; color: var(--color-text-secondary); }
 
 .sessionItem:hover {

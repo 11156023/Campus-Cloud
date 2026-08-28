@@ -322,6 +322,7 @@ async def analyze_rubric(
     raw_text: str,
     template_key: str = "linux",
     template_commands: list[TeacherJudgeTemplateCommand] | None = None,
+    environment_keys: list[str] | None = None,
 ) -> tuple[TeacherJudgeRubricAnalysis, VLLMMetrics]:
     """Send raw document text to AI, return structured rubric analysis."""
     if not settings.VLLM_MODEL_NAME:
@@ -332,6 +333,7 @@ async def analyze_rubric(
     user_content = f"# 評分表原文\n\n{raw_text}"
     template_command_context = TEMPLATE_COMMAND_CONTEXT_TEMPLATE.format(
         template_key=template_key,
+        environment_keys=", ".join(environment_keys or [template_key]),
         template_commands=format_template_commands_for_prompt(template_commands or []),
     )
     analyze_system_prompt = ANALYZE_SYSTEM_PROMPT.replace(
@@ -403,6 +405,7 @@ async def chat_with_rubric(
     is_refine: bool = False,
     template_key: str = "linux",
     template_commands: list[TeacherJudgeTemplateCommand] | None = None,
+    environment_keys: list[str] | None = None,
 ) -> tuple[str, list[dict[str, Any]] | None, VLLMMetrics]:
     """
     Multi-turn chat with rubric context injected into system prompt.
@@ -426,6 +429,7 @@ async def chat_with_rubric(
             "{template_command_context}",
             TEMPLATE_COMMAND_CONTEXT_TEMPLATE.format(
                 template_key=template_key,
+                environment_keys=", ".join(environment_keys or [template_key]),
                 template_commands=format_template_commands_for_prompt(
                     template_commands or []
                 ),

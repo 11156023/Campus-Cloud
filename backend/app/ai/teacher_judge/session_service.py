@@ -161,6 +161,27 @@ def delete_session_data(db: Session, item: TeacherJudgeSession) -> None:
         finalize_file_delete(source_file_stage)
 
 
+def clear_session_messages(db: Session, item: TeacherJudgeSession) -> None:
+    """Clear conversation history while keeping the session and its artifacts."""
+    messages = list(
+        db.exec(
+            select(TeacherJudgeSessionMessage).where(
+                TeacherJudgeSessionMessage.session_id == item.id
+            )
+        )
+    )
+    for message in messages:
+        db.delete(message)
+
+    now = _now()
+    item.summary = ""
+    item.updated_at = now
+    item.last_activity_at = now
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+
+
 def ensure_selected_file_available(
     db: Session,
     file_id: uuid.UUID,
@@ -404,6 +425,7 @@ async def maybe_summarize(
             template_commands=get_enabled_template_commands(
                 db, template_key, include_cross_template=True
             ),
+            environment_keys=file.environment_keys if file else None,
         )
     except Exception:
         return

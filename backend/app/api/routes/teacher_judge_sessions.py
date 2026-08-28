@@ -31,6 +31,7 @@ from app.ai.teacher_judge.script_run_service import _run_to_public, create_scrip
 from app.ai.teacher_judge.service import chat_with_rubric
 from app.ai.teacher_judge.session_service import (
     bounded_history,
+    clear_session_messages,
     delete_session_data,
     ensure_active,
     ensure_selected_file_available,
@@ -309,6 +310,22 @@ def list_messages(
     return [message_public(row) for row in rows]
 
 
+@router.delete(
+    "/{session_id}/messages", response_model=TeacherJudgeSessionPublic
+)
+def clear_messages(
+    teaching_class_id: uuid.UUID,
+    session_id: uuid.UUID,
+    session: SessionDep,
+    current_user: InstructorUser,
+) -> TeacherJudgeSessionPublic:
+    _access(session, teaching_class_id, current_user)
+    item = get_session(session, teaching_class_id, session_id)
+    ensure_active(item)
+    clear_session_messages(session, item)
+    return session_public(session, item)
+
+
 @router.post("/{session_id}/messages", response_model=TeacherJudgeSessionChatResponse)
 async def create_message(
     teaching_class_id: uuid.UUID,
@@ -339,6 +356,7 @@ async def create_message(
         session_id=item.id,
         role=TeacherJudgeMessageRole.user,
         content=redact_message_content(payload.content.strip()),
+        metadata_json={"ui_hidden": True} if payload.is_refine else {},
         created_by=current_user.id,
     )
     session.add(user_message)
@@ -355,6 +373,7 @@ async def create_message(
                 file.template_key if file else "linux",
                 include_cross_template=True,
             ),
+            environment_keys=file.environment_keys if file else None,
         )
         # Without a selected rubric the conversation is general assistance only;
         # do not let an unconstrained model response create an unreviewed proposal.

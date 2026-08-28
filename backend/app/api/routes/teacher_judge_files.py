@@ -63,6 +63,22 @@ def _normalize_supported_template_key(template_key: str) -> str:
     return normalized
 
 
+def _normalize_supported_environment_keys(
+    environment_keys: list[str] | None,
+    primary_template_key: str,
+) -> list[str]:
+    values = environment_keys or [primary_template_key]
+    normalized = list(
+        dict.fromkeys(str(key).strip().lower() for key in values if str(key).strip())
+    )
+    if any(key not in SUPPORTED_TEMPLATE_KEYS for key in normalized):
+        raise HTTPException(status_code=400, detail="未知的評分環境 template。")
+    return [
+        primary_template_key,
+        *[key for key in normalized if key != primary_template_key],
+    ]
+
+
 @router.get("/", response_model=list[TeacherJudgeFilePublic])
 def list_class_teacher_judge_files(
     teaching_class_id: uuid.UUID,
@@ -82,12 +98,16 @@ async def upload_class_teacher_judge_file(
     current_user: InstructorUser,
     file: UploadFile = File(...),
     template_key: str = Form(default="linux"),
+    environment_keys: list[str] | None = Form(default=None),
     conflict_strategy: str | None = Form(default=None),
 ) -> TeacherJudgeFileUploadResponse:
     _ensure_class_access(
         session=session, teaching_class_id=teaching_class_id, current_user=current_user
     )
     template_key = _normalize_supported_template_key(template_key)
+    environment_keys = _normalize_supported_environment_keys(
+        environment_keys, template_key
+    )
     conflict_strategy = parse_conflict_strategy(conflict_strategy)
     file_bytes = await file.read()
 
@@ -116,6 +136,7 @@ async def upload_class_teacher_judge_file(
             raw_text,
             template_key=template_key,
             template_commands=template_commands,
+            environment_keys=environment_keys,
         )
     except HTTPException as exc:
         record_ai_template_call(
@@ -138,7 +159,7 @@ async def upload_class_teacher_judge_file(
         file_bytes=file_bytes,
         analysis=analysis,
         conflict_strategy=conflict_strategy,
-        environment_keys=[template_key],
+        environment_keys=environment_keys,
         display_name=original_filename,
     )
     record_ai_template_call(

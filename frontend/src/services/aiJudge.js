@@ -45,6 +45,14 @@ export function rubricToContext(analysis) {
   });
 }
 
+/** refine action 的內部指令仍保留在 session 歷史，但不在教師聊天室呈現。 */
+export function shouldDisplayChatMessage(message) {
+  const isKnownInternalPrompt = [RUBRIC_POLISH_PROMPT, RUBRIC_REASSESS_PROMPT].includes(
+    message?.content,
+  );
+  return !message?.hidden && !message?.metadata_json?.ui_hidden && !isKnownInternalPrompt;
+}
+
 export const AiJudgeService = {
   /* ── 持久化檢查 Session ── */
 
@@ -123,6 +131,12 @@ export const AiJudgeService = {
     );
   },
 
+  clearSessionMessages(classId, sessionId) {
+    return apiDelete(
+      `/api/v1/teaching-classes/${classId}/judge/sessions/${sessionId}/messages`,
+    );
+  },
+
   sendSessionMessage(
     classId,
     sessionId,
@@ -176,13 +190,17 @@ export const AiJudgeService = {
   },
 
   /**
-   * 上傳評分表文件並觸發 AI 分析。
+   * 上傳評分表文件並觸發 AI 分析；environmentKeys 的第一項為主要情境。
    * 同名檔案已存在時後端回 409，可帶 conflictStrategy（"overwrite" | "copy"）重送。
    */
-  uploadFile(classId, file, templateKey, conflictStrategy) {
+  uploadFile(classId, file, templateKey, conflictStrategy, environmentKeys = null) {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("template_key", templateKey);
+    const selectedEnvironments = Array.isArray(environmentKeys) && environmentKeys.length
+      ? environmentKeys
+      : [templateKey];
+    selectedEnvironments.forEach((key) => formData.append("environment_keys", key));
     if (conflictStrategy) formData.append("conflict_strategy", conflictStrategy);
     return apiPostMultipart(`/api/v1/teaching-classes/${classId}/judge/files/`, formData);
   },

@@ -5,6 +5,7 @@ import {
   RUBRIC_REASSESS_PROMPT,
   TEMPLATE_OPTIONS,
   getTemplateLabel,
+  shouldDisplayChatMessage,
 } from "./aiJudge";
 
 function fakeStorage() {
@@ -34,6 +35,21 @@ describe("AiJudgeService persistent sessions", () => {
   test("評分環境提供 PostgreSQL 模板", () => {
     expect(TEMPLATE_OPTIONS.map((option) => option.key)).toContain("postgresql");
     expect(getTemplateLabel("postgresql")).toBe("PostgreSQL");
+  });
+
+  test("上傳評分表會帶上主要與候選評分環境", async () => {
+    const file = new File(["rubric"], "rubric.pdf", { type: "application/pdf" });
+    await AiJudgeService.uploadFile(
+      "class-1",
+      file,
+      "python",
+      null,
+      ["python", "linux"],
+    );
+
+    const [, init] = fetchMock.mock.calls[0];
+    expect(init.body.get("template_key")).toBe("python");
+    expect(init.body.getAll("environment_keys")).toEqual(["python", "linux"]);
   });
 
   test("blank 建立請求會帶上評分表名稱與多選環境", async () => {
@@ -111,6 +127,27 @@ describe("AiJudgeService persistent sessions", () => {
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toContain("/judge/files/file-1/analysis");
     expect(JSON.parse(init.body)).toEqual({ analysis, expected_revision: 7 });
+  });
+
+  test("清除 session 對話使用 messages DELETE endpoint", async () => {
+    await AiJudgeService.clearSessionMessages("class-1", "session-1");
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toContain(
+      "/api/v1/teaching-classes/class-1/judge/sessions/session-1/messages",
+    );
+    expect(init.method).toBe("DELETE");
+  });
+
+  test("標記為 UI 隱藏的 refine 訊息不會顯示在聊天室", () => {
+    expect(shouldDisplayChatMessage({ role: "user", content: "內部提示詞" })).toBe(true);
+    expect(shouldDisplayChatMessage({
+      role: "user",
+      content: "內部提示詞",
+      metadata_json: { ui_hidden: true },
+    })).toBe(false);
+    expect(shouldDisplayChatMessage({ role: "user", content: RUBRIC_POLISH_PROMPT })).toBe(false);
+    expect(shouldDisplayChatMessage({ role: "user", content: RUBRIC_REASSESS_PROMPT })).toBe(false);
   });
 
   test("只送出一則新訊息，不回傳 client history", async () => {

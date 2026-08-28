@@ -14,6 +14,7 @@ from app.ai.teacher_judge.schemas import (
     RubricItem,
     TeacherJudgeFileMetadataUpdateRequest,
 )
+from app.api.routes.teacher_judge_files import _normalize_supported_environment_keys
 from app.models.teacher_judge_file import TeacherJudgeFile, TeacherJudgeFileStatus
 from app.models.teacher_judge_script_artifact import (
     TeacherJudgeScriptArtifact,
@@ -235,6 +236,8 @@ def test_blank_file_has_created_source_metadata() -> None:
         display_name="Python 期中評分表",
         environment_keys=["python", "linux", "python"],
     )
+
+
     session.commit()
     session.refresh(file)
 
@@ -246,6 +249,21 @@ def test_blank_file_has_created_source_metadata() -> None:
     assert file.template_key == "python"
     assert file.analysis_revision == 1
     assert file.analysis_json["items"] == []
+
+
+def test_upload_environment_keys_are_normalized_with_primary_first() -> None:
+    assert _normalize_supported_environment_keys(
+        ["python", "linux", "python"], "python"
+    ) == ["python", "linux"]
+    assert _normalize_supported_environment_keys(
+        ["python", "linux"], "linux"
+    ) == ["linux", "python"]
+    assert _normalize_supported_environment_keys(None, "linux") == ["linux"]
+
+    with pytest.raises(HTTPException) as exc_info:
+        _normalize_supported_environment_keys(["unknown"], "linux")
+
+    assert exc_info.value.status_code == 400
 
 
 def test_blank_file_accepts_postgresql_environment() -> None:

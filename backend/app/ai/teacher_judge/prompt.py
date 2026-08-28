@@ -81,6 +81,7 @@ ANALYZE_SYSTEM_PROMPT = """
 
 TEMPLATE_COMMAND_CONTEXT_TEMPLATE = """
 目前主要 template：{template_key}
+老師選定的評分環境：{environment_keys}
 
 主要 template 用來提供作業情境與預設判斷；下方 catalog 也可能包含平台其他已啟用能力。
 
