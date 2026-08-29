@@ -161,7 +161,7 @@
 
 .btnDanger {
   background: var(--color-danger);
-  color: #fff;
+  color: var(--color-text-on-primary);
 
   &:hover:not(:disabled) {
     box-shadow: var(--shadow-sm);
@@ -350,12 +350,8 @@
   @include flex-column;
   gap: $spacing-16;
   padding: $spacing-24;
-  background: var(--color-surface-glass);
-  backdrop-filter: blur(20px) saturate(1.6);
-  -webkit-backdrop-filter: blur(20px) saturate(1.6);
-  border: 1px solid var(--color-surface-glass-border);
+  @include glass-surface($shadow: var(--shadow-lg));
   border-radius: $radius-12;
-  box-shadow: var(--shadow-lg);
   animation: confirmIn 0.18s cubic-bezier(0.25, 0.8, 0.25, 1);
 
   h2 {

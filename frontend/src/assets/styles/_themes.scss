@@ -43,7 +43,9 @@
   --color-success:        #28a745;
   --color-warning:        #dc3545;
   --color-danger:         #dc3545;
-  --color-info:           #5471bf;
+  --color-danger-dark:    #b91c1c;
+  --color-info:           #2b4d98;
+  --color-pending:        #d97706;
   --color-status-neutral: #6b7280;
 
   /* ----- Glass backdrop filters -----
@@ -106,7 +108,10 @@ body.dark {
   --color-hover: #1f2636;
   --color-overlay: rgba(0, 0, 0, 0.6);
 
-  /* ----- Status ----- */
+  /* ----- Status -----
+     info / pending 在深色底改用較亮的值確保可讀性 */
+  --color-info:           #89a5e0;
+  --color-pending:        #f59e0b;
   --color-status-neutral: #9ca3af;
 
   /* ----- Shadows ----- */

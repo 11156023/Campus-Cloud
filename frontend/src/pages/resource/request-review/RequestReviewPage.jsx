@@ -33,13 +33,6 @@ const STATUS_META = {
   deleted_approved: { label: "已通過 / 資源已刪除", tone: "success" },
 };
 
-const EMPTY_TEXT = {
-  pending: "目前沒有待審核的申請",
-  approved: "目前沒有已通過的申請",
-  rejected: "目前沒有已拒絕的申請",
-  expired: "目前沒有已過期的申請",
-  all: "目前沒有申請紀錄",
-};
 
 function formatDateTime(value) {
   if (!value) return "未設定";
@@ -231,10 +224,8 @@ function StatusBadge({ status }) {
   );
 }
 
-function EmptyState({ tab }) {
-  return (
-    <SharedEmptyState icon="assignment_turned_in" title="沒有申請" description={EMPTY_TEXT[tab]} />
-  );
+function EmptyState() {
+  return <SharedEmptyState icon="assignment_turned_in" title="沒有申請" />;
 }
 
 function InfoRow({ label, value }) {

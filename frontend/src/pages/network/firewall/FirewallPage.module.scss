@@ -1,10 +1,11 @@
 @use "../../../assets/styles/variables" as *;
 @use "../../../assets/styles/mixins" as *;
 
-/* ── Page（全高，無 header） ── */
+/* ── Page ── */
 .page {
   display: flex;
   flex-direction: column;
+  gap: $spacing-24;
   flex: 1;
   min-height: 0;
   padding: $spacing-8 $spacing-16;
@@ -42,11 +43,10 @@
   border-radius: $radius-16;
   overflow: hidden;
   background: var(--color-flow-bg);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: var(--glass-backdrop-filter);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
   border: 1px solid var(--color-flow-border);
   box-shadow: 0 4px 24px var(--color-flow-shadow);
-  margin: $spacing-16 0;
 }
 
 .centerState {
@@ -202,8 +202,8 @@
   &:disabled { opacity: 0.5; cursor: not-allowed; }
 
   &.toolbarBtnActive {
-    background: color-mix(in srgb, #38a169 12%, transparent);
-    color: #38a169;
+    background: color-mix(in srgb, var(--color-success) 12%, transparent);
+    color: var(--color-success);
   }
 }
 
@@ -220,15 +220,15 @@
 
 /* ── Handle（節點連接點） ── */
 .handleIn {
-  background: #3b82f6 !important;
-  border-color: #3b82f6 !important;
+  background: var(--color-primary) !important;
+  border-color: var(--color-primary) !important;
   width: 8px !important;
   height: 8px !important;
 }
 
 .handleOut {
-  background: #38a169 !important;
-  border-color: #38a169 !important;
+  background: var(--color-success) !important;
+  border-color: var(--color-success) !important;
   width: 8px !important;
   height: 8px !important;
 }
@@ -275,8 +275,6 @@
   border-radius: $radius-12;
   border: 1.5px solid rgba(255, 255, 255, 0.7);
   background: var(--color-surface);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.07);
   color: var(--color-text-secondary);
   transition: border-color $transition-base, box-shadow $transition-base;
@@ -350,9 +348,9 @@
   box-shadow: var(--shadow-sm);
 
   &:hover {
-    background: #e53e3e;
-    border-color: #e53e3e;
-    color: #fff;
+    background: var(--color-danger);
+    border-color: var(--color-danger);
+    color: var(--color-text-on-primary);
   }
 }
 
@@ -381,22 +379,22 @@
   border-radius: $radius-8;
   font-size: $font-size-14;
   font-weight: $font-weight-500;
-  background: #e53e3e;
-  color: #fff;
+  background: var(--color-danger);
+  color: var(--color-text-on-primary);
   cursor: pointer;
   transition: background $transition-base;
 
-  &:hover { background: #c53030; }
+  &:hover { background: var(--color-danger-dark); }
 }
 
 /* ── Confirm overlay ── */
 .confirmOverlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.4);
+  background: var(--color-overlay);
   @include flex-center;
-  z-index: 600;
-  backdrop-filter: blur(2px);
+  z-index: 300;
+  backdrop-filter: blur(4px);
 }
 
 .confirmDialog {

@@ -50,39 +50,7 @@
   gap: $spacing-24;
 }
 
-/* ── Empty state ── */
-.empty {
-  flex: 1;
-  @include flex-column;
-  align-items: center;
-  justify-content: center;
-  gap: $spacing-16;
-  padding: $spacing-48 $spacing-16;
-  text-align: center;
-}
-
-.emptyIcon {
-  width: 72px;
-  height: 72px;
-  border-radius: $radius-16;
-  background: var(--color-surface);
-  color: var(--color-text-secondary);
-  @include flex-center;
-}
-
-.emptyTitle {
-  font-size: $font-size-18;
-  font-weight: $font-weight-700;
-  color: var(--color-text-primary);
-}
-
 /* ── 串接後補充樣式 ────────────────────────────────── */
-.emptyDesc {
-  font-size: $font-size-14;
-  color: var(--color-text-secondary);
-  max-width: 360px;
-  line-height: $line-height-base;
-}
 
 /* 卡片之間 24、卡片內元素 16，維持外鬆內緊的層級 */
 .panelStack {
@@ -282,9 +250,9 @@
   white-space: nowrap;
 }
 
-.badge_success { background: color-mix(in srgb, #28a745 12%, transparent); color: #28a745; }
+.badge_success { background: color-mix(in srgb, var(--color-success) 12%, transparent); color: var(--color-success); }
 .badge_info    { background: color-mix(in srgb, var(--color-primary-dark) 12%, transparent); color: var(--color-primary-dark); }
-.badge_danger  { background: color-mix(in srgb, #dc3545 12%, transparent); color: #dc3545; }
+.badge_danger  { background: color-mix(in srgb, var(--color-danger) 12%, transparent); color: var(--color-danger); }
 .badge_muted   { background: var(--color-hover); color: var(--color-text-muted); }
 
 /* ── 放置策略 ── */

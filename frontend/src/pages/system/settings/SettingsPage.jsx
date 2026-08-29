@@ -570,7 +570,7 @@ function NodesTab() {
   if (loading) return <LoadingState text="載入節點..." />;
   if (nodes.length === 0) {
     return (
-      <EmptyState icon="lock" title="尚無節點資料" description="請先完成 PVE 連線設定並執行同步" />
+      <EmptyState icon="lock" title="尚無節點資料" />
     );
   }
 
@@ -686,7 +686,7 @@ function StorageTab() {
   if (loading) return <LoadingState text="載入 Storage..." />;
   if (storages.length === 0) {
     return (
-      <EmptyState icon="storage" title="尚無 Storage 設定" description="請先完成 PVE 連線設定並執行同步" />
+      <EmptyState icon="storage" title="尚無 Storage 設定" />
     );
   }
 

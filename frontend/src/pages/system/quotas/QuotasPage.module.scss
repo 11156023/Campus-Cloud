@@ -71,16 +71,6 @@
   color: var(--color-text-muted);
 }
 
-.empty {
-  @include flex-column;
-  align-items: center;
-  gap: $spacing-8;
-  padding: $spacing-32 $spacing-16;
-  color: var(--color-text-muted);
-  font-size: $font-size-14;
-  text-align: center;
-}
-
 /* ── 表格 ── */
 .table {
   width: 100%;

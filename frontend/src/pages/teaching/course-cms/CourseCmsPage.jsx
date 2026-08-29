@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import LoadingState from "../../../components/LoadingState/LoadingState";
+import EmptyState from "../../../components/EmptyState/EmptyState";
 import MIcon from "../../../components/MIcon";
 import { useAuth } from "../../../contexts/AuthContext";
 import { useConfirm } from "../../../components/ConfirmDialog/ConfirmProvider";
@@ -123,7 +124,7 @@ function PathColumn({ paths, teachingClasses, selectedId, onSelect, onReload }) 
             </button>
           </div>
         ))}
-        {paths.length === 0 && <div className={styles.emptyHint}>尚無路徑</div>}
+        {paths.length === 0 && <EmptyState icon="topic" iconSize={24} title="尚無路徑" />}
       </div>
       {selectedPath && (
         <label className={styles.pathClassLink}>
@@ -235,7 +236,7 @@ function RoomColumn({ pathId, rooms, templates, selectedId, onSelect, onReload }
             </button>
           </div>
         ))}
-        {rooms.length === 0 && <div className={styles.emptyHint}>尚無房間</div>}
+        {rooms.length === 0 && <EmptyState icon="meeting_room" iconSize={24} title="尚無房間" />}
       </div>
       <form className={styles.addForm} onSubmit={handleCreate}>
         <input
@@ -480,7 +481,7 @@ function TaskColumn({ roomId }) {
               </button>
             </div>
           ))}
-          {tasks.length === 0 && <div className={styles.emptyHint}>尚無任務</div>}
+          {tasks.length === 0 && <EmptyState icon="playlist_add_check" iconSize={24} title="尚無任務" />}
           <form className={styles.addForm} onSubmit={handleCreate}>
             <input
               className={styles.input}

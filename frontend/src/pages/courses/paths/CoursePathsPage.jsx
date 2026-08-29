@@ -63,7 +63,6 @@ export default function CoursePathsPage() {
         <EmptyState
           icon="school"
           title="目前沒有已發布的課程"
-          description="老師發布課程後會自動出現在這裡。"
         />
       )}
 

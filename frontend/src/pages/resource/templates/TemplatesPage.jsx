@@ -513,7 +513,6 @@ export default function TemplatesPage() {
             <EmptyState
               icon="widgets"
               title="還沒有任何範本"
-              description="先準備好一台母機（裝好系統與課程環境），再點右上角「從 VM 建立範本」。"
             />
           </div>
         ) : (

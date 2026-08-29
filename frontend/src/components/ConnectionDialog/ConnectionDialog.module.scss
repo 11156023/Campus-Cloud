@@ -5,11 +5,11 @@
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.4);
+  background: var(--color-overlay);
   @include flex-center;
-  z-index: 500;
+  z-index: 300;
   padding: $spacing-16;
-  backdrop-filter: blur(2px);
+  backdrop-filter: blur(4px);
 }
 
 .dialog {
@@ -233,8 +233,8 @@
 /* ── Error ── */
 .errorMsg {
   font-size: $font-size-14;
-  color: var(--color-danger, #e53e3e);
-  background: color-mix(in srgb, var(--color-danger, #e53e3e) 10%, transparent);
+  color: var(--color-danger);
+  background: color-mix(in srgb, var(--color-danger) 10%, transparent);
   border-radius: $radius-8;
   padding: $spacing-8 $spacing-16;
 }

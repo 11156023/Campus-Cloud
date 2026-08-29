@@ -363,17 +363,16 @@ function EmptyState() {
 
 function ErrorState({ onRetry }) {
   return (
-    <div className={styles.empty}>
-      <div className={`${styles.emptyIcon} ${styles.emptyIconError}`}>
-        <MIcon name="error_outline" size={40} />
-      </div>
-      <h2 className={styles.emptyTitle}>載入失敗</h2>
-      <p className={styles.emptyDesc}>無法取得資源清單，請稍後再試</p>
-      <button type="button" className={styles.btnSecondary} onClick={onRetry}>
-        <MIcon name="refresh" size={16} />
-        重試
-      </button>
-    </div>
+    <EmptyState
+      icon="error_outline"
+      title="載入失敗"
+      action={
+        <button type="button" className={styles.btnSecondary} onClick={onRetry}>
+          <MIcon name="refresh" size={16} />
+          重試
+        </button>
+      }
+    />
   );
 }
 
