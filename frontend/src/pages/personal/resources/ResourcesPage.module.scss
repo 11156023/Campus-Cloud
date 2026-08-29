@@ -63,50 +63,6 @@
   @include flex-column;
 }
 
-/* ── Empty state ── */
-.empty {
-  flex: 1;
-  @include flex-column;
-  align-items: center;
-  justify-content: center;
-  gap: $spacing-16;
-  padding: $spacing-48 $spacing-16;
-  text-align: center;
-}
-
-.emptyIcon {
-  width: 72px;
-  height: 72px;
-  border-radius: $radius-16;
-  background: var(--color-surface);
-  color: var(--color-text-secondary);
-  @include flex-center;
-}
-
-.emptyTitle {
-  font-size: $font-size-18;
-  font-weight: $font-weight-700;
-  color: var(--color-text-primary);
-}
-
-.emptyDesc {
-  font-size: $font-size-14;
-  color: var(--color-text-primary);
-  max-width: 320px;
-  line-height: $line-height-base;
-}
-
-.emptyBtn {
-  @extend %btn-base;
-  background: var(--color-primary);
-  color: var(--color-text-on-primary);
-  margin-top: $spacing-8;
-
-  &:hover {
-    background: var(--color-primary-dark);
-  }
-}
-
 /* ── Resource grid ── */
 .grid {
   display: grid;
@@ -116,45 +72,24 @@
 
 /* ── Resource list ── */
 .tableWrap {
-  @include glass-surface($shadow: var(--shadow-sm));
-  overflow-x: auto;
-  border-radius: $radius-16;
+  @include table-wrap;
 }
 
 .table {
-  width: 100%;
+  @include table-base;
   min-width: 980px;
-  border-collapse: collapse;
 }
 
 .th {
-  padding: $spacing-8 $spacing-16;
-  border-bottom: 1px solid var(--color-border);
-  color: var(--color-text-muted);
-  background: var(--color-hover);
-  font-size: $font-size-12;
-  font-weight: $font-weight-500;
-  text-align: left;
-  white-space: nowrap;
+  @include table-th;
 }
 
 .tr {
-  transition: background $transition-base;
-
-  &:not(:last-child) {
-    border-bottom: 1px solid var(--color-divider);
-  }
-
-  &:hover {
-    background: var(--color-hover);
-  }
+  @include table-tr;
 }
 
 .td {
-  padding: $spacing-8 $spacing-16;
-  color: var(--color-text-primary);
-  font-size: $font-size-14;
-  vertical-align: middle;
+  @include table-td;
 
   .badge {
     margin-left: 0;
@@ -364,12 +299,12 @@
   cursor: pointer;
   border: 1px solid var(--color-border);
   background: var(--color-surface);
-  color: #dc3545;
+  color: var(--color-danger);
   transition: background $transition-base, border-color $transition-base;
 
   &:hover:not(:disabled) {
-    background: color-mix(in srgb, #dc3545 8%, transparent);
-    border-color: color-mix(in srgb, #dc3545 40%, var(--color-border));
+    background: color-mix(in srgb, var(--color-danger) 8%, transparent);
+    border-color: color-mix(in srgb, var(--color-danger) 40%, var(--color-border));
   }
 
   &:disabled { opacity: 0.4; cursor: not-allowed; }
@@ -384,7 +319,6 @@
 }
 
 .badge_success { background: color-mix(in srgb, var(--color-success) 12%, transparent); color: var(--color-success); }
-.badge_warning { background: var(--color-hover); color: var(--color-text-muted); }
 .badge_danger  { background: color-mix(in srgb, var(--color-danger)  12%, transparent); color: var(--color-danger); }
 .badge_info    { background: color-mix(in srgb, var(--color-info)    12%, transparent); color: var(--color-info); }
 .badge_muted   { background: color-mix(in srgb, var(--color-status-neutral) 12%, transparent); color: var(--color-status-neutral); }
@@ -550,24 +484,24 @@
 }
 
 .powerBtnStart {
-  background: color-mix(in srgb, #28a745 10%, transparent);
-  color: #28a745;
+  background: color-mix(in srgb, var(--color-success) 10%, transparent);
+  color: var(--color-success);
 
   &:hover:not(:disabled) {
-    background: color-mix(in srgb, #28a745 10%, var(--color-border));
-    color: #28a745;
-    border-color: #28a745;
+    background: color-mix(in srgb, var(--color-success) 10%, var(--color-border));
+    color: var(--color-success);
+    border-color: var(--color-success);
   }
 }
 
 .powerBtnStop {
-  color: #dc3545;
-  border-color: color-mix(in srgb, #dc3545 30%, var(--color-border));
+  color: var(--color-danger);
+  border-color: color-mix(in srgb, var(--color-danger) 30%, var(--color-border));
 
   &:hover:not(:disabled) {
-    background: color-mix(in srgb, #dc3545 10%, transparent);
-    color: #dc3545;
-    border-color: #dc3545;
+    background: color-mix(in srgb, var(--color-danger) 10%, transparent);
+    color: var(--color-danger);
+    border-color: var(--color-danger);
   }
 }
 
@@ -584,22 +518,18 @@
   white-space: nowrap;
   border: 1px solid var(--color-border);
   transition: background $transition-base, border-color $transition-base;
-  background: color-mix(in srgb, #dc3545 80%, var(--color-border));
+  background: color-mix(in srgb, var(--color-danger) 80%, var(--color-border));
   color: var(--color-text-on-primary);
-  border-color: color-mix(in srgb, #dc3545 80%, var(--color-border));
+  border-color: color-mix(in srgb, var(--color-danger) 80%, var(--color-border));
 
   &:hover {
-    background: color-mix(in srgb, #dc3545 12%, transparent);
-    color: color-mix(in srgb, #dc3545 80%, var(--color-border));
-    border-color: color-mix(in srgb, #dc3545 40%, var(--color-border));
+    background: color-mix(in srgb, var(--color-danger) 12%, transparent);
+    color: color-mix(in srgb, var(--color-danger) 80%, var(--color-border));
+    border-color: color-mix(in srgb, var(--color-danger) 40%, var(--color-border));
   }
 }
 
 /* ── Empty error tint ── */
-.emptyIconError {
-  color: #dc3545;
-  background: color-mix(in srgb, #dc3545 8%, transparent);
-}
 
 /* ── Skeleton ── */
 @keyframes shimmer {
@@ -628,7 +558,7 @@
   position: fixed;
   inset: 0;
   background: var(--color-overlay);
-  z-index: 200;
+  z-index: 300;
   @include flex-center;
   padding: $spacing-16;
   backdrop-filter: blur(4px);
@@ -685,11 +615,11 @@
   font-weight: $font-weight-500;
   cursor: pointer;
   white-space: nowrap;
-  background: #dc3545;
-  color: #fff;
-  border: 1px solid #dc3545;
+  background: var(--color-danger);
+  color: var(--color-text-on-primary);
+  border: 1px solid var(--color-danger);
   transition: background $transition-base;
 
-  &:hover:not(:disabled) { background: #b91c1c; border-color: #b91c1c; }
+  &:hover:not(:disabled) { background: var(--color-danger-dark); border-color: var(--color-danger-dark); }
   &:disabled { opacity: 0.5; cursor: not-allowed; }
 }

@@ -104,7 +104,7 @@
   border-radius: $radius-pill;
   color: var(--color-text-secondary);
   background: var(--color-hover);
-  font-size: 10px;
+  font-size: $font-size-10;
   text-transform: uppercase;
 }
 
@@ -222,7 +222,7 @@
 .btnPrimary:hover:not(:disabled) { background: var(--color-primary-dark); box-shadow: var(--shadow-sm); }
 .btnSecondary { border: 1px solid var(--color-border); color: var(--color-text-primary); background: var(--color-surface); }
 .btnSecondary:hover:not(:disabled) { background: var(--color-hover); }
-.btnAllow { color: #fff; background: var(--color-success); }
+.btnAllow { color: var(--color-text-on-primary); background: var(--color-success); }
 .btnAllow:hover:not(:disabled) { box-shadow: var(--shadow-sm); }
 .btnPrimary:disabled, .btnSecondary:disabled, .btnAllow:disabled { cursor: not-allowed; opacity: .55; }
 

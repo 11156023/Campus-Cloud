@@ -49,7 +49,6 @@ function EmptyState({ hasQuery }) {
     <SharedEmptyState
       icon={hasQuery ? "search_off" : "manage_accounts"}
       title={hasQuery ? "找不到使用者" : "尚無使用者"}
-      description={hasQuery ? "請調整搜尋關鍵字或清除篩選。" : "點擊新增使用者建立第一個帳戶。"}
     />
   );
 }

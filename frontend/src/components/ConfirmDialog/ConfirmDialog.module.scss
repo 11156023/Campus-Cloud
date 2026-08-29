@@ -31,7 +31,7 @@
 
 .iconWarn {
   @include flex-center;
-  color: #d97706;
+  color: var(--color-pending);
 }
 
 .iconDanger {
@@ -90,7 +90,7 @@
 .btnDanger {
   @extend %btn;
   background: var(--color-danger);
-  color: #fff;
+  color: var(--color-text-on-primary);
 
   &:hover {
     background: color-mix(in srgb, var(--color-danger) 85%, black);

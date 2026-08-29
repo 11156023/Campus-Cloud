@@ -288,19 +288,11 @@
 
 /* ── 表格 ── */
 .table {
-  width: 100%;
-  border-collapse: collapse;
+  @include table-base;
 }
 
 .th {
-  padding: $spacing-8 $spacing-16;
-  font-size: $font-size-12;
-  font-weight: $font-weight-500;
-  color: var(--color-text-muted);
-  text-align: left;
-  background: var(--color-hover);
-  border-bottom: 1px solid var(--color-border);
-  white-space: nowrap;
+  @include table-th;
 }
 
 .thWide {
@@ -311,12 +303,9 @@
   text-align: right;
 }
 
+/* 一般列不做 hover——只有可點擊列（.trClickable）才亮 */
 .tr {
-  transition: background $transition-base;
-
-  &:not(:last-child) {
-    border-bottom: 1px solid var(--color-divider);
-  }
+  @include table-tr($hover: false);
 }
 
 .trClickable {
@@ -328,10 +317,7 @@
 }
 
 .td {
-  padding: $spacing-8 $spacing-16;
-  font-size: $font-size-14;
-  color: var(--color-text-primary);
-  vertical-align: middle;
+  @include table-td;
   font-variant-numeric: tabular-nums;
 }
 
@@ -454,14 +440,14 @@
   border-radius: $radius-8;
   font-size: $font-size-12;
   font-weight: $font-weight-500;
-  background: #dc3545;
-  color: #fff;
+  background: var(--color-danger);
+  color: var(--color-text-on-primary);
   cursor: pointer;
   white-space: nowrap;
   transition: background $transition-base;
 
   &:hover:not(:disabled) {
-    background: #b91c1c;
+    background: var(--color-danger-dark);
   }
 
   &:disabled {

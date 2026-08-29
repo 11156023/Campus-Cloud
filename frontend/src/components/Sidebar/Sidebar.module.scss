@@ -409,9 +409,9 @@
   }
 
   &.userPopupItemDanger {
-    color: var(--color-error, #e53e3e);
+    color: var(--color-danger);
     &:hover {
-      background: color-mix(in srgb, var(--color-error, #e53e3e) 10%, transparent);
+      background: color-mix(in srgb, var(--color-danger) 10%, transparent);
     }
   }
 }

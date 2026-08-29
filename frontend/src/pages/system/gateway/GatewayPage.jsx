@@ -342,7 +342,6 @@ function ServiceTab({ service, gatewayReady, host, onDirtyChange }) {
       <EmptyState
         icon="dns"
         title="尚未設定 Gateway 連線"
-        description="請先到「連線設定」完成 SSH 連線設定並測試成功"
       />
     );
   }

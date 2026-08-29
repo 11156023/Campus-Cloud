@@ -72,8 +72,8 @@
   flex-shrink: 0;
 }
 
-.dot_connecting { background: #0891b2; }
-.dot_connected  { background: #28a745; }
+.dot_connecting { background: var(--color-info); }
+.dot_connected  { background: var(--color-success); }
 
 .statusText {
   font-size: $font-size-12;
@@ -205,7 +205,7 @@
   font-size: $font-size-12;
   font-weight: $font-weight-500;
   background: var(--color-danger);
-  color: #fff;
+  color: var(--color-text-on-primary);
   cursor: pointer;
   transition: opacity $transition-base;
 
@@ -264,7 +264,7 @@
 .takeoverTitle {
   font-size: $font-size-16;
   font-weight: $font-weight-500;
-  color: #fff;
+  color: var(--color-text-on-primary);
 }
 
 .takeoverDesc {

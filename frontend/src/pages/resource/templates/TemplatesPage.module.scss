@@ -1,4 +1,4 @@
-﻿.page {
+.page {
   @include flex-column;
   gap: $spacing-24;
   padding: $spacing-8 $spacing-16;
@@ -17,7 +17,7 @@
   flex-shrink: 0;
 }
 
-/* ?? ?∠? ?? */
+/* ── 卡片 ── */
 .card {
   @include flex-column;
   @include glass-surface($shadow: var(--shadow-sm));
@@ -32,40 +32,21 @@
   font-size: $font-size-14;
 }
 
-/* ?? 銵冽 ?? */
+/* ── 表格 ── */
 .table {
-  width: 100%;
-  border-collapse: collapse;
+  @include table-base;
 }
 
 .th {
-  padding: $spacing-8 $spacing-16;
-  font-size: $font-size-12;
-  font-weight: $font-weight-500;
-  color: var(--color-text-muted);
-  text-align: left;
-  background: var(--color-hover);
-  border-bottom: 1px solid var(--color-border);
-  white-space: nowrap;
+  @include table-th;
 }
 
 .tr {
-  transition: background $transition-base;
-
-  &:not(:last-child) {
-    border-bottom: 1px solid var(--color-divider);
-  }
-
-  &:hover {
-    background: var(--color-hover);
-  }
+  @include table-tr;
 }
 
 .td {
-  padding: $spacing-8 $spacing-16;
-  font-size: $font-size-14;
-  color: var(--color-text-primary);
-  vertical-align: middle;
+  @include table-td;
 }
 
 .tdMenu {
@@ -127,7 +108,7 @@
   color: var(--color-text-secondary);
 }
 
-/* ?? Badge ?? */
+/* ── Badge ── */
 .badge {
   display: inline-flex;
   align-items: center;
@@ -143,7 +124,7 @@
 .badge_info  { background: color-mix(in srgb, var(--color-info)    12%, transparent); color: var(--color-info); }
 .badge_muted { background: var(--color-hover); color: var(--color-text-muted); }
 
-/* ?? ??雿???? */
+/* ── 列操作選單 ── */
 .menuWrap {
   position: relative;
   display: inline-block;
@@ -210,7 +191,7 @@
   background: var(--color-divider);
 }
 
-/* ?? 摮貊??? ?? */
+/* ── 學生型錄 ── */
 .catalogGrid {
   display: grid;
   grid-template-columns: 1fr;
@@ -265,7 +246,7 @@
   justify-content: center;
 }
 
-/* ?? ?? ?? */
+/* ── 按鈕 ── */
 %btn-base {
   display: inline-flex;
   align-items: center;
@@ -308,15 +289,15 @@
 
 .btnDanger {
   @extend %btn-base;
-  background: #dc3545;
-  color: #fff;
+  background: var(--color-danger);
+  color: var(--color-text-on-primary);
 
   &:hover:not(:disabled) {
-    background: #b91c1c;
+    background: var(--color-danger-dark);
   }
 }
 
-/* ?? Modal ?? */
+/* ── Modal ── */
 .modalOverlay {
   position: fixed;
   inset: 0;
@@ -364,7 +345,7 @@
   gap: $spacing-8;
 }
 
-/* ?? 銵典 ?? */
+/* ── 表單 ── */
 .field {
   @include flex-column;
   gap: $spacing-4;
@@ -491,7 +472,7 @@
   }
 }
 
-/* ?? ?▼嚗??唾?鞈????渡?璅??隤?嚗??? */
+/* ── 滑桿：克隆時調整資源規格 ── */
 .slider {
   width: 100%;
   accent-color: var(--color-primary);
@@ -502,7 +483,7 @@
   position: relative;
   height: 16px;
   font-size: $font-size-12;
-  color: var(--color-text-muted, #888);
+  color: var(--color-text-muted);
   margin-top: -2px;
 
   span {
@@ -528,7 +509,7 @@
   margin-bottom: 4px;
 }
 
-/* ?? ?航?蝤?憿舐內 ?? */
+/* ── 磁碟固定顯示 ── */
 .diskFixed {
   display: flex;
   align-items: center;
@@ -540,7 +521,7 @@
   font-size: 13px;
 }
 
-/* ?? 蝭 icon ?? */
+/* ── 範本 icon ── */
 .iconThumb {
   width: 36px;
   height: 36px;
@@ -565,7 +546,7 @@
   gap: 12px;
 }
 
-/* ?? ?辣嚗蝙?冽??? ?? */
+/* ── 附件（使用手冊） ── */
 .attachList {
   display: flex;
   flex-direction: column;
@@ -615,7 +596,7 @@
   color: var(--color-danger);
 }
 
-/* ?? ???輻??內 ?? */
+/* ── 政策提示 ── */
 .policyNote {
   display: flex;
   align-items: flex-start;

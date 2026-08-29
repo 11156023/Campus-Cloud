@@ -1,12 +1,28 @@
 import styles from "./LoadingState.module.scss";
 
+/* 3D 方塊堆疊動畫本體；LoadingState 與 LoadingSpinner 共用 */
+function BoxLoader({ style }) {
+  return (
+    <div className={styles.loader} style={style} aria-hidden="true">
+      {Array.from({ length: 8 }, (_, index) => (
+        <div key={index} className={`${styles.box} ${styles[`box${index}`]}`}>
+          <div />
+        </div>
+      ))}
+      <div className={styles.ground}>
+        <div />
+      </div>
+    </div>
+  );
+}
+
 /**
- * 純 spinner（六角形動畫），給自帶文案排版的容器使用（如登入驗證卡片）。
+ * 純 spinner（無文字），給自帶文案排版的容器使用（如登入驗證卡片）。
  *
- * @param {number} [size=60] 寬度（px，高度依比例自動計算）
+ * @param {number} [size=60] 顯示寬度（px；以 200px 原始設計等比縮放，高度隨比例）
  */
 export function LoadingSpinner({ size = 60 }) {
-  return <span className={styles.spinner} style={{ width: size }} aria-hidden="true" />;
+  return <BoxLoader style={{ zoom: size / 200 }} />;
 }
 
 /**
@@ -22,16 +38,7 @@ export default function LoadingState({ text = "載入中…", fullPage = false }
       role="status"
       aria-live="polite"
     >
-      <div className={styles.loader} aria-hidden="true">
-        {Array.from({ length: 8 }, (_, index) => (
-          <div key={index} className={`${styles.box} ${styles[`box${index}`]}`}>
-            <div />
-          </div>
-        ))}
-        <div className={styles.ground}>
-          <div />
-        </div>
-      </div>
+      <BoxLoader />
       {text && <span className={styles.text}>{text}</span>}
     </div>
   );

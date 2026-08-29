@@ -70,10 +70,10 @@ function credStatusInfo(item) {
 }
 
 /* ── Empty ── */
-function EmptyState({ icon, title, desc, guideId }) {
+function EmptyState({ icon, title, guideId }) {
   return (
     <div data-guide={guideId}>
-      <SharedEmptyState icon={icon} title={title} description={desc} />
+      <SharedEmptyState icon={icon} title={title} />
     </div>
   );
 }
@@ -617,7 +617,6 @@ export default function AiApiPage() {
               <EmptyState
                 icon="vpn_key"
                 title="尚無金鑰"
-                desc="目前還沒有任何已核發的 AI API Key。當申請通過後，新的金鑰會出現在這裡。"
                 guideId="ai-keys-content"
               />
             ) : (
@@ -643,7 +642,6 @@ export default function AiApiPage() {
               <EmptyState
                 icon="history"
                 title="尚無紀錄"
-                desc="目前還沒有 AI API 申請紀錄。"
                 guideId="ai-records-content"
               />
             ) : (
