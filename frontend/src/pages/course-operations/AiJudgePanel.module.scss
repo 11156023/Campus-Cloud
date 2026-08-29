@@ -1518,9 +1518,7 @@
 }
 
 .proposalCard {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  display: grid;
   gap: $spacing-16;
   margin-top: $spacing-16;
   padding: $spacing-16;
@@ -1533,6 +1531,64 @@
     color: var(--color-text-muted);
     font-size: $font-size-12;
   }
+}
+
+.proposalHeading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: $spacing-16;
+}
+
+.proposalHeading > span {
+  flex: 0 0 auto;
+  color: var(--color-text-secondary);
+  font-size: $font-size-12;
+  font-weight: $font-weight-700;
+}
+
+.proposalList {
+  display: grid;
+  gap: $spacing-8;
+}
+
+.proposalRow {
+  display: flex;
+  align-items: flex-start;
+  gap: $spacing-8;
+  padding: $spacing-8;
+  border: 1px solid var(--color-border);
+  border-radius: $radius-8;
+  background: var(--color-surface);
+  cursor: pointer;
+
+  input {
+    margin-top: 3px;
+    accent-color: var(--color-primary);
+  }
+
+  > span {
+    display: grid;
+    gap: 3px;
+    min-width: 0;
+  }
+
+  b { font-size: $font-size-14; }
+  small { color: var(--color-text-secondary); font-size: $font-size-12; line-height: 1.45; }
+  em { margin-right: 6px; color: var(--color-primary-dark); font-style: normal; font-weight: $font-weight-700; }
+}
+
+.proposalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: $spacing-8;
+}
+
+.metadataGrid {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(260px, 1.4fr);
+  gap: $spacing-16;
+  align-items: end;
 }
 
 .runHistory {

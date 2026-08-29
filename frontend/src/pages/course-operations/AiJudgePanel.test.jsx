@@ -4,6 +4,7 @@ import {
   CreateCheckChooser,
   ChatPanel,
   RubricStats,
+  buildProposalDiff,
   getRubricCheckTitle,
   getSelectedRubricSource,
   getVisibleRubricSources,
@@ -56,6 +57,26 @@ describe("RubricStats", () => {
     expect(html).not.toContain(RUBRIC_POLISH_PROMPT);
     expect(html).toContain("已完成潤飾，請確認提案。");
     expect(html).toContain("清除內容");
+  });
+});
+
+describe("buildProposalDiff", () => {
+  test("將 AI 修改轉成可確認差異，且未回傳項目不會被默認刪除", () => {
+    const current = [
+      { id: "keep", title: "保留", description: "原內容", detectable: "manual" },
+      { id: "remove", title: "移除", description: "舊項目", detectable: "manual" },
+    ];
+    const diff = buildProposalDiff(current, [
+      { id: "keep", title: "保留", description: "新內容", detectable: "manual" },
+      { id: "new", title: "新增", description: "新項目", detectable: "auto" },
+      { id: "remove", operation: "delete", title: "移除" },
+    ]);
+
+    expect(diff.map((item) => [item.id, item.operation])).toEqual([
+      ["keep", "update"],
+      ["new", "add"],
+      ["remove", "delete"],
+    ]);
   });
 });
 
