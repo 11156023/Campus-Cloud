@@ -7,7 +7,7 @@ import styles from "./CoursePathsPage.module.scss";
 import PageHeader from "../../../components/PageHeader/PageHeader";
 
 export function courseDestination(pathId) {
-  return `/dashboard-new/course/${pathId}`;
+  return `/dashboard/course/${pathId}`;
 }
 
 function ProgressBar({ percent }) {
@@ -72,7 +72,7 @@ export default function CoursePathsPage() {
             <CourseCard
               key={path.id}
               path={path}
-              onOpen={() => navigate(courseDestination(path.id))}
+              onOpen={() => navigate(courseDestination(path.id), { state: { from: "/courses" } })}
             />
           ))}
         </div>

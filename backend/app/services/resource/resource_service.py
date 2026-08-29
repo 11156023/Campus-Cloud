@@ -25,7 +25,6 @@ from app.schemas.resource import (
 from app.services.network import firewall_service
 from app.services.proxmox import proxmox_service
 from app.services.scheduling.recurrence import (
-    compute_active_or_next_window,
     get_schedule_policy,
     is_in_window,
 )
@@ -41,33 +40,15 @@ def _utc_now() -> datetime:
 def _enforce_start_window(*, session: Session, vmid: int) -> None:
     resource = resource_repo.get_resource_by_vmid(session=session, vmid=vmid)
     if resource and resource.teaching_class_id:
-        from app.models import BatchProvisionJob, TeachingClass, TeachingClassStatus
+        from app.models import TeachingClass, TeachingClassStatus
 
         teaching_class = session.get(TeachingClass, resource.teaching_class_id)
         if teaching_class is None or teaching_class.status != TeachingClassStatus.active:
             raise BadRequestError("This teaching-class resource is no longer active.")
-        job = (
-            session.get(BatchProvisionJob, resource.batch_job_id)
-            if resource.batch_job_id
-            else None
-        )
-        if job is None or not job.recurrence_rule:
-            raise BadRequestError("This teaching-class resource has no active schedule.")
-        now = _utc_now()
-        if not is_in_window(job.next_window_start, job.next_window_end, now):
-            window = compute_active_or_next_window(
-                rule=job.recurrence_rule,
-                duration_minutes=job.recurrence_duration_minutes or 0,
-                timezone=job.schedule_timezone,
-                now=now,
-            )
-            job.next_window_start, job.next_window_end = window or (None, None)
-            session.add(job)
-            session.commit()
-        if not is_in_window(job.next_window_start, job.next_window_end, now):
-            raise BadRequestError(
-                "This teaching-class resource can only be started during its class window."
-            )
+        # The recurrence window controls automatic classroom boot/shutdown only.
+        # Enrolled students may manually start their assigned machine for
+        # after-class practice while the class remains active.  The start path
+        # applies the normal practice-session auto-stop policy below.
         return
 
     request = vm_request_repo.get_latest_approved_vm_request_by_vmid(

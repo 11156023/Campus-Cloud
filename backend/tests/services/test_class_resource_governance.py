@@ -489,7 +489,7 @@ def test_class_provision_rejects_missing_capacity_reservation():
         )
 
 
-def test_class_resource_start_is_allowed_only_inside_class_window(monkeypatch):
+def test_active_class_resource_can_be_started_for_after_class_practice(monkeypatch):
     class_id = uuid.uuid4()
     job_id = uuid.uuid4()
     resource = SimpleNamespace(
@@ -512,13 +512,36 @@ def test_class_resource_start_is_allowed_only_inside_class_window(monkeypatch):
     monkeypatch.setattr(
         resource_service,
         "_utc_now",
-        lambda: datetime(2026, 8, 25, 5, 30, tzinfo=UTC),
+        lambda: datetime(2026, 8, 27, 12, 30, tzinfo=UTC),
     )
 
     resource_service._enforce_start_window(
         session=_Session(teaching_class=teaching_class, job=job),
         vmid=701,
     )
+
+
+def test_inactive_class_resource_cannot_be_started(monkeypatch):
+    class_id = uuid.uuid4()
+    resource = SimpleNamespace(
+        teaching_class_id=class_id,
+        batch_job_id=uuid.uuid4(),
+    )
+    monkeypatch.setattr(
+        resource_service.resource_repo,
+        "get_resource_by_vmid",
+        lambda **_kwargs: resource,
+    )
+
+    with pytest.raises(BadRequestError, match="no longer active"):
+        resource_service._enforce_start_window(
+            session=_Session(
+                teaching_class=SimpleNamespace(
+                    status=TeachingClassStatus.archived,
+                ),
+            ),
+            vmid=701,
+        )
 
 
 def test_student_can_extend_owned_class_resource(monkeypatch):

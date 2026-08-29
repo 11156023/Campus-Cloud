@@ -36,8 +36,8 @@ const STUDENT_HOME_GUIDE = {
     },
     {
       selector: '[data-guide="home-start"]',
-      title: "按這裡直接開始上課",
-      text: "「開始練習」會帶你進入老師安排的內容；課堂環境由系統準備，一般上課不必另外申請機器。",
+      title: "直接點擊要使用的課堂機器",
+      text: "老師分配的機器會直接列在這裡。點擊整張機器卡可啟動並進入，右側資訊按鈕則會前往「我的資源」查看完整設定。",
     },
     {
       selector: '[data-guide="home-environment"]',
@@ -60,7 +60,6 @@ const STUDENT_HOME_GUIDE = {
 
 const PAGE_GUIDES = {
   "/dashboard": STUDENT_HOME_GUIDE,
-  "/dashboard-new": STUDENT_HOME_GUIDE,
   "/my-requests": {
     id: "my-requests",
     title: "我的申請",
@@ -321,13 +320,13 @@ export default function UserGuide() {
   const location = useLocation();
   const { user } = useAuth();
   const isStudent = user?.role === "student" && !user?.is_superuser;
-  const isStudentCoursePage = /^\/dashboard-new\/course\/[^/]+$/.test(location.pathname);
+  const isStudentCoursePage = /^\/dashboard\/course\/[^/]+$/.test(location.pathname);
   const guide = isStudentCoursePage
     ? {
-        ...PAGE_GUIDES["/dashboard-new"],
+        ...PAGE_GUIDES["/dashboard"],
         id: "student-course",
         title: "課程頁面",
-        steps: PAGE_GUIDES["/dashboard-new"].steps.filter(
+        steps: PAGE_GUIDES["/dashboard"].steps.filter(
           (item) => item.selector !== '[data-guide="home-schedule"]'
             && item.selector !== '[data-guide="home-other-needs"]'
         ),
