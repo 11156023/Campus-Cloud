@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import MIcon from "../../components/MIcon";
+import PageHeader from "../../components/PageHeader/PageHeader";
+import EmptyState from "../../components/EmptyState/EmptyState";
+import LoadingState from "../../components/LoadingState/LoadingState";
 import { useToast } from "../../hooks/useToast";
 import {
   AiJudgeService,
@@ -582,27 +585,24 @@ export default function AiJudgeRubricEditorPage() {
   const visibleAssistantMessages = messages.filter(shouldDisplayChatMessage);
 
   if (loading) {
-    return <main className={styles.page}><div className={styles.loading}><span className={styles.spinner} />正在載入評分表…</div></main>;
+    return <main className={styles.page}><LoadingState fullPage text="正在載入評分表…" /></main>;
   }
   if (loadError || !file) {
     return (
       <main className={styles.page}>
         <button type="button" className={styles.backLink} onClick={goBack}><MIcon name="arrow_back" size={18} />返回 AI 檢查</button>
-        <section className={styles.errorState}><MIcon name="error_outline" size={30} /><h1>無法載入評分表</h1><p>{loadError || "這項檢查目前沒有可編輯的評分表來源。"}</p></section>
+        <EmptyState icon="error_outline" title="無法載入評分表" description={loadError || "這項檢查目前沒有可編輯的評分表來源。"} />
       </main>
     );
   }
 
   return (
     <main className={styles.page}>
-      <header className={styles.header}>
-        <div className={styles.headerIdentity}>
-          <button type="button" className={styles.backLink} onClick={goBack}><MIcon name="arrow_back" size={18} />返回 AI 檢查</button>
-          <div>
-            <h1>從零建立評分表</h1>
-            <p>{session?.title} · {rubricName || "未命名評分表"}</p>
-          </div>
-        </div>
+      <PageHeader
+        leading={<button type="button" className={styles.backLink} onClick={goBack}><MIcon name="arrow_back" size={18} />返回 AI 檢查</button>}
+        title="從零建立評分表"
+        subtitle={[session?.title, rubricName || "未命名評分表"].filter(Boolean).join(" · ")}
+      >
         <div className={styles.headerActions}>
           <span className={`${styles.saveState} ${styles[`save_${saveState}`]}`} aria-live="polite">
             <MIcon name={saveState === "saved" ? "cloud_done" : saveState === "error" ? "cloud_off" : "sync"} size={16} />
@@ -613,7 +613,7 @@ export default function AiJudgeRubricEditorPage() {
             <MIcon name="check" size={17} />{readOnly ? "返回檢查" : "完成並返回"}
           </button>
         </div>
-      </header>
+      </PageHeader>
 
       {readOnly && <div className={styles.readOnlyNotice}><MIcon name="lock" size={17} />這項檢查已封存，只能查看內容；需要修改請先「重構」成新檢查。</div>}
 
@@ -646,7 +646,7 @@ export default function AiJudgeRubricEditorPage() {
 
           <section className={styles.card}>
             <div className={styles.cardHeading}><div><h2>評估項目（{analysis.items.length}）</h2><p>每一項都會成為腳本與執行結果的判定依據。</p></div><button type="button" className={styles.secondaryButton} disabled={readOnly} onClick={addItem}><MIcon name="add" size={17} />新增項目</button></div>
-            {!analysis.items.length ? <div className={styles.emptyItems}><MIcon name="playlist_add" size={28} /><strong>尚未新增評估項目</strong><p>可手動新增第一項，或請右側 AI 評分表助手產生初稿。</p><button type="button" className={styles.primaryButton} disabled={readOnly || assistantBusy || isClearingMessages} onClick={() => sendAssistant("請依目前檢查名稱與評分環境，產生評估項目初稿")}>產生評估項目初稿</button></div> : <div className={styles.itemsList}>{analysis.items.map((item, index) => <ItemEditor key={item.id ?? index} item={item} index={index} disabled={readOnly} assistantDisabled={assistantBusy || isClearingMessages} onChange={(next) => updateItem(index, next)} onDelete={() => deleteItem(index)} onAssist={() => sendAssistant(`請協助改善第 ${index + 1} 項「${item.title ?? "未命名項目"}」的說明、可偵測性與檢查步驟，只提出可供我確認的評分表提案。`)} />)}</div>}
+            {!analysis.items.length ? <EmptyState icon="playlist_add" title="尚未新增評估項目" action={<button type="button" className={styles.primaryButton} disabled={readOnly || assistantBusy || isClearingMessages} onClick={() => sendAssistant("請依目前檢查名稱與評分環境，產生評估項目初稿")}>產生評估項目初稿</button>} /> : <div className={styles.itemsList}>{analysis.items.map((item, index) => <ItemEditor key={item.id ?? index} item={item} index={index} disabled={readOnly} assistantDisabled={assistantBusy || isClearingMessages} onChange={(next) => updateItem(index, next)} onDelete={() => deleteItem(index)} onAssist={() => sendAssistant(`請協助改善第 ${index + 1} 項「${item.title ?? "未命名項目"}」的說明、可偵測性與檢查步驟，只提出可供我確認的評分表提案。`)} />)}</div>}
             {analysis.items.length > 0 && <div className={styles.itemsFooter}><span>{analysis.items.filter((item) => item.detectable === "auto").length} 項可自動偵測 · {analysis.items.filter((item) => item.detectable === "partial").length} 項部分可偵測 · {analysis.items.filter((item) => item.detectable === "manual").length} 項需人工評閱</span></div>}
           </section>
         </section>

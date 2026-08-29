@@ -33,7 +33,6 @@ function EmptyState({ hasFilter }) {
     <SharedEmptyState
       icon={hasFilter ? "search_off" : "receipt_long"}
       title={hasFilter ? "找不到符合的紀錄" : "尚無操作紀錄"}
-      description={hasFilter ? "請調整篩選條件後重試。" : undefined}
     />
   );
 }

@@ -30,7 +30,7 @@
 
 .iconAutoStop {
   @include flex-center;
-  color: #d97706;
+  color: var(--color-pending);
 }
 
 .iconExpiry {

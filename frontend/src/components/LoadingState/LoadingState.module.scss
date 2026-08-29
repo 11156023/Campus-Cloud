@@ -235,44 +235,6 @@ $box-layouts: (
   }
 }
 
-/* ── 六角 spinner（LoadingSpinner，小尺寸內嵌場景用）── */
-.spinner {
-  aspect-ratio: 1.154;
-  color: var(--color-primary);
-  display: grid;
-  animation: l38-0 6s infinite linear;
-
-  &::before,
-  &::after {
-    content: "";
-    grid-area: 1/1;
-  }
-
-  &::before {
-    clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%);
-    background: conic-gradient(from -30deg, #0000 60deg, currentColor 0);
-  }
-
-  &::after {
-    background: conic-gradient(from -30deg, currentColor 60deg, #0000 0);
-    animation: l38 0.5s infinite alternate;
-  }
-}
-
-@keyframes l38-0 {
-  0%, 16.66%     { transform: rotate(0deg); }
-  16.67%, 33.33% { transform: rotate(60deg); }
-  33.34%, 50%    { transform: rotate(120deg); }
-  50.1%, 66.66%  { transform: rotate(180deg); }
-  66.67%, 83.33% { transform: rotate(240deg); }
-  83.34%, 100%   { transform: rotate(300deg); }
-}
-
-// 原始碼為 translateY(-20px)（以 60px 寬為基準）；改用百分比讓不同 size 等比縮放
-@keyframes l38 {
-  100% { transform: translateY(-33%); }
-}
-
 @keyframes fadeIn {
   from { opacity: 0; }
   to   { opacity: 1; }
@@ -282,10 +244,5 @@ $box-layouts: (
   /* 3D 動畫無靜態定格可言（方塊初始 scale 0），停用動畫時整組隱藏、保留文字 */
   .loader {
     display: none;
-  }
-
-  .spinner,
-  .spinner::after {
-    animation: none;
   }
 }

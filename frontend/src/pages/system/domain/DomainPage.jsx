@@ -396,7 +396,6 @@ export default function DomainPage() {
         <EmptyState
           icon="domain"
           title="尚未連線 Cloudflare"
-          description="點擊「連線設定」輸入 Account ID 與 API Token 後即可載入 Zone 與 DNS 紀錄"
         />
       ) : (
         <div className={styles.workbench}>

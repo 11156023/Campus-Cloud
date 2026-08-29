@@ -16,7 +16,7 @@ export const JOB_STATUS_META = {
   running:   { label: "執行中", icon: "autorenew",     tone: "toneInfo", spin: true },
   completed: { label: "已完成", icon: "check_circle",  tone: "toneSuccess" },
   failed:    { label: "失敗",   icon: "cancel",        tone: "toneDanger" },
-  blocked:   { label: "受阻",   icon: "error_outline", tone: "toneWarning" },
+  blocked:   { label: "受阻",   icon: "error_outline", tone: "tonePending" },
   cancelled: { label: "已取消", icon: "cancel",        tone: "toneMuted" },
 };
 
@@ -80,7 +80,7 @@ export function JobRow({ job, onClick }) {
 /* 提醒 tone（後端 courses/reminders 的 tone 欄位）→ JobRow 色調 class */
 const REMINDER_TONE_CLASS = {
   success: "toneSuccess",
-  warning: "toneWarning",
+  warning: "tonePending",
   danger:  "toneDanger",
 };
 

@@ -19,7 +19,7 @@ from app.models import (
     VMRequest,
     VMRequestStatus,
 )
-from app.services.course.course_service import list_student_schedule
+from app.services.course.course_service import ensure_class_path, list_student_schedule
 from app.services.course.reminder_service import list_student_reminders
 
 
@@ -101,12 +101,48 @@ def test_schedule_uses_real_class_time_teacher_and_location() -> None:
     assert rows[0].start_at.hour == 9
 
 
+def test_class_course_shell_exists_without_tasks_and_publishes_with_class() -> None:
+    session = _session()
+    teacher = _user("teacher@example.edu", UserRole.teacher)
+    teaching_class = TeachingClass(
+        name="Operating Systems",
+        code="os-a",
+        term="2026-1",
+        owner_id=teacher.id,
+        start_date=date(2026, 8, 25),
+        end_date=date(2026, 12, 31),
+        weekday=1,
+        start_time=time(9),
+        end_time=time(11),
+    )
+    session.add(teacher)
+    session.add(teaching_class)
+    session.commit()
+
+    draft = ensure_class_path(session, teaching_class=teaching_class)
+    session.commit()
+
+    assert draft.teaching_class_id == teaching_class.id
+    assert draft.title == teaching_class.name
+    assert draft.status == CoursePathStatus.draft
+
+    published = ensure_class_path(
+        session,
+        teaching_class=teaching_class,
+        published=True,
+    )
+    session.commit()
+
+    assert published.id == draft.id
+    assert published.status == CoursePathStatus.published
+
+
 def test_reminders_derive_expiry_review_and_class_task() -> None:
     session = _session()
     teacher = _user("teacher@example.edu", UserRole.teacher)
     student = _user("student@example.edu", UserRole.student)
     today = date(2026, 8, 25)
-    teaching_class, _ = _linked_class(
+    teaching_class, path = _linked_class(
         session,
         teacher=teacher,
         student=student,
@@ -158,4 +194,6 @@ def test_reminders_derive_expiry_review_and_class_task() -> None:
     }
     assert next(row for row in rows if row.kind == "resource_expiry").target == "/my-resources"
     assert next(row for row in rows if row.kind == "request_review").tone == "success"
-    assert "Checkpoint" in next(row for row in rows if row.kind == "class_task").title
+    class_task = next(row for row in rows if row.kind == "class_task")
+    assert "Checkpoint" in class_task.title
+    assert class_task.target == f"/dashboard/course/{path.id}"

@@ -4,6 +4,7 @@ import "@xyflow/react/dist/style.css";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import LoadingState from "../../components/LoadingState/LoadingState";
 import MIcon from "../../components/MIcon";
+import PageHeader from "../../components/PageHeader/PageHeader";
 import EmptyState from "../../components/EmptyState/EmptyState";
 import ClassroomWatchDialog from "../../components/Classroom/ClassroomWatchDialog";
 import { useConfirm } from "../../components/ConfirmDialog/ConfirmProvider";
@@ -814,7 +815,13 @@ export default function ClassWorkspacePage() {
 
   return <div className={styles.page}>
     <button type="button" className={styles.backLink} onClick={() => navigate("/class-management")}><MIcon name="arrow_back" size={18} />返回班級清單</button>
-    <div className={styles.workspaceHeader}><div><span className={styles.overline}>{item.code} · {item.term}</span><div className={styles.titleLine}><h1 className={styles.pageTitle}>{item.name}</h1></div><p className={styles.pageSubtitle}>{item.students.length} 位學生 · {item.weeks.length} 個課次 · 每週{["一", "二", "三", "四", "五", "六", "日"][item.weekday]} {item.startTime}–{item.endTime}</p></div><div className={styles.headerState}><span className={`${styles.statusBadge} ${styles[`status_${item.status}`]}`}>{STATUS[item.status] ?? item.status}</span></div></div>
+    <PageHeader
+      eyebrow={`${item.code} · ${item.term}`}
+      title={item.name}
+      subtitle={`${item.students.length} 位學生 · ${item.weeks.length} 個課次 · 每週${["一", "二", "三", "四", "五", "六", "日"][item.weekday]} ${item.startTime}–${item.endTime}`}
+    >
+      <div className={styles.headerState}><span className={`${styles.statusBadge} ${styles[`status_${item.status}`]}`}>{STATUS[item.status] ?? item.status}</span></div>
+    </PageHeader>
     {error && <p className={styles.errorMessage}>{error}</p>}
     <section className={styles.workflowTabsBar} aria-label="班級管理流程">
       <nav className={styles.workspaceTabs}>{TABS.map(([key, icon, label]) => {

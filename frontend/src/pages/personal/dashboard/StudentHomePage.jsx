@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import MIcon from "../../../components/MIcon";
 import TerminalDialog from "../resources/TerminalDialog";
@@ -306,9 +306,21 @@ export function buildPracticeMachines(classMachines, resources, deployment, room
 
 export function practiceMachineActionLabel(machine, openingMachineId = null) {
   if (machine?.vmid == null) return "環境配置中";
-  if (openingMachineId === machine.vmid) return "確認狀態中…";
-  if (machine.status === "running") return "直接開啟";
-  return "等待自動開機";
+  if (openingMachineId === machine.vmid) return "正在啟動…";
+  if (machine.status === "running") return "進入機器";
+  return "啟動並進入";
+}
+
+async function waitForPracticeMachine(vmid, attempts = 20) {
+  let resource = null;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    resource = await ResourcesService.get(vmid);
+    if (resource.status === "running") return resource;
+    if (attempt < attempts - 1) {
+      await new Promise((resolve) => window.setTimeout(resolve, 1000));
+    }
+  }
+  return resource;
 }
 
 function StatusBadge({ meta }) {
@@ -358,6 +370,7 @@ function normalizeSchedule(row) {
 
 export default function StudentHomePage({ courseView = false }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const { pathId } = useParams();
   const [view, setView] = useState({
     loading: true,
@@ -375,7 +388,6 @@ export default function StudentHomePage({ courseView = false }) {
   const [expandedAssignmentId, setExpandedAssignmentId] = useState(null);
   const [assignmentChecks, setAssignmentChecks] = useState({});
   const [checkingAssignmentId, setCheckingAssignmentId] = useState(null);
-  const [machinePickerOpen, setMachinePickerOpen] = useState(false);
   const [activePracticeResource, setActivePracticeResource] = useState(null);
   const [openingMachineId, setOpeningMachineId] = useState(null);
 
@@ -557,15 +569,24 @@ export default function StudentHomePage({ courseView = false }) {
     setOpeningMachineId(machine.vmid);
     let resource = machine;
     try {
+      resource = await ResourcesService.get(resource.vmid);
       if (resource.status !== "running") {
-        resource = await ResourcesService.get(resource.vmid);
-      }
-      if (resource.status !== "running") {
-        toast.info("課堂機器會依上課時間自動開機，目前尚未就緒");
-        return;
+        toast.info("正在啟動課堂機器，通常需要一點時間…", {
+          id: `start-class-machine-${machine.vmid}`,
+        });
+        await ResourcesService.start(resource.vmid);
+        resource = await waitForPracticeMachine(resource.vmid);
+        if (resource?.status !== "running") {
+          toast.info("機器仍在啟動中，請稍後再試。", {
+            id: `start-class-machine-${machine.vmid}`,
+          });
+          return;
+        }
+        toast.success("課堂機器已啟動", {
+          id: `start-class-machine-${machine.vmid}`,
+        });
       }
       setActivePracticeResource({ ...machine, ...resource });
-      setMachinePickerOpen(false);
     } catch (error) {
       toast.error(error?.message ?? "無法開啟課堂機器");
     } finally {
@@ -573,16 +594,12 @@ export default function StudentHomePage({ courseView = false }) {
     }
   };
 
-  const openPrimaryTarget = () => {
-    if (practiceMachines.length === 1) {
-      openPracticeMachine(practiceMachines[0]);
+  const openMachineInformation = (machine) => {
+    if (!machine?.vmid) {
+      toast.info("這台課堂機器尚未建立完成。");
       return;
     }
-    if (practiceMachines.length > 1) {
-      setMachinePickerOpen((current) => !current);
-      return;
-    }
-    navigate(primaryTarget);
+    navigate(`/my-resources/${machine.vmid}`);
   };
 
   const openCourseOverview = (path = view.activePath) => {
@@ -590,7 +607,7 @@ export default function StudentHomePage({ courseView = false }) {
       navigate("/courses");
       return;
     }
-    navigate(`/dashboard-new/course/${path.id}`);
+    navigate(`/dashboard/course/${path.id}`, { state: { from: "/dashboard" } });
   };
 
   const toggleAssignment = (assignmentId) => {
@@ -630,7 +647,7 @@ export default function StudentHomePage({ courseView = false }) {
           <button
             type="button"
             className={styles.courseBackButton}
-            onClick={() => navigate("/dashboard-new")}
+            onClick={() => navigate(location.state?.from ?? "/dashboard")}
           >
             <MIcon name="arrow_back" size={18} />
             返回今日課表
@@ -772,43 +789,57 @@ export default function StudentHomePage({ courseView = false }) {
             </div>
           )}
 
-          <div className={styles.primaryActions}>
-            <button type="button" className={styles.primaryButton} onClick={openPrimaryTarget} data-guide="home-start">
-              {practiceMachines.length > 1 ? `開始練習 · ${practiceMachines.length} 台機器` : primaryLabel}
-              <MIcon name="arrow_forward" size={18} />
-            </button>
-          </div>
+          {practiceMachines.length === 0 && (
+            <div className={styles.primaryActions}>
+              <button type="button" className={styles.primaryButton} onClick={() => navigate(primaryTarget)}>
+                {primaryLabel}
+                <MIcon name="arrow_forward" size={18} />
+              </button>
+            </div>
+          )}
 
-          {machinePickerOpen && practiceMachines.length > 1 && (
-            <section className={styles.machinePicker} aria-label="選擇練習機器">
+          {practiceMachines.length > 0 && (
+            <section className={styles.machinePicker} aria-label="課堂機器" data-guide="home-start">
               <header>
-                <div><strong>這個課程需要操作多台機器</strong><span>依照任務步驟選擇要開啟的角色，完成後可隨時切換。</span></div>
-                <button type="button" onClick={() => setMachinePickerOpen(false)} aria-label="關閉機器選擇">
-                  <MIcon name="close" size={18} />
-                </button>
+                <div><strong>你的課堂機器</strong><span>直接點擊機器即可進入；右側資訊按鈕可查看完整設定。</span></div>
               </header>
               <div className={styles.machineGrid}>
                 {practiceMachines.map((machine) => (
-                  <button
-                    type="button"
+                  <div
                     key={machine.machine_node_id ?? `${machine.teaching_class_id ?? "course"}-${machine.vmid}`}
                     className={styles.machineOption}
-                    onClick={() => openPracticeMachine(machine)}
-                    disabled={openingMachineId !== null || machine.vmid == null}
                   >
-                    <span className={styles.machineIcon}><MIcon name={machine.type === "lxc" ? "terminal" : "desktop_windows"} size={22} /></span>
-                    <span className={styles.machineCopy}>
-                      <strong>{machine.classMachineName ?? machine.name}</strong>
-                      <small>
-                        {machine.classMachineRole ?? "課堂練習機"}
-                        {machine.vmid != null ? ` · VMID ${machine.vmid}` : " · 尚未配置"}
-                      </small>
-                    </span>
-                    <span className={`${styles.machineState} ${machine.status === "running" ? styles.machineStateReady : ""}`}>
-                      {practiceMachineActionLabel(machine, openingMachineId)}
-                    </span>
-                    <MIcon name="arrow_forward" size={18} />
-                  </button>
+                    <button
+                      type="button"
+                      className={styles.machineLaunchButton}
+                      onClick={() => openPracticeMachine(machine)}
+                      disabled={openingMachineId !== null || machine.vmid == null}
+                      aria-label={`${practiceMachineActionLabel(machine, openingMachineId)}：${machine.classMachineName ?? machine.name}`}
+                    >
+                      <span className={styles.machineIcon}><MIcon name={machine.type === "lxc" ? "terminal" : "desktop_windows"} size={22} /></span>
+                      <span className={styles.machineCopy}>
+                        <strong>{machine.classMachineName ?? machine.name}</strong>
+                        <small>
+                          {machine.classMachineRole ?? "課堂練習機"}
+                          {machine.vmid != null ? ` · VMID ${machine.vmid}` : " · 尚未配置"}
+                        </small>
+                      </span>
+                      <span className={`${styles.machineState} ${machine.status === "running" ? styles.machineStateReady : ""}`}>
+                        {practiceMachineActionLabel(machine, openingMachineId)}
+                      </span>
+                      <span className={styles.machineArrow}><MIcon name="arrow_forward" size={20} /></span>
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.machineInfoButton}
+                      onClick={() => openMachineInformation(machine)}
+                      disabled={machine.vmid == null}
+                      aria-label={`查看 ${machine.classMachineName ?? machine.name} 的完整資源資訊`}
+                      title="前往我的資源查看完整設定"
+                    >
+                      <MIcon name="info" size={20} />
+                    </button>
+                  </div>
                 ))}
               </div>
             </section>
@@ -1010,7 +1041,7 @@ export default function StudentHomePage({ courseView = false }) {
                   key={template.id}
                   className={styles.templateCard}
                   style={{ "--accent-color": "var(--color-primary)" }}
-                  onClick={() => navigate(`/quick-template/${template.id}`, { state: { from: "/dashboard-new" } })}
+                  onClick={() => navigate(`/quick-template/${template.id}`, { state: { from: "/dashboard" } })}
                 >
                   <div className={styles.templateHeader}>
                     <span className={styles.templateLogo}><MIcon name="layers" size={22} /></span>

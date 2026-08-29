@@ -148,7 +148,7 @@ def list_student_reminders(
                 title=f"{teaching_class.name}：{week.title}",
                 description=f"第 {week.week_number} 週課堂任務，點擊查看內容與檢查項目。",
                 time_label=label,
-                target=f"/dashboard-new/course/{path.id}",
+                target=f"/dashboard/course/{path.id}",
                 occurred_at=datetime.combine(
                     week.session_date,
                     teaching_class.start_time,

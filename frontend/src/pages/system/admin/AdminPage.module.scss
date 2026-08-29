@@ -56,7 +56,7 @@
 
 .btnDanger {
   background: var(--color-danger);
-  color: #fff;
+  color: var(--color-text-on-primary);
 
   &:hover:not(:disabled) {
     box-shadow: var(--shadow-sm);
@@ -131,38 +131,6 @@
 .content {
   flex: 1;
   @include flex-column;
-}
-
-.empty {
-  flex: 1;
-  @include flex-column;
-  align-items: center;
-  justify-content: center;
-  gap: $spacing-16;
-  padding: $spacing-48 $spacing-16;
-  text-align: center;
-}
-
-.emptyIcon {
-  width: 72px;
-  height: 72px;
-  border-radius: $radius-16;
-  background: var(--color-surface);
-  color: var(--color-text-secondary);
-  @include flex-center;
-}
-
-.emptyTitle {
-  font-size: $font-size-18;
-  font-weight: $font-weight-700;
-  color: var(--color-text-primary);
-}
-
-.emptyDesc {
-  font-size: $font-size-14;
-  color: var(--color-text-secondary);
-  max-width: 360px;
-  line-height: $line-height-base;
 }
 
 .list {
@@ -302,7 +270,7 @@
 .modalOverlay {
   position: fixed;
   inset: 0;
-  z-index: 60;
+  z-index: 300;
   display: flex;
   align-items: center;
   justify-content: center;

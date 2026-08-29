@@ -16,7 +16,7 @@
 .toneInfo    { color: var(--color-info); }
 .toneSuccess { color: var(--color-success); }
 .toneDanger  { color: var(--color-danger); }
-.toneWarning { color: #d97706; }
+.tonePending { color: var(--color-pending); }
 
 /* ── 側欄按鈕 ── */
 /* 尺寸與間距對齊 Sidebar.module.scss 的 .navItem，讓它跟語言／使用者同一列感 */
@@ -71,7 +71,7 @@
   padding: 0 5px;
   border-radius: $radius-pill;
   background: var(--color-danger);
-  color: #fff;
+  color: var(--color-text-on-primary);
   font-size: 11px;
   font-weight: $font-weight-700;
   line-height: 18px;
@@ -96,7 +96,7 @@
 /* portal 到 body，left / bottom 由 JS 依按鈕位置以 inline style 指定 */
 .popover {
   position: fixed;
-  z-index: 200;
+  z-index: 150;
   @include flex-column;
   width: min(360px, calc(100vw - #{$spacing-32}));
   max-height: calc(100vh - #{$spacing-32});
@@ -218,7 +218,7 @@
   padding: 1px 6px;
   border-radius: $radius-8;
   background: var(--color-hover);
-  font-size: 10px;
+  font-size: $font-size-10;
   font-weight: $font-weight-500;
   color: var(--color-text-muted);
   white-space: nowrap;
@@ -255,7 +255,7 @@
 }
 
 .jobRowProgressBlocked {
-  background: #d97706;
+  background: var(--color-pending);
 }
 
 .jobRowFoot {

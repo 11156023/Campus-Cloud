@@ -439,23 +439,85 @@
   display: grid;
   min-width: 0;
   min-height: 66px;
-  padding: 10px 12px;
-  grid-template-columns: 38px minmax(0, 1fr) auto 18px;
+  padding: 5px;
+  grid-template-columns: minmax(0, 1fr) 38px;
   align-items: center;
-  gap: 10px;
+  gap: 5px;
   border: 1px solid var(--color-border);
   border-radius: $radius-8;
   color: var(--color-text-muted);
   background: var(--color-surface);
+  transition: border-color $transition-base, background $transition-base, box-shadow $transition-base, transform $transition-base;
+
+  &:has(.machineLaunchButton:hover:not(:disabled)) {
+    border-color: color-mix(in srgb, var(--color-primary) 58%, var(--color-border));
+    background: color-mix(in srgb, var(--color-primary) 6%, var(--color-surface));
+    box-shadow: var(--shadow-sm);
+    transform: translateY(-1px);
+  }
+
+  &:only-child { grid-column: 1 / -1; }
+}
+
+.machineLaunchButton {
+  display: grid;
+  min-width: 0;
+  min-height: 54px;
+  padding: 5px 7px;
+  grid-template-columns: 38px minmax(0, 1fr) auto 18px;
+  align-items: center;
+  gap: 10px;
+  border: 0;
+  border-radius: $radius-8;
+  color: inherit;
+  background: transparent;
   text-align: left;
   cursor: pointer;
 
   &:hover:not(:disabled) {
-    border-color: color-mix(in srgb, var(--color-primary) 38%, var(--color-border));
-    background: var(--color-hover);
+    .machineCopy strong,
+    .machineArrow { color: var(--color-primary); }
+  }
+
+  &:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--color-primary) 55%, transparent);
+    outline-offset: 1px;
   }
 
   &:disabled { cursor: not-allowed; opacity: .4; }
+}
+
+.machineArrow {
+  @include flex-center;
+  color: var(--color-text-muted);
+  transition: color $transition-base, transform $transition-base;
+}
+
+.machineLaunchButton:hover:not(:disabled) .machineArrow { transform: translateX(2px); }
+
+.machineInfoButton {
+  @include flex-center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid color-mix(in srgb, var(--color-primary) 22%, var(--color-border));
+  border-radius: 50%;
+  color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 7%, var(--color-surface));
+  cursor: pointer;
+  transition: background $transition-base, border-color $transition-base, transform $transition-base;
+
+  &:hover:not(:disabled) {
+    border-color: var(--color-primary);
+    background: color-mix(in srgb, var(--color-primary) 14%, var(--color-surface));
+    transform: translateY(-1px);
+  }
+
+  &:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--color-primary) 55%, transparent);
+    outline-offset: 2px;
+  }
+
+  &:disabled { cursor: not-allowed; opacity: .35; }
 }
 
 .machineIcon {

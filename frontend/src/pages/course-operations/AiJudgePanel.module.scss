@@ -116,7 +116,7 @@
   transition: background $transition-base, border-color $transition-base, box-shadow $transition-base, color $transition-base;
 
   &:disabled {
-    opacity: 0.55;
+    opacity: 0.5;
     cursor: not-allowed;
   }
 }
@@ -143,7 +143,7 @@
 
 .btnDanger {
   background: var(--color-danger);
-  color: #fff;
+  color: var(--color-text-on-primary);
 
   &:hover:not(:disabled) {
     box-shadow: var(--shadow-sm);
@@ -168,7 +168,7 @@
   }
 
   &:disabled {
-    opacity: 0.35;
+    opacity: 0.5;
     cursor: not-allowed;
   }
 }
@@ -327,7 +327,7 @@
   transition: background $transition-base, color $transition-base, border-color $transition-base;
 
   &:disabled {
-    opacity: 0.55;
+    opacity: 0.5;
     cursor: not-allowed;
   }
 }
@@ -554,10 +554,10 @@
 }
 
 .statBox_success {
-  background: color-mix(in srgb, #28a745 10%, transparent);
+  background: color-mix(in srgb, var(--color-success) 10%, transparent);
 
-  .statValue { color: #28a745; }
-  .statLabel { color: #28a745; }
+  .statValue { color: var(--color-success); }
+  .statLabel { color: var(--color-success); }
 }
 
 .statBox_info {
@@ -568,10 +568,10 @@
 }
 
 .statBox_danger {
-  background: color-mix(in srgb, #dc3545 10%, transparent);
+  background: color-mix(in srgb, var(--color-danger) 10%, transparent);
 
-  .statValue { color: #dc3545; }
-  .statLabel { color: #dc3545; }
+  .statValue { color: var(--color-danger); }
+  .statLabel { color: var(--color-danger); }
 }
 
 .summaryBox {
@@ -603,9 +603,9 @@
   }
 }
 
-.rubricCard_auto { border-top-color: #28a745; }
+.rubricCard_auto { border-top-color: var(--color-success); }
 .rubricCard_partial { border-top-color: var(--color-primary-dark); }
-.rubricCard_manual { border-top-color: #dc3545; }
+.rubricCard_manual { border-top-color: var(--color-danger); }
 
 .rubricCardHead {
   @include flex-between;
@@ -630,9 +630,9 @@
   white-space: nowrap;
 }
 
-.detBadge_auto { background: color-mix(in srgb, #28a745 12%, transparent); color: #28a745; }
+.detBadge_auto { background: color-mix(in srgb, var(--color-success) 12%, transparent); color: var(--color-success); }
 .detBadge_partial { background: color-mix(in srgb, var(--color-primary-dark) 12%, transparent); color: var(--color-primary-dark); }
-.detBadge_manual { background: color-mix(in srgb, #dc3545 12%, transparent); color: #dc3545; }
+.detBadge_manual { background: color-mix(in srgb, var(--color-danger) 12%, transparent); color: var(--color-danger); }
 
 .rubricField {
   @include flex-column;
@@ -657,7 +657,7 @@
     }
 
     &:disabled {
-      opacity: 0.55;
+      opacity: 0.5;
       cursor: not-allowed;
     }
   }
@@ -730,7 +730,7 @@
 
   code {
     font-family: monospace;
-    font-size: 10px;
+    font-size: $font-size-10;
     color: var(--color-text-muted);
   }
 }
@@ -881,7 +881,7 @@
     }
 
     &:disabled {
-      opacity: 0.55;
+      opacity: 0.5;
       cursor: not-allowed;
     }
   }
@@ -1130,9 +1130,9 @@
   white-space: nowrap;
 }
 
-.badge_success { background: color-mix(in srgb, #28a745 12%, transparent); color: #28a745; }
+.badge_success { background: color-mix(in srgb, var(--color-success) 12%, transparent); color: var(--color-success); }
 .badge_info    { background: color-mix(in srgb, var(--color-primary-dark) 12%, transparent); color: var(--color-primary-dark); }
-.badge_danger  { background: color-mix(in srgb, #dc3545 12%, transparent); color: #dc3545; }
+.badge_danger  { background: color-mix(in srgb, var(--color-danger) 12%, transparent); color: var(--color-danger); }
 .badge_muted   { background: var(--color-hover); color: var(--color-text-muted); }
 
 /* ── Modal ── */
@@ -1148,7 +1148,7 @@
 
 .modal,
 .confirm {
-  width: min(560px, 100%);
+  width: min(640px, 100%);
   max-height: 88vh;
   overflow-y: auto;
   @include flex-column;
@@ -1359,7 +1359,7 @@
 .sidebarEmpty, .mainEmpty { display: flex; flex-direction: column; align-items: center; gap: $spacing-8; padding: $spacing-16 $spacing-8; color: var(--color-text-muted); text-align: center; }
 .sidebarEmpty p, .mainEmpty p { margin: 0; font-size: $font-size-12; line-height: 1.45; }
 .mainEmpty { min-height: 240px; }.mainEmpty > .material-icons-outlined { color: var(--color-primary); }
-.archivedNotice { display: inline-flex; align-items: center; gap: 5px; padding: 5px 8px; border-radius: 999px; color: #916100; background: color-mix(in srgb, #d99a00 10%, transparent); font-size: $font-size-12; white-space: nowrap; }
+.archivedNotice { display: inline-flex; align-items: center; gap: 5px; padding: 5px 8px; border-radius: 999px; color: var(--color-pending); background: color-mix(in srgb, var(--color-pending) 10%, transparent); font-size: $font-size-12; white-space: nowrap; }
 .renameDialog { width: min(420px, calc(100vw - 28px)); }
 
 .sourceRail {
@@ -1398,7 +1398,7 @@
 .sourceText { display: flex; min-width: 0; flex-direction: column; gap: 3px; }
 .sourceText b { overflow: hidden; font-size: $font-size-14; text-overflow: ellipsis; white-space: nowrap; }
 .sourceText small { color: var(--color-text-muted); font-size: $font-size-12; line-height: 1.35; }
-.sourceText em { width: max-content; padding: 2px 6px; border-radius: 999px; color: var(--color-primary-dark); background: color-mix(in srgb, var(--color-primary) 12%, transparent); font-size: 10px; font-style: normal; }
+.sourceText em { width: max-content; padding: 2px 6px; border-radius: 999px; color: var(--color-primary-dark); background: color-mix(in srgb, var(--color-primary) 12%, transparent); font-size: $font-size-10; font-style: normal; }
 .sourceActions { position: relative; }
 .sourceActions .iconBtn,
 .sourceRailActions .iconBtn { width: 36px; height: 36px; }
@@ -1554,7 +1554,7 @@
   cursor: pointer;
 }
 
-@media (max-width: 1100px) {
+@include respond-below(lg) {
   .sessionWorkspace {
     grid-template-columns: minmax(220px, 260px) minmax(0, 1fr);
   }
@@ -1568,7 +1568,7 @@
   }
 }
 
-@media (max-width: 700px) {
+@include respond-below(md) {
   .sessionWorkspace { grid-template-columns: 1fr; }
   .sessionSidebar { position: static; }
   .sessionMain { min-width: 0; }

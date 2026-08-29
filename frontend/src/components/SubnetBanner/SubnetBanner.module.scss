@@ -8,13 +8,9 @@
   padding: 8px $spacing-16;
   margin: $spacing-8 $spacing-8 0;
   border-radius: $radius-12;
-  border: 1px solid color-mix(in srgb, #d97706 40%, transparent);
-  background: color-mix(in srgb, #f59e0b 12%, transparent);
-  color: #b45309;
-
-  body.dark & {
-    color: #fbbf24;
-  }
+  border: 1px solid color-mix(in srgb, var(--color-pending) 40%, transparent);
+  background: color-mix(in srgb, var(--color-pending) 12%, transparent);
+  color: var(--color-pending);
 
   @include respond-to(md) {
     margin: 0 0 $spacing-16;
