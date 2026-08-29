@@ -160,7 +160,6 @@ async def upload_class_teacher_judge_file(
         analysis=analysis,
         conflict_strategy=conflict_strategy,
         environment_keys=environment_keys,
-        display_name=original_filename,
     )
     record_ai_template_call(
         session=session,

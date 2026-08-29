@@ -5,7 +5,9 @@ import {
   ChatPanel,
   RubricStats,
   buildProposalDiff,
+  getRubricDisplayName,
   getRubricCheckTitle,
+  getSessionMenuPosition,
   getSelectedRubricSource,
   getVisibleRubricSources,
   resolveActiveSessionId,
@@ -97,11 +99,27 @@ describe("CreateCheckChooser", () => {
 });
 
 describe("uploaded rubric naming", () => {
-  test("使用上傳檔名作為檢查名稱並限制長度", () => {
-    expect(getRubricCheckTitle({ name: "期中評分表.pdf" })).toBe("期中評分表.pdf");
-    expect(getRubricCheckTitle({ original_filename: "保存的評分表.docx" })).toBe("保存的評分表.docx");
+  test("匯入檔名移除副檔名，且檢查名稱保留檔名主體並限制長度", () => {
+    expect(getRubricDisplayName({ name: "AI評分表審核系統_Python服務Running狀態檢測_簡短版.docx" }))
+      .toBe("AI評分表審核系統_Python服務Running狀態檢測_簡短版");
+    expect(getRubricCheckTitle({ original_filename: "保存的評分表.docx" })).toBe("保存的評分表");
+    expect(getRubricCheckTitle({ display_name: "自訂評分表", original_filename: "保存的評分表.docx" })).toBe("自訂評分表");
     expect(getRubricCheckTitle({ name: "  " })).toBe("未命名檢查");
     expect(getRubricCheckTitle({ name: "a".repeat(300) })).toHaveLength(255);
+  });
+});
+
+describe("session menu positioning", () => {
+  test("浮動選單會貼近觸發按鈕並限制在視窗內", () => {
+    expect(getSessionMenuPosition(
+      { top: 160, right: 780, bottom: 196 },
+      { width: 800, height: 600, menuWidth: 220, menuHeight: 280, margin: 12 },
+    )).toEqual({ top: 208, left: 560 });
+
+    expect(getSessionMenuPosition(
+      { top: 520, right: 790, bottom: 556 },
+      { width: 800, height: 600, menuWidth: 220, menuHeight: 280, margin: 12 },
+    )).toEqual({ top: 228, left: 568 });
   });
 });
 

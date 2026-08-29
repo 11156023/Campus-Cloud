@@ -54,6 +54,12 @@ def _safe_filename(filename: str) -> str:
     return name or "rubric"
 
 
+def _display_name_from_filename(filename: str) -> str:
+    """Return a readable rubric name while keeping the original filename separate."""
+    stem = Path(filename or "").stem.strip()
+    return stem or "評分表"
+
+
 def _suffix(filename: str) -> str:
     return Path(filename).suffix.lower()
 
@@ -324,7 +330,7 @@ def save_analyzed_file(
             file_hash=file_hash,
             template_key=template_key,
             source_type="uploaded",
-            display_name=display_name or original_filename,
+            display_name=display_name or _display_name_from_filename(original_filename),
             environment_keys=list(dict.fromkeys(environment_keys or [template_key])),
             analysis_revision=1,
             analysis_json=analysis.model_dump(mode="json"),
@@ -336,7 +342,7 @@ def save_analyzed_file(
         target_file.file_hash = file_hash
         target_file.template_key = template_key
         target_file.source_type = "uploaded"
-        target_file.display_name = display_name or target_filename
+        target_file.display_name = display_name or _display_name_from_filename(target_filename)
         target_file.environment_keys = list(dict.fromkeys(environment_keys or [template_key]))
         target_file.analysis_revision = int(target_file.analysis_revision or 1) + 1
         target_file.analysis_json = analysis.model_dump(mode="json")

@@ -121,6 +121,29 @@ def test_save_file_requires_conflict_strategy_for_same_active_name(
     assert exc_info.value.detail["file_id"] == first.id
 
 
+def test_uploaded_file_display_name_uses_filename_stem(
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(file_service, "DATA_ROOT", tmp_path)
+    session = _session()
+
+    saved = file_service.save_analyzed_file(
+        session=session,
+        teaching_class_id=uuid.uuid4(),
+        uploaded_by=uuid.uuid4(),
+        original_filename="AI評分表審核系統_Python服務Running狀態檢測_簡短版.docx",
+        file_hash="a" * 64,
+        template_key="python",
+        file_bytes=b"document",
+        analysis=_analysis(),
+        conflict_strategy=None,
+    )
+
+    assert saved.original_filename.endswith(".docx")
+    assert saved.display_name == "AI評分表審核系統_Python服務Running狀態檢測_簡短版"
+
+
 def test_copy_strategy_creates_filename_copy(
     tmp_path,
     monkeypatch: pytest.MonkeyPatch,

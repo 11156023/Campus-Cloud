@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useSearchParams } from "react-router-dom";
 import styles from "./AiJudgePanel.module.scss";
 import LoadingState from "../../components/LoadingState/LoadingState";
@@ -43,10 +44,53 @@ function formatDateTime(value) {
   return new Date(value).toLocaleString("zh-TW");
 }
 
+const RUBRIC_FILE_EXTENSION = /\.(?:docx|pdf)$/i;
+
+/**
+ * 評分表的可讀名稱不應把匯入文件的副檔名帶進工作區標題；原始檔名仍
+ * 保留在 `original_filename`，供衝突判斷與下載使用。
+ */
+export function getRubricDisplayName(file, fallback = "評分表") {
+  const rawName = typeof file === "string"
+    ? file
+    : [file?.name, file?.display_name, file?.original_filename]
+      .find((value) => typeof value === "string" && value.trim());
+  const title = String(rawName ?? "")
+    .trim()
+    .replace(RUBRIC_FILE_EXTENSION, "")
+    .trim();
+  return title || fallback;
+}
+
 export function getRubricCheckTitle(file) {
-  const name = file?.name || file?.original_filename || file?.display_name;
-  const title = String(name ?? "").trim();
-  return (title || "未命名檢查").slice(0, 255);
+  return getRubricDisplayName(file, "未命名檢查").slice(0, 255);
+}
+
+const SESSION_MENU_WIDTH = 220;
+const SESSION_MENU_HEIGHT = 280;
+const SESSION_MENU_MARGIN = 12;
+
+/**
+ * 將 session 的更多功能選單定位在觸發按鈕附近，同時限制在視窗可見範圍內。
+ * 使用 fixed/portal 顯示時，這個位置不會受 session sidebar 的 overflow 影響。
+ */
+export function getSessionMenuPosition(anchorRect, options = {}) {
+  const viewportWidth = options.width ?? (typeof window !== "undefined" ? window.innerWidth : 1024);
+  const viewportHeight = options.height ?? (typeof window !== "undefined" ? window.innerHeight : 768);
+  const menuWidth = options.menuWidth ?? SESSION_MENU_WIDTH;
+  const menuHeight = options.menuHeight ?? SESSION_MENU_HEIGHT;
+  const margin = options.margin ?? SESSION_MENU_MARGIN;
+  const maxLeft = Math.max(margin, viewportWidth - menuWidth - margin);
+  const preferredLeft = anchorRect.right - menuWidth;
+  const left = Math.min(Math.max(margin, preferredLeft), maxLeft);
+  const belowTop = anchorRect.bottom + margin;
+  const aboveTop = anchorRect.top - menuHeight - margin;
+  const fitsBelow = belowTop + menuHeight <= viewportHeight - margin;
+  const fitsAbove = aboveTop >= margin;
+  const preferredTop = fitsBelow ? belowTop : fitsAbove ? aboveTop : belowTop;
+  const maxTop = Math.max(margin, viewportHeight - menuHeight - margin);
+  const top = Math.min(Math.max(margin, preferredTop), maxTop);
+  return { top: Math.round(top), left: Math.round(left) };
 }
 
 function proposalOperationLabel(item) {
@@ -717,7 +761,7 @@ function CreateCheckForm({
                </fieldset>
                <RubricUploader onUpload={(file) => uploadFile(file)} onInvalidFile={setError} isLoading={uploading || creating} />
              </div>
-             <div className={styles.savedRubricBlock}><div className={styles.existingPickerHead}><div><span>或選擇已保存評分表</span><small>每份來源只能綁定一個檢查；若要重構，請使用「重構」。</small></div></div>{files.length ? <div className={styles.existingList}>{files.map((file) => <label key={file.id} className={selectedFileId === file.id ? styles.existingRowActive : styles.existingRow}><input type="radio" name="saved-rubric" checked={selectedFileId === file.id} onChange={() => setSelectedFileId(file.id)} /><span><b>{file.display_name ?? file.original_filename ?? "未命名評分表"}</b><small>{(file.environment_keys?.length ? file.environment_keys : [file.template_key]).map(getTemplateLabel).join("、")} · {file.analysis_json?.items?.length ?? 0} 項 · {formatDateTime(file.updated_at)}</small></span></label>)}</div> : <p className={styles.mutedText}>尚未有可用的評分表。</p>}</div>
+              <div className={styles.savedRubricBlock}><div className={styles.existingPickerHead}><div><span>或選擇已保存評分表</span><small>每份來源只能綁定一個檢查；若要重構，請使用「重構」。</small></div></div>{files.length ? <div className={styles.existingList}>{files.map((file) => <label key={file.id} className={selectedFileId === file.id ? styles.existingRowActive : styles.existingRow}><input type="radio" name="saved-rubric" checked={selectedFileId === file.id} onChange={() => setSelectedFileId(file.id)} /><span><b>{getRubricDisplayName(file, "未命名評分表")}</b><small>{(file.environment_keys?.length ? file.environment_keys : [file.template_key]).map(getTemplateLabel).join("、")} · {file.analysis_json?.items?.length ?? 0} 項 · {formatDateTime(file.updated_at)}</small></span></label>)}</div> : <p className={styles.mutedText}>尚未有可用的評分表。</p>}</div>
              {conflictFile && <div className={styles.conflictActions} role="alert"><span>「{conflictFile.name}」已存在：</span><button type="button" className={styles.btnSecondary} disabled={uploading || creating} onClick={() => uploadFile(conflictFile, "copy")}>建立副本</button><button type="button" className={styles.btnDanger} disabled={uploading || creating} onClick={() => uploadFile(conflictFile, "overwrite")}>覆蓋原本</button><button type="button" className={styles.iconBtn} aria-label="取消同名處理" onClick={() => setConflictFile(null)}><MIcon name="close" size={16} /></button></div>}
            </div>}
           {error && <p className={styles.dialogError} role="alert">{error}</p>}
@@ -851,13 +895,13 @@ function RubricSourceRail({ classId, judgeSession, readOnly, onSessionUpdated, o
   }
 
   async function download(file) {
-    try { const blob = await AiJudgeService.downloadFile(classId, file.id); downloadBlob(blob, file.original_filename ?? `${file.display_name}.pdf`); }
+    try { const blob = await AiJudgeService.downloadFile(classId, file.id); downloadBlob(blob, file.original_filename ?? `${getRubricDisplayName(file)}.pdf`); }
     catch (error) { toast.error(error?.message ?? "下載評分文件失敗"); }
     finally { setOpenMenuId(null); }
   }
 
   async function remove(file) {
-    if (!window.confirm(`確定刪除「${file.display_name ?? file.original_filename}」？已建立的腳本不會受影響。`)) return;
+    if (!window.confirm(`確定刪除「${getRubricDisplayName(file)}」？已建立的腳本不會受影響。`)) return;
     setBusyId(file.id);
     try {
       await AiJudgeService.deleteFile(classId, file.id);
@@ -885,7 +929,7 @@ function RubricSourceRail({ classId, judgeSession, readOnly, onSessionUpdated, o
       </div>
       {loading ? <p className={styles.mutedText}>載入來源中…</p> : visibleFiles.length > 0 ? (
         <div className={styles.sourceList}>
-          {visibleFiles.map((file) => <div key={file.id} className={`${styles.sourceRow} ${file.id === selectedFileId ? styles.sourceRowSelected : ""}`}><button type="button" className={styles.sourceSelect} disabled={readOnly || busyId === file.id} onClick={() => selectFile(file)}><span className={styles.sourceIndicator} aria-hidden="true"><MIcon name={file.id === selectedFileId ? "radio_button_checked" : "radio_button_unchecked"} size={17} /></span><span className={styles.sourceText}><b>{file.display_name ?? file.original_filename ?? "未命名評分表"}</b><small>{(file.environment_keys?.length ? file.environment_keys : [file.template_key]).map(getTemplateLabel).join("、")} · {file.analysis_json?.items?.length ?? 0} 項 · {formatDateTime(file.updated_at)} · {file.source_type === "created" ? "建立於系統" : "已上傳"}</small>{file.id === selectedFileId && <em>已選用</em>}</span></button>{(file.source_type !== "created" || !readOnly) && <div className={styles.sourceActions}><button type="button" className={styles.iconBtn} aria-label={`管理 ${file.display_name ?? "評分表"}`} title="管理評分表來源" aria-haspopup="menu" aria-expanded={openMenuId === file.id} onClick={(event) => { event.stopPropagation(); setOpenMenuId((current) => current === file.id ? null : file.id); }}><MIcon name="more_vert" size={18} /></button>{openMenuId === file.id && <div className={styles.sourceMenu} role="menu">{file.source_type !== "created" && <button type="button" role="menuitem" onClick={() => download(file)}><MIcon name="download" size={15} />下載原始文件</button>}{!readOnly && <button type="button" role="menuitem" className={styles.menuDanger} disabled={busyId === file.id} onClick={() => remove(file)}><MIcon name="delete" size={15} />刪除來源</button>}</div>}</div>}</div>)}
+           {visibleFiles.map((file) => <div key={file.id} className={`${styles.sourceRow} ${file.id === selectedFileId ? styles.sourceRowSelected : ""}`}><button type="button" className={styles.sourceSelect} disabled={readOnly || busyId === file.id} onClick={() => selectFile(file)}><span className={styles.sourceIndicator} aria-hidden="true"><MIcon name={file.id === selectedFileId ? "radio_button_checked" : "radio_button_unchecked"} size={17} /></span><span className={styles.sourceText}><b>{getRubricDisplayName(file, "未命名評分表")}</b><small>{(file.environment_keys?.length ? file.environment_keys : [file.template_key]).map(getTemplateLabel).join("、")} · {file.analysis_json?.items?.length ?? 0} 項 · {formatDateTime(file.updated_at)} · {file.source_type === "created" ? "建立於系統" : "已上傳"}</small>{file.id === selectedFileId && <em>已選用</em>}</span></button>{(file.source_type !== "created" || !readOnly) && <div className={styles.sourceActions}><button type="button" className={styles.iconBtn} aria-label={`管理 ${getRubricDisplayName(file)}`} title="管理評分表來源" aria-haspopup="menu" aria-expanded={openMenuId === file.id} onClick={(event) => { event.stopPropagation(); setOpenMenuId((current) => current === file.id ? null : file.id); }}><MIcon name="more_vert" size={18} /></button>{openMenuId === file.id && <div className={styles.sourceMenu} role="menu">{file.source_type !== "created" && <button type="button" role="menuitem" onClick={() => download(file)}><MIcon name="download" size={15} />下載原始文件</button>}{!readOnly && <button type="button" role="menuitem" className={styles.menuDanger} disabled={busyId === file.id} onClick={() => remove(file)}><MIcon name="delete" size={15} />刪除來源</button>}</div>}</div>}</div>)}
         </div>
       ) : <div className={styles.sourceEmpty}><MIcon name="description" size={24} /><p>{selectedFileId ? "目前來源已無法使用，請重新選擇。" : "這項檢查尚未選擇評分表來源。"}</p>{!readOnly && <button type="button" className={styles.btnSecondary} onClick={onAddSource}><MIcon name="add" size={15} />新增來源</button>}</div>}
     </aside>
@@ -1008,7 +1052,7 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
     setAnalysis(file.analysis_json);
     setUploadedFileName(file.original_filename || "rubric");
     setSourceFileId(file.id);
-    setRubricName(file.display_name || file.original_filename || "評分表");
+    setRubricName(getRubricDisplayName(file));
     setEnvironmentKeys(file.environment_keys?.length ? file.environment_keys : [file.template_key]);
     analysisRevisionsRef.current.set(file.id, file.analysis_revision);
     setAnalysisTemplateKey(file.template_key);
@@ -1105,7 +1149,7 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
       setAnalysis(response.analysis);
       setUploadedFileName(file.name || "rubric");
       setSourceFileId(uploadedFile.id);
-      setRubricName(uploadedFile.display_name || uploadedFile.original_filename || file.name || "評分表");
+      setRubricName(getRubricDisplayName(uploadedFile, getRubricDisplayName(file)));
       setEnvironmentKeys(uploadedFile.environment_keys?.length ? uploadedFile.environment_keys : [uploadedFile.template_key]);
       analysisRevisionsRef.current.set(uploadedFile.id, uploadedFile.analysis_revision);
       setAnalysisTemplateKey(response.template_key ?? selectedTemplateKey);
@@ -1141,13 +1185,13 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
     setAnalysis(file.analysis_json);
     setUploadedFileName(file.original_filename || "rubric");
     setSourceFileId(file.id);
-    setRubricName(file.display_name || file.original_filename || "評分表");
+    setRubricName(getRubricDisplayName(file));
     setEnvironmentKeys(file.environment_keys?.length ? file.environment_keys : [file.template_key]);
     analysisRevisionsRef.current.set(file.id, file.analysis_revision);
     setAnalysisTemplateKey(file.template_key);
     setSelectedTemplateKey(file.template_key);
     if (!judgeSession?.id) setMessages([]);
-    toast.success(`已載入「${file.display_name ?? file.original_filename ?? "評分表"}」`);
+    toast.success(`已載入「${getRubricDisplayName(file)}」`);
   }
 
   async function handleDownloadFile(file) {
@@ -1460,7 +1504,7 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
                   onClick={() => handleSelectFile(file)}
                   disabled={readOnly}
                 >
-                  <span className={styles.fileName}>{file.display_name ?? file.original_filename ?? "未命名評分表"}</span>
+                  <span className={styles.fileName}>{getRubricDisplayName(file, "未命名評分表")}</span>
                   <span className={styles.fileMeta}>
                     {getTemplateLabel(file.template_key)} · {formatDateTime(file.updated_at)}
                     {file.status === "replaced" ? " · 已取代" : ""}
@@ -2653,8 +2697,6 @@ function LegacyAiJudgePanel({ classId, members }) {
                   onClick={() => setActiveSessionId(item.id)}
                 >
                   <strong>{item.title}</strong>
-                  <span>{item.template_key ? getTemplateLabel(item.template_key) : "尚未選評分表"}</span>
-                  <small>{formatDateTime(item.last_activity_at)}</small>
                 </button>
               ))
             )}
@@ -2806,6 +2848,7 @@ function TeacherWorkspacePanel({ classId, members }) {
   const [createOpen, setCreateOpen] = useState(false);
   const [sourceOnly, setSourceOnly] = useState(false);
   const [openMenuId, setOpenMenuId] = useState(null);
+  const [sessionMenuPosition, setSessionMenuPosition] = useState(null);
   const [busySessionIds, setBusySessionIds] = useState(() => new Set());
   const [renameTarget, setRenameTarget] = useState(null);
   const [renameTitle, setRenameTitle] = useState("");
@@ -2813,10 +2856,18 @@ function TeacherWorkspacePanel({ classId, members }) {
   const [deleting, setDeleting] = useState(false);
   const requestVersionRef = useRef(0);
   const classIdRef = useRef(classId);
+  const closeSessionMenu = useCallback(() => {
+    setOpenMenuId(null);
+    setSessionMenuPosition(null);
+  }, []);
 
   const activeSession = useMemo(
     () => sessions.find((item) => item.id === activeSessionId) ?? null,
     [activeSessionId, sessions],
+  );
+  const openSessionMenuItem = useMemo(
+    () => sessions.find((item) => item.id === openMenuId) ?? null,
+    [openMenuId, sessions],
   );
 
   const loadSessions = useCallback(async () => {
@@ -2851,29 +2902,35 @@ function TeacherWorkspacePanel({ classId, members }) {
     setRenameTarget(null);
     setDeleteTarget(null);
     setActiveSessionId(null);
-    setOpenMenuId(null);
+    closeSessionMenu();
     loadSessions();
     return () => { requestVersionRef.current += 1; };
-  }, [loadSessions]);
+  }, [closeSessionMenu, loadSessions]);
 
   useEffect(() => {
-    setOpenMenuId(null);
-  }, [activeSessionId, statusFilter]);
+    closeSessionMenu();
+  }, [activeSessionId, closeSessionMenu, statusFilter]);
 
   useEffect(() => {
     if (!openMenuId) return undefined;
     const menuId = `check-menu-${openMenuId}`;
+    function updateMenuPosition() {
+      const trigger = document.querySelector(`[aria-controls="${menuId}"]`);
+      if (!(trigger instanceof HTMLElement)) return;
+      setSessionMenuPosition(getSessionMenuPosition(trigger.getBoundingClientRect()));
+    }
+    updateMenuPosition();
     const focusTimer = window.setTimeout(() => {
       document.getElementById(menuId)?.querySelector('[role="menuitem"]:not(:disabled)')?.focus();
     }, 0);
     function closeMenuOnOutsideClick(event) {
       const target = event.target;
       if (target instanceof Element && (target.closest(`#${menuId}`) || target.closest(`[aria-controls="${menuId}"]`))) return;
-      setOpenMenuId(null);
+      closeSessionMenu();
     }
     function navigateMenu(event) {
       if (event.key === "Escape") {
-        setOpenMenuId(null);
+        closeSessionMenu();
         return;
       }
       if (!event.key || !["ArrowDown", "ArrowUp"].includes(event.key)) return;
@@ -2889,16 +2946,20 @@ function TeacherWorkspacePanel({ classId, members }) {
     }
     document.addEventListener("mousedown", closeMenuOnOutsideClick);
     document.addEventListener("keydown", navigateMenu);
+    window.addEventListener("resize", updateMenuPosition);
+    window.addEventListener("scroll", updateMenuPosition, true);
     return () => {
       window.clearTimeout(focusTimer);
       document.removeEventListener("mousedown", closeMenuOnOutsideClick);
       document.removeEventListener("keydown", navigateMenu);
+      window.removeEventListener("resize", updateMenuPosition);
+      window.removeEventListener("scroll", updateMenuPosition, true);
       const active = document.activeElement;
       if (active instanceof HTMLElement && active.closest(`#${menuId}`)) {
         document.querySelector(`[aria-controls="${menuId}"]`)?.focus();
       }
     };
-  }, [openMenuId]);
+  }, [closeSessionMenu, openMenuId]);
 
   function updateSessionInList(updated) {
     if (classIdRef.current !== classId) return;
@@ -2920,7 +2981,7 @@ function TeacherWorkspacePanel({ classId, members }) {
          .then((updated) => {
            if (classIdRef.current !== requestClassId) return;
            updateSessionInList(updated);
-           toast.success(`已選用「${created.display_name ?? created.original_filename ?? "評分表"}」。`);
+           toast.success(`已選用「${getRubricDisplayName(created)}」。`);
          })
         .catch((error) => {
           if (classIdRef.current === requestClassId) {
@@ -2941,7 +3002,7 @@ function TeacherWorkspacePanel({ classId, members }) {
     if (!item || busySessionIds.has(item.id)) return;
     const requestClassId = classId;
     setBusySessionIds((current) => new Set(current).add(item.id));
-    setOpenMenuId(null);
+    closeSessionMenu();
     try {
       const updated = await action(item);
       if (classIdRef.current !== requestClassId) return null;
@@ -3022,6 +3083,39 @@ function TeacherWorkspacePanel({ classId, members }) {
     }
   }
 
+  function toggleSessionMenu(event, sessionId) {
+    event.stopPropagation();
+    if (openMenuId === sessionId) {
+      closeSessionMenu();
+      return;
+    }
+    setSessionMenuPosition(getSessionMenuPosition(event.currentTarget.getBoundingClientRect()));
+    setOpenMenuId(sessionId);
+  }
+
+  function renderSessionMenu(item) {
+    if (!item || !sessionMenuPosition) return null;
+    const busy = busySessionIds.has(item.id);
+    return (
+      <div
+        id={`check-menu-${item.id}`}
+        className={styles.sessionMenu}
+        role="menu"
+        aria-label={`「${item.title}」更多功能`}
+        style={{ top: `${sessionMenuPosition.top}px`, left: `${sessionMenuPosition.left}px` }}
+      >
+        {item.status === "active" && <>
+          <button type="button" role="menuitem" disabled={busy} onClick={() => { setRenameTarget(item); setRenameTitle(item.title); closeSessionMenu(); }}><MIcon name="edit" size={16} />重新命名</button>
+          <button type="button" role="menuitem" disabled={busy} onClick={() => pinSession(item)}><MIcon name="push_pin" filled={Boolean(item.pinned_at)} size={16} />{item.pinned_at ? "取消釘選" : "釘選"}</button>
+        </>}
+        <button type="button" role="menuitem" disabled={busy} onClick={() => forkSession(item)}><MIcon name="fork_right" size={16} />重構</button>
+        <span className={styles.menuSeparator} />
+        {item.status === "active" ? <button type="button" role="menuitem" disabled={busy} onClick={() => archiveSession(item)}><MIcon name="archive" size={16} />封存</button> : <button type="button" role="menuitem" disabled={busy} onClick={() => restoreSession(item)}><MIcon name="unarchive" size={16} />還原至進行中</button>}
+        <button type="button" role="menuitem" className={styles.menuDanger} disabled={busy} onClick={() => { setDeleteTarget(item); closeSessionMenu(); }}><MIcon name="delete" size={16} />刪除</button>
+      </div>
+    );
+  }
+
   return (
     <div className={styles.panel}>
       <div className={styles.panelHeading}>
@@ -3041,24 +3135,12 @@ function TeacherWorkspacePanel({ classId, members }) {
                const busy = busySessionIds.has(item.id);
                return (
                  <div key={item.id} className={`${styles.sessionRow} ${selected ? styles.sessionRowActive : ""}`} role="listitem">
-                   <button type="button" className={selected ? styles.sessionItemActive : styles.sessionItem} aria-current={selected ? "true" : undefined} onClick={() => { setCreationView(null); setActiveSessionId(item.id); setOpenMenuId(null); }}>
+                   <button type="button" className={selected ? styles.sessionItemActive : styles.sessionItem} aria-current={selected ? "true" : undefined} onClick={() => { setCreationView(null); setActiveSessionId(item.id); closeSessionMenu(); }}>
                      <strong>{item.title}</strong>
-                     <span>{item.selected_file_item_count === 0 ? "尚未新增評估項目" : item.selected_file_name ?? "尚未選擇評分表"} · {item.message_count ?? 0} 對話</span>
-                     <small>{formatDateTime(item.last_activity_at)}</small>
                    </button>
                    <div className={styles.sessionRowActions}>
                      {statusFilter === "active" && <button type="button" className={`${styles.iconBtn} ${item.pinned_at ? styles.pinActive : ""}`} aria-label={item.pinned_at ? `取消釘選「${item.title}」` : `釘選「${item.title}」`} aria-pressed={Boolean(item.pinned_at)} title={item.pinned_at ? "取消釘選" : "釘選"} disabled={busy} onClick={(event) => { event.stopPropagation(); pinSession(item); }}><MIcon name="push_pin" filled={Boolean(item.pinned_at)} size={17} /></button>}
-                     <button type="button" className={styles.iconBtn} aria-label={`更多「${item.title}」功能`} title="更多功能" aria-haspopup="menu" aria-expanded={openMenuId === item.id} aria-controls={`check-menu-${item.id}`} disabled={busy} onClick={(event) => { event.stopPropagation(); setOpenMenuId((current) => current === item.id ? null : item.id); }}><MIcon name="more_vert" size={18} /></button>
-                     {openMenuId === item.id && <div id={`check-menu-${item.id}`} className={styles.sessionMenu} role="menu">
-                       {item.status === "active" && <>
-                         <button type="button" role="menuitem" disabled={busy} onClick={() => { setRenameTarget(item); setRenameTitle(item.title); setOpenMenuId(null); }}>重新命名</button>
-                         <button type="button" role="menuitem" disabled={busy} onClick={() => pinSession(item)}>{item.pinned_at ? "取消釘選" : "釘選"}</button>
-                       </>}
-                       <button type="button" role="menuitem" disabled={busy} onClick={() => forkSession(item)}><MIcon name="fork_right" size={15} />重構</button>
-                       <span className={styles.menuSeparator} />
-                       {item.status === "active" ? <button type="button" role="menuitem" disabled={busy} onClick={() => archiveSession(item)}><MIcon name="archive" size={15} />封存</button> : <button type="button" role="menuitem" disabled={busy} onClick={() => restoreSession(item)}><MIcon name="unarchive" size={15} />還原至進行中</button>}
-                       <button type="button" role="menuitem" className={styles.menuDanger} disabled={busy} onClick={() => { setDeleteTarget(item); setOpenMenuId(null); }}>刪除</button>
-                     </div>}
+                     <button type="button" className={styles.iconBtn} aria-label={`更多「${item.title}」功能`} title="更多功能" aria-haspopup="menu" aria-expanded={openMenuId === item.id} aria-controls={`check-menu-${item.id}`} disabled={busy} onClick={(event) => toggleSessionMenu(event, item.id)}><MIcon name="more_vert" size={18} /></button>
                    </div>
                  </div>
                );
@@ -3068,7 +3150,7 @@ function TeacherWorkspacePanel({ classId, members }) {
 
         <section className={styles.sessionMain}>
           {creationView === "choose" ? <CreateCheckChooser onChoose={handleCreationChoice} onCancel={() => setCreationView(null)} /> : creationView ? <CreateCheckForm key={creationView} classId={classId} embedded initialMode={creationView} onClose={() => setCreationView("choose")} onCreated={handleCreated} /> : !activeSession ? <div className={styles.card}><div className={styles.mainEmpty}><MIcon name="checklist" size={30} /><p>{statusFilter === "active" ? "請從左側選擇一項檢查，或新增檢查。" : "請選擇已封存的檢查查看內容與結果。"}</p><button type="button" className={styles.btnPrimary} onClick={() => statusFilter === "active" ? (setSourceOnly(false), setCreationView("choose")) : setStatusFilter("active")}>{statusFilter === "active" ? "新增檢查" : "查看進行中"}</button></div></div> : <>
-            <div className={styles.sessionHeader}><div><h3>{activeSession.title}</h3><p>{activeSession.selected_file_name ?? "尚未選擇評分表"} · 對話 {activeSession.message_count ?? 0} · 腳本 {activeSession.script_count ?? 0} · 執行 {activeSession.run_count ?? 0}</p></div>{activeSession.status === "archived" && <span className={styles.archivedNotice}><MIcon name="lock" size={14} />這項檢查已封存，只能查看或複製</span>}</div>
+            <div className={styles.sessionHeader}><div><h3>{activeSession.title}</h3><p>{getRubricDisplayName(activeSession.selected_file_name, "尚未選擇評分表")} · 對話 {activeSession.message_count ?? 0} · 腳本 {activeSession.script_count ?? 0} · 執行 {activeSession.run_count ?? 0}</p></div>{activeSession.status === "archived" && <span className={styles.archivedNotice}><MIcon name="lock" size={14} />這項檢查已封存，只能查看或複製</span>}</div>
             <div className={styles.subTabs} role="tablist" aria-label="檢查工作頁籤">{TEACHER_JUDGE_TABS.map((tab) => <button key={tab.key} type="button" role="tab" aria-selected={activeTab === tab.key} className={activeTab === tab.key ? styles.subTabActive : styles.subTab} onClick={() => setActiveTab(tab.key)}><MIcon name={tab.icon} size={16} />{tab.label}</button>)}</div>
             {activeTab === "rubrics" && <RubricsTab key={activeSession.id} classId={classId} judgeSession={activeSession} onSessionUpdated={updateSessionInList} onAddSource={() => { setSourceOnly(true); setCreateOpen(true); }} onScriptCreated={() => { loadSessions(); setActiveTab("scripts"); }} showFileLibrary={false} />}
             {activeTab === "scripts" && <ScriptsTab classId={classId} sessionId={activeSession.id} readOnly={activeSession.status === "archived"} onScriptApproved={() => setActiveTab("execution")} />}
@@ -3076,6 +3158,8 @@ function TeacherWorkspacePanel({ classId, members }) {
           </>}
         </section>
       </div>
+
+      {typeof document !== "undefined" && openSessionMenuItem && sessionMenuPosition && createPortal(renderSessionMenu(openSessionMenuItem), document.body)}
 
       {createOpen && <CreateCheckForm classId={classId} sourceOnly={sourceOnly} onClose={() => { setCreateOpen(false); setSourceOnly(false); }} onCreated={handleCreated} />}
        {renameTarget && <div className={styles.modalOverlay} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setRenameTarget(null); }}><form className={`${styles.confirm} ${styles.renameDialog}`} role="dialog" aria-modal="true" aria-labelledby="rename-check-title" onSubmit={renameSession}><div className={styles.modalHeader}><h2 id="rename-check-title">重新命名檢查</h2><button type="button" className={styles.iconBtn} aria-label="關閉" onClick={() => setRenameTarget(null)}><MIcon name="close" size={18} /></button></div><label className={styles.dialogField}><span>檢查名稱</span><input autoFocus value={renameTitle} maxLength={255} onChange={(event) => setRenameTitle(event.target.value)} /></label><div className={styles.modalActions}><button type="button" className={styles.btnSecondary} onClick={() => setRenameTarget(null)}>取消</button><button type="submit" className={styles.btnPrimary} disabled={!renameTitle.trim() || busySessionIds.has(renameTarget.id)}>儲存</button></div></form></div>}
