@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import logging
-import re
 from time import perf_counter
 from typing import Any, Literal, cast
 
@@ -36,30 +35,175 @@ from app.models.teacher_judge_template_command import TeacherJudgeTemplateComman
 
 logger = logging.getLogger(__name__)
 
-_PYTHON_ENTRYPOINT_PATTERN = re.compile(r"\b[\w.-]+\.py\b", re.IGNORECASE)
-_PYTHON_EXECUTION_INTENT_PATTERN = re.compile(
-    r"報錯|錯誤|例外|執行|啟動|運行|error|exception|traceback|stderr|exit\s+code",
-    re.IGNORECASE,
+_PYTHON_EXECUTION_INTENT_KEYWORDS = (
+    "報錯",
+    "錯誤",
+    "例外",
+    "執行",
+    "啟動",
+    "運行",
+    "error",
+    "exception",
+    "traceback",
+    "stderr",
 )
-_PYTHON_COMMAND_PATTERN = re.compile(
-    r"\b(?:uv\s+run\s+)?python(?:3(?:\.\d+)?)?\s+[^\r\n]*?\b[\w.-]+\.py\b",
-    re.IGNORECASE,
-)
-_WORKING_DIRECTORY_PATTERN = re.compile(
-    r"(?:cwd|工作目錄)\s*(?:=|:|：|為|是)\s*"
-    r"(?:[A-Za-z]:[\\/][^\s，。；]+|/[^\s，。；]+|\.\.?[\\/][^\s，。；]*|\.)",
-    re.IGNORECASE,
-)
-_EXIT_CRITERIA_PATTERN = re.compile(
-    r"exit\s+code\s*(?:為|是|=|:|：)?\s*0|return\s*code\s*(?:為|是|=|:|：)?\s*0|"
-    r"正常結束|未捕捉例外|沒有(?:報錯|錯誤|例外)|無(?:報錯|錯誤|例外)",
-    re.IGNORECASE,
-)
-_LONG_RUNNING_CRITERIA_PATTERN = re.compile(
-    r"(?:常駐|持續執行|不會結束).{0,30}(?:timeout|逾時|秒|分鐘|連接埠|port)|"
-    r"(?:timeout|逾時|秒|分鐘|連接埠|port).{0,30}(?:常駐|持續執行|不會結束)",
-    re.IGNORECASE,
-)
+_EXIT_CRITERIA_MARKERS = ("exit code", "return code", "returncode")
+_LONG_RUNNING_TERMS = ("常駐", "持續執行", "不會結束")
+_LONG_RUNNING_SIGNALS = ("timeout", "逾時", "秒", "分鐘", "連接埠", "port")
+
+
+def _normalize_for_matching(text: str) -> str:
+    """Collapse user-provided whitespace before literal matching."""
+    return " ".join(text.casefold().split())
+
+
+def _is_word_character(character: str) -> bool:
+    return character.isalnum() or character == "_"
+
+
+def _contains_python_filename(text: str) -> bool:
+    """Find a ``*.py`` filename without backtracking over user input."""
+    folded = text.casefold()
+    filename_candidate_start: int | None = None
+    for index, character in enumerate(folded):
+        if _is_word_character(character) or character in ".-":
+            previous = folded[index - 1] if index else ""
+            if _is_word_character(character) and (
+                index == 0 or not _is_word_character(previous)
+            ):
+                filename_candidate_start = index
+        else:
+            filename_candidate_start = None
+
+        if not folded.startswith(".py", index) or filename_candidate_start is None:
+            continue
+        if filename_candidate_start >= index:
+            continue
+
+        after = index + len(".py")
+        after_is_boundary = after >= len(folded) or not _is_word_character(
+            folded[after]
+        )
+        if after_is_boundary:
+            return True
+
+    return False
+
+
+def _is_python_interpreter(token: str) -> bool:
+    token = token.lstrip("'\"`()[]{}<>")
+    executable = token.replace("\\", "/").rsplit("/", 1)[-1].casefold()
+    if executable == "python":
+        return True
+    if not executable.startswith("python3"):
+        return False
+
+    suffix = executable[len("python3") :]
+    return not suffix or (suffix.startswith(".") and suffix[1:].isdigit())
+
+
+def _has_python_command(text: str) -> bool:
+    """Check for a Python interpreter followed by a script on the same line."""
+    for line in text.splitlines():
+        tokens = line.split()
+        interpreter_seen = False
+        for token in tokens:
+            if _is_python_interpreter(token):
+                interpreter_seen = True
+            elif interpreter_seen and _contains_python_filename(token):
+                return True
+    return False
+
+
+def _is_working_directory_path(value: str) -> bool:
+    if len(value) > 3 and value[0].isalpha() and value[1] == ":" and value[2] in "\\/":
+        return True
+    if value.startswith("/"):
+        return len(value) > 1
+    if value.startswith(("./", ".\\", "../", "..\\")):
+        return True
+    return value == "."
+
+
+def _has_working_directory(text: str) -> bool:
+    for line in text.splitlines():
+        folded = line.casefold()
+        for label in ("cwd", "工作目錄"):
+            search_from = 0
+            while True:
+                label_start = folded.find(label, search_from)
+                if label_start < 0:
+                    break
+
+                value = line[label_start + len(label) :].lstrip()
+                while value and value[0] in "=:：為是":
+                    value = value[1:].lstrip()
+                for delimiter in ("，", "。", "；"):
+                    value = value.split(delimiter, 1)[0]
+                value_parts = value.split(None, 1)
+                value = value_parts[0] if value_parts else ""
+                if _is_working_directory_path(value):
+                    return True
+                search_from = label_start + len(label)
+    return False
+
+
+def _has_exit_criteria(text: str) -> bool:
+    normalized = _normalize_for_matching(text)
+    for marker in _EXIT_CRITERIA_MARKERS:
+        search_from = 0
+        while True:
+            marker_start = normalized.find(marker, search_from)
+            if marker_start < 0:
+                break
+            value = normalized[marker_start + len(marker) :].lstrip(" =:：為是")
+            if value.startswith("0"):
+                return True
+            search_from = marker_start + len(marker)
+
+    return any(
+        phrase in normalized
+        for phrase in (
+            "正常結束",
+            "未捕捉例外",
+            "沒有報錯",
+            "沒有錯誤",
+            "沒有例外",
+            "無報錯",
+            "無錯誤",
+            "無例外",
+        )
+    )
+
+
+def _has_terms_within_distance(
+    text: str,
+    first_terms: tuple[str, ...],
+    second_terms: tuple[str, ...],
+) -> bool:
+    folded = text.casefold()
+    for first in first_terms:
+        search_from = 0
+        while True:
+            first_start = folded.find(first, search_from)
+            if first_start < 0:
+                break
+            window_start = first_start + len(first)
+            window = folded[
+                window_start : window_start + 30 + max(map(len, second_terms))
+            ]
+            if any(second in window for second in second_terms):
+                return True
+            search_from = window_start
+    return False
+
+
+def _has_long_running_criteria(text: str) -> bool:
+    return any(
+        _has_terms_within_distance(line, _LONG_RUNNING_TERMS, _LONG_RUNNING_SIGNALS)
+        or _has_terms_within_distance(line, _LONG_RUNNING_SIGNALS, _LONG_RUNNING_TERMS)
+        for line in text.splitlines()
+    )
 
 
 async def close_http_client() -> None:
@@ -68,20 +212,18 @@ async def close_http_client() -> None:
 
 
 def _is_python_entrypoint_execution_check(text: str) -> bool:
-    return bool(
-        _PYTHON_ENTRYPOINT_PATTERN.search(text)
-        and _PYTHON_EXECUTION_INTENT_PATTERN.search(text)
+    normalized = _normalize_for_matching(text)
+    return _contains_python_filename(text) and (
+        any(keyword in normalized for keyword in _PYTHON_EXECUTION_INTENT_KEYWORDS)
+        or "exit code" in normalized
     )
 
 
 def _has_complete_python_execution_contract(text: str) -> bool:
     return bool(
-        _PYTHON_COMMAND_PATTERN.search(text)
-        and _WORKING_DIRECTORY_PATTERN.search(text)
-        and (
-            _EXIT_CRITERIA_PATTERN.search(text)
-            or _LONG_RUNNING_CRITERIA_PATTERN.search(text)
-        )
+        _has_python_command(text)
+        and _has_working_directory(text)
+        and (_has_exit_criteria(text) or _has_long_running_criteria(text))
     )
 
 

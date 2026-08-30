@@ -448,6 +448,30 @@ def test_normalize_main_py_is_auto_with_explicit_contract() -> None:
     assert "stdout" in (items[0].detection_method or "")
 
 
+def test_python_contract_handles_repeated_whitespace_and_returncode() -> None:
+    text = (
+        "python3 main.py\n"
+        "cwd = /srv/submission\n"
+        f"returncode{' ' * 10_000}0"
+    )
+
+    assert teacher_judge_service._has_complete_python_execution_contract(text)
+
+
+def test_python_contract_rejects_interpreter_with_no_script() -> None:
+    text = "python3" + (" " * 10_000) + "--version"
+
+    assert not teacher_judge_service._has_complete_python_execution_contract(text)
+
+
+def test_python_contract_accepts_bounded_long_running_criteria() -> None:
+    text = "python3 main.py\ncwd = /srv/submission\n" + "常駐" + (
+        "x" * 30
+    ) + "timeout"
+
+    assert teacher_judge_service._has_complete_python_execution_contract(text)
+
+
 def test_normalize_python_code_quality_stays_manual() -> None:
     items = teacher_judge_service._normalize_rubric_items(
         [{"title": "評估 main.py 的架構品質", "detectable": "manual"}],
