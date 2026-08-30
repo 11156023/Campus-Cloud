@@ -47,16 +47,41 @@ describe('AI PVE template UI contract', () => {
     });
   });
 
-  test('target validation rejects duplicate or incomplete VMIDs', () => {
+  test('target validation supports optional slots and rejects invalid VMIDs', () => {
     expect(validateTargets([
       { vmid: '102', template_key: 'n8n' },
       { vmid: '102', template_key: 'python' },
       { vmid: '', template_key: '' },
-    ]).error).toBe('每個 VMID 必須是大於零的整數。');
+    ]).error).toBe('已填入的 VMID 不得重複。');
     expect(validateTargets([
       { vmid: '102', template_key: 'n8n' },
       { vmid: '107', template_key: 'python' },
-    ]).error).toBe('請填寫 3 台測試機器。');
+      { vmid: '', template_key: '' },
+    ])).toEqual({
+      targets: [
+        { vmid: 102, template_key: 'n8n' },
+        { vmid: 107, template_key: 'python' },
+      ],
+      error: null,
+    });
+    expect(validateTargets([
+      { vmid: '', template_key: '' },
+      { vmid: '', template_key: '' },
+      { vmid: '', template_key: '' },
+    ]).error).toBe('至少填寫 1 台測試機器。');
+    expect(validateTargets([
+      { vmid: '102', template_key: '' },
+      { vmid: '', template_key: '' },
+      { vmid: '', template_key: '' },
+    ]).error).toBe('每台機器都必須選擇 AI 機器模板。');
+    expect(validateTargets([
+      { vmid: '102', template_key: 'n8n' },
+      { vmid: '', template_key: 'python' },
+      { vmid: '', template_key: '' },
+    ])).toEqual({
+      targets: [{ vmid: 102, template_key: 'n8n' }],
+      error: null,
+    });
   });
 
   test('tool calls are grouped by their target VMID', () => {

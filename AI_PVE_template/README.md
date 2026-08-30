@@ -4,28 +4,33 @@
 `/api/v1/ai/pve-template/*` API，不保存資料庫、SSH key、AI key、token 或 raw
 輸出；token 只存在目前瀏覽器頁面的記憶體中。
 
-目前測試頁一次測試三台機器。每台都要填入 VMID 並選擇一個 AI 機器模板；模板會直接
+目前測試頁最多同時測試三台機器。填入 VMID 的槽位才會啟用；空白槽位會被忽略，因此
+可以只測單台或雙台。每個已填入的 VMID 都要選擇一個 AI 機器模板；模板會直接
 帶入 AI 的角色與診斷方向。這裡的模板不是 Proxmox 建機映像，也不代表已驗證 CPU、RAM、
 Disk、OS 或服務狀態。
 
 ## 啟動
 
 1. 先啟動 Campus backend，並確認資料庫已套用 `aipve01_ai_pve_templates`。
-2. 在此資料夾啟動本機 HTTP server（ES module 需要 HTTP origin）：
+2. 在此資料夾啟動支援熱重載的本機 HTTP server（ES module 需要 HTTP origin）：
 
    ```powershell
-   python -m http.server 8088
+   # 若 18088 已被舊 server 使用，先在舊 server 視窗按 Ctrl+C
+   python dev_server.py --port 18088
    ```
 
-3. 填入 backend API base（預設 `http://localhost:18200/api/v1`）與目前 access token。
-4. 載入模板，填入三個測試 VMID 並為每台選擇機器模板；後端仍會重新驗證使用者與完整 VMID scope。
+   修改 `index.html`、`app.js`、`ui.js` 或其他測試頁檔案後，瀏覽器會自動重新載入。
+   若只需要純靜態服務，仍可使用 `python -m http.server 18088`，但不會自動刷新頁面。
 
-流程是「填三個 VMID／選三個模板 → 輸入任務 → 觀察 tool call → 若為未知／自訂 SSH 指令則確認 →
+3. 填入 backend API base（預設 `http://localhost:18200/api/v1`）與目前 access token。
+4. 載入模板，填入一至三個測試 VMID，並為每台已填入的機器選擇模板；後端仍會重新驗證使用者與完整 VMID scope。
+
+流程是「填一至三個 VMID／選對應模板 → 輸入任務 → 觀察 tool call → 若為未知／自訂 SSH 指令則確認 →
 顯示 exit code/stdout/stderr → 由 AI 產生下一步」。頁面不使用 `localStorage` 或
 `sessionStorage`。
 
-初始請求只把三台選取的模板帶入 prompt，不會額外抓取 PVE 或 SSH 規格。使用者明確要求
-guest 內資料時，AI 才能對本次三個 VMID 使用受控 `ssh_exec`；每台會依自己的模板套用
+初始請求只把已填入機器所選的模板帶入 prompt，不會額外抓取 PVE 或 SSH 規格。使用者明確要求
+guest 內資料時，AI 才能對本次一至三個 VMID 使用受控 `ssh_exec`；每台會依自己的模板套用
 唯讀 command policy。
 
 ## 從網頁 F12 取得 Access token

@@ -121,7 +121,10 @@ $('loadTemplates').onclick = () => withLoading('正在載入可用的 AI 模板�
   const templates = await request('/ai/pve-template/templates');
   state.templates = templates;
   targetNodes().forEach(({ template }) => {
-    template.replaceChildren(...templates.map((item) => {
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = '請選擇模板（填 VMID 才啟用）';
+    template.replaceChildren(placeholder, ...templates.map((item) => {
       const option = document.createElement('option');
       option.value = item.template_key;
       option.textContent = `${item.display_name} — ${item.description}`;

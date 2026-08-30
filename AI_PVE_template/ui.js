@@ -14,14 +14,24 @@ export function findPendingTool(data) {
   return (data?.tools_called || []).find((tool) => tool?.result?.pending) || null;
 }
 
-export function validateTargets(rawTargets, requiredCount = 3) {
-  const targets = (rawTargets || []).map((target) => ({
-    vmid: Number(String(target?.vmid ?? '').trim()),
+export function validateTargets(rawTargets, maxCount = 3) {
+  const rows = (rawTargets || []).map((target) => ({
+    vmidText: String(target?.vmid ?? '').trim(),
     template_key: String(target?.template_key ?? '').trim(),
   }));
-  if (targets.length !== requiredCount) {
-    return { targets, error: `請填寫 ${requiredCount} 台測試機器。` };
+  // A slot is enabled by its VMID. A template left selected in an otherwise
+  // blank row must not turn that optional row into an invalid target.
+  const activeRows = rows.filter((row) => row.vmidText);
+  if (!activeRows.length) {
+    return { targets: [], error: '至少填寫 1 台測試機器。' };
   }
+  if (activeRows.length > maxCount) {
+    return { targets: [], error: `最多只能測試 ${maxCount} 台機器。` };
+  }
+  const targets = activeRows.map((row) => ({
+    vmid: Number(row.vmidText),
+    template_key: row.template_key,
+  }));
   if (targets.some((target) => !Number.isInteger(target.vmid) || target.vmid < 1)) {
     return { targets, error: '每個 VMID 必須是大於零的整數。' };
   }
@@ -29,7 +39,7 @@ export function validateTargets(rawTargets, requiredCount = 3) {
     return { targets, error: '每台機器都必須選擇 AI 機器模板。' };
   }
   if (new Set(targets.map((target) => target.vmid)).size !== targets.length) {
-    return { targets, error: '三個 VMID 不得重複。' };
+    return { targets, error: '已填入的 VMID 不得重複。' };
   }
   return { targets, error: null };
 }

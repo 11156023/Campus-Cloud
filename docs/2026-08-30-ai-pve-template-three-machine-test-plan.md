@@ -4,13 +4,13 @@
 | --- | --- |
 | 文件日期 | 2026-08-30（Asia/Taipei） |
 | 適用範圍 | `AI_PVE_template/` 隔離測試頁與 `/api/v1/ai/pve-template/*` |
-| 目標 | 一次輸入三個 VMID，逐台選擇 AI 機器模板，讓 AI 在同一段對話中辨識三台角色並受控使用 SSH |
+| 目標 | 一次輸入一至三個 VMID，逐台選擇 AI 機器模板，讓 AI 在同一段對話中辨識各台角色並受控使用 SSH |
 | 本次限制 | 初始上下文只使用使用者選取的模板，不額外抓取 PVE、SSH 或 guest 規格 |
 | 不在本次範圍 | 正式 `/ai-pve` 管理頁、Proxmox 建機模板、自動辨識模板、真實硬體規格同步、資料庫 migration |
 
 ## 1. 決策摘要
 
-測試版採用「三個固定目標槽位，每個槽位各自選擇一個 AI 機器角色模板」：
+測試版採用「三個固定目標槽位，每個槽位各自選擇一個 AI 機器角色模板；空白槽位不送出」：
 
 ```text
 機器 1：VMID + AI 機器模板
@@ -123,9 +123,9 @@ prompt。AI 因此在第一次推理前就知道三個目標及各自的模板�
 
 ### 4.2 送出前驗證
 
-- 三個 VMID 都必須存在且為大於零的整數。
-- 三個 VMID 不得重複。
-- 每台都必須選擇一個已載入模板。
+- 已填入的 VMID 必須為大於零的整數；完全空白的槽位會被忽略。
+- 已填入的 VMID 不得重複。
+- 每個已填入 VMID 的槽位都必須選擇一個已載入模板。
 - Access token、API base 與 message 沿用現有檢查。
 - 正在送出或等待 SSH 確認時，鎖定 VMID、模板與訊息輸入。
 - VMID 或模板變更時清除既有 `state.messages`，避免舊目標的 tool result 混入新對話。
@@ -179,8 +179,8 @@ class AIPVETemplateChatRequest(BaseModel):
     messages: list[dict[str, Any]] | None = Field(default=None, max_length=40)
 ```
 
-API 允許一至三台，隔離測試頁則要求三個槽位全部填寫。這樣可保留 focused 單機測試，
-也不需要同時保留頂層 `vmid`／`template_key` 相容欄位。
+API 與隔離測試頁都允許一至三台；頁面只會送出已填入的槽位，未填槽位直接忽略。這樣可
+用同一入口測單機、雙機或三機，也不需要同時保留頂層 `vmid`／`template_key` 相容欄位。
 
 ### 5.2 Response
 
@@ -445,8 +445,8 @@ class _PendingContext:
 
 ### 11.2 Frontend focused tests
 
-- 三個 VMID 與三個模板可建立正確 `targets` payload。
-- 空值、非整數、零、負數與 duplicate VMID 不可送出。
+- 一至三個已填 VMID 與對應模板可建立正確 `targets` payload；空白槽位不送出。
+- 已填 VMID 的非整數、零、負數與 duplicate VMID 不可送出。
 - 切換任一 VMID／模板會清除舊 history。
 - pending 時所有 target 欄位鎖定。
 - confirmation 顯示正確 VMID、reason 與 command。
