@@ -6,6 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 from fastapi import HTTPException
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, SQLModel, create_engine, select
 
 from app.ai.teacher_judge import file_service, session_service
@@ -69,6 +70,50 @@ def test_archived_session_is_read_only() -> None:
     assert exc_info.value.status_code == 409
 
 
+def test_clear_messages_keeps_session(monkeypatch: pytest.MonkeyPatch) -> None:
+    db = _session()
+    class_id = uuid.uuid4()
+    item = TeacherJudgeSession(
+        teaching_class_id=class_id,
+        title="Clear chat",
+        summary="過時摘要",
+    )
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    db.add_all(
+        [
+            TeacherJudgeSessionMessage(
+                session_id=item.id,
+                role=TeacherJudgeMessageRole.user,
+                content="問題",
+            ),
+            TeacherJudgeSessionMessage(
+                session_id=item.id,
+                role=TeacherJudgeMessageRole.assistant,
+                content="回答",
+            ),
+        ]
+    )
+    db.commit()
+    monkeypatch.setattr(teacher_judge_sessions, "_access", lambda *args: None)
+
+    result = teacher_judge_sessions.clear_messages(
+        class_id,
+        item.id,
+        db,
+        SimpleNamespace(id=uuid.uuid4()),
+    )
+
+    assert result.id == str(item.id)
+    assert result.message_count == 0
+    assert result.title == "Clear chat"
+    refreshed = db.get(TeacherJudgeSession, item.id)
+    assert refreshed is not None
+    assert refreshed.summary == ""
+    assert db.exec(select(TeacherJudgeSessionMessage)).all() == []
+
+
 def test_session_creation_mode_contract_is_explicit() -> None:
     with pytest.raises(ValueError):
         TeacherJudgeSessionCreateRequest(
@@ -102,7 +147,7 @@ def test_chat_can_start_without_selected_file() -> None:
     assert session_service.selected_file_for_chat(db, item) is None
 
 
-def test_delete_session_data_removes_owned_records_but_keeps_shared_file() -> None:
+def test_delete_session_data_removes_owned_records_and_private_file() -> None:
     db = _session()
     class_id = uuid.uuid4()
     rubric_file = _file(db, class_id)
@@ -146,7 +191,85 @@ def test_delete_session_data_removes_owned_records_but_keeps_shared_file() -> No
     assert db.get(TeacherJudgeScriptArtifact, artifact.id) is None
     assert not db.exec(select(TeacherJudgeScriptRun)).all()
     assert not db.exec(select(TeacherJudgeSessionMessage)).all()
-    assert db.get(TeacherJudgeFile, rubric_file.id) is not None
+    assert db.get(TeacherJudgeFile, rubric_file.id) is None
+
+
+def test_selected_file_cannot_be_claimed_by_another_session() -> None:
+    db = _session()
+    class_id = uuid.uuid4()
+    rubric_file = _file(db, class_id)
+    owner = TeacherJudgeSession(
+        teaching_class_id=class_id,
+        title="Owner",
+        selected_file_id=rubric_file.id,
+    )
+    db.add(owner)
+    db.commit()
+    db.refresh(owner)
+
+    with pytest.raises(HTTPException) as exc_info:
+        session_service.ensure_selected_file_available(db, rubric_file.id)
+
+    assert exc_info.value.status_code == 409
+    assert exc_info.value.detail["code"] == "teacher_judge_file_in_use"
+    assert "重構" in exc_info.value.detail["message"]
+
+
+def test_create_session_rejects_a_source_owned_by_another_session(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    db = _session()
+    class_id = uuid.uuid4()
+    rubric_file = _file(db, class_id)
+    db.add(
+        TeacherJudgeSession(
+            teaching_class_id=class_id,
+            title="Owner",
+            selected_file_id=rubric_file.id,
+        )
+    )
+    db.commit()
+    monkeypatch.setattr(teacher_judge_sessions, "_access", lambda *args: None)
+
+    with pytest.raises(HTTPException) as exc_info:
+        teacher_judge_sessions.create_session(
+            class_id,
+            TeacherJudgeSessionCreateRequest(
+                title="Should fail",
+                creation_mode="existing",
+                selected_file_id=rubric_file.id,
+            ),
+            db,
+            SimpleNamespace(id=uuid.uuid4()),
+        )
+
+    assert exc_info.value.status_code == 409
+    assert "重構" in exc_info.value.detail["message"]
+    assert len(db.exec(select(TeacherJudgeSession)).all()) == 1
+
+
+def test_selected_file_unique_index_allows_only_one_session_owner() -> None:
+    db = _session()
+    class_id = uuid.uuid4()
+    rubric_file = _file(db, class_id)
+    db.add(
+        TeacherJudgeSession(
+            teaching_class_id=class_id,
+            title="First",
+            selected_file_id=rubric_file.id,
+        )
+    )
+    db.commit()
+    db.add(
+        TeacherJudgeSession(
+            teaching_class_id=class_id,
+            title="Second",
+            selected_file_id=rubric_file.id,
+        )
+    )
+
+    with pytest.raises(IntegrityError):
+        db.commit()
 
 
 def test_fork_created_session_clones_rubric_without_history() -> None:
@@ -232,13 +355,14 @@ async def test_message_without_rubric_is_saved_and_uses_general_chat(
     async def fake_chat(messages, rubric_context, **kwargs):
         assert messages[-1].content == "先討論檢查需求"
         assert rubric_context == "{}"
+        assert kwargs["is_refine"] is False
         assert kwargs["template_key"] == "linux"
         return "可以，先描述目標環境。", None, {}
 
     monkeypatch.setattr(teacher_judge_sessions, "_access", lambda *args: None)
     monkeypatch.setattr(teacher_judge_sessions, "chat_with_rubric", fake_chat)
     monkeypatch.setattr(
-        teacher_judge_sessions, "get_enabled_template_commands", lambda *args: []
+        teacher_judge_sessions, "get_enabled_template_commands", lambda *args, **kwargs: []
     )
 
     result = await teacher_judge_sessions.create_message(
@@ -253,6 +377,50 @@ async def test_message_without_rubric_is_saved_and_uses_general_chat(
     assert result.assistant_message.content == "可以，先描述目標環境。"
     assert result.rubric_proposal is None
     assert len(db.exec(select(TeacherJudgeSessionMessage)).all()) == 2
+
+
+@pytest.mark.asyncio
+async def test_refine_message_uses_the_rubric_polish_prompt_mode(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    db = _session()
+    class_id = uuid.uuid4()
+    rubric_file = _file(db, class_id)
+    item = TeacherJudgeSession(
+        teaching_class_id=class_id,
+        title="Polish rubric",
+        selected_file_id=rubric_file.id,
+    )
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+
+    async def fake_chat(messages, rubric_context, **kwargs):
+        assert messages[-1].content == "請審核並潤飾目前的評分表"
+        assert '"items": []' in rubric_context
+        assert kwargs["is_refine"] is True
+        return "檢查完畢，評分表目前狀態良好。", None, {}
+
+    monkeypatch.setattr(teacher_judge_sessions, "_access", lambda *args: None)
+    monkeypatch.setattr(teacher_judge_sessions, "chat_with_rubric", fake_chat)
+    monkeypatch.setattr(
+        teacher_judge_sessions, "get_enabled_template_commands", lambda *args, **kwargs: []
+    )
+
+    result = await teacher_judge_sessions.create_message(
+        class_id,
+        item.id,
+        TeacherJudgeSessionMessageCreateRequest(
+            content="請審核並潤飾目前的評分表",
+            is_refine=True,
+        ),
+        db,
+        SimpleNamespace(id=uuid.uuid4()),
+    )
+
+    assert result.assistant_message.content == "檢查完畢，評分表目前狀態良好。"
+    assert result.rubric_proposal is None
+    assert result.user_message.metadata_json["ui_hidden"] is True
 
 
 @pytest.mark.asyncio
@@ -360,7 +528,7 @@ async def test_summary_runs_only_on_tenth_completed_turn(
 
     monkeypatch.setattr(session_service, "chat_with_rubric", fake_chat)
     monkeypatch.setattr(
-        session_service, "get_enabled_template_commands", lambda *args: []
+        session_service, "get_enabled_template_commands", lambda *args, **kwargs: []
     )
 
     for index in range(9):
@@ -421,7 +589,7 @@ async def test_summary_failure_preserves_previous_value(
 
     monkeypatch.setattr(session_service, "chat_with_rubric", fail_chat)
     monkeypatch.setattr(
-        session_service, "get_enabled_template_commands", lambda *args: []
+        session_service, "get_enabled_template_commands", lambda *args, **kwargs: []
     )
     await session_service.maybe_summarize(db, item, rubric_file)
 

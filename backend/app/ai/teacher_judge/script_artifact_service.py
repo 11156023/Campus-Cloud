@@ -99,14 +99,14 @@ SCRIPT_GENERATION_SYSTEM_PROMPT = f"""
 你是 Teacher Judge 的受管 Python 資料收集腳本產生器。
 
 # 任務
-根據 rubric snapshot 產生一份只讀、可重複執行的 Python managed data collection script。
-腳本負責收集同學 VM/LXC 內的服務、port、process、localhost HTTP 等資料，整理成 JSON，供後續解讀與評分使用。
+根據 rubric snapshot 產生一份安全、受管、可重複執行的 Python managed data collection script。
+腳本負責收集同學 VM/LXC 內的服務、port、process、localhost HTTP 等資料；若 rubric 明確引用允許執行程式入口的 catalog command，才可依下列限制執行該入口。最後整理成 JSON，供後續解讀與評分使用。
 
 # 硬性規則
 - 只能輸出 JSON，不要 markdown。
 - JSON 欄位必須是 {{"script_content": "..."}}。
 - script_content 必須是完整 Python 程式。
-- 腳本只能收集本機服務狀態、port、process、HTTP localhost endpoint。
+- 腳本預設只能收集本機服務狀態、port、process、HTTP localhost endpoint。
 - 腳本不得刪除、修改、修復、安裝、重啟、停用或重設任何環境。
 - 腳本不得讀取 .env、.ssh、private key 或把資料送到外部網路。
 - 若需要執行指令，只能使用 subprocess.run([...], timeout=秒數, capture_output=True, text=True, check=False)。
@@ -117,6 +117,10 @@ SCRIPT_GENERATION_SYSTEM_PROMPT = f"""
 - 腳本最後必須 print 單一 JSON，schema_version 固定為 {RESULT_SCHEMA_VERSION}，並使用 json.dumps(..., ensure_ascii=False)。
 - 輸出 JSON 的 metadata 必須包含 timestamp 與 platform。
 - 優先根據 rubric item 的 check_steps.command_key 對應 template_commands 產生收集項目。
+- `python.run_entrypoint` 是執行觀察能力，不是原始碼審查：只有 rubric item 已明確提供工作目錄、實際 Python 命令／參數與成功條件時才可執行。
+- 執行 Python 入口時，必須使用 argv list、明確 `cwd`、有限 timeout，並把 exit code、stdout、stderr、未捕捉例外與 timeout 寫成該 check 的證據。
+- 若 rubric 缺少工作目錄、命令或「正常結束／常駐服務」判準，不得搜尋檔案系統或猜路徑；該 check 必須回傳 `unknown`，清楚寫出缺少的資訊。
+- 不得把 Python 執行檢查替換成 n8n、Port 或程序存在檢查；這些只能在 rubric 本來就要求時使用。
 - 若 previous_review_feedback 有內容，代表上一輪腳本審查未通過；必須修正其中所有 policy、quality validator、AI reviewer 問題。
 - 腳本頂層必須定義 `errors: list[str] = []`。每個收集項目的例外處理區塊（try/except）必須使用 `errors.append(f"{{check_id}}: {{錯誤說明}}")` 記錄錯誤原因，讓老師看到執行時的收集品質。所有收集成功時 errors 輸出空陣列。
 
@@ -160,10 +164,11 @@ SCRIPT_GENERATION_SYSTEM_PROMPT = f"""
 
 AI_REVIEWER_SYSTEM_PROMPT = """
 你是 Teacher Judge managed data collection script 的安全審查員。
-只審查腳本，不執行腳本。請依 policy 判斷它是否只做 read-only inspection。
+只審查腳本，不執行腳本。請依 policy 判斷它是否只做 read-only inspection，或只執行 rubric 與 catalog 明確授權的受控程式入口。
 
 ## 安全審查
 若腳本可能刪除、修改、修復、安裝、重啟、讀取敏感檔案或對外傳資料，approved 必須是 false。
+若腳本使用 `python.run_entrypoint`，只有在 rubric 已提供明確 cwd、argv、timeout 與成功條件，且程式只收集 exit code/stdout/stderr、沒有安裝或修復動作時才可核准；risk_level 至少為 medium，後續仍需老師核准腳本與執行。
 
 ## 錯誤記錄完整性
 - 檢查腳本有 subprocess.run / HTTP 請求等外部呼叫時，是否有對應的 try/except 並在 except 中 call errors.append()。
@@ -1032,7 +1037,9 @@ async def create_artifact(
         raise HTTPException(status_code=400, detail="腳本名稱不可空白。")
 
     if template_commands is None:
-        template_commands = get_enabled_template_commands(session, template_key)
+        template_commands = get_enabled_template_commands(
+            session, template_key, include_cross_template=True
+        )
 
     rubric_snapshot = _with_template_command_catalog(
         _rubric_snapshot(rubric_analysis, template_key),
@@ -1106,7 +1113,9 @@ async def regenerate_artifact(
         raise HTTPException(status_code=400, detail="已封存的腳本不能重新生成。")
     template_key = artifact.template_key
     if template_commands is None:
-        template_commands = get_enabled_template_commands(session, template_key)
+        template_commands = get_enabled_template_commands(
+            session, template_key, include_cross_template=True
+        )
 
     rubric_snapshot = _with_template_command_catalog(
         _rubric_snapshot(rubric_analysis, template_key)

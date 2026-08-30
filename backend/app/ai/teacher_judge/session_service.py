@@ -11,9 +11,13 @@ from fastapi import HTTPException
 from sqlmodel import Session, desc, func, select
 
 from app.ai.teacher_judge.file_service import (
+    FileDeleteStage,
     _stored_path,
     _unlink_if_exists,
     clone_file_asset,
+    finalize_file_delete,
+    restore_file_delete,
+    stage_file_delete,
 )
 from app.ai.teacher_judge.schemas import (
     TeacherJudgeRubricChatMessage,
@@ -94,29 +98,71 @@ def get_session(
 
 
 def delete_session_data(db: Session, item: TeacherJudgeSession) -> None:
-    """Delete a session and all session-owned messages, scripts, and runs.
+    """Delete a session and its private rubric, messages, scripts, and runs."""
+    source_file_stage: FileDeleteStage | None = None
+    try:
+        if item.selected_file_id:
+            source_file = db.get(TeacherJudgeFile, item.selected_file_id)
+            if (
+                source_file is not None
+                and source_file.teaching_class_id == item.teaching_class_id
+            ):
+                # A unique DB index prevents this for new data.  The guard keeps a
+                # legacy shared row from being removed underneath another session
+                # if deletion runs before the ownership migration is applied.
+                other_session = db.exec(
+                    select(TeacherJudgeSession).where(
+                        TeacherJudgeSession.selected_file_id == source_file.id,
+                        TeacherJudgeSession.id != item.id,
+                    )
+                ).first()
+                if other_session is None:
+                    source_file_stage = stage_file_delete(
+                        session=db, file=source_file
+                    )
 
-    Rubric files are class-scoped library records and may be shared by multiple
-    sessions, so the selected file itself is intentionally preserved.
-    """
-    artifacts = list(
-        db.exec(
-            select(TeacherJudgeScriptArtifact).where(
-                TeacherJudgeScriptArtifact.session_id == item.id
-            )
-        )
-    )
-    for artifact in artifacts:
-        runs = list(
+        artifacts = list(
             db.exec(
-                select(TeacherJudgeScriptRun).where(
-                    TeacherJudgeScriptRun.artifact_id == artifact.id
+                select(TeacherJudgeScriptArtifact).where(
+                    TeacherJudgeScriptArtifact.session_id == item.id
                 )
             )
         )
-        for run in runs:
-            db.delete(run)
+        for artifact in artifacts:
+            runs = list(
+                db.exec(
+                    select(TeacherJudgeScriptRun).where(
+                        TeacherJudgeScriptRun.artifact_id == artifact.id
+                    )
+                )
+            )
+            for run in runs:
+                db.delete(run)
 
+        messages = list(
+            db.exec(
+                select(TeacherJudgeSessionMessage).where(
+                    TeacherJudgeSessionMessage.session_id == item.id
+                )
+            )
+        )
+        for message in messages:
+            db.delete(message)
+        for artifact in artifacts:
+            db.delete(artifact)
+
+        db.delete(item)
+        db.commit()
+    except Exception:
+        db.rollback()
+        restore_file_delete(source_file_stage)
+        raise
+    else:
+        finalize_file_delete(source_file_stage)
+
+
+def clear_session_messages(db: Session, item: TeacherJudgeSession) -> None:
+    """Clear conversation history while keeping the session and its artifacts."""
     messages = list(
         db.exec(
             select(TeacherJudgeSessionMessage).where(
@@ -126,11 +172,44 @@ def delete_session_data(db: Session, item: TeacherJudgeSession) -> None:
     )
     for message in messages:
         db.delete(message)
-    for artifact in artifacts:
-        db.delete(artifact)
 
-    db.delete(item)
+    now = _now()
+    item.summary = ""
+    item.updated_at = now
+    item.last_activity_at = now
+    db.add(item)
     db.commit()
+    db.refresh(item)
+
+
+def ensure_selected_file_available(
+    db: Session,
+    file_id: uuid.UUID,
+    *,
+    exclude_session_id: uuid.UUID | None = None,
+) -> None:
+    """Reject attaching a rubric that another session already owns.
+
+    Session fork is the explicit copy boundary.  Regular create/update flows
+    may claim an unassigned class file, but they never silently clone or share
+    a source with another session.
+    """
+    statement = select(TeacherJudgeSession).where(
+        TeacherJudgeSession.selected_file_id == file_id
+    )
+    if exclude_session_id is not None:
+        statement = statement.where(TeacherJudgeSession.id != exclude_session_id)
+    owner = db.exec(statement).first()
+    if owner is None:
+        return
+    raise HTTPException(
+        status_code=409,
+        detail={
+            "code": "teacher_judge_file_in_use",
+            "message": "這份評分表已被其他檢查使用；請使用「重構」建立獨立副本，或上傳新的評分表。",
+            "session_id": str(owner.id),
+        },
+    )
 
 
 def ensure_active(item: TeacherJudgeSession) -> None:
@@ -343,7 +422,10 @@ async def maybe_summarize(
             rubric_context,
             is_refine=False,
             template_key=template_key,
-            template_commands=get_enabled_template_commands(db, template_key),
+            template_commands=get_enabled_template_commands(
+                db, template_key, include_cross_template=True
+            ),
+            environment_keys=file.environment_keys if file else None,
         )
     except Exception:
         return

@@ -3,11 +3,18 @@ import {
   getConfirmationDetails,
   getToolDisplayData,
   getResponseStatus,
+  groupToolCallsByVmid,
+  validateTargets,
 } from './ui.js';
 
-const state = { messages: [], pendingToken: null, busy: false };
+const TARGET_COUNT = 3;
+const state = { messages: [], pendingToken: null, busy: false, templates: [] };
 const $ = (id) => document.getElementById(id);
 const base = () => $('apiBase').value.trim().replace(/\/$/, '');
+const targetNodes = () => Array.from({ length: TARGET_COUNT }, (_, index) => ({
+  vmid: $(`target${index + 1}Vmid`),
+  template: $(`target${index + 1}Template`),
+}));
 const headers = () => ({
   'Content-Type': 'application/json',
   Authorization: `Bearer ${$('token').value.trim()}`,
@@ -18,7 +25,10 @@ function setBusy(busy, message = '') {
   const lockedByConfirmation = Boolean(state.pendingToken);
   $('loadTemplates').disabled = busy || lockedByConfirmation;
   $('send').disabled = busy || lockedByConfirmation;
-  $('template').disabled = busy || lockedByConfirmation;
+  targetNodes().forEach(({ vmid, template }) => {
+    vmid.disabled = busy || lockedByConfirmation;
+    template.disabled = busy || lockedByConfirmation;
+  });
   $('message').disabled = busy || lockedByConfirmation;
   $('approve').disabled = busy || !state.pendingToken;
   $('reject').disabled = busy || !state.pendingToken;
@@ -50,14 +60,26 @@ function renderTool(tool) {
   const result = tool.result || {};
   const node = document.createElement('div');
   node.className = `tool${result.pending ? ' pending' : ''}`;
-  node.innerHTML = `<strong>${escapeHtml(tool.name)}</strong><pre>${escapeHtml(JSON.stringify(getToolDisplayData(tool), null, 2))}</pre>`;
+  const vmid = tool?.args?.vmid ?? result.vmid;
+  const label = vmid == null ? '' : `（VMID ${escapeHtml(vmid)}）`;
+  node.innerHTML = `<strong>${escapeHtml(tool.name)}</strong>${label}<pre>${escapeHtml(JSON.stringify(getToolDisplayData(tool), null, 2))}</pre>`;
   return node;
 }
 
 function render(data) {
   state.messages = data.messages || state.messages;
   $('reply').textContent = data.error ? `錯誤：${data.error}` : (data.reply || '');
-  $('tools').replaceChildren(...(data.tools_called || []).map(renderTool));
+  const groups = groupToolCallsByVmid(data);
+  const nodes = [];
+  for (const [vmid, tools] of groups) {
+    if (vmid !== 'unknown') {
+      const heading = document.createElement('h3');
+      heading.textContent = `VMID ${vmid}`;
+      nodes.push(heading);
+    }
+    nodes.push(...tools.map(renderTool));
+  }
+  $('tools').replaceChildren(...nodes);
 
   const confirmation = getConfirmationDetails(data);
   state.pendingToken = confirmation?.token || null;
@@ -97,21 +119,34 @@ async function withLoading(message, action) {
 
 $('loadTemplates').onclick = () => withLoading('正在載入可用的 AI 模板…', async () => {
   const templates = await request('/ai/pve-template/templates');
-  $('template').replaceChildren(...templates.map((item) => {
-    const option = document.createElement('option');
-    option.value = item.template_key;
-    option.textContent = `${item.display_name} — ${item.description}`;
-    return option;
-  }));
+  state.templates = templates;
+  targetNodes().forEach(({ template }) => {
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = '請選擇模板（填 VMID 才啟用）';
+    template.replaceChildren(placeholder, ...templates.map((item) => {
+      const option = document.createElement('option');
+      option.value = item.template_key;
+      option.textContent = `${item.display_name} — ${item.description}`;
+      return option;
+    }));
+  });
   setStatus(`已載入 ${templates.length} 個可用模板。`, 'complete');
 });
 
 $('send').onclick = () => withLoading('AI 正在分析模板、VMID 與任務，請稍候…', async () => {
+  const validation = validateTargets(targetNodes().map(({ vmid, template }) => ({
+    vmid: vmid.value,
+    template_key: template.value,
+  })));
+  if (validation.error) {
+    setStatus(validation.error, 'error');
+    return;
+  }
   const data = await request('/ai/pve-template/chat', {
     method: 'POST',
     body: JSON.stringify({
-      template_key: $('template').value,
-      vmid: 102,
+      targets: validation.targets,
       message: $('message').value,
       messages: state.messages.length ? state.messages : undefined,
     }),
@@ -133,3 +168,16 @@ async function confirm(approved) {
 
 $('approve').onclick = () => confirm(true);
 $('reject').onclick = () => confirm(false);
+
+targetNodes().forEach(({ vmid, template }) => {
+  const reset = () => {
+    if (!state.messages.length && !state.pendingToken) return;
+    state.messages = [];
+    state.pendingToken = null;
+    $('tools').replaceChildren();
+    $('reply').textContent = '目標已變更，請重新送出任務。';
+    $('confirmation').hidden = true;
+  };
+  vmid.addEventListener('change', reset);
+  template.addEventListener('change', reset);
+});

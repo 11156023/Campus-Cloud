@@ -1,5 +1,5 @@
 import { lazy } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useParams } from "react-router-dom";
 import { useAuth } from "./contexts/AuthContext";
 import DashboardLayout from "./layout/DashboardLayout";
 import LoginPage from "./pages/login/LoginPage";
@@ -41,7 +41,6 @@ const CourseTemplateManagementPage = lazy(() => import("./pages/course-operation
 const CourseTemplateEditorPage = lazy(() => import("./pages/course-operations/CourseTemplateEditorPage"));
 const ClassManagementPage = lazy(() => import("./pages/course-operations/ClassManagementPage"));
 const ClassWorkspacePage = lazy(() => import("./pages/course-operations/ClassWorkspacePage"));
-const AiJudgeRubricEditorPage = lazy(() => import("./pages/course-operations/AiJudgeRubricEditorPage"));
 const ClassSetupPage = lazy(() => import("./pages/course-operations/ClassSetupPage"));
 
 // 系統管理
@@ -94,6 +93,12 @@ function AuthBootstrapState({ unavailable = false, retrying = false, onRetry }) 
       </section>
     </main>
   );
+}
+
+function LegacyAiJudgeEditorRedirect() {
+  const { classId, sessionId } = useParams();
+  const query = sessionId ? `?check=${encodeURIComponent(sessionId)}` : "";
+  return <Navigate to={`/class-management/${classId}/ai${query}`} replace />;
 }
 
 function App() {
@@ -180,9 +185,10 @@ function App() {
           <Route path="/class-management" element={<ClassManagementPage />} />
           <Route path="/class-management/new" element={<Navigate to="/class-setup" replace />} />
           <Route path="/class-setup" element={<ClassSetupPage />} />
+          {/* 舊評分表連結保留導回主工作頁，避免書籤落到不存在的獨立 editor。 */}
           <Route
             path="/class-management/:classId/ai/checks/:sessionId/edit"
-            element={<AiJudgeRubricEditorPage />}
+            element={<LegacyAiJudgeEditorRedirect />}
           />
           <Route path="/class-management/:classId" element={<ClassWorkspacePage />} />
           <Route path="/class-management/:classId/:section" element={<ClassWorkspacePage />} />
