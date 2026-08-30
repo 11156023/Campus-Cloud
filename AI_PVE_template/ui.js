@@ -14,6 +14,37 @@ export function findPendingTool(data) {
   return (data?.tools_called || []).find((tool) => tool?.result?.pending) || null;
 }
 
+export function validateTargets(rawTargets, requiredCount = 3) {
+  const targets = (rawTargets || []).map((target) => ({
+    vmid: Number(String(target?.vmid ?? '').trim()),
+    template_key: String(target?.template_key ?? '').trim(),
+  }));
+  if (targets.length !== requiredCount) {
+    return { targets, error: `請填寫 ${requiredCount} 台測試機器。` };
+  }
+  if (targets.some((target) => !Number.isInteger(target.vmid) || target.vmid < 1)) {
+    return { targets, error: '每個 VMID 必須是大於零的整數。' };
+  }
+  if (targets.some((target) => !target.template_key)) {
+    return { targets, error: '每台機器都必須選擇 AI 機器模板。' };
+  }
+  if (new Set(targets.map((target) => target.vmid)).size !== targets.length) {
+    return { targets, error: '三個 VMID 不得重複。' };
+  }
+  return { targets, error: null };
+}
+
+export function groupToolCallsByVmid(data) {
+  const groups = new Map();
+  for (const tool of data?.tools_called || []) {
+    const vmid = tool?.args?.vmid ?? tool?.result?.vmid;
+    const key = vmid == null ? 'unknown' : String(vmid);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(tool);
+  }
+  return groups;
+}
+
 export function getConfirmationDetails(data) {
   const pending = findPendingTool(data);
   if (!pending && !data?.needs_confirmation) return null;
@@ -23,7 +54,7 @@ export function getConfirmationDetails(data) {
     command: pending?.args?.command || result.command || '',
     reason: result.reason || '這個指令不在 template 的唯讀 smoke command 清單，需要人工確認。',
     token: result.confirm_token || null,
-    vmid: data?.vmid ?? pending?.args?.vmid ?? null,
+    vmid: data?.vmid ?? pending?.args?.vmid ?? result.vmid ?? data?.targets?.[0]?.vmid ?? null,
   };
 }
 

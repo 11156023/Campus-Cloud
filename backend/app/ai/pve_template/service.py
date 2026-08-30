@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import time
+import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -17,21 +19,18 @@ from app.ai.pve_log.ssh_exec import (
     peek_pending_scope,
 )
 from app.ai.pve_template.prompts import compose_system_prompt
-from app.ai.pve_template.repository import (
-    get_by_id,
-    get_by_key,
-)
-from app.ai.pve_template.repository import (
-    list_enabled as list_enabled_templates,
-)
+from app.ai.pve_template.repository import get_by_id, get_by_key
+from app.ai.pve_template.repository import list_enabled as list_enabled_templates
 from app.ai.pve_template.schemas import (
     AIPVETemplateChatRequest,
     AIPVETemplateChatResponse,
     AIPVETemplateRead,
     AIPVETemplateSSHConfirmRequest,
+    AIPVETemplateTargetRead,
 )
 from app.core.authorizers import require_resource_access
 from app.exceptions import BadRequestError, NotFoundError
+from app.models import AIPVETemplate
 from app.repositories import resource as resource_repo
 
 _PENDING_CONTEXT_TTL = 300
@@ -40,7 +39,10 @@ _PENDING_CONTEXT_TTL = 300
 @dataclass(slots=True)
 class _PendingContext:
     created_at: float
-    vmid: int
+    scope_id: uuid.UUID
+    targets: tuple[tuple[int, AIPVETemplate], ...]
+    allowed_vmids: frozenset[int]
+    template_keys_by_vmid: dict[int, str]
     messages: list[dict[str, Any]]
 
 
@@ -73,16 +75,52 @@ def list_templates(*, session: Session) -> list[AIPVETemplateRead]:
     ]
 
 
+def _resolve_targets(
+    *, request: AIPVETemplateChatRequest, session: Session
+) -> tuple[tuple[int, AIPVETemplate], ...]:
+    resolved: list[tuple[int, AIPVETemplate]] = []
+    for target in request.targets:
+        template = get_by_key(session=session, template_key=target.template_key)
+        if template is None or not template.enabled:
+            raise NotFoundError(
+                f"找不到可用的 AI PVE template：{target.template_key}"
+            )
+        resolved.append((target.vmid, template))
+    return tuple(resolved)
+
+
+def _authorize_targets(
+    *,
+    session: Session,
+    current_user: Any,
+    targets: Sequence[tuple[int, AIPVETemplate]],
+) -> None:
+    # Authorize every target before the LLM or any runtime tool is reached.
+    for vmid, _template in targets:
+        _authorize_vmid(session=session, current_user=current_user, vmid=vmid)
+
+
+def _target_reads(
+    targets: Sequence[tuple[int, AIPVETemplate]],
+) -> list[AIPVETemplateTargetRead]:
+    return [
+        AIPVETemplateTargetRead(
+            vmid=vmid,
+            template_key=template.template_key,
+            display_name=template.display_name,
+        )
+        for vmid, template in targets
+    ]
+
+
 def _response(
     *,
-    template_key: str,
-    vmid: int,
+    targets: Sequence[tuple[int, AIPVETemplate]],
     response: ChatResponse,
     confirmation_result: SSHExecResult | None = None,
 ) -> AIPVETemplateChatResponse:
     return AIPVETemplateChatResponse(
-        template_key=template_key,
-        vmid=vmid,
+        targets=_target_reads(targets),
         reply=response.reply,
         tools_called=response.tools_called,
         needs_confirmation=response.needs_confirmation,
@@ -92,15 +130,34 @@ def _response(
     )
 
 
-def _remember_pending(*, vmid: int, response: ChatResponse) -> None:
+def _remember_pending(
+    *,
+    targets: Sequence[tuple[int, AIPVETemplate]],
+    scope_id: uuid.UUID,
+    response: ChatResponse,
+) -> None:
     _cleanup_pending_context()
+    target_tuple = tuple(targets)
+    allowed_vmids = frozenset(vmid for vmid, _template in target_tuple)
+    template_keys_by_vmid = {
+        vmid: template.template_key for vmid, template in target_tuple
+    }
     for record in response.tools_called:
         result = record.result or {}
         token = result.get("confirm_token")
         if token and result.get("pending"):
+            stored_scope_type, stored_scope_id = peek_pending_scope(str(token))
+            effective_scope_id = (
+                stored_scope_id
+                if stored_scope_type == "template" and stored_scope_id is not None
+                else scope_id
+            )
             _pending_context[str(token)] = _PendingContext(
                 created_at=time.monotonic(),
-                vmid=vmid,
+                scope_id=effective_scope_id,
+                targets=target_tuple,
+                allowed_vmids=allowed_vmids,
+                template_keys_by_vmid=template_keys_by_vmid,
                 messages=[dict(message) for message in response.messages],
             )
 
@@ -108,25 +165,28 @@ def _remember_pending(*, vmid: int, response: ChatResponse) -> None:
 async def chat(
     *, request: AIPVETemplateChatRequest, current_user: Any, session: Session
 ) -> AIPVETemplateChatResponse:
-    template = get_by_key(session=session, template_key=request.template_key)
-    if template is None or not template.enabled:
-        raise NotFoundError("找不到可用的 AI PVE template")
-    _authorize_vmid(session=session, current_user=current_user, vmid=request.vmid)
+    targets = _resolve_targets(request=request, session=session)
+    _authorize_targets(session=session, current_user=current_user, targets=targets)
+    allowed_vmids = {vmid for vmid, _template in targets}
+    template_keys_by_vmid = {
+        vmid: template.template_key for vmid, template in targets
+    }
+    scope_id = uuid.uuid4()
 
     response = await pve_chat(
         message=request.message,
         history=request.messages,
         session=session,
-        allowed_vmids={request.vmid},
+        allowed_vmids=allowed_vmids,
         requester_id=current_user.id,
-        scope_type="template",
-        scope_id=template.id,
-        system_prompt=compose_system_prompt(template, vmid=request.vmid),
-        template_key=template.template_key,
+        scope_type="template_batch",
+        scope_id=scope_id,
+        system_prompt=compose_system_prompt(targets=targets),
+        template_keys_by_vmid=template_keys_by_vmid,
         auto_execute_known_ssh=True,
     )
-    _remember_pending(vmid=request.vmid, response=response)
-    return _response(template_key=template.template_key, vmid=request.vmid, response=response)
+    _remember_pending(targets=targets, scope_id=scope_id, response=response)
+    return _response(targets=targets, response=response)
 
 
 def _replace_pending_tool_result(
@@ -165,29 +225,36 @@ async def confirm_ssh(
     token = request.token or request.confirm_token or ""
     pending_request = peek_pending_request(token)
     scope_type, scope_id = peek_pending_scope(token)
-    if pending_request is None or scope_type != "template" or scope_id is None:
+    context = _pending_context.get(token)
+    if (
+        pending_request is None
+        or scope_type not in {"template", "template_batch"}
+        or scope_id is None
+        or context is None
+        or context.scope_id != scope_id
+    ):
         raise BadRequestError("確認 token 無效、已過期或不是 AI PVE template 請求")
 
-    template = get_by_id(session=session, template_id=scope_id)
-    if template is None or not template.enabled:
-        raise NotFoundError("此 AI PVE template 已不存在或停用")
-    _authorize_vmid(session=session, current_user=current_user, vmid=pending_request.vmid)
+    targets = _resolve_targets_from_context(context=context, session=session)
+    _authorize_targets(session=session, current_user=current_user, targets=targets)
+    if pending_request.vmid not in context.allowed_vmids:
+        raise BadRequestError("確認 token 的 VMID 不在目前 AI PVE template scope")
+    effective_scope_type = scope_type or "template_batch"
 
     result = await confirm_exec(
         request,
         session=session,
         requester_id=current_user.id,
-        scope_type="template",
+        scope_type=effective_scope_type,
         scope_id=scope_id,
-        allowed_vmids={pending_request.vmid},
+        allowed_vmids=set(context.allowed_vmids),
     )
     _cleanup_pending_context()
     # Token still exists means confirm_exec rejected the caller/scope before
     # consuming it. Keep both stores intact so the legitimate owner can retry.
     if peek_pending_request(token) is not None:
         return AIPVETemplateChatResponse(
-            template_key=template.template_key,
-            vmid=pending_request.vmid,
+            targets=_target_reads(targets),
             reply="確認未生效，原指令仍在等待有效的使用者決策。",
             error=result.error or result.block_reason,
             confirmation_result=result,
@@ -196,8 +263,7 @@ async def confirm_ssh(
     context = _pending_context.pop(token, None)
     if context is None or result.pending:
         return AIPVETemplateChatResponse(
-            template_key=template.template_key,
-            vmid=pending_request.vmid,
+            targets=_target_reads(targets),
             reply="找不到可恢復的 AI 對話內容，請重新發起任務。",
             error=result.error or result.block_reason or "AI 對話接續內容已過期",
             confirmation_result=result,
@@ -210,21 +276,42 @@ async def confirm_ssh(
             approved=request.approved,
         ),
         session=session,
-        allowed_vmids={context.vmid},
+        allowed_vmids=set(context.allowed_vmids),
         requester_id=current_user.id,
-        scope_type="template",
-        scope_id=template.id,
-        system_prompt=compose_system_prompt(template, vmid=context.vmid),
-        template_key=template.template_key,
+        scope_type=effective_scope_type,
+        scope_id=context.scope_id,
+        system_prompt=compose_system_prompt(targets=context.targets),
+        template_keys_by_vmid=context.template_keys_by_vmid,
         auto_execute_known_ssh=True,
     )
-    _remember_pending(vmid=context.vmid, response=resumed)
+    _remember_pending(
+        targets=context.targets,
+        scope_id=context.scope_id,
+        response=resumed,
+    )
     return _response(
-        template_key=template.template_key,
-        vmid=context.vmid,
+        targets=context.targets,
         response=resumed,
         confirmation_result=result,
     )
+
+
+def _resolve_targets_from_context(
+    *, context: _PendingContext, session: Session
+) -> tuple[tuple[int, AIPVETemplate], ...]:
+    resolved: list[tuple[int, AIPVETemplate]] = []
+    for vmid, template in context.targets:
+        current = get_by_id(session=session, template_id=template.id)
+        if (
+            current is None
+            or not current.enabled
+            or current.template_key != template.template_key
+        ):
+            raise NotFoundError(
+                f"找不到可用的 AI PVE template：{template.template_key}"
+            )
+        resolved.append((vmid, current))
+    return tuple(resolved)
 
 
 __all__ = ["chat", "confirm_ssh", "list_templates"]
