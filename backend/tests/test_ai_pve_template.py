@@ -46,6 +46,8 @@ def test_template_prompt_keeps_code_owned_safety_rules() -> None:
     assert "直接呼叫 ssh_exec" in prompt
     assert "後端是唯一的確認攔截點" in prompt
     assert "不要為此多呼叫 get_resource_detail" in prompt
+    assert "逐筆、分開詢問" in prompt
+    assert "不得宣稱該 VM 正在執行、已完成檢查" in prompt
 
 
 def test_multi_target_prompt_lists_each_selected_template() -> None:
@@ -279,6 +281,151 @@ async def test_known_read_ssh_calls_for_multiple_targets_run_concurrently(
     assert result.reply == "三台完成"
     assert peak == 3
     assert [tool.args["vmid"] for tool in result.tools_called] == [102, 107, 115]
+
+
+@pytest.mark.asyncio
+async def test_multiple_pending_ssh_calls_are_confirmed_separately_before_summary(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    completion_payloads: list[dict[str, object]] = []
+    executed_vmids: list[int] = []
+    commands = {
+        102: "custom-check-python",
+        107: "custom-check-n8n",
+        115: "custom-check-postgresql",
+    }
+
+    async def fake_completion(payload, *, timeout):
+        del timeout
+        completion_payloads.append(copy.deepcopy(payload))
+        if len(completion_payloads) == 1:
+            return {
+                "choices": [
+                    {
+                        "message": {
+                            "role": "assistant",
+                            "content": None,
+                            "tool_calls": [
+                                {
+                                    "id": f"call-{vmid}",
+                                    "type": "function",
+                                    "function": {
+                                        "name": "ssh_exec",
+                                        "arguments": (
+                                            f'{{"vmid": {vmid}, '
+                                            f'"command": "{commands[vmid]}", '
+                                            '"reason": "自訂檢查"}'
+                                        ),
+                                    },
+                                }
+                                for vmid in (102, 107, 115)
+                            ],
+                        }
+                    }
+                ]
+            }
+        return {
+            "choices": [
+                {"message": {"role": "assistant", "content": "三台指令皆已處理。"}}
+            ]
+        }
+
+    async def fake_ssh_tool(args, **_kwargs):
+        vmid = int(args["vmid"])
+        executed_vmids.append(vmid)
+        return {
+            "vmid": vmid,
+            "command": args["command"],
+            "reason": args["reason"],
+            "pending": True,
+            "confirm_token": f"token-{vmid}",
+        }
+
+    monkeypatch.setattr(
+        pve_chat_module,
+        "settings",
+        type(
+            "SettingsStub",
+            (),
+            {
+                "VLLM_BASE_URL": "http://vllm/v1",
+                "VLLM_MODEL_NAME": "test-model",
+                "VLLM_TIMEOUT": 30,
+            },
+        )(),
+    )
+    monkeypatch.setattr(
+        pve_chat_module.vllm_client,
+        "create_chat_completion",
+        fake_completion,
+    )
+    monkeypatch.setattr(pve_chat_module, "_execute_ssh_tool", fake_ssh_tool)
+
+    common = {
+        "allowed_vmids": {102, 107, 115},
+        "system_prompt": "safety",
+        "template_keys_by_vmid": {
+            102: "python",
+            107: "n8n",
+            115: "postgresql",
+        },
+        "auto_execute_known_ssh": True,
+    }
+    first = await pve_chat_module.chat(message="檢查三台", **common)
+
+    assert executed_vmids == [102]
+    assert first.needs_confirmation is True
+    assert [tool.result.get("deferred") for tool in first.tools_called] == [
+        None,
+        True,
+        True,
+    ]
+
+    history = template_service._replace_pending_tool_result(
+        first.messages,
+        SSHExecResult(vmid=102, command=commands[102], exit_code=0),
+        approved=True,
+    )
+    second = await pve_chat_module.chat(
+        history=history,
+        resume_deferred_ssh=True,
+        **common,
+    )
+
+    assert executed_vmids == [102, 107]
+    assert len(completion_payloads) == 1
+    assert second.needs_confirmation is True
+    assert second.tools_called[0].args["vmid"] == 107
+
+    history = template_service._replace_pending_tool_result(
+        second.messages,
+        SSHExecResult(vmid=107, command=commands[107], exit_code=0),
+        approved=False,
+    )
+    third = await pve_chat_module.chat(
+        history=history,
+        resume_deferred_ssh=True,
+        **common,
+    )
+
+    assert executed_vmids == [102, 107, 115]
+    assert len(completion_payloads) == 1
+    assert third.needs_confirmation is True
+    assert third.tools_called[0].args["vmid"] == 115
+
+    history = template_service._replace_pending_tool_result(
+        third.messages,
+        SSHExecResult(vmid=115, command=commands[115], exit_code=0),
+        approved=True,
+    )
+    completed = await pve_chat_module.chat(
+        history=history,
+        resume_deferred_ssh=True,
+        **common,
+    )
+
+    assert completed.reply == "三台指令皆已處理。"
+    assert len(completion_payloads) == 2
 
 
 @pytest.mark.asyncio
@@ -634,6 +781,7 @@ async def test_template_confirmation_resumes_ai_with_execution_result(
 
     assert result.reply == resumed.reply
     assert result.confirmation_result is not None
+    assert calls[1]["resume_deferred_ssh"] is True
     expected_decision = "approved" if approved else "rejected"
     assert (
         f'"confirmation_decision": "{expected_decision}"'

@@ -398,6 +398,36 @@ def _deferred_ssh_result(args: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _next_deferred_ssh_call(
+    messages: list[dict[str, Any]],
+) -> tuple[int, dict[str, Any]] | None:
+    """Find the next server-deferred SSH call in an existing tool-call round."""
+    for message_index, message in enumerate(messages):
+        if message.get("role") != "tool":
+            continue
+        try:
+            content = json.loads(str(message.get("content", "")))
+        except (TypeError, json.JSONDecodeError):
+            continue
+        if not isinstance(content, dict) or not content.get("deferred"):
+            continue
+
+        tool_call_id = message.get("tool_call_id")
+        for assistant in reversed(messages[:message_index]):
+            if assistant.get("role") != "assistant":
+                continue
+            for tool_call in assistant.get("tool_calls") or []:
+                if tool_call.get("id") != tool_call_id:
+                    continue
+                function = tool_call.get("function") or {}
+                if function.get("name") != "ssh_exec":
+                    return None
+                return message_index, _parse_tool_arguments(
+                    function.get("arguments") or "{}"
+                )
+    return None
+
+
 def _normalize_assistant_message(message: dict[str, Any]) -> dict[str, Any]:
     """Normalize native and Qwen text-encoded tool calls into one message shape."""
     assistant_msg = dict(message)
@@ -606,6 +636,7 @@ async def chat(
     template_key: str | None = None,
     template_keys_by_vmid: dict[int, str] | None = None,
     auto_execute_known_ssh: bool = False,
+    resume_deferred_ssh: bool = False,
 ) -> ChatResponse:
     """執行有限步數的 AI agent 對話，支援 tool calling、確認中斷及接續。"""
     if not settings.VLLM_BASE_URL or not settings.VLLM_MODEL_NAME:
@@ -657,6 +688,43 @@ async def chat(
             messages.append({"role": "user", "content": message})
 
     tools_called: list[ToolCallRecord] = []
+    if resume_deferred_ssh:
+        while deferred_call := _next_deferred_ssh_call(messages):
+            message_index, func_args = deferred_call
+            try:
+                result = await _execute_ssh_tool(
+                    func_args,
+                    session=session,
+                    allowed_vmids=allowed_vmids,
+                    requester_id=requester_id,
+                    scope_type=scope_type,
+                    scope_id=scope_id,
+                    template_key=template_key,
+                    template_keys_by_vmid=template_keys_by_vmid,
+                    auto_execute_known_ssh=auto_execute_known_ssh,
+                )
+            except Exception as exc:
+                logger.error("延後的 SSH 工具執行失敗：%s", exc)
+                result = {"error": str(exc)}
+            result_dict = result if isinstance(result, dict) else {}
+            messages[message_index]["content"] = json.dumps(
+                result,
+                ensure_ascii=False,
+                default=str,
+            )
+            tools_called.append(
+                ToolCallRecord(name="ssh_exec", args=func_args, result=result_dict)
+            )
+            if result_dict.get("pending"):
+                return ChatResponse(
+                    reply=(
+                        "有指令需要您的確認；這是下一筆個別審核，同意或拒絕後，AI 會繼續"
+                        "處理其餘指令。"
+                    ),
+                    tools_called=tools_called,
+                    needs_confirmation=True,
+                    messages=messages,
+                )
     _snapshot: SystemSnapshot | None = None  # lazy，只有工具真的被呼叫時才收集
 
     for tool_round in range(_MAX_TOOL_ROUNDS + 1):
@@ -874,7 +942,10 @@ async def chat(
 
         if needs_confirmation:
             return ChatResponse(
-                reply="有指令需要您的確認；同意或拒絕後，AI 會從目前步驟繼續。",
+                reply=(
+                    "有指令需要您的確認；若還有其他待審核指令，會在本次決定後"
+                    "分開詢問。"
+                ),
                 tools_called=tools_called,
                 needs_confirmation=True,
                 messages=messages,

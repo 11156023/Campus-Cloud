@@ -283,6 +283,7 @@ async def confirm_ssh(
         system_prompt=compose_system_prompt(targets=context.targets),
         template_keys_by_vmid=context.template_keys_by_vmid,
         auto_execute_known_ssh=True,
+        resume_deferred_ssh=True,
     )
     _remember_pending(
         targets=context.targets,
