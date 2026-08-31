@@ -20,6 +20,12 @@ Four independent cleanups, none of which changes application behaviour:
    (``user``), so the column carries no information.  The PostgreSQL enum type
    also still holds a ``group`` value left over from the retired test-groups
    feature, so the type goes too.
+
+Every step is idempotent.  Databases in this project have drifted before --
+``fdb02_resource_ip_cache`` exists only because one was stamped past the
+migration that added ``resources.ip_address`` -- so a revision that drops
+things has to survive being replayed against a database that already has them
+dropped.
 """
 
 import sqlalchemy as sa
@@ -31,12 +37,20 @@ branch_labels = None
 depends_on = None
 
 
+def _has_column(table: str, column: str) -> bool:
+    return column in {
+        col["name"] for col in sa.inspect(op.get_bind()).get_columns(table)
+    }
+
+
 def upgrade():
     # 1. Final backfill before the legacy IP cache columns disappear for good.
     #    resource_networks.ip_address is unique, so collisions resolve to the
-    #    row we are about to write.
-    op.execute(
-        """
+    #    row we are about to write.  Skipped when the source columns are already
+    #    gone, which is the case on a replay.
+    if _has_column("resources", "ip_address"):
+        op.execute(
+            """
         WITH source_rows AS (
             SELECT DISTINCT ON (ip_address)
                 vmid,
@@ -69,7 +83,7 @@ def upgrade():
             cached_at     = EXCLUDED.cached_at,
             updated_at    = now()
         """
-    )
+        )
 
     # 2. Collapse any pre-existing duplicates, keeping the freshest row, so the
     #    unique constraint below can be created.
@@ -94,54 +108,75 @@ def upgrade():
         )
         """
     )
-    op.create_unique_constraint(
-        "uq_resource_networks_resource_vmid", "resource_networks", ["resource_vmid"]
+    op.execute(
+        """
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_constraint
+                WHERE conname = 'uq_resource_networks_resource_vmid'
+            ) THEN
+                ALTER TABLE resource_networks
+                ADD CONSTRAINT uq_resource_networks_resource_vmid
+                UNIQUE (resource_vmid);
+            END IF;
+        END $$;
+        """
     )
 
     # 3. The legacy per-resource IP cache.
-    op.drop_column("resources", "ip_address_cached_at")
-    op.drop_column("resources", "ip_address")
+    op.execute("ALTER TABLE resources DROP COLUMN IF EXISTS ip_address_cached_at")
+    op.execute("ALTER TABLE resources DROP COLUMN IF EXISTS ip_address")
 
     # 4. The single-valued quota scope and its orphaned enum type.
-    op.drop_column("resource_quotas", "scope")
+    op.execute("ALTER TABLE resource_quotas DROP COLUMN IF EXISTS scope")
     op.execute("DROP TYPE IF EXISTS quotascope")
 
     # 5. The table replaced by Redis-backed rate limiting.
-    op.drop_table("ai_api_rate_limit")
+    op.execute("DROP TABLE IF EXISTS ai_api_rate_limit")
 
 
 def downgrade():
-    op.create_table(
-        "ai_api_rate_limit",
-        sa.Column("user_id", sa.Uuid(), nullable=False),
-        sa.Column("minute_key", sa.String(length=20), nullable=False),
-        sa.Column("request_count", sa.Integer(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
-        sa.ForeignKeyConstraint(["user_id"], ["user.id"]),
-        sa.PrimaryKeyConstraint("user_id", "minute_key"),
+    # Mirrors upgrade(): every statement tolerates the object already being in
+    # the state it is meant to reach.
+    op.execute(
+        """
+        CREATE TABLE IF NOT EXISTS ai_api_rate_limit (
+            user_id       UUID        NOT NULL REFERENCES "user"(id),
+            minute_key    VARCHAR(20) NOT NULL,
+            request_count INTEGER     NOT NULL,
+            updated_at    TIMESTAMPTZ NOT NULL,
+            PRIMARY KEY (user_id, minute_key)
+        )
+        """
     )
-    op.create_index(
-        "ix_ai_api_rate_limit_updated_at", "ai_api_rate_limit", ["updated_at"]
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS ix_ai_api_rate_limit_updated_at "
+        "ON ai_api_rate_limit (updated_at)"
     )
 
-    op.execute("CREATE TYPE quotascope AS ENUM ('group', 'user')")
-    op.add_column(
-        "resource_quotas",
-        sa.Column(
-            "scope",
-            sa.Enum("group", "user", name="quotascope"),
-            nullable=False,
-            server_default="user",
-        ),
+    op.execute(
+        """
+        DO $$
+        BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'quotascope') THEN
+                CREATE TYPE quotascope AS ENUM ('group', 'user');
+            END IF;
+        END $$;
+        """
     )
-    op.alter_column("resource_quotas", "scope", server_default=None)
+    op.execute(
+        "ALTER TABLE resource_quotas "
+        "ADD COLUMN IF NOT EXISTS scope quotascope NOT NULL DEFAULT 'user'"
+    )
+    op.execute("ALTER TABLE resource_quotas ALTER COLUMN scope DROP DEFAULT")
 
-    op.add_column(
-        "resources", sa.Column("ip_address", sa.String(length=64), nullable=True)
+    op.execute(
+        "ALTER TABLE resources ADD COLUMN IF NOT EXISTS ip_address VARCHAR(64)"
     )
-    op.add_column(
-        "resources",
-        sa.Column("ip_address_cached_at", sa.DateTime(timezone=True), nullable=True),
+    op.execute(
+        "ALTER TABLE resources "
+        "ADD COLUMN IF NOT EXISTS ip_address_cached_at TIMESTAMPTZ"
     )
     op.execute(
         """
@@ -154,6 +189,7 @@ def downgrade():
         """
     )
 
-    op.drop_constraint(
-        "uq_resource_networks_resource_vmid", "resource_networks", type_="unique"
+    op.execute(
+        "ALTER TABLE resource_networks "
+        "DROP CONSTRAINT IF EXISTS uq_resource_networks_resource_vmid"
     )
