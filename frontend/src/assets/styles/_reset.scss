@@ -41,6 +41,14 @@ button {
   background: none;
   font: inherit;
   color: inherit;
+  /* 全站按鈕的 hover / active / disabled 狀態一律漸變；
+     元件若自訂 transition（如含 transform）會覆蓋此預設 */
+  transition:
+    background-color $transition-base,
+    border-color $transition-base,
+    color $transition-base,
+    opacity $transition-base,
+    box-shadow $transition-base;
 
   /* 隱藏滑鼠點擊後殘留的 focus outline,但保留鍵盤導航時的可見焦點 */
   &:focus { outline: none; }

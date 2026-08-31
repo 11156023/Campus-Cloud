@@ -97,7 +97,7 @@ body.dark {
   --color-text: #d4deef;
   --color-text-primary: #f0f4ff;
   --color-text-secondary: #d9e8ff;
-  --color-text-muted: #5c6880;
+  --color-text-muted: #c6cddc;
   --color-text-on-primary: #ffffff;
 
   /* ----- Borders ----- */
@@ -157,15 +157,18 @@ body[data-style="black"] {
 }
 
 /* 液態玻璃（Liquid Glass）：仿真實玻璃的清透折射感——
-   清透的關鍵是把毛玻璃的重霧（blur 12px）降到 2px，表面塗層壓到
-   近乎全透，改靠「提高背後內容的飽和與亮度 + SVG 折射濾鏡
+   清透的關鍵是把毛玻璃的重霧（blur 12px）降到 2px，改靠
+   「提高背後內容的飽和與亮度 + SVG 折射濾鏡
    （index.html 的 #liquid-glass-lens，僅 Chromium 生效，其他瀏覽器
    自動退回無折射的清透玻璃）」呈現玻璃體感。
+   表面塗層沿用主題預設不覆寫——壓到近乎全透會讓
+   半透明淡色（主色 badge / hover）在高飽和 backdrop 上偏色。
    邊框是明顯的白色亮邊（rim highlight），陰影組合模擬凸面玻璃：
    頂部鏡面亮線 + 底部反光 + 集中在邊緣的內側亮帶
    （負 spread 讓中央保持清透）。明暗模式皆可用，兩套變數分開定義。 */
 body[data-style="liquid"] {
-  --color-surface-glass: rgba(255, 255, 255, 0.18);
+  /* 表面塗層不覆寫，沿用主題預設（rgba 白 0.62）：
+     近乎全透的塗層會讓半透明淡色在高飽和 backdrop 上偏色 */
   --color-surface-glass-border: rgba(255, 255, 255, 0.95);
   --color-sidebar-glass: rgba(255, 255, 255, 0.12);
   --color-sidebar-glass-border: rgba(255, 255, 255, 0.8);
@@ -179,7 +182,7 @@ body[data-style="liquid"] {
 }
 
 body.dark[data-style="liquid"] {
-  --color-surface-glass: rgba(16, 22, 36, 0.22);
+  /* 表面塗層同亮色模式：不覆寫，沿用深色主題預設 */
   --color-surface-glass-border: rgba(255, 255, 255, 0.28);
   --color-sidebar-glass: rgba(16, 22, 36, 0.18);
   --color-sidebar-glass-border: rgba(255, 255, 255, 0.22);
