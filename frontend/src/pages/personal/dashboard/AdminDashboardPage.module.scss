@@ -29,16 +29,6 @@
   @include glass-surface($shadow: var(--shadow-md));
   overflow: hidden;
   border-radius: $radius-16;
-  background: color-mix(
-    in srgb,
-    var(--color-primary) 8%,
-    var(--color-surface-glass)
-  );
-  border-color: color-mix(
-    in srgb,
-    var(--color-primary) 26%,
-    var(--color-surface-glass-border)
-  );
 }
 .assistantHero {
   display: grid;

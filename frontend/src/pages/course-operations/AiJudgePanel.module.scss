@@ -510,8 +510,8 @@
 }
 
 .assessmentStatus_current {
-  background: color-mix(in srgb, #28a745 12%, transparent);
-  color: #28a745;
+  background: color-mix(in srgb, var(--color-success) 12%, transparent);
+  color: var(--color-success);
 }
 
 .assessmentStatus_stale {
@@ -1131,9 +1131,9 @@
 }
 
 .badge_success { background: color-mix(in srgb, var(--color-success) 12%, transparent); color: var(--color-success); }
-.badge_info    { background: color-mix(in srgb, var(--color-primary-dark) 12%, transparent); color: var(--color-primary-dark); }
-.badge_danger  { background: color-mix(in srgb, var(--color-danger) 12%, transparent); color: var(--color-danger); }
-.badge_muted   { background: var(--color-hover); color: var(--color-text-muted); }
+.badge_info { background: color-mix(in srgb, var(--color-primary-dark) 12%, transparent); color: var(--color-primary-dark); }
+.badge_danger { background: color-mix(in srgb, var(--color-danger) 12%, transparent); color: var(--color-danger); }
+.badge_muted { background: var(--color-hover); color: var(--color-text-muted); }
 
 /* ── Modal ── */
 .modalOverlay {
@@ -1144,10 +1144,29 @@
   padding: $spacing-16;
   background: var(--color-overlay);
   backdrop-filter: blur(4px);
+  animation: modalFadeIn 0.15s ease;
+  transition: opacity 0.15s ease;
+}
+
+.modalOverlayOut {
+  animation: none;
+  opacity: 0;
+  pointer-events: none;
+}
+
+@keyframes modalFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes modalSlideUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 .modal,
 .confirm {
+  animation: modalSlideUp 0.18s cubic-bezier(0.25, 0.8, 0.25, 1);
   width: min(640px, 100%);
   max-height: 88vh;
   overflow-y: auto;
@@ -1223,9 +1242,8 @@
   @include flex-column;
   gap: $spacing-16;
   padding: $spacing-16;
-  border: 1px solid var(--color-border);
-  border-radius: $radius-12;
-  background: var(--color-surface);
+  @include glass-surface($shadow: var(--shadow-sm));
+  border-radius: $radius-16;
 }
 
 .sessionCreate {
@@ -1315,8 +1333,22 @@
 .sessionRowActions .iconBtn { width: 36px; height: 36px; }
 .pinActive { color: var(--color-primary); }
 
+@keyframes menuIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.sessionMenuOut {
+  animation: none !important;
+  opacity: 0;
+  transform: translateY(6px);
+  pointer-events: none;
+}
+
 .sessionMenu,
 .sourceMenu {
+  animation: menuIn 0.13s ease;
+  transition: opacity 0.13s ease, transform 0.13s ease;
   position: absolute;
   z-index: 20;
   display: flex;
@@ -1338,7 +1370,7 @@
   overflow-y: auto;
   padding: 8px;
   border-radius: $radius-12;
-  box-shadow: 0 16px 40px rgb(0 0 0 / 18%), 0 2px 8px rgb(0 0 0 / 8%);
+  box-shadow: var(--shadow-lg);
 }
 
 .sourceMenu {
@@ -1382,9 +1414,8 @@
   flex-direction: column;
   gap: $spacing-16;
   padding: $spacing-16;
-  border: 1px solid var(--color-border);
-  border-radius: $radius-12;
-  background: var(--color-surface);
+  @include glass-surface($shadow: var(--shadow-sm));
+  border-radius: $radius-16;
 }
 
 .sourceRailHead {
@@ -1428,9 +1459,8 @@
 .createChooser {
   min-width: 0;
   padding: clamp(20px, 3vw, 32px);
-  border: 1px solid var(--color-border);
-  border-radius: $radius-12;
-  background: var(--color-surface);
+  @include glass-surface($shadow: var(--shadow-sm));
+  border-radius: $radius-16;
 }
 .createCheckPanel { max-width: 760px; }
 .inlineBackButton {
@@ -1491,7 +1521,7 @@
 .modeFieldset { margin: 0; padding: 0; border: 0; }.modeFieldset legend { margin-bottom: 8px; color: var(--color-text-secondary); font-size: $font-size-12; font-weight: $font-weight-500; }
 .modeChoices { display: grid; gap: $spacing-8; }.modeChoice, .modeChoiceActive { display: flex; gap: 9px; padding: 11px; border: 1px solid var(--color-border); border-radius: $radius-8; cursor: pointer; }.modeChoiceActive { border-color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 7%, transparent); }.modeChoice input, .modeChoiceActive input { margin-top: 3px; accent-color: var(--color-primary); }.modeChoice span, .modeChoiceActive span { display: flex; min-width: 0; flex-direction: column; gap: 3px; }.modeChoice b, .modeChoiceActive b { font-size: $font-size-14; }.modeChoice small, .modeChoiceActive small { color: var(--color-text-muted); font-size: $font-size-12; line-height: 1.4; }
 .modeFields { display: flex; flex-direction: column; gap: $spacing-16; }.dialogChips { display: flex; flex-wrap: wrap; gap: 7px; }.dialogChip, .dialogChipActive { display: inline-flex; align-items: center; gap: 5px; padding: 6px 9px; border: 1px solid var(--color-border); border-radius: 999px; color: var(--color-text-secondary); background: var(--color-surface); font-size: $font-size-12; cursor: pointer; }.dialogChipActive { border-color: var(--color-primary); color: var(--color-primary-dark); background: color-mix(in srgb, var(--color-primary) 9%, transparent); }.dialogChip input { accent-color: var(--color-primary); }
-.existingPicker { display: flex; flex-direction: column; gap: $spacing-8; }.existingPickerHead { display: flex; align-items: center; justify-content: space-between; gap: $spacing-8; color: var(--color-text-secondary); font-size: $font-size-12; font-weight: $font-weight-500; }.uploadSourceButton { display: inline-flex; align-items: center; gap: 5px; padding: 6px 8px; border: 1px solid var(--color-border); border-radius: $radius-8; color: var(--color-text-primary); background: var(--color-surface); font-size: $font-size-12; cursor: pointer; }.uploadSourceButton:hover { background: var(--color-hover); }.uploadSourceButton input { display: none; }.existingList { display: flex; max-height: 200px; flex-direction: column; gap: 5px; overflow-y: auto; }.existingRow, .existingRowActive { display: flex; gap: 8px; padding: 8px; border: 1px solid var(--color-border); border-radius: $radius-8; cursor: pointer; }.existingRowActive { border-color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 7%, transparent); }.existingRow input, .existingRowActive input { accent-color: var(--color-primary); }.existingRow span, .existingRowActive span { display: flex; min-width: 0; flex-direction: column; gap: 2px; }.existingRow b, .existingRowActive b { overflow: hidden; font-size: $font-size-12; text-overflow: ellipsis; white-space: nowrap; }.existingRow small, .existingRowActive small { color: var(--color-text-muted); font-size: $font-size-12; }.dialogError { margin: 0; color: var(--color-danger); font-size: $font-size-12; }
+.existingPicker { display: flex; flex-direction: column; gap: $spacing-8; }.existingPickerHead { display: flex; align-items: center; justify-content: space-between; gap: $spacing-8; color: var(--color-text-secondary); font-size: $font-size-12; font-weight: $font-weight-500; }.existingList { display: flex; max-height: 200px; flex-direction: column; gap: 5px; overflow-y: auto; }.existingRow, .existingRowActive { display: flex; gap: 8px; padding: 8px; border: 1px solid var(--color-border); border-radius: $radius-8; cursor: pointer; }.existingRowActive { border-color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 7%, transparent); }.existingRow input, .existingRowActive input { accent-color: var(--color-primary); }.existingRow span, .existingRowActive span { display: flex; min-width: 0; flex-direction: column; gap: 2px; }.existingRow b, .existingRowActive b { overflow: hidden; font-size: $font-size-12; text-overflow: ellipsis; white-space: nowrap; }.existingRow small, .existingRowActive small { color: var(--color-text-muted); font-size: $font-size-12; }.dialogError { margin: 0; color: var(--color-danger); font-size: $font-size-12; }
 .uploadSourceBlock,
 .savedRubricBlock { display: flex; flex-direction: column; gap: $spacing-8; }
 .uploadEnvironmentHint,
@@ -1628,11 +1658,9 @@
   .sessionWorkspace {
     grid-template-columns: minmax(220px, 260px) minmax(0, 1fr);
   }
-
   .sessionSidebar {
     position: static;
   }
-
   .sessionList {
     max-height: 240px;
   }
@@ -1649,7 +1677,6 @@
   .createChoice { min-height: 190px; padding: $spacing-16; }
   .createCheckPanel { padding: $spacing-16; }
   .existingPickerHead { align-items: flex-start; flex-direction: column; }
-  .uploadSourceButton { width: 100%; justify-content: center; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -10,6 +10,12 @@
   overflow: hidden;
   max-height: 100%;
   overflow-y: auto;
+  animation: panelIn 0.18s ease;
+}
+
+@keyframes panelIn {
+  from { opacity: 0; transform: translateX(8px); }
+  to   { opacity: 1; transform: translateX(0); }
 }
 
 /* ── Header ── */

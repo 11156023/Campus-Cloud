@@ -10,15 +10,19 @@ import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import MIcon from "../MIcon";
 import { ResourcesService } from "../../services/resources";
+import useDialogPresence from "../../hooks/useDialogPresence";
 import styles from "./SessionWarningDialog.module.scss";
 
 export default function SessionWarningDialog({ status, onClose, onDismissPermanent }) {
   const [doNotShow, setDoNotShow] = useState(false);
   const [extending, setExtending] = useState(false);
+  // 關閉時保留最後一筆狀態，先播放離場動畫再卸載
+  const presence = useDialogPresence(status);
+  const shown = presence.item;
 
-  if (!status) return null;
+  if (!presence.open) return null;
 
-  const isExpiry = status.warn_reason === "expiry";
+  const isExpiry = shown.warn_reason === "expiry";
 
   const handleClose = () => {
     if (doNotShow) onDismissPermanent();
@@ -29,7 +33,7 @@ export default function SessionWarningDialog({ status, onClose, onDismissPermane
   const handleExtend = async () => {
     setExtending(true);
     try {
-      const result = await ResourcesService.extendSession(status.vmid);
+      const result = await ResourcesService.extendSession(shown.vmid);
       toast.success(`已延長 ${result.extended_minutes / 60} 小時`);
       onClose();
     } catch (e) {
@@ -40,7 +44,10 @@ export default function SessionWarningDialog({ status, onClose, onDismissPermane
   };
 
   return createPortal(
-    <div className={styles.overlay} onClick={handleClose}>
+    <div
+      className={`${styles.overlay} ${presence.closing ? styles.overlayOut : ""}`}
+      onClick={handleClose}
+    >
       <div
         className={styles.dialog}
         role="alertdialog"
@@ -58,12 +65,12 @@ export default function SessionWarningDialog({ status, onClose, onDismissPermane
         <p className={styles.desc}>
           {isExpiry ? (
             <>
-              VM #{status.vmid} 將在約 <strong>{status.hours_until_expiry ?? "?"} 小時</strong>{" "}
+              VM #{shown.vmid} 將在約 <strong>{shown.hours_until_expiry ?? "?"} 小時</strong>{" "}
               後到期並停用。請及早備份資料；如需延長使用期限，請向管理員申請。
             </>
           ) : (
             <>
-              VM #{status.vmid} 將在約 <strong>{status.minutes_until_stop ?? "?"} 分鐘</strong>{" "}
+              VM #{shown.vmid} 將在約 <strong>{shown.minutes_until_stop ?? "?"} 分鐘</strong>{" "}
               後自動關機。需要繼續使用嗎？
             </>
           )}
@@ -86,7 +93,7 @@ export default function SessionWarningDialog({ status, onClose, onDismissPermane
             <button
               type="button"
               className={styles.btnPrimary}
-              disabled={!status.can_extend || extending}
+              disabled={!shown.can_extend || extending}
               onClick={handleExtend}
             >
               <span className={extending ? styles.spin : ""}>

@@ -34,6 +34,12 @@
   z-index: 3100;
   overflow: hidden;
   pointer-events: none;
+  animation: guideLayerIn 0.18s ease;
+}
+
+@keyframes guideLayerIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 .guideBackdrop {

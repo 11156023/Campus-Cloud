@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import styles from "./GpuMgmtPage.module.scss";
 import MIcon from "../../../components/MIcon";
 import SharedEmptyState from "../../../components/EmptyState/EmptyState";
@@ -10,6 +10,9 @@ import LoadingState from "../../../components/LoadingState/LoadingState";
 import PageHeader from "../../../components/PageHeader/PageHeader";
 
 const COLUMNS = ["Mapping", "描述", "節點 / PCI", "可用 / 總數", "使用中 VM", "狀態", "動作"];
+
+/* 超過此數量的 PCI 位址改以「範圍摘要 + 展開列」顯示，避免 SR-IOV 撐爆列高 */
+const PCI_COLLAPSE_THRESHOLD = 3;
 
 /* 將 backend GPUMappingDetail 攤平為前端列 */
 function flattenMappings(mappings) {
@@ -47,6 +50,61 @@ function flattenMappings(mappings) {
       })),
     };
   });
+}
+
+/* 解析 PCI 位址 domain:bus:device.function；function 佔 3 bits，
+   以 device*8+function 當序數判斷 VF 是否連續（15:00.7 的下一個是 15:01.0） */
+function parsePci(path) {
+  const m = /^([0-9a-fA-F]{4}:[0-9a-fA-F]{2}):([0-9a-fA-F]{2})\.([0-9a-fA-F])$/.exec(path ?? "");
+  if (!m) return null;
+  return { prefix: m[1], ord: parseInt(m[2], 16) * 8 + parseInt(m[3], 16) };
+}
+
+/* 將同節點、同 domain:bus 的連續位址壓成區段；無法解析或不連續就各自成段 */
+function compressEntries(mapEntries) {
+  const segments = [];
+  for (const entry of mapEntries) {
+    const parsed = parsePci(entry.pci);
+    const last = segments[segments.length - 1];
+    if (
+      parsed &&
+      last?.endOrd != null &&
+      last.node === entry.node &&
+      last.prefix === parsed.prefix &&
+      parsed.ord === last.endOrd + 1
+    ) {
+      last.end = entry.pci;
+      last.endOrd = parsed.ord;
+      last.count += 1;
+    } else {
+      segments.push({
+        node: entry.node,
+        start: entry.pci,
+        end: entry.pci,
+        prefix: parsed?.prefix,
+        endOrd: parsed?.ord ?? null,
+        count: 1,
+      });
+    }
+  }
+  return segments;
+}
+
+/* 區段顯示文字，迄端省略 domain：0000:15:00.2 – 15:03.7 */
+function formatSegment(seg) {
+  if (seg.count === 1) return seg.start;
+  return `${seg.start} – ${seg.end.replace(/^[0-9a-fA-F]{4}:/, "")}`;
+}
+
+/* 依節點分組（保留原始順序），供展開列分節顯示 */
+function groupByNode(mapEntries) {
+  const groups = [];
+  for (const entry of mapEntries) {
+    const last = groups[groups.length - 1];
+    if (last && last.node === entry.node) last.items.push(entry);
+    else groups.push({ node: entry.node, items: [entry] });
+  }
+  return groups;
 }
 
 /* MB → 人類可讀（512 MB / 4 GB / 1.5 GB） */
@@ -103,6 +161,16 @@ export default function GpuMgmtPage() {
   const [rows, setRows] = useState([]);
   const [filter, setFilter] = useState("");
   const [loading, setLoading] = useState(true);
+  const [expandedIds, setExpandedIds] = useState(() => new Set());
+
+  const toggleExpanded = (id) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   /** silent = true 時不觸發 loading 與錯誤提示，供背景自動刷新使用 */
   const load = useCallback(async (silent = false) => {
@@ -224,73 +292,119 @@ export default function GpuMgmtPage() {
                 </tr>
               </thead>
               <tbody>
-                {visible.map((n) => (
-                  <tr key={n.id} className={styles.tr}>
-                    <td className={styles.td}>
-                      <div className={styles.nameCell}>
-                        <div className={styles.nameIcon}>
-                          <MIcon name="memory" size={18} />
-                        </div>
-                        <div>
-                          <div className={styles.namePrimary}>{n.mapping}</div>
-                          <div className={styles.nameSub}>
-                            {n.is_sriov ? "SR-IOV" : "Passthrough"}
-                            {n.mdev_profile ? ` · ${n.mdev_profile}` : ""}
-                            {n.per_instance_vram_mb > 0
-                              ? ` (${formatVram(n.per_instance_vram_mb)}/顆)`
-                              : ""}
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className={styles.td}>{n.description || "—"}</td>
-                    <td className={styles.td}>
-                      {n.mapEntries.length === 0 ? (
-                        <span className={styles.muted}>—</span>
-                      ) : (
-                        <div className={styles.mapList}>
-                          {n.mapEntries.map((entry) => (
-                            <div key={entry.key} className={styles.mapEntry}>
-                              <span className={styles.mapNode}>{entry.node}</span>
-                              <code className={styles.code}>{entry.pci}</code>
+                {visible.map((n) => {
+                  const collapsible = n.mapEntries.length > PCI_COLLAPSE_THRESHOLD;
+                  const expanded = collapsible && expandedIds.has(n.id);
+                  const unitLabel = n.is_sriov ? "個 VF" : "個裝置";
+                  return (
+                    <Fragment key={n.id}>
+                      <tr className={`${styles.tr} ${expanded ? styles.trExpanded : ""}`}>
+                        <td className={styles.td}>
+                          <div className={styles.nameCell}>
+                            <div className={styles.nameIcon}>
+                              <MIcon name="memory" size={18} />
                             </div>
-                          ))}
-                        </div>
+                            <div>
+                              <div className={styles.namePrimary}>{n.mapping}</div>
+                              <div className={styles.nameSub}>
+                                {n.is_sriov ? "SR-IOV" : "Passthrough"}
+                                {n.mdev_profile ? ` · ${n.mdev_profile}` : ""}
+                                {n.per_instance_vram_mb > 0
+                                  ? ` (${formatVram(n.per_instance_vram_mb)}/顆)`
+                                  : ""}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className={styles.td}>{n.description || "—"}</td>
+                        <td className={styles.td}>
+                          {n.mapEntries.length === 0 ? (
+                            <span className={styles.muted}>—</span>
+                          ) : collapsible ? (
+                            <div className={styles.mapSummary}>
+                              {compressEntries(n.mapEntries).map((seg) => (
+                                <span key={`${seg.node}-${seg.start}`} className={styles.mapEntry}>
+                                  <span className={styles.mapNode}>{seg.node}</span>
+                                  <code className={styles.code}>{formatSegment(seg)}</code>
+                                </span>
+                              ))}
+                              <button
+                                type="button"
+                                className={`${styles.vfChip} ${expanded ? styles.vfChipOpen : ""}`}
+                                aria-expanded={expanded}
+                                onClick={() => toggleExpanded(n.id)}
+                              >
+                                {n.mapEntries.length} {unitLabel}
+                                <MIcon name="expand_more" size={14} />
+                              </button>
+                            </div>
+                          ) : (
+                            <div className={styles.mapList}>
+                              {n.mapEntries.map((entry) => (
+                                <div key={entry.key} className={styles.mapEntry}>
+                                  <span className={styles.mapNode}>{entry.node}</span>
+                                  <code className={styles.code}>{entry.pci}</code>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </td>
+                        <td className={styles.td}>
+                          <div>{n.available_count} / {n.capacity_count}</div>
+                          {n.is_sriov && n.capacity_count !== n.device_count && (
+                            <div className={styles.cellSub}>{n.device_count} VF</div>
+                          )}
+                          {n.total_vram_mb > 0 && (
+                            <div className={styles.cellSub}>
+                              {n.used_vram_known
+                                ? `VRAM 使用中 ${formatVram(n.used_vram_mb) || "0"} / ${formatVram(n.total_vram_mb)}`
+                                : `VRAM 共 ${formatVram(n.total_vram_mb)} · 已用量未知`}
+                            </div>
+                          )}
+                        </td>
+                        <td className={styles.td}>
+                          <VmChips vms={n.vms} />
+                        </td>
+                        <td className={styles.td}>
+                          <StatusBadge used={n.used_count} total={n.capacity_count} />
+                        </td>
+                        <td className={styles.td}>
+                          <div className={styles.actions}>
+                            <button
+                              type="button"
+                              className={`${styles.actionBtn} ${styles.actionBtnDanger}`}
+                              title="移除映射"
+                              onClick={() => handleDelete(n.id)}
+                            >
+                              <MIcon name="delete" size={16} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+
+                      {expanded && (
+                        <tr className={styles.detailTr}>
+                          <td className={styles.detailTd} colSpan={COLUMNS.length}>
+                            <div className={styles.detailBody}>
+                              {groupByNode(n.mapEntries).map((group) => (
+                                <div key={group.node}>
+                                  <div className={styles.detailNode}>
+                                    {group.node} · {group.items.length} {unitLabel}
+                                  </div>
+                                  <div className={styles.pciGrid}>
+                                    {group.items.map((entry) => (
+                                      <code key={entry.key} className={styles.code}>{entry.pci}</code>
+                                    ))}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </td>
+                        </tr>
                       )}
-                    </td>
-                    <td className={styles.td}>
-                      <div>{n.available_count} / {n.capacity_count}</div>
-                      {n.is_sriov && n.capacity_count !== n.device_count && (
-                        <div className={styles.cellSub}>{n.device_count} VF</div>
-                      )}
-                      {n.total_vram_mb > 0 && (
-                        <div className={styles.cellSub}>
-                          {n.used_vram_known
-                            ? `VRAM 使用中 ${formatVram(n.used_vram_mb) || "0"} / ${formatVram(n.total_vram_mb)}`
-                            : `VRAM 共 ${formatVram(n.total_vram_mb)} · 已用量未知`}
-                        </div>
-                      )}
-                    </td>
-                    <td className={styles.td}>
-                      <VmChips vms={n.vms} />
-                    </td>
-                    <td className={styles.td}>
-                      <StatusBadge used={n.used_count} total={n.capacity_count} />
-                    </td>
-                    <td className={styles.td}>
-                      <div className={styles.actions}>
-                        <button
-                          type="button"
-                          className={`${styles.actionBtn} ${styles.actionBtnDanger}`}
-                          title="移除映射"
-                          onClick={() => handleDelete(n.id)}
-                        >
-                          <MIcon name="delete" size={16} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                    </Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>

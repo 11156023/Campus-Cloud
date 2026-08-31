@@ -10,6 +10,13 @@
   @include flex-center;
   padding: $spacing-16;
   animation: fadeIn 0.15s ease;
+  transition: opacity 0.15s ease;
+}
+
+.overlayOut {
+  animation: none;
+  opacity: 0;
+  pointer-events: none;
 }
 
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -239,6 +246,13 @@
   @include flex-center;
   background: rgba(0, 0, 0, 0.6);
   backdrop-filter: blur(4px);
+  animation: fadeIn 0.15s ease;
+  transition: opacity 0.15s ease;
+}
+
+.takeoverOverlayOut {
+  animation: none;
+  opacity: 0;
 }
 
 .takeoverBox {

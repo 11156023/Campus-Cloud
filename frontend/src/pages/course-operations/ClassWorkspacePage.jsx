@@ -12,7 +12,8 @@ import { ClassroomService } from "../../services/classroom";
 import { courseNodeHasUsableSource, CourseEnvironmentsService } from "../../services/courseEnvironments";
 import { TeachingClassesService } from "../../services/teachingClasses";
 import AiJudgePanel from "./AiJudgePanel";
-import ClassCreateDialog from "./ClassCreatePage";
+import ClassCreateDialog from "./ClassCreateDialog";
+import useDialogPresence from "../../hooks/useDialogPresence";
 import {
   machineRuntimeState,
   mergeResourceUsageByVmid,
@@ -243,6 +244,7 @@ function Students({ item, onRefresh }) {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
+  const addDialog = useDialogPresence(showAdd);
   const fileRef = useRef(null);
   const locked = item.status !== "planning";
   async function add(event) {
@@ -313,7 +315,7 @@ function Students({ item, onRefresh }) {
       })}</div> : <EmptyState icon="group_add" title="尚未加入學生。" />}
     </section>
 
-    {showAdd && <div className={styles.createDialogOverlay} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) setShowAdd(false); }}><section className={`${styles.createDialog} ${styles.studentDialog}`} role="dialog" aria-modal="true" aria-labelledby="add-student-title"><header className={styles.createDialogHeader}><h2 id="add-student-title">加入學生</h2><button type="button" className={styles.iconBtn} aria-label="關閉" onClick={() => setShowAdd(false)}><MIcon name="close" size={19} /></button></header><form onSubmit={add}><div className={styles.studentDialogBody}><label className={styles.field}><span>Email，可使用逗號或換行分隔</span><textarea rows={6} value={emails} onChange={(event) => setEmails(event.target.value)} placeholder="student01@example.edu&#10;student02@example.edu" autoFocus /></label></div><footer className={styles.createDialogFooter}><button type="button" className={styles.btnSecondary} onClick={() => setShowAdd(false)}>取消</button><button type="submit" className={styles.btnPrimary} disabled={!emails.trim() || busy}>{busy ? "加入中…" : "加入學生"}</button></footer></form></section></div>}
+    {addDialog.open && <div className={`${styles.createDialogOverlay} ${addDialog.closing ? styles.createDialogOverlayOut : ""}`} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) setShowAdd(false); }}><section className={`${styles.createDialog} ${styles.studentDialog}`} role="dialog" aria-modal="true" aria-labelledby="add-student-title"><header className={styles.createDialogHeader}><h2 id="add-student-title">加入學生</h2><button type="button" className={styles.iconBtn} aria-label="關閉" onClick={() => setShowAdd(false)}><MIcon name="close" size={19} /></button></header><form onSubmit={add}><div className={styles.studentDialogBody}><label className={styles.field}><span>Email，可使用逗號或換行分隔</span><textarea rows={6} value={emails} onChange={(event) => setEmails(event.target.value)} placeholder="student01@example.edu&#10;student02@example.edu" autoFocus /></label></div><footer className={styles.createDialogFooter}><button type="button" className={styles.btnSecondary} onClick={() => setShowAdd(false)}>取消</button><button type="submit" className={styles.btnPrimary} disabled={!emails.trim() || busy}>{busy ? "加入中…" : "加入學生"}</button></footer></form></section></div>}
   </div>;
 }
 
@@ -704,6 +706,7 @@ export default function ClassWorkspacePage() {
   const [recovering, setRecovering] = useState(false);
   const [lifecycleBusy, setLifecycleBusy] = useState(false);
   const [scheduleOpen, setScheduleOpen] = useState(false);
+  const scheduleDialog = useDialogPresence(scheduleOpen);
   const [templateId, setTemplateId] = useState("");
   const [templates, setTemplates] = useState([]);
   const template = templates.find((row) => row.id === templateId);
@@ -842,6 +845,6 @@ export default function ClassWorkspacePage() {
       {tab === "ai" && !postUnavailable && <AiJudgeWorkspace item={item} />}
       {!TABS.some(([key]) => key === tab) && <LockedFeature section={tab} />}
     </main>
-    {scheduleOpen && <ClassCreateDialog item={item} onClose={() => setScheduleOpen(false)} onUpdated={(result) => { refresh(result); setScheduleOpen(false); setMessage("班級與固定課表已更新。"); }} />}
+    {scheduleDialog.open && <ClassCreateDialog item={item} closing={scheduleDialog.closing} onClose={() => setScheduleOpen(false)} onUpdated={(result) => { refresh(result); setScheduleOpen(false); setMessage("班級與固定課表已更新。"); }} />}
   </div>;
 }

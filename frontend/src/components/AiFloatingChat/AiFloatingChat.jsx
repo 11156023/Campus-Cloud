@@ -4,6 +4,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { AiNavigationService } from "../../services/aiNavigation";
 import { AiTemplateRecommendationApi } from "../../services/aiTemplateRecommendation";
 import MIcon from "../MIcon";
+import useDialogPresence from "../../hooks/useDialogPresence";
 import styles from "./AiFloatingChat.module.scss";
 
 const PAGE_CONTEXTS = [
@@ -111,6 +112,8 @@ function Message({ message, onNavigate }) {
 }
 
 export default function AiFloatingChat({ open = false, onOpenChange = () => {} }) {
+  // 關閉時先播放離場動畫再卸載面板
+  const presence = useDialogPresence(open, 180);
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -218,11 +221,18 @@ export default function AiFloatingChat({ open = false, onOpenChange = () => {} }
   }
 
   return (
-    <div className={`${styles.root} ${open ? styles.rootOpen : ""}`}>
-      {open && <button type="button" className={styles.backdrop} onClick={close} aria-label="關閉 AI 助手" />}
+    <div className={`${styles.root} ${presence.open ? styles.rootOpen : ""}`}>
+      {presence.open && (
+        <button
+          type="button"
+          className={`${styles.backdrop} ${presence.closing ? styles.backdropOut : ""}`}
+          onClick={close}
+          aria-label="關閉 AI 助手"
+        />
+      )}
 
-      {open && (
-        <aside className={styles.panel} aria-label="AI 助手">
+      {presence.open && (
+        <aside className={`${styles.panel} ${presence.closing ? styles.panelOut : ""}`} aria-label="AI 助手">
           <header className={styles.header}>
             <span className={styles.brandIcon}><MIcon name="auto_awesome" size={19} /></span>
             <div className={styles.headerText}>
@@ -289,7 +299,7 @@ export default function AiFloatingChat({ open = false, onOpenChange = () => {} }
         </aside>
       )}
 
-      {!open && (
+      {!presence.open && (
         <button type="button" className={styles.fab} onClick={() => onOpenChange(true)} aria-label="開啟 AI 助手">
           <MIcon name="auto_awesome" size={21} />
           <span>AI 助手</span>

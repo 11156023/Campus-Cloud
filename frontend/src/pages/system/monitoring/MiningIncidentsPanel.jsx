@@ -5,6 +5,7 @@ import LoadingState from "../../../components/LoadingState/LoadingState";
 import EmptyState from "../../../components/EmptyState/EmptyState";
 import { MiningIncidentsService } from "../../../services/miningIncidents";
 import { useToast } from "../../../hooks/useToast";
+import useDialogPresence from "../../../hooks/useDialogPresence";
 
 const STATUS_LABELS = {
   detected: "已偵測",
@@ -26,6 +27,8 @@ export default function MiningIncidentsPanel() {
   const [dismissExempt, setDismissExempt] = useState(false);
   const [dismissNote, setDismissNote] = useState("");
   const [busy, setBusy] = useState(false);
+  const banDialog     = useDialogPresence(banTarget);
+  const dismissDialog = useDialogPresence(dismissTarget);
 
   const load = useCallback(async () => {
     try {
@@ -174,12 +177,15 @@ export default function MiningIncidentsPanel() {
       )}
 
       {/* 停權確認 */}
-      {banTarget && (
-        <div className={styles.modalOverlay} onClick={() => setBanTarget(null)}>
+      {banDialog.open && (
+        <div
+          className={`${styles.modalOverlay} ${banDialog.closing ? styles.modalOverlayOut : ""}`}
+          onClick={() => setBanTarget(null)}
+        >
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
             <span className={styles.modalTitle}>確認停權帳號？</span>
             <p className={styles.modalDesc}>
-              VMID {banTarget.vmid} 的擁有者帳號將被停用（無法登入），VM
+              VMID {banDialog.item.vmid} 的擁有者帳號將被停用（無法登入），VM
               維持暫停狀態以保留證據。此操作可由管理員在使用者管理中還原。
             </p>
             <div className={styles.modalActions}>
@@ -204,12 +210,15 @@ export default function MiningIncidentsPanel() {
       )}
 
       {/* 誤判解除 */}
-      {dismissTarget && (
-        <div className={styles.modalOverlay} onClick={closeDismiss}>
+      {dismissDialog.open && (
+        <div
+          className={`${styles.modalOverlay} ${dismissDialog.closing ? styles.modalOverlayOut : ""}`}
+          onClick={closeDismiss}
+        >
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
             <span className={styles.modalTitle}>解除挖礦事件</span>
             <p className={styles.modalDesc}>
-              VMID {dismissTarget.vmid} 將標記為誤判並嘗試恢復運行。
+              VMID {dismissDialog.item.vmid} 將標記為誤判並嘗試恢復運行。
             </p>
             <label className={styles.checkLine}>
               <input

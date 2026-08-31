@@ -119,7 +119,7 @@ function PortForwardForm({ rows, setRows }) {
 }
 
 /* ── 主元件 ── */
-export default function ConnectionDialog({ nodes, onConfirm, onClose }) {
+export default function ConnectionDialog({ nodes, onConfirm, onClose, closing = false }) {
   // 節點選擇
   const [sourceKey, setSourceKey] = useState("internet");
   const [targetKey, setTargetKey] = useState(nodes[0]?.key ?? "");
@@ -207,7 +207,10 @@ export default function ConnectionDialog({ nodes, onConfirm, onClose }) {
   };
 
   return (
-    <div className={styles.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div
+      className={`${styles.overlay} ${closing ? styles.overlayOut : ""}`}
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
       <div className={styles.dialog}>
         {/* Title */}
         <div className={styles.dialogHeader}>
