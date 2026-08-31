@@ -7,6 +7,7 @@ import { useAuth } from "../../../contexts/AuthContext";
 import { TemplatesService, safeTemplateIconUrl } from "../../../services/templates";
 import { downloadBlob } from "../../../services/api";
 import { useToast } from "../../../hooks/useToast";
+import useDialogPresence from "../../../hooks/useDialogPresence";
 import { useConfirm } from "../../../components/ConfirmDialog/ConfirmProvider";
 import { TemplateStatusBadge } from "./TemplateBadges";
 import TemplateCloneDialog from "./TemplateCloneDialog";
@@ -27,7 +28,7 @@ const formatBytes = (bytes) => {
 };
 
 /** 使用手冊（附件）瀏覽與下載 */
-function ManualDialog({ template, onClose }) {
+function ManualDialog({ template, closing = false, onClose }) {
   const toast = useToast();
   const [attachments, setAttachments] = useState(null);
   const [downloadingId, setDownloadingId] = useState(null);
@@ -60,7 +61,10 @@ function ManualDialog({ template, onClose }) {
   };
 
   return (
-    <div className={styles.modalOverlay} onClick={onClose}>
+    <div
+      className={`${styles.modalOverlay} ${closing ? styles.modalOverlayOut : ""}`}
+      onClick={onClose}
+    >
       <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
         <span className={styles.modalTitle}>
           <MIcon name="description" size={20} />
@@ -101,7 +105,7 @@ function ManualDialog({ template, onClose }) {
 }
 
 /** 單列的「⋯」操作選單 */
-function RowMenu({ template, cycleBusy, onClone, onEdit, onManual, onRetry, onCycle, onDelete, onClose, anchorRef }) {
+function RowMenu({ template, cycleBusy, onClone, onEdit, onManual, onRetry, onCycle, onDelete, onClose, anchorRef, closing = false }) {
   const ref = useRef(null);
 
   useEffect(() => {
@@ -113,7 +117,7 @@ function RowMenu({ template, cycleBusy, onClone, onEdit, onManual, onRetry, onCy
   }, [onClose, anchorRef]);
 
   return (
-    <div ref={ref} className={styles.rowMenu}>
+    <div ref={ref} className={`${styles.rowMenu} ${closing ? styles.rowMenuOut : ""}`}>
       <button
         type="button"
         className={styles.rowMenuItem}
@@ -200,6 +204,7 @@ function RowMenu({ template, cycleBusy, onClone, onEdit, onManual, onRetry, onCy
 
 function ManagementRow({ template, cycleBusy, onClone, onEdit, onManual, onRetry, onCycle, onDelete }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const menu = useDialogPresence(menuOpen, 130);
   const menuBtnRef = useRef(null);
 
   return (
@@ -244,7 +249,7 @@ function ManagementRow({ template, cycleBusy, onClone, onEdit, onManual, onRetry
       <td className={`${styles.td} ${styles.mutedCell}`}>v{template.version}</td>
       <td className={`${styles.td} ${styles.tdMenu}`}>
         <div className={styles.menuWrap}>
-          {menuOpen && (
+          {menu.open && (
             <RowMenu
               template={template}
               cycleBusy={cycleBusy}
@@ -256,6 +261,7 @@ function ManagementRow({ template, cycleBusy, onClone, onEdit, onManual, onRetry
               onDelete={onDelete}
               onClose={() => setMenuOpen(false)}
               anchorRef={menuBtnRef}
+              closing={menu.closing}
             />
           )}
           <button
@@ -362,6 +368,11 @@ export default function TemplatesPage() {
   const [cloneTarget, setCloneTarget] = useState(null);
   const [manualTarget, setManualTarget] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const createDialog  = useDialogPresence(createOpen);
+  const editDialog    = useDialogPresence(editTarget);
+  const manualDialog  = useDialogPresence(manualTarget);
+  const cloneDialog   = useDialogPresence(cloneTarget);
+  const deleteDialog  = useDialogPresence(deleteTarget);
   const [cycleBusy, setCycleBusy] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const timerRef = useRef(null);
@@ -560,37 +571,44 @@ export default function TemplatesPage() {
         />
       )}
 
-      {createOpen && (
+      {createDialog.open && (
         <TemplateFormDialog
+          closing={createDialog.closing}
           onClose={() => setCreateOpen(false)}
           onSaved={() => load()}
         />
       )}
-      {editTarget && (
+      {editDialog.open && (
         <TemplateFormDialog
-          template={editTarget}
+          template={editDialog.item}
+          closing={editDialog.closing}
           onClose={() => setEditTarget(null)}
           onSaved={() => load()}
         />
       )}
-      {manualTarget && (
+      {manualDialog.open && (
         <ManualDialog
-          template={manualTarget}
+          template={manualDialog.item}
+          closing={manualDialog.closing}
           onClose={() => setManualTarget(null)}
         />
       )}
-      {cloneTarget && (
+      {cloneDialog.open && (
         <TemplateCloneDialog
-          template={cloneTarget}
+          template={cloneDialog.item}
           canBatch={canManage}
+          closing={cloneDialog.closing}
           onClose={() => setCloneTarget(null)}
         />
       )}
 
-      {deleteTarget && (
-        <div className={styles.modalOverlay} onClick={() => setDeleteTarget(null)}>
+      {deleteDialog.open && (
+        <div
+          className={`${styles.modalOverlay} ${deleteDialog.closing ? styles.modalOverlayOut : ""}`}
+          onClick={() => setDeleteTarget(null)}
+        >
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-            <span className={styles.modalTitle}>刪除範本「{deleteTarget.name}」？</span>
+            <span className={styles.modalTitle}>刪除範本「{deleteDialog.item.name}」？</span>
             <p className={styles.modalDesc}>
               PVE 端的範本磁碟會一併刪除，動作無法復原。如果還有從此範本克隆出的機器（linked
               clone），系統會拒絕刪除。

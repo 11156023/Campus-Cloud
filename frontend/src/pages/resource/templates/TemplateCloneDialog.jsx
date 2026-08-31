@@ -15,7 +15,7 @@ const formatBytes = (bytes) => {
 };
 
 /** 從範本克隆開通（teacher/admin 可批量，student 固定單台） */
-export default function TemplateCloneDialog({ template, canBatch, onClose, onCloned }) {
+export default function TemplateCloneDialog({ template, canBatch, closing = false, onClose, onCloned }) {
   const toast = useToast();
   const [hostname, setHostname] = useState("");
   const [count, setCount] = useState("1");
@@ -88,7 +88,10 @@ export default function TemplateCloneDialog({ template, canBatch, onClose, onClo
   };
 
   return (
-    <div className={styles.modalOverlay} onClick={onClose}>
+    <div
+      className={`${styles.modalOverlay} ${closing ? styles.modalOverlayOut : ""}`}
+      onClick={onClose}
+    >
       <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
         <span className={styles.modalTitle}>
           {safeTemplateIconUrl(template.icon_url) ? (

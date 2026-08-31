@@ -3,7 +3,7 @@ import MIcon from "../../components/MIcon";
 import { TeachingClassesService } from "../../services/teachingClasses";
 import styles from "./CourseOperations.module.scss";
 
-export default function ClassCreateDialog({ item = null, onClose, onCreated, onUpdated }) {
+export default function ClassCreateDialog({ item = null, closing = false, onClose, onCreated, onUpdated }) {
   const isEdit = Boolean(item);
   const [form, setForm] = useState(() => ({
     name: item?.name ?? "",
@@ -63,7 +63,7 @@ export default function ClassCreateDialog({ item = null, onClose, onCreated, onU
     }
   }
 
-  return <div className={styles.createDialogOverlay} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !submitting) onClose(); }}>
+  return <div className={`${styles.createDialogOverlay} ${closing ? styles.createDialogOverlayOut : ""}`} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !submitting) onClose(); }}>
     <section className={styles.createDialog} role="dialog" aria-modal="true" aria-labelledby="create-class-title">
       <header className={styles.createDialogHeader}>
         <h2 id="create-class-title">{isEdit ? "編輯班級與課表" : "建立班級"}</h2>

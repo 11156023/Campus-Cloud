@@ -496,6 +496,19 @@ $spacing-16: 12px;
   padding: $spacing-16;
   background: var(--color-overlay);
   backdrop-filter: blur(4px);
+  animation: fadeIn 0.15s ease;
+  transition: opacity 0.15s ease;
+}
+
+.modalOverlayOut {
+  animation: none;
+  opacity: 0;
+  pointer-events: none;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 .modal,
@@ -508,6 +521,12 @@ $spacing-16: 12px;
   padding: $spacing-24;
   @include glass-surface($shadow: var(--shadow-lg));
   border-radius: $radius-12;
+  animation: slideUp 0.18s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 .modalHeader {

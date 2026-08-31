@@ -9,6 +9,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import MIcon from "../MIcon";
+import useDialogPresence from "../../hooks/useDialogPresence";
 import styles from "./ConfirmDialog.module.scss";
 
 const ConfirmContext = createContext(null);
@@ -50,14 +51,19 @@ export function ConfirmProvider({ children }) {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [pending, close]);
 
-  const opts = pending?.options;
+  // 關閉時保留最後一筆資料，先播放離場動畫再卸載
+  const presence = useDialogPresence(pending);
+  const opts = presence.item?.options;
 
   return (
     <ConfirmContext.Provider value={confirm}>
       {children}
-      {pending &&
+      {presence.open &&
         createPortal(
-          <div className={styles.overlay} onClick={() => close(false)}>
+          <div
+            className={`${styles.overlay} ${presence.closing ? styles.overlayOut : ""}`}
+            onClick={() => close(false)}
+          >
             <div
               className={styles.dialog}
               role="alertdialog"

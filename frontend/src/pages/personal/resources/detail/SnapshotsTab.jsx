@@ -5,13 +5,17 @@ import LoadingState from "../../../../components/LoadingState/LoadingState";
 import EmptyState from "../../../../components/EmptyState/EmptyState";
 import { ResourcesService } from "../../../../services/resources";
 import { useToast } from "../../../../hooks/useToast";
+import useDialogPresence from "../../../../hooks/useDialogPresence";
 
 const INIT_SNAPSHOT_NAME = "skylab-init";
 
 /** 輕量確認 dialog（比照 ResourcesPage 的 ConfirmModal 行為） */
-function ConfirmModal({ title, desc, confirmLabel = "確定", danger = false, loading = false, onConfirm, onClose }) {
+function ConfirmModal({ title, desc, confirmLabel = "確定", danger = false, loading = false, closing = false, onConfirm, onClose }) {
   return (
-    <div className={styles.modalOverlay} onClick={onClose}>
+    <div
+      className={`${styles.modalOverlay} ${closing ? styles.modalOverlayOut : ""}`}
+      onClick={onClose}
+    >
       <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
         <span className={styles.modalTitle}>{title}</span>
         {desc && <p className={styles.modalDesc}>{desc}</p>}
@@ -43,6 +47,10 @@ export default function SnapshotsTab({ vmid }) {
   const [snapname, setSnapname] = useState("");
   const [description, setDescription] = useState("");
   const [busy, setBusy] = useState(false);
+  const createDialog    = useDialogPresence(createOpen);
+  const resetDialog     = useDialogPresence(resetConfirm);
+  const rollbackDialog  = useDialogPresence(rollbackTarget);
+  const deleteDialog    = useDialogPresence(deleteTarget);
 
   const load = useCallback(async () => {
     try {
@@ -201,8 +209,11 @@ export default function SnapshotsTab({ vmid }) {
         )}
       </div>
 
-      {createOpen && (
-        <div className={styles.modalOverlay} onClick={() => setCreateOpen(false)}>
+      {createDialog.open && (
+        <div
+          className={`${styles.modalOverlay} ${createDialog.closing ? styles.modalOverlayOut : ""}`}
+          onClick={() => setCreateOpen(false)}
+        >
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
             <span className={styles.modalTitle}>建立快照</span>
             <p className={styles.modalDesc}>快照會保留目前磁碟狀態，可隨時還原</p>
@@ -247,13 +258,14 @@ export default function SnapshotsTab({ vmid }) {
         </div>
       )}
 
-      {resetConfirm && (
+      {resetDialog.open && (
         <ConfirmModal
           title="重置到初始狀態？"
           desc="VM 會還原到初始快照並重新開機，之後的所有變更將會消失。"
           confirmLabel="重置"
           danger
           loading={busy}
+          closing={resetDialog.closing}
           onConfirm={() =>
             run(() => ResourcesService.resetToInit(vmid), "重置任務已排入背景執行", () =>
               setResetConfirm(false),
@@ -263,16 +275,17 @@ export default function SnapshotsTab({ vmid }) {
         />
       )}
 
-      {rollbackTarget && (
+      {rollbackDialog.open && (
         <ConfirmModal
-          title={`還原到快照「${rollbackTarget}」？`}
+          title={`還原到快照「${rollbackDialog.item}」？`}
           desc="還原後，快照之後的變更將會消失。"
           confirmLabel="還原"
           danger
           loading={busy}
+          closing={rollbackDialog.closing}
           onConfirm={() =>
             run(
-              () => ResourcesService.rollbackSnapshot(vmid, rollbackTarget),
+              () => ResourcesService.rollbackSnapshot(vmid, rollbackDialog.item),
               "還原已開始",
               () => setRollbackTarget(null),
             )
@@ -281,16 +294,17 @@ export default function SnapshotsTab({ vmid }) {
         />
       )}
 
-      {deleteTarget && (
+      {deleteDialog.open && (
         <ConfirmModal
-          title={`刪除快照「${deleteTarget}」？`}
+          title={`刪除快照「${deleteDialog.item}」？`}
           desc="刪除後無法復原。"
           confirmLabel="刪除"
           danger
           loading={busy}
+          closing={deleteDialog.closing}
           onConfirm={() =>
             run(
-              () => ResourcesService.deleteSnapshot(vmid, deleteTarget),
+              () => ResourcesService.deleteSnapshot(vmid, deleteDialog.item),
               "快照已刪除",
               () => setDeleteTarget(null),
             )

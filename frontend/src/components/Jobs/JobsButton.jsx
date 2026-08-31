@@ -4,6 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import MIcon from "../MIcon";
 import { useJobs } from "./JobsProvider";
 import { JobEmpty, JobLoading, JobRow, ReminderRow } from "./JobRow";
+import useDialogPresence from "../../hooks/useDialogPresence";
 import styles from "./Jobs.module.scss";
 
 const POPOVER_WIDTH = 360;
@@ -34,6 +35,8 @@ export default function JobsButton({ collapsed = false }) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState(null);
+  // 關閉時先播放離場動畫再卸載
+  const presence = useDialogPresence(open, 130);
   const btnRef = useRef(null);
   const popRef = useRef(null);
 
@@ -119,10 +122,10 @@ export default function JobsButton({ collapsed = false }) {
         )}
       </button>
 
-      {open && pos && createPortal(
+      {presence.open && pos && createPortal(
         <div
           ref={popRef}
-          className={styles.popover}
+          className={`${styles.popover} ${presence.closing ? styles.popoverOut : ""}`}
           style={{ left: pos.left, bottom: pos.bottom }}
         >
           <div className={styles.popoverHeader}>
