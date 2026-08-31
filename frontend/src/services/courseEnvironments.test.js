@@ -33,7 +33,6 @@ describe("CourseEnvironmentsService", () => {
 
   test("payload stores memory in MB and pins the PVE template", () => {
     const payload = environmentPayload({
-      code: "WEB",
       name: "Web Lab",
       description: "",
       usageScope: "both",
@@ -72,7 +71,6 @@ describe("CourseEnvironmentsService", () => {
 
   test("payload supports a custom LXC node and firewall-style edge", () => {
     const payload = environmentPayload({
-      code: "NET",
       name: "Network Lab",
       nodes: [
         { id: "fw", sourceType: "custom", customImageRef: "local:vztmpl/debian.tar.zst", customUnprivileged: true, name: "Firewall", role: "gateway", type: "lxc", cpu: 2, memory: 2, disk: 8, network: "lab-net" },

@@ -310,7 +310,6 @@ def test_course_connection_creates_matching_source_out_and_target_in(monkeypatch
 def test_course_environment_accepts_template_and_custom_nodes_with_three_node_limit():
     template_id = uuid.uuid4()
     body = EnvironmentCreate(
-        code="NET-LAB",
         name="Network Lab",
         nodes=[
             EnvironmentNodeIn(

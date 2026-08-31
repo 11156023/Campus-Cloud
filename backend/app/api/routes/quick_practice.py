@@ -18,7 +18,6 @@ def _serialize_template(session: SessionDep, environment, version) -> dict:
     return {
         "id": environment.id,
         "version_id": version.id,
-        "code": environment.code,
         "name": environment.name,
         "description": environment.description,
         "version": version.version,

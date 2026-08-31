@@ -28,9 +28,6 @@ class CourseEnvironment(SQLModel, table=True):
     """Stable identity for a reusable course environment."""
 
     __tablename__ = "course_environments"
-    __table_args__ = (
-        UniqueConstraint("owner_id", "code", name="uq_course_environment_owner_code"),
-    )
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     owner_id: uuid.UUID = Field(
@@ -41,7 +38,6 @@ class CourseEnvironment(SQLModel, table=True):
             index=True,
         )
     )
-    code: str = Field(max_length=80)
     name: str = Field(max_length=255)
     description: str | None = Field(default=None, max_length=2000)
     usage_scope: str = Field(

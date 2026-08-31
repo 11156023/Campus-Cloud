@@ -23,7 +23,7 @@ const TABS = [
   ["machines", "機器配置"],
 ];
 
-const emptyTemplate = { id: "new", name: "", code: "", description: "", usageScope: "course", status: "draft", classes: 0, updatedAt: "尚未儲存", nodes: [], edges: [] };
+const emptyTemplate = { id: "new", name: "", description: "", usageScope: "course", status: "draft", classes: 0, updatedAt: "尚未儲存", nodes: [], edges: [] };
 
 const FIREWALL_PROTOCOLS = ["tcp", "udp", "icmp", "icmpv6", "sctp"];
 
@@ -252,14 +252,12 @@ export default function CourseTemplateEditorPage() {
   ));
   const saveBlockReason = !template.name.trim()
     ? "請先輸入環境名稱"
-    : !template.code.trim()
-      ? "請先輸入環境代碼"
-      : template.nodes.length === 0
-        ? "請到「機器配置」加入至少一台機器"
-        : template.nodes.length > 3
-          ? "每位學生最多只能配置三台機器"
-          : invalidTopology
-            ? "請修正拓撲連線的連接埠"
+    : template.nodes.length === 0
+      ? "請到「機器配置」加入至少一台機器"
+      : template.nodes.length > 3
+        ? "每位學生最多只能配置三台機器"
+        : invalidTopology
+          ? "請修正拓撲連線的連接埠"
             : "";
   useEffect(() => {
     if (!templateId) { setTemplate(structuredClone(emptyTemplate)); setLoading(false); return undefined; }
@@ -351,12 +349,12 @@ export default function CourseTemplateEditorPage() {
   if (loading) return <LoadingState fullPage text="正在讀取多機環境…" />;
   return <div className={styles.page}>
     <button type="button" className={styles.backLink} onClick={() => navigate(returnTo ?? "/course-template-management")}><MIcon name="arrow_back" size={18} />{returnTo ? "返回班級上課環境" : "返回多機環境"}</button>
-    <PageHeader title={isNew ? "建立多機環境" : template.name} subtitle={isNew ? "定義可重複套用到正式課程或快速練習的固定機器組合。" : `${template.code} · v${template.version} · ${template.updatedAt}`}><div className={styles.pageActions}><button type="button" className={styles.btnSecondary} onClick={() => navigate(returnTo ?? "/course-template-management")}>返回</button>{locked ? <button type="button" className={styles.btnPrimary} disabled={saving} onClick={newVersion}><MIcon name="content_copy" size={16} />建立新版本</button> : <><button type="button" className={styles.btnSecondary} disabled={isNew || saving || !template.name.trim() || !template.code.trim() || template.nodes.length === 0 || template.nodes.length > 3 || invalidTopology} onClick={publish}><MIcon name="lock" size={16} />儲存、發布並鎖定</button><button type="button" className={styles.btnPrimary} disabled={saving || !template.name.trim() || !template.code.trim() || template.nodes.length === 0 || template.nodes.length > 3 || invalidTopology} onClick={save}><MIcon name="save" size={16} />{saving ? "儲存中…" : "儲存草稿"}</button></>}</div></PageHeader>
+    <PageHeader title={isNew ? "建立多機環境" : template.name} subtitle={isNew ? "定義可重複套用到正式課程或快速練習的固定機器組合。" : `v${template.version} · ${template.updatedAt}`}><div className={styles.pageActions}><button type="button" className={styles.btnSecondary} onClick={() => navigate(returnTo ?? "/course-template-management")}>返回</button>{locked ? <button type="button" className={styles.btnPrimary} disabled={saving} onClick={newVersion}><MIcon name="content_copy" size={16} />建立新版本</button> : <><button type="button" className={styles.btnSecondary} disabled={isNew || saving || !template.name.trim() || template.nodes.length === 0 || template.nodes.length > 3 || invalidTopology} onClick={publish}><MIcon name="lock" size={16} />儲存、發布並鎖定</button><button type="button" className={styles.btnPrimary} disabled={saving || !template.name.trim() || template.nodes.length === 0 || template.nodes.length > 3 || invalidTopology} onClick={save}><MIcon name="save" size={16} />{saving ? "儲存中…" : "儲存草稿"}</button></>}</div></PageHeader>
     {returnTo && <p className={styles.persistentFeedback}><MIcon name="bookmark_added" size={17} /><span><strong>班級草稿已保存。</strong>請完成機器配置並「發布」模板；發布後會自動回到班級建立流程。</span></p>}
     {message && <p className={styles.persistentFeedback}><MIcon name="info" size={17} />{message}</p>}
     {!locked && saveBlockReason && <p className={styles.persistentFeedback}><MIcon name="info" size={17} />尚不能儲存：{saveBlockReason}。</p>}
     <div className={styles.stepTabs}>{TABS.map(([key, label], index) => <button type="button" key={key} className={tab === key ? styles.stepActive : ""} onClick={() => changeTab(key)}><span>{index + 1}</span>{label}</button>)}</div>
-    {tab === "basic" && <section className={styles.card}><div className={styles.cardHeader}><div><h2>基本資料</h2><p>{locked ? "這個版本已發布並鎖定；需要調整時請建立新版本。" : "同一份多機環境可用於正式課程、快速練習，或同時提供兩種用途。"}</p></div></div><div className={styles.formGrid}><label className={styles.field}><span>環境名稱</span><input disabled={locked} value={template.name} onChange={(event) => update({ name: event.target.value })} placeholder="例如：Linux 三層式上課環境" /></label><label className={styles.field}><span>環境代碼</span><input disabled={locked} value={template.code} onChange={(event) => update({ code: event.target.value })} placeholder="LINUX-3TIER" /></label><label className={styles.field}><span>套用方式</span><select disabled={locked} value={template.usageScope ?? "course"} onChange={(event) => update({ usageScope: event.target.value })}><option value="course">只用於正式課程</option><option value="quick_practice">只用於快速練習</option><option value="both">正式課程與快速練習</option></select></label><label className={`${styles.field} ${styles.fieldFull}`}><span>環境用途</span><textarea disabled={locked} rows={5} value={template.description ?? ""} onChange={(event) => update({ description: event.target.value })} /></label></div><div className={styles.actionFooter}><button type="button" className={styles.btnPrimary} onClick={() => changeTab("machines")}>查看機器配置<MIcon name="arrow_forward" size={16} /></button></div></section>}
+    {tab === "basic" && <section className={styles.card}><div className={styles.cardHeader}><div><h2>基本資料</h2><p>{locked ? "這個版本已發布並鎖定；需要調整時請建立新版本。" : "同一份多機環境可用於正式課程、快速練習，或同時提供兩種用途。"}</p></div></div><div className={styles.formGrid}><label className={styles.field}><span>環境名稱</span><input disabled={locked} value={template.name} onChange={(event) => update({ name: event.target.value })} placeholder="例如：Linux 三層式上課環境" /></label><label className={styles.field}><span>套用方式</span><select disabled={locked} value={template.usageScope ?? "course"} onChange={(event) => update({ usageScope: event.target.value })}><option value="course">只用於正式課程</option><option value="quick_practice">只用於快速練習</option><option value="both">正式課程與快速練習</option></select></label><label className={`${styles.field} ${styles.fieldFull}`}><span>環境用途</span><textarea disabled={locked} rows={5} value={template.description ?? ""} onChange={(event) => update({ description: event.target.value })} /></label></div><div className={styles.actionFooter}><button type="button" className={styles.btnPrimary} onClick={() => changeTab("machines")}>查看機器配置<MIcon name="arrow_forward" size={16} /></button></div></section>}
     {tab === "machines" && <MachineEditor value={template.nodes} edges={template.edges ?? []} onChange={(nodes) => update({ nodes })} onEdgesChange={(edges) => update({ edges })} pveTemplates={pveTemplates} vmImages={vmImages} lxcImages={lxcImages} sourceNotice={sourceNotice} locked={locked} />}
   </div>;
 }

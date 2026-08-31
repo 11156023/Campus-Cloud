@@ -35,7 +35,6 @@ export function saveCourseTemplate(template) {
   const next = {
     ...template,
     id,
-    code: template.code.trim(),
     name: template.name.trim(),
     description: template.description.trim(),
     version: previous?.version ?? 1,

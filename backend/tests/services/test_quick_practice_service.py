@@ -44,7 +44,6 @@ def quick_db():
 def _environment() -> CourseEnvironment:
     return CourseEnvironment(
         owner_id=uuid.uuid4(),
-        code="DB-LAB",
         name="資料庫練習",
         usage_scope="quick_practice",
     )
@@ -134,7 +133,6 @@ def _session_graph(db: Session) -> tuple[QuickPracticeSession, list[VMRequest]]:
     db.flush()
     environment = CourseEnvironment(
         owner_id=teacher.id,
-        code=f"LAB-{uuid.uuid4().hex[:8]}",
         name="Web 與資料庫",
         usage_scope="quick_practice",
     )

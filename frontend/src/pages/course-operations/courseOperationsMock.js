@@ -2,7 +2,6 @@ export const templateCatalog = [
   {
     id: "tpl-linux-three-tier",
     name: "Linux 三層式上課環境",
-    code: "LINUX-3TIER",
     version: 3,
     status: "published",
     description: "每位學生配置 Client、Web Server 與 Database，供整學期固定使用。",
@@ -17,7 +16,6 @@ export const templateCatalog = [
   {
     id: "tpl-network-dual",
     name: "Router + Client 上課環境",
-    code: "NETWORK-PAIR",
     version: 2,
     status: "published",
     description: "每位學生配置固定的路由器與用戶端機器。",
@@ -31,7 +29,6 @@ export const templateCatalog = [
   {
     id: "tpl-docker-single",
     name: "Docker 開發環境",
-    code: "DOCKER-DEV",
     version: 4,
     status: "draft",
     description: "固定 Docker Engine 與 Compose 開發環境。",

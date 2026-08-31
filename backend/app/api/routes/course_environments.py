@@ -83,7 +83,6 @@ class EnvironmentEdgeIn(BaseModel):
 
 
 class EnvironmentCreate(BaseModel):
-    code: str = Field(min_length=1, max_length=80)
     name: str = Field(min_length=1, max_length=255)
     description: str | None = Field(default=None, max_length=2000)
     usage_scope: Literal["course", "quick_practice", "both"] = "course"
@@ -173,23 +172,6 @@ def _validate_configuration(
         signatures.add(signature)
 
 
-def _ensure_code_available(
-    session: SessionDep,
-    *,
-    owner_id: uuid.UUID,
-    code: str,
-    exclude_environment_id: uuid.UUID | None = None,
-) -> None:
-    query = select(CourseEnvironment.id).where(
-        CourseEnvironment.owner_id == owner_id,
-        CourseEnvironment.code == code.strip(),
-    )
-    if exclude_environment_id is not None:
-        query = query.where(CourseEnvironment.id != exclude_environment_id)
-    if session.exec(query).first() is not None:
-        raise BadRequestError("環境代碼已存在，請使用不同的代碼")
-
-
 def _replace_nodes(
     session: SessionDep,
     version: CourseEnvironmentVersion,
@@ -235,7 +217,6 @@ def _serialize_version(
         "id": environment.id,
         "version_id": version.id,
         "owner_id": environment.owner_id,
-        "code": environment.code,
         "name": environment.name,
         "description": environment.description,
         "usage_scope": environment.usage_scope,
@@ -333,14 +314,8 @@ def create_environment(
     session: SessionDep,
     current_user: InstructorUser,
 ) -> dict[str, Any]:
-    _ensure_code_available(
-        session,
-        owner_id=current_user.id,
-        code=body.code,
-    )
     environment = CourseEnvironment(
         owner_id=current_user.id,
-        code=body.code.strip(),
         name=body.name.strip(),
         description=body.description,
         usage_scope=body.usage_scope,
@@ -365,13 +340,6 @@ def update_environment(
     version = _latest(session, environment)
     if version.status != CourseEnvironmentVersionStatus.draft:
         raise BadRequestError("已發布的課程版本不可修改，請建立新版本")
-    _ensure_code_available(
-        session,
-        owner_id=environment.owner_id,
-        code=body.code,
-        exclude_environment_id=environment.id,
-    )
-    environment.code = body.code.strip()
     environment.name = body.name.strip()
     environment.description = body.description
     environment.usage_scope = body.usage_scope

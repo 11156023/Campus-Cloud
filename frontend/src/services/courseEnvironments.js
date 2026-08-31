@@ -49,7 +49,6 @@ export function normalizeCourseEnvironment(item) {
 
 export function environmentPayload(item) {
   return {
-    code: item.code.trim(),
     name: item.name.trim(),
     description: item.description?.trim() || null,
     usage_scope: item.usageScope ?? "course",

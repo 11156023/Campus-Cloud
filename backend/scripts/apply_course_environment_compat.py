@@ -36,6 +36,15 @@ def _add_column(table: str, name: str, definition: str) -> None:
         connection.execute(text(f'ALTER TABLE "{table}" ADD COLUMN {definition}'))
 
 
+def _drop_not_null(table: str, name: str) -> None:
+    if name not in _column_names(table):
+        return
+    with engine.begin() as connection:
+        connection.execute(
+            text(f'ALTER TABLE "{table}" ALTER COLUMN {name} DROP NOT NULL')
+        )
+
+
 def apply() -> None:
     new_tables = [SQLModel.metadata.tables[name] for name in NEW_TABLE_NAMES]
     SQLModel.metadata.create_all(engine, tables=new_tables, checkfirst=True)
@@ -45,6 +54,9 @@ def apply() -> None:
         "usage_scope",
         "usage_scope VARCHAR(24) NOT NULL DEFAULT 'course'",
     )
+    # The environment code was removed; legacy databases keep the column but
+    # must not block inserts that no longer provide a value.
+    _drop_not_null("course_environments", "code")
     _add_column(
         "course_environment_nodes",
         "position_x",
