@@ -88,6 +88,33 @@ class LayoutUpdate(BaseModel):
 # ─── 回應 schemas ──────────────────────────────────────────────────────────────
 
 
+class FirewallRuleCreate(BaseModel):
+    """建立防火牆規則（原始 Proxmox 規則）"""
+
+    type: Literal["in", "out"] = Field(description="規則方向")
+    action: Literal["ACCEPT", "DROP", "REJECT"] = Field(description="動作")
+    source: str | None = Field(default=None, description="來源 IP/CIDR")
+    dest: str | None = Field(default=None, description="目標 IP/CIDR")
+    proto: str | None = Field(default=None, description="協定 (tcp/udp/icmp)")
+    dport: str | None = Field(default=None, description="目標端口或範圍")
+    sport: str | None = Field(default=None, description="來源端口或範圍")
+    enable: int = Field(default=1, description="是否啟用 (1=是, 0=否)")
+    comment: str | None = Field(default=None, description="備註")
+
+
+class FirewallRuleUpdate(BaseModel):
+    """更新防火牆規則"""
+
+    action: Literal["ACCEPT", "DROP", "REJECT"] | None = None
+    source: str | None = None
+    dest: str | None = None
+    proto: str | None = None
+    dport: str | None = None
+    sport: str | None = None
+    enable: int | None = None
+    comment: str | None = None
+
+
 class FirewallRulePublic(BaseModel):
     """防火牆規則（回應）"""
 
@@ -146,6 +173,19 @@ class TopologyResponse(BaseModel):
 
 
 # ─── NAT 規則 ──────────────────────────────────────────────────────────────────
+class NATRulePublic(BaseModel):
+    """NAT 端口轉發規則（回應）"""
+
+    id: uuid.UUID
+    ssh_host: str
+    vmid: int
+    vm_ip: str
+    external_port: int
+    internal_port: int
+    protocol: str
+    created_at: datetime
+
+
 class ReverseProxyRulePublic(BaseModel):
     """反向代理規則（回應）"""
 
@@ -166,10 +206,13 @@ __all__ = [
     "ConnectionDelete",
     "LayoutNodeUpdate",
     "LayoutUpdate",
+    "FirewallRuleCreate",
+    "FirewallRuleUpdate",
     "FirewallRulePublic",
     "FirewallOptionsPublic",
     "TopologyNode",
     "TopologyEdge",
     "TopologyResponse",
+    "NATRulePublic",
     "ReverseProxyRulePublic",
 ]

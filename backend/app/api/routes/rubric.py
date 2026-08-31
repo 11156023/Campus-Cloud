@@ -209,3 +209,12 @@ async def download_excel(
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": "attachment; filename=rubric.xlsx"},
     )
+
+
+@router.get("/health")
+async def health_check():
+    """健康檢查端點。"""
+    return {
+        "status": "ok",
+        "vllm_configured": bool(settings.VLLM_MODEL_NAME),
+    }

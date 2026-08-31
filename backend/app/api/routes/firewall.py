@@ -1,28 +1,35 @@
-﻿"""防火牆管理 API 路由"""
+"""防火牆管理 API 路由"""
 
 import logging
 
 from fastapi import APIRouter, HTTPException
 
 from app.api.deps import (
+    AdminUser,
     CurrentUser,
     ResourceInfoDep,
     SessionDep,
     check_firewall_access,
 )
+from app.core.authorizers import can_bypass_resource_ownership
 from app.exceptions import BadRequestError, NotFoundError, ProxmoxError
 from app.models import AuditAction
 from app.repositories import firewall_layout as layout_repo
+from app.repositories import nat_rule as nat_repo
 from app.schemas import Message
 from app.schemas.firewall import (
     ConnectionCreate,
     ConnectionDelete,
     FirewallOptionsPublic,
+    FirewallRuleCreate,
     FirewallRulePublic,
+    FirewallRuleUpdate,
     LayoutUpdate,
+    NATRulePublic,
     TopologyResponse,
 )
-from app.services.network import firewall_service
+from app.services.network import firewall_service, nat_service
+from app.services.resource.access import require_resource_management
 from app.services.user import audit_service
 
 logger = logging.getLogger(__name__)
@@ -188,7 +195,7 @@ def delete_connection(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ─── 單一 VM 防火牆規則（唯讀）───────────────────────────────────────────────
+# ─── 單一 VM 防火牆規則 ───────────────────────────────────────────────────────
 
 
 @router.get("/{vmid}/rules", response_model=list[FirewallRulePublic])
@@ -223,6 +230,204 @@ def list_rules(
         ]
     except ProxmoxError as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/{vmid}/rules", response_model=Message)
+def create_rule(
+    vmid: int,
+    rule: FirewallRuleCreate,
+    session: SessionDep,
+    current_user: CurrentUser,
+    resource_info: ResourceInfoDep,
+):
+    """在 VM 上建立防火牆規則"""
+    require_resource_management(session=session, user=current_user, vmid=vmid)
+    try:
+        rule_dict = {k: v for k, v in rule.model_dump().items() if v is not None}
+        firewall_service.create_rule(resource_info["node"], vmid, resource_info["type"], rule_dict)
+        audit_service.log_action(
+            session=session,
+            user_id=current_user.id,
+            vmid=vmid,
+            action=AuditAction.firewall_rule_create,
+            details=f"Created firewall rule on VM {vmid}: {rule_dict}",
+        )
+        return Message(message="規則已建立")
+    except ProxmoxError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.put("/{vmid}/rules/{pos}", response_model=Message)
+def update_rule(
+    vmid: int,
+    pos: int,
+    rule: FirewallRuleUpdate,
+    session: SessionDep,
+    current_user: CurrentUser,
+    resource_info: ResourceInfoDep,
+):
+    """更新 VM 防火牆規則（不可修改 SkyLab 管理的規則）"""
+    require_resource_management(session=session, user=current_user, vmid=vmid)
+    try:
+        rules = firewall_service.get_vm_firewall_rules(
+            resource_info["node"], vmid, resource_info["type"]
+        )
+        target_rule = next((r for r in rules if r.get("pos") == pos), None)
+        if target_rule and str(target_rule.get("comment", "")).startswith("SkyLab:"):
+            raise HTTPException(
+                status_code=400,
+                detail="此規則由 SkyLab 管理，不可修改",
+            )
+        rule_dict = {k: v for k, v in rule.model_dump().items() if v is not None}
+        firewall_service.update_rule(
+            resource_info["node"], vmid, resource_info["type"], pos, rule_dict
+        )
+        audit_service.log_action(
+            session=session,
+            user_id=current_user.id,
+            vmid=vmid,
+            action=AuditAction.firewall_rule_update,
+            details=f"Updated firewall rule pos={pos} on VM {vmid}: {rule_dict}",
+        )
+        return Message(message="規則已更新")
+    except ProxmoxError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/{vmid}/rules/{pos}", response_model=Message)
+def delete_rule(
+    vmid: int,
+    pos: int,
+    session: SessionDep,
+    current_user: CurrentUser,
+    resource_info: ResourceInfoDep,
+):
+    """刪除 VM 防火牆規則（不可刪除 SkyLab 管理的規則，請使用連線刪除 API）"""
+    require_resource_management(session=session, user=current_user, vmid=vmid)
+    try:
+        # 先取得規則確認不是 SkyLab 管理的規則
+        rules = firewall_service.get_vm_firewall_rules(
+            resource_info["node"], vmid, resource_info["type"]
+        )
+        target_rule = next((r for r in rules if r.get("pos") == pos), None)
+        if target_rule and str(target_rule.get("comment", "")).startswith("SkyLab:"):
+            raise HTTPException(
+                status_code=400,
+                detail="此規則由 SkyLab 管理，請使用連線管理介面進行操作",
+            )
+        firewall_service.delete_rule_by_pos(resource_info["node"], vmid, resource_info["type"], pos)
+        audit_service.log_action(
+            session=session,
+            user_id=current_user.id,
+            vmid=vmid,
+            action=AuditAction.firewall_rule_delete,
+            details=f"Deleted firewall rule pos={pos} on VM {vmid}",
+        )
+        return Message(message="規則已刪除")
+    except HTTPException:
+        raise
+    except ProxmoxError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ─── NAT 端口轉發管理 ──────────────────────────────────────────────────────────
+
+
+@router.get("/nat-rules", response_model=list[NATRulePublic])
+def list_nat_rules(
+    session: SessionDep,
+    current_user: CurrentUser,
+):
+    """列出所有 NAT 端口轉發規則（僅 superuser 可查看所有；一般使用者只看自己的 VM）"""
+    from app.repositories import resource as resource_repo  # noqa: PLC0415
+
+    rules = nat_repo.list_rules(session)
+    if can_bypass_resource_ownership(current_user):
+        visible_rules = rules
+    else:
+        own_resources = resource_repo.get_resources_by_user(
+            session=session, user_id=current_user.id
+        )
+        own_vmids = {r.vmid for r in own_resources}
+        visible_rules = [r for r in rules if r.vmid in own_vmids]
+
+    return [
+        NATRulePublic(
+            id=r.id,
+            ssh_host=r.ssh_host,
+            vmid=r.vmid,
+            vm_ip=r.vm_ip,
+            external_port=r.external_port,
+            internal_port=r.internal_port,
+            protocol=r.protocol,
+            created_at=r.created_at,
+        )
+        for r in visible_rules
+    ]
+
+
+@router.delete("/nat-rules/{rule_id}", response_model=Message)
+def delete_nat_rule(
+    rule_id: str,
+    session: SessionDep,
+    current_user: CurrentUser,
+):
+    """刪除 NAT 端口轉發規則"""
+    import uuid  # noqa: PLC0415
+
+    try:
+        rule_uuid = uuid.UUID(rule_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="無效的規則 ID")
+
+    rule = nat_repo.get_rule(session, rule_uuid)
+    if rule is None:
+        raise HTTPException(status_code=404, detail="NAT 規則不存在")
+
+    check_firewall_access(vmid=rule.vmid, current_user=current_user, session=session)
+
+    try:
+        nat_service.remove_nat_rule_by_id(session=session, rule_id=rule_id)
+        audit_service.log_action(
+            session=session,
+            user_id=current_user.id,
+            vmid=rule.vmid,
+            action=AuditAction.nat_rule_delete,
+            details=(
+                f"Deleted NAT rule {rule_id} (vmid={rule.vmid} "
+                f"ext={rule.external_port} → int={rule.internal_port}/{rule.protocol})"
+            ),
+        )
+        return Message(message="NAT 規則已刪除")
+    except ProxmoxError as e:
+        logger.error(f"Proxmox error removing NAT rule {rule_id}: {e}")
+        raise HTTPException(status_code=502, detail="Proxmox 操作失敗")
+    except Exception:
+        logger.exception(f"Failed to remove NAT rule {rule_id}")
+        raise HTTPException(status_code=500, detail="刪除 NAT 規則失敗")
+
+
+@router.post("/nat-rules/sync", response_model=Message)
+def sync_nat_rules(
+    session: SessionDep,
+    current_user: AdminUser,
+):
+    """手動將 DB 中的 NAT 規則同步到 Gateway VM haproxy"""
+    try:
+        nat_service.sync_to_gateway(session=session)
+        audit_service.log_action(
+            session=session,
+            user_id=current_user.id,
+            action=AuditAction.nat_rule_sync,
+            details="Manually synced NAT rules to Gateway VM",
+        )
+        return Message(message="NAT 規則已同步到 Gateway VM")
+    except ProxmoxError as e:
+        logger.error(f"Proxmox error syncing NAT rules: {e}")
+        raise HTTPException(status_code=502, detail="Proxmox 操作失敗")
+    except Exception:
+        logger.exception("Failed to sync NAT rules")
+        raise HTTPException(status_code=500, detail="同步 NAT 規則失敗")
 
 
 @router.get("/{vmid}/options", response_model=FirewallOptionsPublic)
