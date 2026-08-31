@@ -141,7 +141,7 @@
 .classroomMachine button:disabled { color: var(--color-text-muted); opacity: 0.5; cursor: not-allowed; }
 .classroomNoMachine { color: var(--color-text-muted); font-size: $font-size-12; }
 
-@include respond-to(md) { .page { padding: 0; } }
+@media (min-width: $breakpoint-sidebar) { .page { padding: 0; } }
 @include respond-below(lg) { .templateChoices { grid-template-columns: 1fr; } }
 @include respond-below(md) { .cardHeader, .toolbar { align-items: flex-start; flex-direction: column; } .formGrid { grid-template-columns: 1fr; } }
 

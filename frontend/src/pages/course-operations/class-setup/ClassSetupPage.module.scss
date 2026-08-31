@@ -8,7 +8,7 @@
   flex: 1;
   width: 100%;
 
-  @include respond-to(md) { padding: 0; }
+  @media (min-width: $breakpoint-sidebar) { padding: 0; }
 }
 .backLink { display: inline-flex; width: fit-content; align-items: center; gap: $spacing-8; padding: 4px 0; border: 0; color: var(--color-text-secondary); background: transparent; font-size: $font-size-12; cursor: pointer; }
 .backLink:hover { color: var(--color-primary); }

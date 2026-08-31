@@ -8,7 +8,7 @@
   flex: 1;
   max-width: 640px;
 
-  @include respond-to(md) {
+  @media (min-width: $breakpoint-sidebar) {
     padding: 0;
   }
 }

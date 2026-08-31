@@ -7,8 +7,16 @@
   padding: $spacing-8 $spacing-16;
   flex: 1;
 
-  @include respond-to(md) {
+  @media (min-width: $breakpoint-sidebar) {
     padding: 0;
+  }
+
+  /* 桌面版鎖定視口高度，改由 zoneList / list 內部滾動；
+     flex: none 讓 height 不被外層 column flex 演算法蓋掉 */
+  @include respond-to(lg) {
+    flex: none;
+    height: calc(100dvh - var(--layout-py) * 2 - var(--footer-h) - #{$spacing-16});
+    overflow: hidden;
   }
 }
 
