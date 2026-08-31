@@ -48,6 +48,7 @@ _RESOURCE_OPTIONS_CACHE_TTL_SECONDS = 300.0
 _gpu_options_cache: dict[str, Any] = {"at": 0.0, "items": []}
 _live_nodes_cache: dict[str, Any] = {"at": 0.0, "items": []}
 _base_resource_options_cache: dict[str, Any] = {"at": 0.0, "items": None}
+_application_templates_cache: dict[str, Any] = {"at": 0.0, "items": None}
 
 router = APIRouter(
     prefix="/ai/template-recommendation",
@@ -144,16 +145,24 @@ def _build_resource_options_with_gpu(gpu_options: list[dict[str, Any]]) -> dict[
     return resource_options
 
 
-def _application_templates_for(
-    session: SessionDep, user: CurrentUser
-) -> list[dict[str, Any]]:
-    """已開放的應用範本；教師另有完整母範本清單，這裡只給目錄。"""
+def _get_application_templates_cached(session: SessionDep) -> list[dict[str, Any]]:
+    """已開放的應用範本目錄。
+
+    目錄與使用者無關（開放與否是範本自己的旗標），所以整個程序共用一份快取；
+    來源一律由伺服器決定，不採用客戶端送來的清單，否則模型的候選會變成前端
+    可以偽造的東西。
+    """
+    now = monotonic()
+    cached_at = float(_application_templates_cache.get("at") or 0.0)
+    cached_items = _application_templates_cache.get("items")
+    if cached_items is not None and (now - cached_at) <= _RESOURCE_OPTIONS_CACHE_TTL_SECONDS:
+        return deepcopy(cached_items)
     try:
         catalog = template_service.list_student_catalog(session=session)
     except Exception as exc:  # pragma: no cover - PVE 失敗不該擋住建議
         logger.warning("Unable to load the application template catalog: %s", exc)
         return []
-    return [
+    items = [
         {
             "template_id": item.pve_vmid,
             "name": item.name,
@@ -165,6 +174,29 @@ def _application_templates_for(
         }
         for item in catalog
     ]
+    _application_templates_cache["at"] = now
+    _application_templates_cache["items"] = items
+    return deepcopy(items)
+
+
+def _allowed_vm_template_ids(
+    session: SessionDep,
+    user: CurrentUser,
+    application_templates: list[dict[str, Any]],
+) -> set[int]:
+    """使用者實際可以拿來申請的 VM 來源 id（PVE 讀不到時回空集合）。"""
+    base = _get_base_resource_options_cached().get("vm_operating_systems") or []
+    if not base:
+        return set()
+    allowed = {int(item.get("template_id") or 0) for item in base}
+    if not has_permission(user, Permission.TEMPLATE_MANAGE):
+        allowed -= vm_template_repo.registered_pve_vmids(session=session)
+    allowed |= {
+        int(item.get("template_id") or 0)
+        for item in application_templates
+        if str(item.get("resource_type")) != "lxc"
+    }
+    return allowed
 
 
 def _resolve_resource_options(
@@ -180,20 +212,26 @@ def _resolve_resource_options(
     申請不到（甚至看不到）的來源。
     """
     form_context = request.form_context
-    application_templates = _application_templates_for(session, user)
+    application_templates = _get_application_templates_cached(session)
     if form_context and form_context.resource_options_from_client:
-        client_templates = [
-            item.model_dump(mode="json")
-            for item in form_context.application_template_options
+        client_vm_options = [
+            item.model_dump(mode="json") for item in form_context.vm_os_options
         ]
+        allowed_vm_ids = _allowed_vm_template_ids(
+            session, user, application_templates
+        )
+        if allowed_vm_ids:
+            client_vm_options = [
+                item
+                for item in client_vm_options
+                if int(item.get("template_id") or 0) in allowed_vm_ids
+            ]
         return {
             "lxc_os_images": [
                 item.model_dump(mode="json") for item in form_context.lxc_os_options
             ],
-            "vm_operating_systems": [
-                item.model_dump(mode="json") for item in form_context.vm_os_options
-            ],
-            "application_templates": client_templates or application_templates,
+            "vm_operating_systems": client_vm_options,
+            "application_templates": application_templates,
             "gpu_options": [dict(item) for item in gpu_options],
         }
     resource_options = _build_resource_options_with_gpu(gpu_options)

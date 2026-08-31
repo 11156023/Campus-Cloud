@@ -133,21 +133,26 @@ def list_student_catalog(*, session: Session) -> list[TemplateCatalogItem]:
     with the PVE facts the request form needs (OS family and the source
     machine's own spec, which is the clone's floor).
     """
-    from app.services.proxmox import provisioning_service  # noqa: PLC0415
+    from app.services.proxmox.provisioning_service import (  # noqa: PLC0415
+        _template_disk_gb,
+        is_windows_template,
+    )
 
     templates = template_repo.list_student_catalog(session=session)
     if not templates:
         return []
-    pve_by_vmid = {
-        int(item.vmid): item for item in provisioning_service.get_vm_templates()
+    # VM 與 LXC 範本都要對帳，所以讀 pool 內的原始紀錄（VM 專用清單已排除 LXC）
+    raw_by_vmid = {
+        int(item["vmid"]): item for item in proxmox_ops.get_vm_templates()
     }
     catalog: list[TemplateCatalogItem] = []
     for template in templates:
-        pve = pve_by_vmid.get(template.pve_vmid)
-        is_lxc = template.resource_type.lower() == "lxc"
-        if not is_lxc and pve is None:
-            # A VM template PVE can no longer see would fail at provision time.
+        raw = raw_by_vmid.get(template.pve_vmid)
+        if raw is None:
+            # PVE 已經找不到的範本會在建立時失敗，不該出現在目錄裡
             continue
+        max_memory = raw.get("maxmem")
+        is_lxc = template.resource_type.lower() == "lxc"
         catalog.append(
             TemplateCatalogItem(
                 id=template.id,
@@ -157,10 +162,13 @@ def list_student_catalog(*, session: Session) -> list[TemplateCatalogItem]:
                 resource_type=template.resource_type,
                 node=template.node,
                 version=template.version,
-                is_windows=bool(pve.is_windows) if pve else False,
-                cores=template.default_cores or (pve.cores if pve else None),
-                memory_mb=template.default_memory or (pve.memory_mb if pve else None),
-                disk_gb=template.default_disk or (pve.disk_gb if pve else None),
+                # ostype 只有 VM 讀得到，而且每次查詢都會打 PVE，
+                # 所以只對目錄裡的 VM 逐筆確認
+                is_windows=(not is_lxc) and is_windows_template(template.pve_vmid),
+                cores=template.default_cores or (raw.get("maxcpu") or None),
+                memory_mb=template.default_memory
+                or (int(max_memory) // (1024 * 1024) if max_memory else None),
+                disk_gb=template.default_disk or (_template_disk_gb(raw) or None),
             )
         )
     return catalog

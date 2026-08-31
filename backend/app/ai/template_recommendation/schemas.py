@@ -127,18 +127,6 @@ class VMOSOptionContext(BaseModel):
     node: str = ""
 
 
-class ApplicationTemplateContext(BaseModel):
-    """老師／官方已裝好的環境範本，是申請時可直接套用的來源。"""
-
-    template_id: int
-    name: str = ""
-    description: str = ""
-    resource_type: Literal["lxc", "qemu"] = "qemu"
-    cores: int | None = None
-    memory_mb: int | None = None
-    disk_gb: int | None = None
-
-
 class RecommendationFormContext(BaseModel):
     resource_type: Literal["lxc", "vm"] | None = None
     mode: Literal["immediate", "scheduled"] | None = None
@@ -159,9 +147,6 @@ class RecommendationFormContext(BaseModel):
     schedule_options: list[ScheduleOptionContext] = Field(default_factory=list, max_length=12)
     lxc_os_options: list[LXCOSOptionContext] = Field(default_factory=list, max_length=100)
     vm_os_options: list[VMOSOptionContext] = Field(default_factory=list, max_length=100)
-    application_template_options: list[ApplicationTemplateContext] = Field(
-        default_factory=list, max_length=100
-    )
     resource_options_from_client: bool = False
 
 

@@ -8,6 +8,7 @@ from datetime import UTC, datetime, timedelta
 import sqlalchemy as sa
 from sqlmodel import Session, col, func, select
 
+from app.core.permissions import is_admin
 from app.exceptions import BadRequestError, NotFoundError
 from app.infrastructure.worker import submit_sync
 from app.models import (
@@ -74,7 +75,7 @@ def is_visible_to(session: Session, *, environment: CourseEnvironment, user) -> 
     the linked classes, and ``owner`` to nobody but the teacher who owns it.
     The owner always sees their own environment so they can rehearse it.
     """
-    if environment.owner_id == user.id or getattr(user, "is_superuser", False):
+    if environment.owner_id == user.id or is_admin(user):
         return True
     if environment.audience == "campus":
         return True
@@ -99,14 +100,12 @@ def is_visible_to(session: Session, *, environment: CourseEnvironment, user) -> 
 
 
 def get_published_template(
-    session: Session, *, environment_id: uuid.UUID, user=None
+    session: Session, *, environment_id: uuid.UUID, user
 ) -> tuple[CourseEnvironment, CourseEnvironmentVersion]:
     environment = session.get(CourseEnvironment, environment_id)
     if environment is None or environment.usage_scope not in {"quick_practice", "both"}:
         raise NotFoundError("Quick-practice template not found")
-    if user is not None and not is_visible_to(
-        session, environment=environment, user=user
-    ):
+    if not is_visible_to(session, environment=environment, user=user):
         # Same error as "does not exist": the audience must not be probeable.
         raise NotFoundError("Quick-practice template not found")
     version = session.exec(
@@ -123,7 +122,7 @@ def get_published_template(
 
 
 def list_published_templates(
-    session: Session, *, user=None
+    session: Session, *, user
 ) -> list[tuple[CourseEnvironment, CourseEnvironmentVersion]]:
     environments = session.exec(
         select(CourseEnvironment)
@@ -132,9 +131,7 @@ def list_published_templates(
     ).all()
     result: list[tuple[CourseEnvironment, CourseEnvironmentVersion]] = []
     for environment in environments:
-        if user is not None and not is_visible_to(
-            session, environment=environment, user=user
-        ):
+        if not is_visible_to(session, environment=environment, user=user):
             continue
         version = session.exec(
             select(CourseEnvironmentVersion)

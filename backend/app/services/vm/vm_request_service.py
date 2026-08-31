@@ -321,8 +321,9 @@ def _validate_template_source(
             raise BadRequestError("Selected LXC template is not registered")
         # 未註冊的 PVE template 就是平台基礎映像，任何人都能申請。
         return None
-    expected_type = "lxc" if resource_type == "lxc" else "qemu"
-    if template.resource_type.lower() != expected_type:
+    # 其他模組一律把「非 lxc」視為 qemu，這裡沿用同一個判定
+    template_kind = "lxc" if template.resource_type.lower() == "lxc" else "qemu"
+    if template_kind != ("lxc" if resource_type == "lxc" else "qemu"):
         raise BadRequestError("Selected template type does not match the request")
     if template.status != VMTemplateStatus.ready:
         raise BadRequestError("Selected template is not ready")
@@ -361,7 +362,7 @@ def create(
     if request_in.resource_type not in ("lxc", "vm"):
         raise BadRequestError("resource_type must be 'lxc' or 'vm'")
 
-    # ---------- 來源範本：先驗證再算配額（目錄範本會覆寫規格） ----------
+    # ---------- 來源範本：先驗證再算配額（磁碟下限會提高用量） ----------
     source_template: VMTemplate | None = None
     source_vmid = getattr(request_in, "template_id", None)
     if source_vmid:

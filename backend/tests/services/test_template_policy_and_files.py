@@ -420,3 +420,88 @@ def test_manual_download_validates_attachment_id(
             vmid=400,
             attachment_id=uuid.uuid4(),
         )
+
+
+# ---------------------------------------------------------------------------
+# 學生可申請的應用範本目錄
+# ---------------------------------------------------------------------------
+
+
+def _catalog_rows() -> list[VMTemplate]:
+    return [
+        make_template(
+            pve_vmid=9001,
+            name="n8n",
+            resource_type="lxc",
+            student_requestable=True,
+        ),
+        make_template(
+            pve_vmid=9002,
+            name="jupyter",
+            resource_type="qemu",
+            student_requestable=True,
+            default_cores=4,
+            default_memory=8192,
+            default_disk=60,
+        ),
+        make_template(pve_vmid=9003, name="gone", student_requestable=True),
+    ]
+
+
+def test_student_catalog_uses_pve_facts_and_skips_missing_templates(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        template_service.template_repo,
+        "list_student_catalog",
+        lambda **kwargs: _catalog_rows(),
+    )
+    monkeypatch.setattr(
+        template_service.proxmox_ops,
+        "get_vm_templates",
+        lambda: [
+            # 16 GiB disk, 2 GiB RAM
+            {"vmid": 9001, "type": "lxc", "maxcpu": 2, "maxmem": 2147483648, "maxdisk": 17179869184},
+            {"vmid": 9002, "type": "qemu", "maxcpu": 2, "maxmem": 2147483648, "maxdisk": 21474836480},
+        ],
+    )
+    monkeypatch.setattr(
+        "app.services.proxmox.provisioning_service.is_windows_template",
+        lambda vmid: False,
+    )
+
+    catalog = template_service.list_student_catalog(session=None)  # type: ignore[arg-type]
+
+    by_vmid = {item.pve_vmid: item for item in catalog}
+    # PVE 上已經不存在的範本不能留在目錄裡，否則學生按下去才失敗
+    assert set(by_vmid) == {9001, 9002}
+    # 沒有設定預設值的容器範本，規格與磁碟下限來自 PVE 本身
+    assert (by_vmid[9001].cores, by_vmid[9001].memory_mb, by_vmid[9001].disk_gb) == (
+        2,
+        2048,
+        16,
+    )
+    # 教師設定過的預設值優先於 PVE 的實際大小
+    assert (by_vmid[9002].cores, by_vmid[9002].memory_mb, by_vmid[9002].disk_gb) == (
+        4,
+        8192,
+        60,
+    )
+
+
+def test_lxc_templates_are_not_offered_as_vm_sources(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.services.proxmox import provisioning_service
+
+    monkeypatch.setattr(
+        provisioning_service.proxmox_service,
+        "get_vm_templates",
+        lambda: [
+            {"vmid": 9001, "type": "lxc", "name": "n8n", "node": "pve1"},
+            {"vmid": 9002, "type": "qemu", "name": "ubuntu", "node": "pve1"},
+        ],
+    )
+    monkeypatch.setattr(provisioning_service, "_template_ostype", lambda vm: "l26")
+
+    assert [item.vmid for item in provisioning_service.get_vm_templates()] == [9002]

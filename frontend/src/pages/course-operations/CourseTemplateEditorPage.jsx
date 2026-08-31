@@ -259,12 +259,12 @@ export default function CourseTemplateEditorPage() {
     ? "請先輸入環境名稱"
     : missingAudienceClass
       ? "請選擇可以看到這個環境的班級"
-    : template.nodes.length === 0
-      ? "請到「機器配置」加入至少一台機器"
-      : template.nodes.length > 3
-        ? "每位學生最多只能配置三台機器"
-        : invalidTopology
-          ? "請修正拓撲連線的連接埠"
+      : template.nodes.length === 0
+        ? "請到「機器配置」加入至少一台機器"
+        : template.nodes.length > 3
+          ? "每位學生最多只能配置三台機器"
+          : invalidTopology
+            ? "請修正拓撲連線的連接埠"
             : "";
   useEffect(() => {
     if (!templateId) { setTemplate(structuredClone(emptyTemplate)); setLoading(false); return undefined; }

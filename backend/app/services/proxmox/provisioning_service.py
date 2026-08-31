@@ -1176,7 +1176,16 @@ def is_windows_template(template_id: int) -> bool:
 
 
 def get_vm_templates() -> list[VMTemplateSchema]:
-    all_vms = proxmox_service.get_vm_templates()
+    """VM 來源用的 PVE 範本清單。
+
+    pool 內的 LXC 範本同樣是 template=1，但它們不能當 VM 來源（ostype 也讀
+    不到），所以在這裡就濾掉，避免出現在申請表單的虛擬機清單裡。
+    """
+    all_vms = [
+        vm
+        for vm in proxmox_service.get_vm_templates()
+        if str(vm.get("type") or "qemu").lower() != "lxc"
+    ]
     templates: list[VMTemplateSchema] = []
     for vm in all_vms:
         ostype = _template_ostype(vm)

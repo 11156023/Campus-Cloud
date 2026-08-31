@@ -11,6 +11,7 @@ from sqlmodel import col, delete, func, select
 
 from app.api.deps import InstructorUser, SessionDep
 from app.core.authorizers import require_teaching_access
+from app.core.permissions import is_admin
 from app.exceptions import BadRequestError, NotFoundError
 from app.models import (
     CourseEnvironment,
@@ -210,15 +211,19 @@ def _replace_audience(
     session: SessionDep,
     *,
     environment: CourseEnvironment,
-    owner_id: uuid.UUID,
+    owner_id: uuid.UUID | None,
     class_ids: list[uuid.UUID],
 ) -> None:
-    """Rewrite the class allow-list, refusing classes the teacher does not own."""
+    """Rewrite the class allow-list.
+
+    A teacher may only open an environment to their own classes; ``owner_id``
+    is None for admins, who curate other people's environments too.
+    """
     for class_id in class_ids:
         teaching_class = session.get(TeachingClass, class_id)
         if teaching_class is None:
             raise BadRequestError("指定的班級不存在")
-        if teaching_class.owner_id != owner_id:
+        if owner_id is not None and teaching_class.owner_id != owner_id:
             raise BadRequestError(f"班級「{teaching_class.name}」不屬於這位教師")
     session.exec(
         delete(CourseEnvironmentAudience).where(
@@ -391,7 +396,7 @@ def create_environment(
     _replace_audience(
         session,
         environment=environment,
-        owner_id=current_user.id,
+        owner_id=None if is_admin(current_user) else current_user.id,
         class_ids=body.audience_class_ids,
     )
     _replace_nodes(session, version, body.nodes, body.edges)
@@ -418,7 +423,7 @@ def update_environment(
     _replace_audience(
         session,
         environment=environment,
-        owner_id=environment.owner_id,
+        owner_id=None if is_admin(current_user) else environment.owner_id,
         class_ids=body.audience_class_ids,
     )
     _replace_nodes(session, version, body.nodes, body.edges)

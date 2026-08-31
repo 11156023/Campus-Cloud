@@ -364,13 +364,13 @@ export default function RequestFormPage({ onBack, className }) {
     vmChoices.find((t) => String(t.vmid) === String(form.template_id)) || null;
   const isWindowsVm = resourceType === "vm" && Boolean(selectedVmTemplate?.is_windows);
 
-  /* 目前選到的範本：規格由教師決定，申請者不能改（後端也會覆寫） */
+  /* 目前選到的應用範本：帶入建議規格並顯示說明；規格仍可調整，
+     但磁碟不得小於範本本身（克隆只能放大，後端會再守一次） */
   const selectedCatalogItem = useMemo(() => catalogChoices.find((item) => (
     item.resource_type === "lxc"
       ? item.id === selectedTplId
       : String(item.pve_vmid) === String(form.template_id)
   )) ?? null, [catalogChoices, selectedTplId, form.template_id]);
-  /* 套用範本後規格仍可調整；磁碟下限由範本大小決定（克隆只能放大） */
 
   /* 是否已完成作業系統選擇（型別確定後，帳密欄位才顯示） */
   const osChosen = resourceType === "vm"
@@ -545,18 +545,9 @@ export default function RequestFormPage({ onBack, className }) {
       label: template.name || String(template.vmid),
       node: template.node || "",
     })),
-    /* 讓 AI 分得出「已裝好的環境」與「乾淨作業系統」，並讀得到範本說明 */
-    application_template_options: catalogChoices.map((item) => ({
-      template_id: Number(item.pve_vmid),
-      name: item.name || "",
-      description: item.description || "",
-      resource_type: item.resource_type === "lxc" ? "lxc" : "qemu",
-      cores: item.cores ?? null,
-      memory_mb: item.memory_mb ?? null,
-      disk_gb: item.disk_gb ?? null,
-    })),
+    /* 應用範本的候選由後端提供，前端不送，避免候選清單可被偽造 */
     resource_options_from_client: true,
-  }), [resourceType, mode, form, gpuOptions, availabilityData, lxcTemplates, vmChoices, catalogChoices]);
+  }), [resourceType, mode, form, gpuOptions, availabilityData, lxcTemplates, vmChoices]);
 
   function applyAiPrefill(prefill) {
     if (!prefill) return;
