@@ -14,6 +14,7 @@ from app.core.authorizers import require_teaching_access
 from app.exceptions import BadRequestError, NotFoundError
 from app.models import (
     CourseEnvironment,
+    CourseEnvironmentAudience,
     CourseEnvironmentEdge,
     CourseEnvironmentNode,
     CourseEnvironmentVersion,
@@ -86,8 +87,29 @@ class EnvironmentCreate(BaseModel):
     name: str = Field(min_length=1, max_length=255)
     description: str | None = Field(default=None, max_length=2000)
     usage_scope: Literal["course", "quick_practice", "both"] = "course"
+    audience: Literal["owner", "class", "campus"] = "class"
+    audience_class_ids: list[uuid.UUID] = Field(default_factory=list, max_length=50)
     nodes: list[EnvironmentNodeIn] = Field(min_length=1, max_length=3)
     edges: list[EnvironmentEdgeIn] = Field(default_factory=list, max_length=6)
+
+    @model_validator(mode="after")
+    def validate_audience(self) -> "EnvironmentCreate":
+        """Audience only gates the student quick-practice list.
+
+        A course-only environment never reaches that list, so an empty class
+        allow-list is fine there; once the environment is offered as practice
+        the teacher must say which classes may see it.
+        """
+        if self.audience != "class":
+            self.audience_class_ids = []
+            return self
+        self.audience_class_ids = list(dict.fromkeys(self.audience_class_ids))
+        if not self.audience_class_ids and self.usage_scope in {
+            "quick_practice",
+            "both",
+        }:
+            raise ValueError("開放快速練習時，必須選擇可以看到這個環境的班級")
+        return self
 
 
 class EnvironmentUpdate(EnvironmentCreate):
@@ -172,6 +194,45 @@ def _validate_configuration(
         signatures.add(signature)
 
 
+def _audience_class_ids(
+    session: SessionDep, environment_id: uuid.UUID
+) -> list[uuid.UUID]:
+    return list(
+        session.exec(
+            select(CourseEnvironmentAudience.class_id).where(
+                CourseEnvironmentAudience.environment_id == environment_id
+            )
+        ).all()
+    )
+
+
+def _replace_audience(
+    session: SessionDep,
+    *,
+    environment: CourseEnvironment,
+    owner_id: uuid.UUID,
+    class_ids: list[uuid.UUID],
+) -> None:
+    """Rewrite the class allow-list, refusing classes the teacher does not own."""
+    for class_id in class_ids:
+        teaching_class = session.get(TeachingClass, class_id)
+        if teaching_class is None:
+            raise BadRequestError("指定的班級不存在")
+        if teaching_class.owner_id != owner_id:
+            raise BadRequestError(f"班級「{teaching_class.name}」不屬於這位教師")
+    session.exec(
+        delete(CourseEnvironmentAudience).where(
+            col(CourseEnvironmentAudience.environment_id) == environment.id
+        )
+    )
+    for class_id in class_ids:
+        session.add(
+            CourseEnvironmentAudience(
+                environment_id=environment.id, class_id=class_id
+            )
+        )
+
+
 def _replace_nodes(
     session: SessionDep,
     version: CourseEnvironmentVersion,
@@ -220,6 +281,8 @@ def _serialize_version(
         "name": environment.name,
         "description": environment.description,
         "usage_scope": environment.usage_scope,
+        "audience": environment.audience,
+        "audience_class_ids": _audience_class_ids(session, environment.id),
         "version": version.version,
         "status": version.status,
         "configuration_hash": version.configuration_hash,
@@ -319,11 +382,18 @@ def create_environment(
         name=body.name.strip(),
         description=body.description,
         usage_scope=body.usage_scope,
+        audience=body.audience,
     )
     version = CourseEnvironmentVersion(environment_id=environment.id, version=1)
     session.add(environment)
     session.add(version)
     session.flush()
+    _replace_audience(
+        session,
+        environment=environment,
+        owner_id=current_user.id,
+        class_ids=body.audience_class_ids,
+    )
     _replace_nodes(session, version, body.nodes, body.edges)
     session.commit()
     return _serialize_version(session, environment, version)
@@ -343,7 +413,14 @@ def update_environment(
     environment.name = body.name.strip()
     environment.description = body.description
     environment.usage_scope = body.usage_scope
+    environment.audience = body.audience
     environment.updated_at = get_datetime_utc()
+    _replace_audience(
+        session,
+        environment=environment,
+        owner_id=environment.owner_id,
+        class_ids=body.audience_class_ids,
+    )
     _replace_nodes(session, version, body.nodes, body.edges)
     session.add(environment)
     session.commit()

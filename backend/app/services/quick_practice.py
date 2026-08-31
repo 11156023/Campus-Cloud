@@ -12,6 +12,7 @@ from app.exceptions import BadRequestError, NotFoundError
 from app.infrastructure.worker import submit_sync
 from app.models import (
     CourseEnvironment,
+    CourseEnvironmentAudience,
     CourseEnvironmentEdge,
     CourseEnvironmentNode,
     CourseEnvironmentVersion,
@@ -19,6 +20,7 @@ from app.models import (
     QuickPracticeSession,
     QuickPracticeSessionMachine,
     Resource,
+    TeachingClassStudent,
     User,
     VMProvisioningStatus,
     VMRequest,
@@ -65,11 +67,47 @@ def _environment_for_version(
     return environment
 
 
+def is_visible_to(session: Session, *, environment: CourseEnvironment, user) -> bool:
+    """Audience check for the student-facing list and for launch.
+
+    ``campus`` is open to every signed-in user, ``class`` only to students of
+    the linked classes, and ``owner`` to nobody but the teacher who owns it.
+    The owner always sees their own environment so they can rehearse it.
+    """
+    if environment.owner_id == user.id or getattr(user, "is_superuser", False):
+        return True
+    if environment.audience == "campus":
+        return True
+    if environment.audience != "class":
+        return False
+    return (
+        session.exec(
+            select(CourseEnvironmentAudience.id)
+            .join(
+                TeachingClassStudent,
+                col(TeachingClassStudent.class_id)
+                == col(CourseEnvironmentAudience.class_id),
+            )
+            .where(
+                CourseEnvironmentAudience.environment_id == environment.id,
+                TeachingClassStudent.user_id == user.id,
+                TeachingClassStudent.status == "active",
+            )
+        ).first()
+        is not None
+    )
+
+
 def get_published_template(
-    session: Session, *, environment_id: uuid.UUID
+    session: Session, *, environment_id: uuid.UUID, user=None
 ) -> tuple[CourseEnvironment, CourseEnvironmentVersion]:
     environment = session.get(CourseEnvironment, environment_id)
     if environment is None or environment.usage_scope not in {"quick_practice", "both"}:
+        raise NotFoundError("Quick-practice template not found")
+    if user is not None and not is_visible_to(
+        session, environment=environment, user=user
+    ):
+        # Same error as "does not exist": the audience must not be probeable.
         raise NotFoundError("Quick-practice template not found")
     version = session.exec(
         select(CourseEnvironmentVersion)
@@ -85,7 +123,7 @@ def get_published_template(
 
 
 def list_published_templates(
-    session: Session,
+    session: Session, *, user=None
 ) -> list[tuple[CourseEnvironment, CourseEnvironmentVersion]]:
     environments = session.exec(
         select(CourseEnvironment)
@@ -94,6 +132,10 @@ def list_published_templates(
     ).all()
     result: list[tuple[CourseEnvironment, CourseEnvironmentVersion]] = []
     for environment in environments:
+        if user is not None and not is_visible_to(
+            session, environment=environment, user=user
+        ):
+            continue
         version = session.exec(
             select(CourseEnvironmentVersion)
             .where(
@@ -538,7 +580,7 @@ def launch(
     session: Session, *, user, environment_id: uuid.UUID
 ) -> QuickPracticeSession:
     environment, version = get_published_template(
-        session, environment_id=environment_id
+        session, environment_id=environment_id, user=user
     )
     nodes = nodes_for_version(session, version_id=version.id)
     if not nodes:

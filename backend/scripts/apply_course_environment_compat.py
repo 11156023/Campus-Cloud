@@ -15,6 +15,7 @@ from app.core.db import engine
 
 NEW_TABLE_NAMES = [
     "course_environments",
+    "course_environment_audiences",
     "course_environment_versions",
     "course_environment_nodes",
     "course_environment_edges",
@@ -53,6 +54,12 @@ def apply() -> None:
         "course_environments",
         "usage_scope",
         "usage_scope VARCHAR(24) NOT NULL DEFAULT 'course'",
+    )
+    # Existing rows keep today's behaviour: visible to every signed-in user.
+    _add_column(
+        "course_environments",
+        "audience",
+        "audience VARCHAR(24) NOT NULL DEFAULT 'campus'",
     )
     # The environment code was removed; legacy databases keep the column but
     # must not block inserts that no longer provide a value.

@@ -3,6 +3,7 @@ import {
   courseNodeHasUsableSource,
   CourseEnvironmentsService,
   environmentPayload,
+  normalizeCourseEnvironment,
 } from "./courseEnvironments";
 
 const jsonRes = (body) => ({
@@ -88,6 +89,33 @@ describe("CourseEnvironmentsService", () => {
       protocol: "tcp",
       port: 443,
     });
+  });
+
+  test("payload keeps the class allow-list only for a class audience", () => {
+    const base = {
+      name: "Firewall Lab",
+      usageScope: "quick_practice",
+      audienceClassIds: ["class-a", "class-b"],
+      nodes: [{ id: "fw", sourceTemplateId: "tpl-id", name: "FW", role: "gateway", type: "lxc", cpu: 1, memory: 1, disk: 8 }],
+    };
+
+    expect(environmentPayload({ ...base, audience: "class" }).audience_class_ids)
+      .toEqual(["class-a", "class-b"]);
+    expect(environmentPayload({ ...base, audience: "campus" }).audience_class_ids)
+      .toEqual([]);
+    expect(environmentPayload({ ...base, audience: "campus" }).audience).toBe("campus");
+  });
+
+  test("normalize defaults an environment without an audience to class scope", () => {
+    const normalized = normalizeCourseEnvironment({
+      id: "env-1",
+      version_id: "ver-1",
+      nodes: [],
+      edges: [],
+    });
+
+    expect(normalized.audience).toBe("class");
+    expect(normalized.audienceClassIds).toEqual([]);
   });
 
   test("classroom selection accepts both machine templates and custom images", () => {

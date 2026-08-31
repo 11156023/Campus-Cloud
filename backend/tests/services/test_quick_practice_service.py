@@ -1,5 +1,5 @@
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, time, timedelta
 from types import SimpleNamespace
 from unittest.mock import Mock
 
@@ -9,6 +9,7 @@ from sqlmodel import Session, SQLModel, create_engine
 
 from app.models import (
     CourseEnvironment,
+    CourseEnvironmentAudience,
     CourseEnvironmentEdge,
     CourseEnvironmentNode,
     CourseEnvironmentVersion,
@@ -18,6 +19,8 @@ from app.models import (
     QuickPracticeSessionMachine,
     Resource,
     SubnetConfig,
+    TeachingClass,
+    TeachingClassStudent,
     User,
     UserRole,
     VMProvisioningStatus,
@@ -408,3 +411,106 @@ def test_quick_practice_ip_reservation_is_atomic_and_idempotent(
         quick_practice._ip_reservation_prefix(practice_id),
     )
     assert released == 2
+
+
+def _audience_fixture(db: Session, audience: str) -> tuple[CourseEnvironment, User, User]:
+    teacher = User(
+        email=f"teacher-{uuid.uuid4()}@example.edu",
+        hashed_password="hash",
+        role=UserRole.teacher,
+    )
+    student = User(
+        email=f"student-{uuid.uuid4()}@example.edu",
+        hashed_password="hash",
+        role=UserRole.student,
+    )
+    db.add_all([teacher, student])
+    db.flush()
+    environment = CourseEnvironment(
+        owner_id=teacher.id,
+        name="防火牆練習",
+        usage_scope="quick_practice",
+        audience=audience,
+    )
+    db.add(environment)
+    db.flush()
+    return environment, teacher, student
+
+
+def _enrol(db: Session, *, teacher: User, student: User, status: str = "active") -> uuid.UUID:
+    today = datetime.now(UTC).date()
+    teaching_class = TeachingClass(
+        owner_id=teacher.id,
+        name="資訊安全",
+        code="SEC-1141",
+        term="114-1",
+        start_date=today,
+        end_date=today + timedelta(days=90),
+        weekday=0,
+        start_time=time(9, 0),
+        end_time=time(12, 0),
+    )
+    db.add(teaching_class)
+    db.flush()
+    db.add(
+        TeachingClassStudent(
+            class_id=teaching_class.id, user_id=student.id, status=status
+        )
+    )
+    db.flush()
+    return teaching_class.id
+
+
+def test_campus_audience_is_visible_to_any_signed_in_user(quick_db: Session) -> None:
+    environment, _teacher, student = _audience_fixture(quick_db, "campus")
+
+    assert quick_practice.is_visible_to(
+        quick_db, environment=environment, user=student
+    )
+
+
+def test_owner_audience_hides_the_environment_from_students(quick_db: Session) -> None:
+    environment, teacher, student = _audience_fixture(quick_db, "owner")
+
+    assert quick_practice.is_visible_to(
+        quick_db, environment=environment, user=teacher
+    )
+    assert not quick_practice.is_visible_to(
+        quick_db, environment=environment, user=student
+    )
+
+
+def test_class_audience_only_reaches_enrolled_students(quick_db: Session) -> None:
+    environment, teacher, student = _audience_fixture(quick_db, "class")
+    outsider = User(
+        email=f"outsider-{uuid.uuid4()}@example.edu",
+        hashed_password="hash",
+        role=UserRole.student,
+    )
+    quick_db.add(outsider)
+    quick_db.flush()
+    class_id = _enrol(quick_db, teacher=teacher, student=student)
+    quick_db.add(
+        CourseEnvironmentAudience(environment_id=environment.id, class_id=class_id)
+    )
+    quick_db.commit()
+
+    assert quick_practice.is_visible_to(
+        quick_db, environment=environment, user=student
+    )
+    assert not quick_practice.is_visible_to(
+        quick_db, environment=environment, user=outsider
+    )
+
+
+def test_class_audience_ignores_dropped_students(quick_db: Session) -> None:
+    environment, teacher, student = _audience_fixture(quick_db, "class")
+    class_id = _enrol(quick_db, teacher=teacher, student=student, status="removed")
+    quick_db.add(
+        CourseEnvironmentAudience(environment_id=environment.id, class_id=class_id)
+    )
+    quick_db.commit()
+
+    assert not quick_practice.is_visible_to(
+        quick_db, environment=environment, user=student
+    )
