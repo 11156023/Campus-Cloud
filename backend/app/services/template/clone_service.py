@@ -95,8 +95,6 @@ async def request_clone(
 
     if data.login_password and not template.allow_password_change:
         raise BadRequestError("此範本不允許自訂登入密碼")
-    if template.requires_gpu and not data.gpu_mapping_id:
-        raise BadRequestError("此範本需要 GPU，請選擇要配置的 GPU")
     if data.gpu_mapping_id:
         if template.resource_type == "lxc":
             raise BadRequestError("LXC 範本不支援 GPU 直通")

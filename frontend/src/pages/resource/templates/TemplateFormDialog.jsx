@@ -32,7 +32,6 @@ export default function TemplateFormDialog({ template, onClose, onSaved }) {
   );
   const [defaultCores, setDefaultCores] = useState(template?.default_cores || 2);
   const [defaultMemory, setDefaultMemory] = useState(template?.default_memory || 2048);
-  const [requiresGpu, setRequiresGpu] = useState(Boolean(template?.requires_gpu));
   const [resources, setResources] = useState([]);
   const [resourcesLoading, setResourcesLoading] = useState(!isEdit);
   const [busy, setBusy] = useState(false);
@@ -48,15 +47,6 @@ export default function TemplateFormDialog({ template, onClose, onSaved }) {
       cancelled = true;
     };
   }, [isEdit, isAdmin]);
-
-  // 來源機類型決定可否設定 GPU（hostpci 僅 qemu 支援）
-  const selectedResource = resources.find((r) => String(r.vmid) === sourceVmid);
-  const resourceType = isEdit ? template.resource_type : selectedResource?.type;
-  const gpuSelectable = resourceType !== "lxc";
-
-  useEffect(() => {
-    if (!gpuSelectable && requiresGpu) setRequiresGpu(false);
-  }, [gpuSelectable, requiresGpu]);
 
   const handleSubmit = async () => {
     if (!isEdit && !sourceVmid) {
@@ -74,7 +64,6 @@ export default function TemplateFormDialog({ template, onClose, onSaved }) {
       visibility,
       default_cores: useCustomSpec ? Number(defaultCores) : null,
       default_memory: useCustomSpec ? Number(defaultMemory) : null,
-      requires_gpu: requiresGpu,
     };
 
     if (!isEdit) {
@@ -197,16 +186,6 @@ export default function TemplateFormDialog({ template, onClose, onSaved }) {
             </label>
           </div>
         </div>
-
-        <label className={styles.checkLine} title={gpuSelectable ? undefined : "LXC 範本不支援 GPU 直通"}>
-          <input
-            type="checkbox"
-            checked={requiresGpu}
-            disabled={!gpuSelectable}
-            onChange={(e) => setRequiresGpu(e.target.checked)}
-          />
-          使用此範本需要 GPU（克隆時強制選擇並配置 GPU；僅 VM 範本可設）
-        </label>
 
         <label className={styles.checkLine}>
           <input

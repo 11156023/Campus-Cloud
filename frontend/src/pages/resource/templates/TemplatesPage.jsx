@@ -310,9 +310,6 @@ function StudentCatalog({ templates, onClone, onManual }) {
               <span className={styles.typeChip}>{template.default_disk} GB 磁碟</span>
             )}
             <span className={styles.typeChip}>v{template.version}</span>
-            {template.requires_gpu && (
-              <span className={styles.typeChip}>需要 GPU</span>
-            )}
             {template.allow_password_change === false && (
               <span className={styles.typeChip}>固定帳密</span>
             )}

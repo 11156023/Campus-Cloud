@@ -1,9 +1,8 @@
 """範本政策（密碼/GPU/磁碟鎖定）與 icon/附件檔案的單元測試。
 
 mock PVE operations 與 repo，無 DB / Redis：
-- request_clone：密碼政策、requires_gpu 強制、GPU 節點相容、payload 加密
+- request_clone：密碼政策、GPU 節點相容、payload 加密
 - _reconfigure_qemu：login_password=None 時不得帶 cipassword
-- create/update template：LXC 不可設 requires_gpu
 - template_files：icon 與附件的實體檔案生命週期
 - add_attachment：副檔名 / 大小 / 數量上限
 """
@@ -23,11 +22,7 @@ import pytest
 from app.core.security import decrypt_value
 from app.exceptions import BadRequestError
 from app.models import VMTemplate, VMTemplateStatus
-from app.schemas.template import (
-    TemplateCloneRequest,
-    VMTemplateCreate,
-    VMTemplateUpdate,
-)
+from app.schemas.template import TemplateCloneRequest
 from app.services.proxmox import provisioning_service
 from app.services.template import clone_service, template_files, template_service
 
@@ -81,20 +76,6 @@ async def test_request_clone_rejects_custom_password_when_locked(
         )
 
 
-async def test_request_clone_requires_gpu_selection(
-    clone_target: VMTemplate,
-) -> None:
-    clone_target.requires_gpu = True
-
-    with pytest.raises(BadRequestError, match="需要 GPU"):
-        await clone_service.request_clone(
-            session=None,  # type: ignore[arg-type]
-            user=make_user("teacher"),
-            template_id=clone_target.id,
-            data=TemplateCloneRequest(count=1),
-        )
-
-
 async def test_request_clone_rejects_gpu_on_lxc_template(
     clone_target: VMTemplate,
 ) -> None:
@@ -112,7 +93,6 @@ async def test_request_clone_rejects_gpu_on_lxc_template(
 async def test_request_clone_rejects_gpu_not_on_template_node(
     clone_target: VMTemplate, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    clone_target.requires_gpu = True
     monkeypatch.setattr(
         provisioning_service, "_gpu_mapping_nodes", lambda mapping_id: {"pve2"}
     )
@@ -129,7 +109,6 @@ async def test_request_clone_rejects_gpu_not_on_template_node(
 async def test_request_clone_payload_encrypts_password_and_locks_disk(
     clone_target: VMTemplate, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    clone_target.requires_gpu = True
     monkeypatch.setattr(
         provisioning_service, "_gpu_mapping_nodes", lambda mapping_id: {"pve1"}
     )
@@ -234,58 +213,6 @@ def test_reconfigure_qemu_sets_custom_password(
 ) -> None:
     captured = _reconfigure(monkeypatch, "Custom1234")
     assert captured["cipassword"] == "Custom1234"
-
-
-# ---------------------------------------------------------------------------
-# create / update template：LXC 不可設 requires_gpu
-# ---------------------------------------------------------------------------
-
-
-async def test_create_template_rejects_requires_gpu_for_lxc(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    import app.core.authorizers as authorizers
-
-    monkeypatch.setattr(authorizers, "require_template_manage", lambda user: None)
-    monkeypatch.setattr(
-        template_service.template_repo,
-        "get_template_by_pve_vmid",
-        lambda **kw: None,
-    )
-    monkeypatch.setattr(
-        template_service.proxmox_ops,
-        "find_resource",
-        lambda vmid: {"vmid": vmid, "type": "lxc", "node": "pve1"},
-    )
-
-    with pytest.raises(BadRequestError, match="LXC"):
-        await template_service.create_template(
-            session=None,  # type: ignore[arg-type]
-            user=make_user("teacher"),
-            data=VMTemplateCreate(
-                source_vmid=321, name="ct-tpl", requires_gpu=True
-            ),
-        )
-
-
-def test_update_template_rejects_requires_gpu_for_lxc(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    template = make_template(resource_type="lxc")
-    monkeypatch.setattr(
-        template_service, "_get_or_404", lambda session, template_id: template
-    )
-    monkeypatch.setattr(
-        template_service, "_require_owner", lambda user, template: None
-    )
-
-    with pytest.raises(BadRequestError, match="LXC"):
-        template_service.update_template(
-            session=None,  # type: ignore[arg-type]
-            user=make_user("teacher"),
-            template_id=template.id,
-            data=VMTemplateUpdate(requires_gpu=True),
-        )
 
 
 # ---------------------------------------------------------------------------

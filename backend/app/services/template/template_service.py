@@ -234,9 +234,6 @@ async def create_template(
     resource_type = "lxc" if pve_resource.get("type") == "lxc" else "qemu"
     node = str(pve_resource["node"])
 
-    if data.requires_gpu and resource_type == "lxc":
-        raise BadRequestError("LXC 範本不支援 GPU 直通，無法設定需要 GPU")
-
     # 母機若是平台管理的資源，僅擁有者或 admin 能轉換（轉換後原 VM 消失）
     owned = session.get(Resource, data.source_vmid)
     if owned is not None and owned.user_id != user.id and not is_admin(user):
@@ -257,7 +254,6 @@ async def create_template(
             default_cores=data.default_cores,
             default_memory=data.default_memory,
             allow_password_change=data.allow_password_change,
-            requires_gpu=data.requires_gpu,
             source_vmid=data.source_vmid,
         )
     else:
@@ -273,7 +269,6 @@ async def create_template(
             default_cores=data.default_cores,
             default_memory=data.default_memory,
             allow_password_change=data.allow_password_change,
-            requires_gpu=data.requires_gpu,
             source_vmid=data.source_vmid,
         )
     try:
@@ -385,8 +380,6 @@ def update_template(
     updates: dict[str, Any] = data.model_dump(exclude_unset=True)
     for field, value in updates.items():
         setattr(template, field, value)
-    if template.requires_gpu and template.resource_type == "lxc":
-        raise BadRequestError("LXC 範本不支援 GPU 直通，無法設定需要 GPU")
     template_repo.touch(session=session, template=template)
     return _to_public(template)
 
