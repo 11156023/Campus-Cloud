@@ -78,3 +78,69 @@ def test_normalizer_selects_only_available_gpu_and_valid_schedule() -> None:
     assert prefill["start_at"] == start.isoformat()
     assert prefill["end_at"] == end.isoformat()
     assert prefill["storage"] == "local-lvm"
+
+
+N8N_CATALOG = [
+    {
+        "template_id": 9100,
+        "name": "n8n 自動化流程",
+        "description": "已安裝 n8n 與 PostgreSQL，開機即可使用",
+        "resource_type": "lxc",
+        "cores": 2,
+        "memory_mb": 4096,
+        "disk_gb": 16,
+    },
+    {
+        "template_id": 9200,
+        "name": "Jupyter 資料分析",
+        "description": "已安裝 JupyterLab",
+        "resource_type": "qemu",
+        "cores": 4,
+        "memory_mb": 8192,
+        "disk_gb": 40,
+    },
+]
+
+
+def _plan(prefill: dict) -> dict:
+    return normalize_ai_result(
+        {"form_prefill": prefill},
+        RecommendationRequest(goal="想要一台跑 n8n 的機器"),
+        [],
+        resource_options={
+            "lxc_os_images": [{"value": "local:vztmpl/debian-12.tar.zst"}],
+            "vm_operating_systems": [{"template_id": 8000, "label": "Ubuntu 22.04"}],
+            "application_templates": N8N_CATALOG,
+            "gpu_options": [],
+        },
+    )["final_plan"]["form_prefill"]
+
+
+def test_planner_may_clone_a_container_application_template() -> None:
+    prefill = _plan(
+        {"resource_type": "lxc", "lxc_template_id": 9100, "cores": 2, "memory_mb": 4096}
+    )
+
+    assert prefill["lxc_template_id"] == 9100
+    # 走克隆路徑時不能同時帶基礎映像，否則申請表單會兩邊都填
+    assert prefill["lxc_os_image"] == ""
+
+
+def test_an_unknown_template_id_falls_back_to_a_base_image() -> None:
+    prefill = _plan({"resource_type": "lxc", "lxc_template_id": 4242})
+
+    assert prefill["lxc_template_id"] == 0
+    assert prefill["lxc_os_image"] == "local:vztmpl/debian-12.tar.zst"
+
+
+def test_a_container_template_cannot_be_used_as_a_vm_source() -> None:
+    prefill = _plan({"resource_type": "vm", "vm_template_id": 9100})
+
+    # 9100 是容器範本，不在 VM 候選內，只能退回可用的 VM 來源
+    assert prefill["vm_template_id"] in {8000, 9200}
+
+
+def test_a_vm_application_template_stays_selectable() -> None:
+    prefill = _plan({"resource_type": "vm", "vm_template_id": 9200})
+
+    assert prefill["vm_template_id"] == 9200

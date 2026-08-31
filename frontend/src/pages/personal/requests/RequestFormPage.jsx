@@ -545,15 +545,34 @@ export default function RequestFormPage({ onBack, className }) {
       label: template.name || String(template.vmid),
       node: template.node || "",
     })),
+    /* 讓 AI 分得出「已裝好的環境」與「乾淨作業系統」，並讀得到範本說明 */
+    application_template_options: catalogChoices.map((item) => ({
+      template_id: Number(item.pve_vmid),
+      name: item.name || "",
+      description: item.description || "",
+      resource_type: item.resource_type === "lxc" ? "lxc" : "qemu",
+      cores: item.cores ?? null,
+      memory_mb: item.memory_mb ?? null,
+      disk_gb: item.disk_gb ?? null,
+    })),
     resource_options_from_client: true,
-  }), [resourceType, mode, form, gpuOptions, availabilityData, lxcTemplates, vmChoices]);
+  }), [resourceType, mode, form, gpuOptions, availabilityData, lxcTemplates, vmChoices, catalogChoices]);
 
   function applyAiPrefill(prefill) {
     if (!prefill) return;
     const nextResourceType = prefill.resource_type === "vm" ? "vm" : "lxc";
     setResourceType(nextResourceType);
+    /* AI 選了容器應用範本時給的是 PVE VMID，要換回目錄項目的 id */
+    const lxcCatalogPick = nextResourceType === "lxc" && prefill.lxc_template_id
+      ? catalogChoices.find((item) => (
+        item.resource_type === "lxc"
+          && String(item.pve_vmid) === String(prefill.lxc_template_id)
+      ))
+      : null;
     if (nextResourceType === "vm") {
       setAutoOsChoice(prefill.vm_template_id ? `vm:${prefill.vm_template_id}` : "");
+    } else if (lxcCatalogPick) {
+      setAutoOsChoice(`tpl:${lxcCatalogPick.id}`);
     } else {
       setAutoOsChoice(prefill.lxc_os_image ? `img:${prefill.lxc_os_image}` : "");
     }
@@ -564,6 +583,7 @@ export default function RequestFormPage({ onBack, className }) {
     }
 
     if (nextResourceType !== "lxc") setSelectedTplId("");
+    else setSelectedTplId(lxcCatalogPick ? lxcCatalogPick.id : "");
 
     setForm((prev) => {
       const disk = Number(prefill.disk_gb || 0);
@@ -571,7 +591,7 @@ export default function RequestFormPage({ onBack, className }) {
         ...prev,
         hostname: prefill.hostname ? normalizeHostname(prefill.hostname) : prev.hostname,
         ostemplate: nextResourceType === "lxc"
-          ? (prefill.lxc_os_image || prev.ostemplate)
+          ? (lxcCatalogPick ? "" : (prefill.lxc_os_image || prev.ostemplate))
           : prev.ostemplate,
         template_id: nextResourceType === "vm" && prefill.vm_template_id
           ? String(prefill.vm_template_id)

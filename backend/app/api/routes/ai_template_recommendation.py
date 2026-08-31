@@ -32,10 +32,13 @@ from app.ai.template_recommendation.schemas import (
 )
 from app.ai.utils import apply_thinking_control, strip_think_tags
 from app.api.deps import CurrentUser, SessionDep
+from app.core.permissions import Permission, has_permission
 from app.infrastructure.ai.template_recommendation import client
 from app.repositories import vm_request as vm_request_repo
+from app.repositories import vm_template as vm_template_repo
 from app.services.llm_gateway import ai_gateway_service
 from app.services.proxmox import gpu_service
+from app.services.template import template_service
 
 logger = logging.getLogger(__name__)
 
@@ -141,12 +144,48 @@ def _build_resource_options_with_gpu(gpu_options: list[dict[str, Any]]) -> dict[
     return resource_options
 
 
+def _application_templates_for(
+    session: SessionDep, user: CurrentUser
+) -> list[dict[str, Any]]:
+    """已開放的應用範本；教師另有完整母範本清單，這裡只給目錄。"""
+    try:
+        catalog = template_service.list_student_catalog(session=session)
+    except Exception as exc:  # pragma: no cover - PVE 失敗不該擋住建議
+        logger.warning("Unable to load the application template catalog: %s", exc)
+        return []
+    return [
+        {
+            "template_id": item.pve_vmid,
+            "name": item.name,
+            "description": item.description or "",
+            "resource_type": item.resource_type,
+            "cores": item.cores,
+            "memory_mb": item.memory_mb,
+            "disk_gb": item.disk_gb,
+        }
+        for item in catalog
+    ]
+
+
 def _resolve_resource_options(
     request: ChatRequest,
     gpu_options: list[dict[str, Any]],
+    session: SessionDep,
+    user: CurrentUser,
 ) -> dict[str, Any]:
+    """候選清單必須跟使用者實際能選的一致。
+
+    母範本同時也是 PVE template，所以伺服器端組清單時要濾掉已註冊的範本，
+    再把開放申請的應用範本以獨立清單交給模型；否則模型會推薦到使用者根本
+    申請不到（甚至看不到）的來源。
+    """
     form_context = request.form_context
+    application_templates = _application_templates_for(session, user)
     if form_context and form_context.resource_options_from_client:
+        client_templates = [
+            item.model_dump(mode="json")
+            for item in form_context.application_template_options
+        ]
         return {
             "lxc_os_images": [
                 item.model_dump(mode="json") for item in form_context.lxc_os_options
@@ -154,9 +193,19 @@ def _resolve_resource_options(
             "vm_operating_systems": [
                 item.model_dump(mode="json") for item in form_context.vm_os_options
             ],
+            "application_templates": client_templates or application_templates,
             "gpu_options": [dict(item) for item in gpu_options],
         }
-    return _build_resource_options_with_gpu(gpu_options)
+    resource_options = _build_resource_options_with_gpu(gpu_options)
+    if not has_permission(user, Permission.TEMPLATE_MANAGE):
+        registered = vm_template_repo.registered_pve_vmids(session=session)
+        resource_options["vm_operating_systems"] = [
+            item
+            for item in resource_options.get("vm_operating_systems") or []
+            if int(item.get("template_id") or 0) not in registered
+        ]
+    resource_options["application_templates"] = application_templates
+    return resource_options
 
 
 def _resolve_recommend_gpu_options(request: ChatRequest, *, requires_gpu: bool) -> list[dict[str, Any]]:
@@ -370,7 +419,9 @@ async def recommend(
         top_k=request.top_k,
     )
 
-    resource_options = _resolve_resource_options(request, gpu_options)
+    resource_options = _resolve_resource_options(
+        request, gpu_options, session, current_user
+    )
 
     try:
         ai_result, ai_metrics = await generate_ai_plan(
