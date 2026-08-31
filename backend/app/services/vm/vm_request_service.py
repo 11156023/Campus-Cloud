@@ -339,17 +339,20 @@ def _validate_template_source(
     return template
 
 
-def _apply_catalog_defaults(request_in: VMRequestCreate, template: VMTemplate) -> None:
-    """目錄範本的規格由教師決定，申請者不能改。"""
-    if template.default_cores:
-        request_in.cores = template.default_cores
-    if template.default_memory:
-        request_in.memory = template.default_memory
-    if template.default_disk:
-        if request_in.resource_type == "lxc":
-            request_in.rootfs_size = template.default_disk
-        else:
-            request_in.disk_size = template.default_disk
+def _apply_template_floor(request_in: VMRequestCreate, template: VMTemplate) -> None:
+    """套用範本後仍可自訂規格，但磁碟不得小於範本本身。
+
+    CPU 與記憶體由申請者決定（配額仍會把關）；磁碟是物理限制：克隆出來的
+    機器天生就是範本的大小，PVE 只能放大不能縮小，所以低於範本的值一律
+    提高到範本大小，再進配額計算。
+    """
+    floor = template.default_disk
+    if not floor:
+        return
+    if request_in.resource_type == "lxc":
+        request_in.rootfs_size = max(int(request_in.rootfs_size or 0), floor)
+    else:
+        request_in.disk_size = max(int(request_in.disk_size or 0), floor)
 
 
 def create(
@@ -368,10 +371,8 @@ def create(
             user=user,
             resource_type=request_in.resource_type,
         )
-        if source_template is not None and not has_permission(
-            user, Permission.TEMPLATE_MANAGE
-        ):
-            _apply_catalog_defaults(request_in, source_template)
+        if source_template is not None:
+            _apply_template_floor(request_in, source_template)
 
     # ---------- 配額執法（E7）：寫入前先擋 ----------
     quota_service.check_quota(

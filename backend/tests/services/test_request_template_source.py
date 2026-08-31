@@ -134,14 +134,8 @@ def test_teacher_does_not_need_the_student_flag(
     assert _validate(make_user("teacher")) is template
 
 
-def test_catalog_defaults_override_the_submitted_spec() -> None:
-    template = make_template(
-        student_requestable=True,
-        default_cores=4,
-        default_memory=8192,
-        default_disk=40,
-    )
-    request_in = VMRequestCreate(
+def _catalog_request(**overrides: Any) -> VMRequestCreate:
+    payload: dict[str, Any] = dict(
         reason="I want to try n8n",
         resource_type="vm",
         hostname="n8n-test",
@@ -152,11 +146,45 @@ def test_catalog_defaults_override_the_submitted_spec() -> None:
         username="student",
         template_id=9001,
     )
+    payload.update(overrides)
+    return VMRequestCreate(**payload)
 
-    vm_request_service._apply_catalog_defaults(request_in, template)
+
+def test_a_template_request_keeps_the_requested_cpu_and_memory() -> None:
+    template = make_template(
+        student_requestable=True,
+        default_cores=4,
+        default_memory=8192,
+        default_disk=40,
+    )
+    request_in = _catalog_request()
+
+    vm_request_service._apply_template_floor(request_in, template)
 
     assert (request_in.cores, request_in.memory, request_in.disk_size) == (
-        4,
-        8192,
-        40,
+        8,
+        32768,
+        200,
     )
+
+
+def test_disk_cannot_be_smaller_than_the_template() -> None:
+    template = make_template(student_requestable=True, default_disk=40)
+    request_in = _catalog_request(disk_size=20)
+
+    vm_request_service._apply_template_floor(request_in, template)
+
+    assert request_in.disk_size == 40
+
+
+def test_lxc_rootfs_is_raised_to_the_template_floor() -> None:
+    template = make_template(
+        student_requestable=True, resource_type="lxc", default_disk=16
+    )
+    request_in = _catalog_request(
+        resource_type="lxc", disk_size=None, rootfs_size=8, username=None
+    )
+
+    vm_request_service._apply_template_floor(request_in, template)
+
+    assert request_in.rootfs_size == 16

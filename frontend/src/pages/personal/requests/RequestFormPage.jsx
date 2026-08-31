@@ -319,6 +319,17 @@ export default function RequestFormPage({ onBack, className }) {
       .finally(() => setSysTplLoading(false));
   }, [isPrivileged]);
 
+  /* 申請一律是單台；範本只是「來源」，VM 或 LXC 由範本本身決定 */
+  const catalogChoices = useMemo(
+    () => catalog.map((item) => ({
+      ...item,
+      choice: item.resource_type === "lxc"
+        ? `tpl:${item.id}`
+        : `vm:${item.pve_vmid}`,
+    })),
+    [catalog],
+  );
+
   /* VM 選項 = 應用範本目錄 + 平台基礎映像（後端已依角色過濾清單） */
   const catalogVmChoices = useMemo(
     () => catalog
@@ -352,6 +363,14 @@ export default function RequestFormPage({ onBack, className }) {
   const selectedVmTemplate =
     vmChoices.find((t) => String(t.vmid) === String(form.template_id)) || null;
   const isWindowsVm = resourceType === "vm" && Boolean(selectedVmTemplate?.is_windows);
+
+  /* 目前選到的範本：規格由教師決定，申請者不能改（後端也會覆寫） */
+  const selectedCatalogItem = useMemo(() => catalogChoices.find((item) => (
+    item.resource_type === "lxc"
+      ? item.id === selectedTplId
+      : String(item.pve_vmid) === String(form.template_id)
+  )) ?? null, [catalogChoices, selectedTplId, form.template_id]);
+  /* 套用範本後規格仍可調整；磁碟下限由範本大小決定（克隆只能放大） */
 
   /* 是否已完成作業系統選擇（型別確定後，帳密欄位才顯示） */
   const osChosen = resourceType === "vm"
@@ -867,25 +886,25 @@ export default function RequestFormPage({ onBack, className }) {
               <FieldGroup label="作業系統" required
                 error={errors.template_id || errors.ostemplate}
                 hint={osChosen
-                  ? `將建立為「${resourceType === "vm" ? "虛擬機" : "LXC 容器"}」`
-                  : "虛擬機與容器的作業系統一起列出，選擇後由系統自動決定建立方式"}>
+                  ? `一次申請一台，將建立為「${resourceType === "vm" ? "虛擬機" : "LXC 容器"}」`
+                  : "可直接套用老師／官方準備好的環境範本，或從作業系統映像自行安裝；一次申請一台"}>
                 <SelectField
                   value={autoOsChoice}
                   onChange={handleAutoOsSelect}
                   disabled={vmLoading || lxcLoading || sysTplLoading}
                   placeholder={(vmLoading || lxcLoading || sysTplLoading) ? "載入中…" : "選擇作業系統"}
                 >
-                  {catalogVmChoices.length > 0 && (
-                    <optgroup label="應用範本（已裝好的環境）">
-                      {catalogVmChoices.map((t) => (
-                        <option key={`cat-${t.vmid}`} value={`vm:${t.vmid}`}>
+                  {catalogChoices.length > 0 && (
+                    <optgroup label="老師／官方提供的環境範本">
+                      {catalogChoices.map((t) => (
+                        <option key={`cat-${t.id}`} value={t.choice}>
                           {withGpuTag(stripGpuMarker(t.name), osNameNeedsGpu(t.name))}
                         </option>
                       ))}
                     </optgroup>
                   )}
                   {vmTemplates.length > 0 && (
-                    <optgroup label="虛擬機範本">
+                    <optgroup label={isPrivileged ? "虛擬機範本" : "作業系統映像（虛擬機）"}>
                       {vmTemplates.map((t) => (
                         <option key={`vm-${t.vmid}`} value={`vm:${t.vmid}`}>
                           {withGpuTag(stripGpuMarker(t.name), osNameNeedsGpu(t.name))}
@@ -893,8 +912,8 @@ export default function RequestFormPage({ onBack, className }) {
                       ))}
                     </optgroup>
                   )}
-                  {lxcSysTemplates.length > 0 && (
-                    <optgroup label={isPrivileged ? "容器範本（克隆建立）" : "應用範本（容器）"}>
+                  {isPrivileged && lxcSysTemplates.length > 0 && (
+                    <optgroup label="容器範本（克隆建立）">
                       {lxcSysTemplates.map((t) => (
                         <option key={`tpl-${t.id}`} value={`tpl:${t.id}`}>
                           {withGpuTag(`${stripGpuMarker(t.name)}（v${t.version}）`, osNameNeedsGpu(t.name))}
@@ -915,6 +934,17 @@ export default function RequestFormPage({ onBack, className }) {
                     </optgroup>
                   )}
                 </SelectField>
+                {selectedCatalogItem && (
+                  <p className={styles.fieldHint}>
+                    {selectedCatalogItem.description
+                      || "老師／官方已裝好的環境，建立後可直接使用。"}
+                    {" "}範本建議規格：{selectedCatalogItem.cores ?? "—"} 核心 ·{" "}
+                    {selectedCatalogItem.memory_mb
+                      ? `${(selectedCatalogItem.memory_mb / 1024).toFixed(1)} GB RAM`
+                      : "— RAM"}
+                    {selectedCatalogItem.disk_gb ? ` · ${selectedCatalogItem.disk_gb} GB` : ""}
+                  </p>
+                )}
               </FieldGroup>
 
               {/* 帳密欄位：選定作業系統（型別確定）後才顯示 */}
@@ -967,6 +997,12 @@ export default function RequestFormPage({ onBack, className }) {
             {/* ── 硬體資源配置 ── */}
             <div className={styles.formSection}>
               <h2 className={styles.sectionTitle}>硬體資源配置</h2>
+
+              {selectedCatalogItem && (
+                <p className={styles.fieldHint}>
+                  已帶入範本的建議規格，可依需求調整；硬碟不可小於範本本身的大小。
+                </p>
+              )}
 
               <FieldGroup label="CPU 核心數" labelRight={`${form.cores} 核心`}>
                 <input
