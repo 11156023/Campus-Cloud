@@ -12,12 +12,9 @@ from fastapi import APIRouter, File, UploadFile
 from fastapi.responses import FileResponse
 
 from app.api.deps import CurrentUser, InstructorUser, SessionDep
-from app.core.permissions import is_admin
 from app.exceptions import NotFoundError
-from app.repositories import task_record as task_record_repo
 from app.schemas.template import (
     TaskRecordPublic,
-    TaskRecordsPublic,
     TemplateAttachmentPublic,
     TemplateAttachmentsPublic,
     TemplateCatalogPublic,
@@ -34,32 +31,7 @@ from app.services.template import clone_service, template_files, template_servic
 router = APIRouter(prefix="/templates", tags=["templates"])
 
 
-# --- 任務狀態（必須宣告在 /{template_id} 之前，避免路徑衝突） ---
-
-
-@router.get("/tasks", response_model=TaskRecordsPublic)
-def list_my_tasks(
-    session: SessionDep, current_user: CurrentUser, limit: int = 50
-) -> TaskRecordsPublic:
-    """列出自己的背景任務（新到舊）。"""
-    records = task_record_repo.list_task_records_by_user(
-        session=session, user_id=current_user.id, limit=min(max(limit, 1), 200)
-    )
-    data = [TaskRecordPublic.from_record(r) for r in records]
-    return TaskRecordsPublic(data=data, count=len(data))
-
-
-@router.get("/tasks/{task_id}", response_model=TaskRecordPublic)
-def get_task(
-    session: SessionDep, current_user: CurrentUser, task_id: uuid.UUID
-) -> TaskRecordPublic:
-    """查詢單一任務狀態（本人或 admin）。"""
-    record = task_record_repo.get_task_record(session=session, task_id=task_id)
-    if record is None or (
-        record.user_id != current_user.id and not is_admin(current_user)
-    ):
-        raise NotFoundError("Task not found")
-    return TaskRecordPublic.from_record(record)
+# --- 學生目錄（必須宣告在 /{template_id} 之前，避免路徑衝突） ---
 
 
 @router.get("/catalog", response_model=TemplateCatalogPublic)

@@ -100,17 +100,6 @@ class VNCInfoSchema(BaseModel):
     ticket: str | None = None
     port: str | None = None
     message: str
-
-
-class TerminalInfoSchema(BaseModel):
-    """LXC Terminal 連線資訊"""
-
-    vmid: int
-    ws_url: str
-    ticket: str | None = None
-    message: str
-
-
 class TemplateSchema(BaseModel):
     """LXC OS template 資訊"""
 

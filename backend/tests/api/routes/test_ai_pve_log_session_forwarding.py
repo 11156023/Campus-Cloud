@@ -7,7 +7,6 @@ from app.ai.pve_log.schemas import (
     ChatRequest,
     ChatResponse,
     SSHConfirmRequest,
-    SSHExecRequest,
     SSHExecResult,
 )
 from app.api.routes import ai_pve_log as route
@@ -42,30 +41,6 @@ async def test_chat_forwards_session_to_service(
     assert result.reply == "ok"
     assert captured["session"] is fake_session
     assert captured["allowed_vmids"] is None
-
-
-@pytest.mark.asyncio
-async def test_post_ssh_exec_forwards_session(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    captured: dict[str, object] = {}
-
-    async def _fake_ssh_exec(req: SSHExecRequest, *, session=None) -> SSHExecResult:
-        captured["session"] = session
-        return SSHExecResult(
-            vmid=req.vmid,
-            host="127.0.0.1",
-            ssh_user=req.ssh_user,
-            command=req.command,
-        )
-
-    monkeypatch.setattr(ssh_exec_module, "ssh_exec", _fake_ssh_exec)
-
-    fake_session = object()
-    req = SSHExecRequest(vmid=157, command="python3 --version")
-    result = await route.post_ssh_exec(req, object(), fake_session)
-    assert result.vmid == 157
-    assert captured["session"] is fake_session
 
 
 @pytest.mark.asyncio

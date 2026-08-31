@@ -1,4 +1,4 @@
-﻿"""NAT 端口轉發服務 — 透過 Gateway VM 的 haproxy 管理 TCP/UDP 轉發規則。
+"""NAT 端口轉發服務 — 透過 Gateway VM 的 haproxy 管理 TCP/UDP 轉發規則。
 
 設計原則：
 - DB 為 source of truth，儲存所有 external_port → vm_ip:internal_port 映射
@@ -217,20 +217,6 @@ def apply_nat_rule(
         raise
 
 
-def remove_nat_rule_by_id(session: object, rule_id: str) -> None:
-    """刪除指定 NAT 規則：從 DB 刪除後同步 haproxy。"""
-    import uuid as _uuid  # noqa: PLC0415
-
-    from app.repositories import nat_rule as nat_repo  # noqa: PLC0415
-
-    rule = nat_repo.get_rule(session, _uuid.UUID(rule_id))  # type: ignore[arg-type]
-    if rule is None:
-        raise BadRequestError(f"NAT 規則 {rule_id} 不存在")
-
-    nat_repo.delete_rule(session, rule)  # type: ignore[arg-type]
-    _sync_haproxy(session)
-
-
 def remove_nat_rules_for_vmid(session: object, vmid: int) -> None:
     """刪除指定 VM 的所有 NAT 規則（VM 刪除時使用）。"""
     from app.repositories import nat_rule as nat_repo  # noqa: PLC0415
@@ -251,10 +237,3 @@ def remove_nat_rules_by_internal_port(
     )
     if deleted:
         _sync_haproxy(session)
-
-
-def sync_to_gateway(session: object) -> None:
-    """手動觸發 haproxy 同步（供管理員 API 使用）。
-    Gateway VM 未設定時拋錯（讓 API 回 500，給使用者明確提示）。
-    """
-    _sync_haproxy(session)
