@@ -6,6 +6,7 @@ import LoadingState from "../../components/LoadingState/LoadingState";
 import MIcon from "../../components/MIcon";
 import { useToast } from "../../hooks/useToast";
 import useAutoRefresh from "../../hooks/useAutoRefresh";
+import useDialogPresence from "../../hooks/useDialogPresence";
 import { downloadBlob } from "../../services/api";
 import { createRubricAnalysisAutosave } from "./rubricAnalysisAutosave";
 import {
@@ -592,9 +593,12 @@ export function ChatPanel({
 
 /* ── 確認 Modal（覆蓋/副本、刪除） ──────────────────────── */
 
-function ConfirmModal({ title, description, actions, onClose }) {
+function ConfirmModal({ title, description, actions, closing = false, onClose }) {
   return (
-    <div className={styles.modalOverlay} onMouseDown={onClose}>
+    <div
+      className={`${styles.modalOverlay} ${closing ? styles.modalOverlayOut : ""}`}
+      onMouseDown={onClose}
+    >
       <div className={styles.confirm} onMouseDown={(e) => e.stopPropagation()}>
         <div className={styles.confirmIcon}>
           <MIcon name="warning" size={24} />
@@ -612,6 +616,7 @@ function CreateCheckForm({
   sourceOnly = false,
   embedded = false,
   initialMode = "",
+  closing = false,
   onClose,
   onCreated,
 }) {
@@ -771,7 +776,7 @@ function CreateCheckForm({
   );
 
   if (embedded) return form;
-  return <div className={styles.modalOverlay} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !creating && !uploading) onClose(); }}>{form}</div>;
+  return <div className={`${styles.modalOverlay} ${closing ? styles.modalOverlayOut : ""}`} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !creating && !uploading) onClose(); }}>{form}</div>;
 }
 
 export function CreateCheckChooser({ onChoose, onCancel, busy = false, error = "" }) {
@@ -826,6 +831,8 @@ function RubricSourceRail({ classId, judgeSession, readOnly, onSessionUpdated, o
   const [loading, setLoading] = useState(true);
   const [openMenuId, setOpenMenuId] = useState(null);
   const [busyId, setBusyId] = useState(null);
+  // 來源選單離場動畫：關閉時保留最後開啟的列 130ms
+  const sourceMenuKeep = useDialogPresence(openMenuId, 130);
   const [showOtherSources, setShowOtherSources] = useState(false);
   const selectedFileId = judgeSession?.selected_file_id ?? null;
 
@@ -929,7 +936,7 @@ function RubricSourceRail({ classId, judgeSession, readOnly, onSessionUpdated, o
       </div>
       {loading ? <p className={styles.mutedText}>載入來源中…</p> : visibleFiles.length > 0 ? (
         <div className={styles.sourceList}>
-           {visibleFiles.map((file) => <div key={file.id} className={`${styles.sourceRow} ${file.id === selectedFileId ? styles.sourceRowSelected : ""}`}><button type="button" className={styles.sourceSelect} disabled={readOnly || busyId === file.id} onClick={() => selectFile(file)}><span className={styles.sourceIndicator} aria-hidden="true"><MIcon name={file.id === selectedFileId ? "radio_button_checked" : "radio_button_unchecked"} size={17} /></span><span className={styles.sourceText}><b>{getRubricDisplayName(file, "未命名評分表")}</b><small>{(file.environment_keys?.length ? file.environment_keys : [file.template_key]).map(getTemplateLabel).join("、")} · {file.analysis_json?.items?.length ?? 0} 項 · {formatDateTime(file.updated_at)} · {file.source_type === "created" ? "建立於系統" : "已上傳"}</small>{file.id === selectedFileId && <em>已選用</em>}</span></button>{(file.source_type !== "created" || !readOnly) && <div className={styles.sourceActions}><button type="button" className={styles.iconBtn} aria-label={`管理 ${getRubricDisplayName(file)}`} title="管理評分表來源" aria-haspopup="menu" aria-expanded={openMenuId === file.id} onClick={(event) => { event.stopPropagation(); setOpenMenuId((current) => current === file.id ? null : file.id); }}><MIcon name="more_vert" size={18} /></button>{openMenuId === file.id && <div className={styles.sourceMenu} role="menu">{file.source_type !== "created" && <button type="button" role="menuitem" onClick={() => download(file)}><MIcon name="download" size={15} />下載原始文件</button>}{!readOnly && <button type="button" role="menuitem" className={styles.menuDanger} disabled={busyId === file.id} onClick={() => remove(file)}><MIcon name="delete" size={15} />刪除來源</button>}</div>}</div>}</div>)}
+           {visibleFiles.map((file) => <div key={file.id} className={`${styles.sourceRow} ${file.id === selectedFileId ? styles.sourceRowSelected : ""}`}><button type="button" className={styles.sourceSelect} disabled={readOnly || busyId === file.id} onClick={() => selectFile(file)}><span className={styles.sourceIndicator} aria-hidden="true"><MIcon name={file.id === selectedFileId ? "radio_button_checked" : "radio_button_unchecked"} size={17} /></span><span className={styles.sourceText}><b>{getRubricDisplayName(file, "未命名評分表")}</b><small>{(file.environment_keys?.length ? file.environment_keys : [file.template_key]).map(getTemplateLabel).join("、")} · {file.analysis_json?.items?.length ?? 0} 項 · {formatDateTime(file.updated_at)} · {file.source_type === "created" ? "建立於系統" : "已上傳"}</small>{file.id === selectedFileId && <em>已選用</em>}</span></button>{(file.source_type !== "created" || !readOnly) && <div className={styles.sourceActions}><button type="button" className={styles.iconBtn} aria-label={`管理 ${getRubricDisplayName(file)}`} title="管理評分表來源" aria-haspopup="menu" aria-expanded={openMenuId === file.id} onClick={(event) => { event.stopPropagation(); setOpenMenuId((current) => current === file.id ? null : file.id); }}><MIcon name="more_vert" size={18} /></button>{sourceMenuKeep.item === file.id && <div className={`${styles.sourceMenu} ${sourceMenuKeep.closing ? styles.sessionMenuOut : ""}`} role="menu">{file.source_type !== "created" && <button type="button" role="menuitem" onClick={() => download(file)}><MIcon name="download" size={15} />下載原始文件</button>}{!readOnly && <button type="button" role="menuitem" className={styles.menuDanger} disabled={busyId === file.id} onClick={() => remove(file)}><MIcon name="delete" size={15} />刪除來源</button>}</div>}</div>}</div>)}
         </div>
       ) : <div className={styles.sourceEmpty}><MIcon name="description" size={24} /><p>{selectedFileId ? "目前來源已無法使用，請重新選擇。" : "這項檢查尚未選擇評分表來源。"}</p>{!readOnly && <button type="button" className={styles.btnSecondary} onClick={onAddSource}><MIcon name="add" size={15} />新增來源</button>}</div>}
     </aside>
@@ -957,7 +964,9 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
   const [sourceFileId, setSourceFileId] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const deleteDialog = useDialogPresence(deleteTarget);
   const [pendingConflictFile, setPendingConflictFile] = useState(null);
+  const conflictDialog = useDialogPresence(pendingConflictFile);
   const [selectedTemplateKey, setSelectedTemplateKey] = useState("linux");
   const [analysisTemplateKey, setAnalysisTemplateKey] = useState("linux");
   const [pendingProposal, setPendingProposal] = useState(null);
@@ -1679,10 +1688,11 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
         </div>
       </div>
 
-      {pendingConflictFile && (
+      {conflictDialog.open && (
         <ConfirmModal
           title="已有同名評分表"
-          description={`「${pendingConflictFile.name}」已存在。請選擇覆蓋原本文件，或建立一份副本後重新分析。`}
+          description={`「${conflictDialog.item.name}」已存在。請選擇覆蓋原本文件，或建立一份副本後重新分析。`}
+          closing={conflictDialog.closing}
           onClose={() => {
             if (!isUploading) setPendingConflictFile(null);
           }}
@@ -1700,7 +1710,7 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
                 type="button"
                 className={styles.btnSecondary}
                 disabled={isUploading}
-                onClick={() => handleUpload(pendingConflictFile, "copy")}
+                onClick={() => handleUpload(conflictDialog.item, "copy")}
               >
                 建立副本
               </button>
@@ -1708,7 +1718,7 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
                 type="button"
                 className={styles.btnPrimary}
                 disabled={isUploading}
-                onClick={() => handleUpload(pendingConflictFile, "overwrite")}
+                onClick={() => handleUpload(conflictDialog.item, "overwrite")}
               >
                 覆蓋原本
               </button>
@@ -1717,10 +1727,11 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
         />
       )}
 
-      {deleteTarget && (
+      {deleteDialog.open && (
         <ConfirmModal
           title="確認刪除評分表？"
-          description={`你即將刪除「${deleteTarget.original_filename}」的原始檔與保存分析。刪除後不會影響已建立的腳本。`}
+          description={`你即將刪除「${deleteDialog.item.original_filename}」的原始檔與保存分析。刪除後不會影響已建立的腳本。`}
+          closing={deleteDialog.closing}
           onClose={() => {
             if (!deleting) setDeleteTarget(null);
           }}
@@ -1802,7 +1813,8 @@ function ScriptsTab({ classId, sessionId, readOnly = false, onScriptApproved }) 
   const [error, setError] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
-  const [actionPending, setActionPending] = useState(null); // "approve" | "regenerate" | "delete"
+  const [actionPending, setActionPending] = useState(null);
+  const deleteScriptDialog = useDialogPresence(deleteTarget); // "approve" | "regenerate" | "delete"
 
   const fetchScripts = useCallback(async () => {
     setLoading(true);
@@ -1971,10 +1983,11 @@ function ScriptsTab({ classId, sessionId, readOnly = false, onScriptApproved }) 
         </div>
       )}
 
-      {deleteTarget && (
+      {deleteScriptDialog.open && (
         <ConfirmModal
           title="確認刪除檢查腳本？"
-          description={`你即將永久刪除「${deleteTarget.name}」v${deleteTarget.version}。刪除後無法再查看、核准或重新生成。`}
+          description={`你即將永久刪除「${deleteScriptDialog.item.name}」v${deleteScriptDialog.item.version}。刪除後無法再查看、核准或重新生成。`}
+          closing={deleteScriptDialog.closing}
           onClose={() => {
             if (actionPending !== "delete") setDeleteTarget(null);
           }}
@@ -2094,6 +2107,7 @@ function ExecutionTab({ classId, sessionId, readOnly = false, members }) {
   const toast = useToast();
   const [selectedVmids, setSelectedVmids] = useState([]);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const runDialog = useDialogPresence(dialogOpen);
   const [selectedScriptId, setSelectedScriptId] = useState(null);
   const [creatingRun, setCreatingRun] = useState(false);
   const [activeRunRef, setActiveRunRef] = useState(null); // { scriptId, runId }
@@ -2444,8 +2458,11 @@ function ExecutionTab({ classId, sessionId, readOnly = false, members }) {
         </div>
       )}
 
-      {dialogOpen && (
-        <div className={styles.modalOverlay} onMouseDown={() => setDialogOpen(false)}>
+      {runDialog.open && (
+        <div
+          className={`${styles.modalOverlay} ${runDialog.closing ? styles.modalOverlayOut : ""}`}
+          onMouseDown={() => setDialogOpen(false)}
+        >
           <div className={styles.modal} onMouseDown={(e) => e.stopPropagation()}>
             <div className={styles.modalHeader}>
               <div>
@@ -2524,309 +2541,6 @@ function ExecutionTab({ classId, sessionId, readOnly = false, members }) {
   );
 }
 
-/* ── 主面板 ─────────────────────────────────────────────── */
-
-const JUDGE_TABS = [
-  { key: "rubrics", label: "評分表", icon: "description" },
-  { key: "scripts", label: "檢查腳本", icon: "terminal" },
-  { key: "execution", label: "執行與結果", icon: "play_circle_outline" },
-];
-
-function LegacyAiJudgePanel({ classId, members }) {
-  const [activeTab, setActiveTab] = useState("rubrics");
-  const [sessions, setSessions] = useState([]);
-  const [sessionStatus, setSessionStatus] = useState("active");
-  const [activeSessionId, setActiveSessionId] = useState(null);
-  const [newSessionTitle, setNewSessionTitle] = useState("");
-  const [sessionsLoading, setSessionsLoading] = useState(true);
-  const [sessionAction, setSessionAction] = useState(false);
-  const [deleteSessionTarget, setDeleteSessionTarget] = useState(null);
-  const [deletingSession, setDeletingSession] = useState(false);
-  const requestVersionRef = useRef(0);
-  const toast = useToast();
-
-  const activeSession = useMemo(
-    () => sessions.find((item) => item.id === activeSessionId) ?? null,
-    [activeSessionId, sessions],
-  );
-
-  const loadSessions = useCallback(async () => {
-    const requestVersion = ++requestVersionRef.current;
-    setSessionsLoading(true);
-    try {
-      const rows = await AiJudgeService.listSessions(classId, sessionStatus);
-      if (requestVersion !== requestVersionRef.current) return;
-      setSessions(rows);
-      setActiveSessionId((current) =>
-        rows.some((item) => item.id === current) ? current : (rows[0]?.id ?? null),
-      );
-    } catch (err) {
-      if (requestVersion === requestVersionRef.current) {
-        setSessions([]);
-        setActiveSessionId(null);
-        toast.error(err?.message ?? "載入檢查清單失敗");
-      }
-    } finally {
-      if (requestVersion === requestVersionRef.current) setSessionsLoading(false);
-    }
-  }, [classId, sessionStatus, toast]);
-
-  useEffect(() => {
-    setActiveSessionId(null);
-    setSessions([]);
-    loadSessions();
-    return () => {
-      requestVersionRef.current += 1;
-    };
-  }, [loadSessions]);
-
-  async function createJudgeSession(e) {
-    e.preventDefault();
-    const title = newSessionTitle.trim();
-    if (!title) return;
-    setSessionAction(true);
-    try {
-      const created = await AiJudgeService.createSession(classId, { title });
-      if (sessionStatus !== "active") setSessionStatus("active");
-      setSessions((current) => [created, ...current.filter((item) => item.id !== created.id)]);
-      setActiveSessionId(created.id);
-      setNewSessionTitle("");
-    } catch (err) {
-      toast.error(err?.message ?? "建立檢查失敗");
-    } finally {
-      setSessionAction(false);
-    }
-  }
-
-  async function archiveActiveSession() {
-    if (!activeSession) return;
-    setSessionAction(true);
-    try {
-      await AiJudgeService.archiveSession(classId, activeSession.id);
-      setSessions((current) => current.filter((item) => item.id !== activeSession.id));
-      setActiveSessionId(null);
-      toast.success("檢查已封存");
-    } catch (err) {
-      toast.error(err?.message ?? "封存檢查失敗");
-    } finally {
-      setSessionAction(false);
-    }
-  }
-
-  async function deleteJudgeSession() {
-    if (!deleteSessionTarget) return;
-    setDeletingSession(true);
-    try {
-      await AiJudgeService.deleteSession(classId, deleteSessionTarget.id);
-      setSessions((current) =>
-        current.filter((item) => item.id !== deleteSessionTarget.id),
-      );
-      setActiveSessionId((current) =>
-        current === deleteSessionTarget.id ? null : current,
-      );
-      setDeleteSessionTarget(null);
-      toast.success("檢查與相關資料已刪除");
-    } catch (err) {
-      toast.error(err?.message ?? "刪除檢查失敗");
-    } finally {
-      setDeletingSession(false);
-    }
-  }
-
-  function updateSessionInList(updated) {
-    setSessions((current) =>
-      current.map((item) => (item.id === updated.id ? updated : item)),
-    );
-  }
-
-  return (
-    <div className={styles.panel}>
-      <div className={styles.panelHeading}>
-        <h2 className={styles.panelTitle}>
-          <MIcon name="checklist" size={20} />
-          AI 檢查
-        </h2>
-          <p className={styles.panelDesc}>管理班級評分表、檢查腳本與執行結果。</p>
-      </div>
-
-      <div className={styles.sessionWorkspace}>
-        <aside className={styles.sessionSidebar}>
-          <form className={styles.sessionCreate} onSubmit={createJudgeSession}>
-            <input
-              value={newSessionTitle}
-              onChange={(event) => setNewSessionTitle(event.target.value)}
-              placeholder="新增檢查名稱"
-              maxLength={255}
-            />
-            <button
-              type="submit"
-              className={styles.btnPrimary}
-              disabled={sessionAction || !newSessionTitle.trim()}
-            >
-              <MIcon name="add" size={16} />
-              新增
-            </button>
-          </form>
-          <div className={styles.sessionFilters}>
-            {["active", "archived"].map((status) => (
-              <button
-                key={status}
-                type="button"
-                className={sessionStatus === status ? styles.chipBtnActive : styles.chipBtn}
-                onClick={() => setSessionStatus(status)}
-              >
-                {status === "active" ? "進行中" : "已封存"}
-              </button>
-            ))}
-          </div>
-          <div className={styles.sessionList}>
-            {sessionsLoading ? (
-              <LoadingState />
-            ) : sessions.length === 0 ? (
-              <p className={styles.mutedText}>目前沒有檢查紀錄。</p>
-            ) : (
-              sessions.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  className={
-                    item.id === activeSessionId
-                      ? styles.sessionItemActive
-                      : styles.sessionItem
-                  }
-                  onClick={() => setActiveSessionId(item.id)}
-                >
-                  <strong>{item.title}</strong>
-                </button>
-              ))
-            )}
-          </div>
-        </aside>
-
-        <section className={styles.sessionMain}>
-          {!activeSession ? (
-            <div className={styles.card}>
-              <p className={styles.mutedText}>
-                {sessionStatus === "active"
-                  ? "請新增或選擇一項檢查。"
-                  : "請選擇已封存的檢查查看歷史。"}
-              </p>
-            </div>
-          ) : (
-            <>
-              <div className={styles.sessionHeader}>
-                <div>
-                  <h3>{activeSession.title}</h3>
-                  <p>
-                    {activeSession.selected_file_name ?? "尚未選擇評分表"} · 對話{" "}
-                    {activeSession.message_count} · 腳本 {activeSession.script_count} · 執行{" "}
-                    {activeSession.run_count}
-                  </p>
-                </div>
-                <div className={styles.sectionActions}>
-                  {activeSession.status === "active" && (
-                    <button
-                      type="button"
-                      className={styles.btnSecondary}
-                      disabled={sessionAction || deletingSession}
-                      onClick={archiveActiveSession}
-                    >
-                      <MIcon name="archive" size={16} />
-                      封存
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    className={styles.btnDanger}
-                    disabled={sessionAction || deletingSession}
-                    onClick={() => setDeleteSessionTarget(activeSession)}
-                  >
-                    <MIcon name="delete" size={16} />
-                    刪除
-                  </button>
-                </div>
-              </div>
-
-              <div className={styles.subTabs}>
-                {JUDGE_TABS.map((tab) => (
-                  <button
-                    key={tab.key}
-                    type="button"
-                    className={activeTab === tab.key ? styles.subTabActive : styles.subTab}
-                    onClick={() => setActiveTab(tab.key)}
-                  >
-                    <MIcon name={tab.icon} size={16} />
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
-
-              {activeTab === "rubrics" && (
-                <RubricsTab
-                  key={activeSession.id}
-                  classId={classId}
-                  judgeSession={activeSession}
-                  onSessionUpdated={updateSessionInList}
-                  onScriptCreated={() => {
-                    loadSessions();
-                    setActiveTab("scripts");
-                  }}
-                />
-              )}
-              {activeTab === "scripts" && (
-                <ScriptsTab
-                  classId={classId}
-                  sessionId={activeSession.id}
-                  readOnly={activeSession.status === "archived"}
-                  onScriptApproved={() => setActiveTab("execution")}
-                />
-              )}
-              {activeTab === "execution" && (
-                <ExecutionTab
-                  classId={classId}
-                  sessionId={activeSession.id}
-                  readOnly={activeSession.status === "archived"}
-                  members={members}
-                />
-              )}
-            </>
-          )}
-        </section>
-      </div>
-
-      {deleteSessionTarget && (
-        <ConfirmModal
-          title="確認刪除檢查？"
-          description={`「${deleteSessionTarget.title}」及其專屬評分表來源、對話、檢查腳本與執行紀錄將直接刪除，且無法復原；其他檢查不受影響。`}
-          onClose={() => {
-            if (!deletingSession) setDeleteSessionTarget(null);
-          }}
-          actions={
-            <>
-              <button
-                type="button"
-                className={styles.btnSecondary}
-                disabled={deletingSession}
-                onClick={() => setDeleteSessionTarget(null)}
-              >
-                取消
-              </button>
-              <button
-                type="button"
-                className={styles.btnDanger}
-                disabled={deletingSession}
-                onClick={deleteJudgeSession}
-              >
-                {deletingSession ? "刪除中..." : "確認刪除"}
-              </button>
-            </>
-          }
-        />
-      )}
-    </div>
-  );
-}
-
 /* ── 導師工作區 ─────────────────────────────────────────── */
 
 const TEACHER_JUDGE_TABS = [
@@ -2846,14 +2560,19 @@ function TeacherWorkspacePanel({ classId, members }) {
   const [loading, setLoading] = useState(true);
   const [creationView, setCreationView] = useState(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const createDialog = useDialogPresence(createOpen);
   const [sourceOnly, setSourceOnly] = useState(false);
   const [openMenuId, setOpenMenuId] = useState(null);
   const [sessionMenuPosition, setSessionMenuPosition] = useState(null);
+  // 選單離場動畫：關閉時保留最後的目標與位置 130ms
+  const sessionMenuPos = useDialogPresence(sessionMenuPosition, 130);
   const [busySessionIds, setBusySessionIds] = useState(() => new Set());
   const [renameTarget, setRenameTarget] = useState(null);
+  const renameDialog = useDialogPresence(renameTarget);
   const [renameTitle, setRenameTitle] = useState("");
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const deleteCheckDialog = useDialogPresence(deleteTarget);
   const requestVersionRef = useRef(0);
   const classIdRef = useRef(classId);
   const closeSessionMenu = useCallback(() => {
@@ -2869,6 +2588,7 @@ function TeacherWorkspacePanel({ classId, members }) {
     () => sessions.find((item) => item.id === openMenuId) ?? null,
     [openMenuId, sessions],
   );
+  const sessionMenuItemKeep = useDialogPresence(openSessionMenuItem, 130);
 
   const loadSessions = useCallback(async () => {
     const requestVersion = ++requestVersionRef.current;
@@ -3094,15 +2814,16 @@ function TeacherWorkspacePanel({ classId, members }) {
   }
 
   function renderSessionMenu(item) {
-    if (!item || !sessionMenuPosition) return null;
+    const menuPos = sessionMenuPos.item;
+    if (!item || !menuPos) return null;
     const busy = busySessionIds.has(item.id);
     return (
       <div
         id={`check-menu-${item.id}`}
-        className={styles.sessionMenu}
+        className={`${styles.sessionMenu} ${sessionMenuPos.closing ? styles.sessionMenuOut : ""}`}
         role="menu"
         aria-label={`「${item.title}」更多功能`}
-        style={{ top: `${sessionMenuPosition.top}px`, left: `${sessionMenuPosition.left}px` }}
+        style={{ top: `${menuPos.top}px`, left: `${menuPos.left}px` }}
       >
         {item.status === "active" && <>
           <button type="button" role="menuitem" disabled={busy} onClick={() => { setRenameTarget(item); setRenameTitle(item.title); closeSessionMenu(); }}><MIcon name="edit" size={16} />重新命名</button>
@@ -3159,11 +2880,11 @@ function TeacherWorkspacePanel({ classId, members }) {
         </section>
       </div>
 
-      {typeof document !== "undefined" && openSessionMenuItem && sessionMenuPosition && createPortal(renderSessionMenu(openSessionMenuItem), document.body)}
+      {typeof document !== "undefined" && sessionMenuItemKeep.open && sessionMenuPos.item && createPortal(renderSessionMenu(sessionMenuItemKeep.item), document.body)}
 
-      {createOpen && <CreateCheckForm classId={classId} sourceOnly={sourceOnly} onClose={() => { setCreateOpen(false); setSourceOnly(false); }} onCreated={handleCreated} />}
-       {renameTarget && <div className={styles.modalOverlay} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setRenameTarget(null); }}><form className={`${styles.confirm} ${styles.renameDialog}`} role="dialog" aria-modal="true" aria-labelledby="rename-check-title" onSubmit={renameSession}><div className={styles.modalHeader}><h2 id="rename-check-title">重新命名檢查</h2><button type="button" className={styles.iconBtn} aria-label="關閉" onClick={() => setRenameTarget(null)}><MIcon name="close" size={18} /></button></div><label className={styles.dialogField}><span>檢查名稱</span><input autoFocus value={renameTitle} maxLength={255} onChange={(event) => setRenameTitle(event.target.value)} /></label><div className={styles.modalActions}><button type="button" className={styles.btnSecondary} onClick={() => setRenameTarget(null)}>取消</button><button type="submit" className={styles.btnPrimary} disabled={!renameTitle.trim() || busySessionIds.has(renameTarget.id)}>儲存</button></div></form></div>}
-      {deleteTarget && <ConfirmModal title="確認刪除檢查？" description={`「${deleteTarget.title}」及其專屬評分表來源、對話、檢查腳本與執行紀錄將直接刪除，且無法復原；其他檢查不受影響。`} onClose={() => { if (!deleting) setDeleteTarget(null); }} actions={<><button type="button" className={styles.btnSecondary} disabled={deleting} onClick={() => setDeleteTarget(null)}>取消</button><button type="button" className={styles.btnDanger} disabled={deleting} onClick={deleteSession}>{deleting ? "刪除中…" : "確認刪除"}</button></>} />}
+      {createDialog.open && <CreateCheckForm classId={classId} sourceOnly={sourceOnly} closing={createDialog.closing} onClose={() => { setCreateOpen(false); setSourceOnly(false); }} onCreated={handleCreated} />}
+       {renameDialog.open && <div className={`${styles.modalOverlay} ${renameDialog.closing ? styles.modalOverlayOut : ""}`} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setRenameTarget(null); }}><form className={`${styles.confirm} ${styles.renameDialog}`} role="dialog" aria-modal="true" aria-labelledby="rename-check-title" onSubmit={renameSession}><div className={styles.modalHeader}><h2 id="rename-check-title">重新命名檢查</h2><button type="button" className={styles.iconBtn} aria-label="關閉" onClick={() => setRenameTarget(null)}><MIcon name="close" size={18} /></button></div><label className={styles.dialogField}><span>檢查名稱</span><input autoFocus value={renameTitle} maxLength={255} onChange={(event) => setRenameTitle(event.target.value)} /></label><div className={styles.modalActions}><button type="button" className={styles.btnSecondary} onClick={() => setRenameTarget(null)}>取消</button><button type="submit" className={styles.btnPrimary} disabled={!renameTitle.trim() || busySessionIds.has(renameDialog.item.id)}>儲存</button></div></form></div>}
+      {deleteCheckDialog.open && <ConfirmModal title="確認刪除檢查？" description={`「${deleteCheckDialog.item.title}」及其專屬評分表來源、對話、檢查腳本與執行紀錄將直接刪除，且無法復原；其他檢查不受影響。`} closing={deleteCheckDialog.closing} onClose={() => { if (!deleting) setDeleteTarget(null); }} actions={<><button type="button" className={styles.btnSecondary} disabled={deleting} onClick={() => setDeleteTarget(null)}>取消</button><button type="button" className={styles.btnDanger} disabled={deleting} onClick={deleteSession}>{deleting ? "刪除中…" : "確認刪除"}</button></>} />}
     </div>
   );
 }
