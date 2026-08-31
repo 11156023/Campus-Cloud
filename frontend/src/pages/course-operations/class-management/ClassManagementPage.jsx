@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import LoadingState from "../../components/LoadingState/LoadingState";
-import MIcon from "../../components/MIcon";
-import EmptyState from "../../components/EmptyState/EmptyState";
-import { TeachingClassesService } from "../../services/teachingClasses";
-import styles from "./CourseOperations.module.scss";
-import PageHeader from "../../components/PageHeader/PageHeader";
+import LoadingState from "../../../components/LoadingState/LoadingState";
+import MIcon from "../../../components/MIcon";
+import EmptyState from "../../../components/EmptyState/EmptyState";
+import { TeachingClassesService } from "../../../services/teachingClasses";
+import styles from "../CourseOperations.module.scss";
+import PageHeader from "../../../components/PageHeader/PageHeader";
 
 const STATUS = {
   planning: "準備中",

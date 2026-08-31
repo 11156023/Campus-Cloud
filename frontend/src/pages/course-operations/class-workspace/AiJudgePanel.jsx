@@ -2,12 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useSearchParams } from "react-router-dom";
 import styles from "./AiJudgePanel.module.scss";
-import LoadingState from "../../components/LoadingState/LoadingState";
-import MIcon from "../../components/MIcon";
-import { useToast } from "../../hooks/useToast";
-import useAutoRefresh from "../../hooks/useAutoRefresh";
-import useDialogPresence from "../../hooks/useDialogPresence";
-import { downloadBlob } from "../../services/api";
+import LoadingState from "../../../components/LoadingState/LoadingState";
+import MIcon from "../../../components/MIcon";
+import { useToast } from "../../../hooks/useToast";
+import useAutoRefresh from "../../../hooks/useAutoRefresh";
+import useDialogPresence from "../../../hooks/useDialogPresence";
+import { downloadBlob } from "../../../services/api";
 import { createRubricAnalysisAutosave } from "./rubricAnalysisAutosave";
 import {
   AiJudgeService,
@@ -17,7 +17,7 @@ import {
   getTemplateLabel,
   rubricToContext,
   shouldDisplayChatMessage,
-} from "../../services/aiJudge";
+} from "../../../services/aiJudge";
 
 /* ── 共用小元件 ─────────────────────────────────────────── */
 

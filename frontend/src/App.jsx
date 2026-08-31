@@ -37,11 +37,11 @@ const AiPvePage = lazy(() => import("./pages/system/ai-pve/AiPvePage"));
 const CoursePathsPage = lazy(() => import("./pages/courses/paths/CoursePathsPage"));
 const CourseRoomPage = lazy(() => import("./pages/courses/room/CourseRoomPage"));
 const CourseCmsPage = lazy(() => import("./pages/teaching/course-cms/CourseCmsPage"));
-const CourseTemplateManagementPage = lazy(() => import("./pages/course-operations/CourseTemplateManagementPage"));
-const CourseTemplateEditorPage = lazy(() => import("./pages/course-operations/CourseTemplateEditorPage"));
-const ClassManagementPage = lazy(() => import("./pages/course-operations/ClassManagementPage"));
-const ClassWorkspacePage = lazy(() => import("./pages/course-operations/ClassWorkspacePage"));
-const ClassSetupPage = lazy(() => import("./pages/course-operations/ClassSetupPage"));
+const CourseTemplateManagementPage = lazy(() => import("./pages/course-operations/course-templates/CourseTemplateManagementPage"));
+const CourseTemplateEditorPage = lazy(() => import("./pages/course-operations/course-templates/CourseTemplateEditorPage"));
+const ClassManagementPage = lazy(() => import("./pages/course-operations/class-management/ClassManagementPage"));
+const ClassWorkspacePage = lazy(() => import("./pages/course-operations/class-workspace/ClassWorkspacePage"));
+const ClassSetupPage = lazy(() => import("./pages/course-operations/class-setup/ClassSetupPage"));
 
 // 系統管理
 const AdminPage = lazy(() => import("./pages/system/admin/AdminPage"));

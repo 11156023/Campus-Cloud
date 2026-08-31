@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import MIcon from "../../components/MIcon";
-import PageHeader from "../../components/PageHeader/PageHeader";
-import EmptyState from "../../components/EmptyState/EmptyState";
-import LoadingState from "../../components/LoadingState/LoadingState";
-import { CourseEnvironmentsService } from "../../services/courseEnvironments";
-import { TeachingClassesService } from "../../services/teachingClasses";
+import MIcon from "../../../components/MIcon";
+import PageHeader from "../../../components/PageHeader/PageHeader";
+import EmptyState from "../../../components/EmptyState/EmptyState";
+import LoadingState from "../../../components/LoadingState/LoadingState";
+import { CourseEnvironmentsService } from "../../../services/courseEnvironments";
+import { TeachingClassesService } from "../../../services/teachingClasses";
 import styles from "./ClassSetupPage.module.scss";
 
 const STEPS = [
