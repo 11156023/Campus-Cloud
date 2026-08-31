@@ -79,10 +79,27 @@ def _resource(*, vmid: int, user_id: uuid.UUID) -> models.Resource:
         vmid=vmid,
         user_id=user_id,
         environment_type="linux",
-        ip_address="10.0.0.10",
         ssh_private_key_encrypted="encrypted-key",
         created_at=datetime.now(timezone.utc),
     )
+
+
+def _add_resource(
+    session: Session, *, vmid: int, user_id: uuid.UUID, ip: str | None = "10.0.0.10"
+) -> models.Resource:
+    """Add a resource, plus its cached IP row when the test expects a cache hit."""
+    resource = _resource(vmid=vmid, user_id=user_id)
+    session.add(resource)
+    if ip is not None:
+        session.add(
+            models.ResourceNetwork(
+                resource_vmid=vmid,
+                ip_address=ip,
+                source="proxmox",
+                cached_at=datetime.now(timezone.utc),
+            )
+        )
+    return resource
 
 
 def _valid_result_json() -> str:
@@ -793,7 +810,7 @@ def test_create_script_run_snapshots_only_running_class_targets(
         policy_check_result_json={"approved": True},
         ai_review_result_json={"approved": True},
     )
-    session.add(_resource(vmid=101, user_id=user_id))
+    _add_resource(session, vmid=101, user_id=user_id)
     session.add(artifact)
     session.commit()
     session.refresh(artifact)
@@ -852,9 +869,7 @@ def test_create_script_run_falls_back_to_live_ip_when_cache_missing(
         policy_check_result_json={"approved": True},
         ai_review_result_json={"approved": True},
     )
-    resource = _resource(vmid=131, user_id=user_id)
-    resource.ip_address = None
-    session.add(resource)
+    resource = _add_resource(session, vmid=131, user_id=user_id, ip=None)
     session.add(artifact)
     session.commit()
     session.refresh(artifact)
@@ -912,7 +927,7 @@ def test_create_script_run_rejects_stopped_target(
         policy_check_result_json={"approved": True},
         ai_review_result_json={"approved": True},
     )
-    session.add(_resource(vmid=101, user_id=user_id))
+    _add_resource(session, vmid=101, user_id=user_id)
     session.add(artifact)
     session.commit()
     session.refresh(artifact)
@@ -960,9 +975,8 @@ def test_create_script_run_rejects_target_without_ssh_key(
         policy_check_result_json={"approved": True},
         ai_review_result_json={"approved": True},
     )
-    resource = _resource(vmid=101, user_id=user_id)
+    resource = _add_resource(session, vmid=101, user_id=user_id)
     resource.ssh_private_key_encrypted = None
-    session.add(resource)
     session.add(artifact)
     session.commit()
     session.refresh(artifact)
@@ -1011,7 +1025,7 @@ async def test_execute_script_run_saves_valid_target_result(
         policy_check_result_json={"approved": True},
         ai_review_result_json={"approved": True},
     )
-    session.add(_resource(vmid=101, user_id=user_id))
+    _add_resource(session, vmid=101, user_id=user_id)
     session.add(artifact)
     session.commit()
     session.refresh(artifact)
@@ -1134,7 +1148,7 @@ async def test_execute_script_run_does_not_commit_partial_results_before_analysi
         policy_check_result_json={"approved": True},
         ai_review_result_json={"approved": True},
     )
-    session.add(_resource(vmid=101, user_id=user_id))
+    _add_resource(session, vmid=101, user_id=user_id)
     session.add(artifact)
     session.commit()
     session.refresh(artifact)
@@ -1206,9 +1220,7 @@ def test_executor_runtime_target_falls_back_to_live_ip_when_cache_missing(
     session = _session()
     teaching_class_id = uuid.uuid4()
     user_id = uuid.uuid4()
-    resource = _resource(vmid=131, user_id=user_id)
-    resource.ip_address = None
-    session.add(resource)
+    resource = _add_resource(session, vmid=131, user_id=user_id, ip=None)
     session.commit()
 
     run = models.TeacherJudgeScriptRun(
@@ -1257,7 +1269,7 @@ async def test_execute_script_run_saves_invalid_json_result(
         policy_check_result_json={"approved": True},
         ai_review_result_json={"approved": True},
     )
-    session.add(_resource(vmid=101, user_id=user_id))
+    _add_resource(session, vmid=101, user_id=user_id)
     session.add(artifact)
     session.commit()
     session.refresh(artifact)
@@ -1420,7 +1432,7 @@ async def test_execute_script_run_records_executor_level_failure(
         policy_check_result_json={"approved": True},
         ai_review_result_json={"approved": True},
     )
-    session.add(_resource(vmid=101, user_id=user_id))
+    _add_resource(session, vmid=101, user_id=user_id)
     session.add(artifact)
     session.commit()
     session.refresh(artifact)
