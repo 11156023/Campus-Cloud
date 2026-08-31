@@ -381,7 +381,7 @@ function ConnectionsSection({ connections, loading, onRefresh }) {
           </div>
         )}
         <p className={styles.cardHint}>
-          節點即時用量、趨勢圖與告警請至{" "}
+          節點即時用量、趨勢圖與警告請至{" "}
           <Link to="/monitoring" className={styles.inlineLink}>監控與日誌 → 資源監控</Link>
           {" "}查看。
         </p>

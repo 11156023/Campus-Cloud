@@ -1,4 +1,4 @@
-"""資源閾值告警：抽樣 → 評估（純函式）→ 落 DB + Email 通知。
+"""資源閾值警告：抽樣 → 評估（純函式）→ 落 DB + Email 通知。
 
 評估邏輯（collect_samples / evaluate）為純函式，不碰 DB/PVE/SMTP，
 方便單元測試；I/O 由 process_resource_alerts 協調。
@@ -127,7 +127,7 @@ def evaluate(
     config: _ConfigLike,
     now: datetime,
 ) -> AlertDecision:
-    """純函式：比對樣本與現有告警，決定新事件與待 resolve 事件。
+    """純函式：比對樣本與現有警告，決定新事件與待 resolve 事件。
 
     ``alerts`` 需包含 open 事件與（供冷卻期判斷的）近期已 resolve 事件。
     樣本缺漏（節點暫時查不到）不觸發 resolve — 避免 PVE 抖動誤報恢復。
@@ -184,7 +184,7 @@ def _notify_admins(session: Session, created: list[AlertEvent]) -> None:
     emails = _list_admin_emails(session)
     for alert in created:
         subject = (
-            f"[SkyLab 告警] {alert.target} {alert.metric.value} "
+            f"[SkyLab 警告] {alert.target} {alert.metric.value} "
             f"{alert.value:.0f}%"
         )
         html = (
@@ -205,7 +205,7 @@ def _notify_admins(session: Session, created: list[AlertEvent]) -> None:
 
 
 def process_resource_alerts() -> int:
-    """Scheduler tick：依設定間隔抽樣並評估告警。回傳新建事件數。"""
+    """Scheduler tick：依設定間隔抽樣並評估警告。回傳新建事件數。"""
     global _last_run_monotonic
     try:
         with Session(engine) as session:

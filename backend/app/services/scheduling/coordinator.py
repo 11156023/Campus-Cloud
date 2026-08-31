@@ -722,7 +722,7 @@ def process_expired_requests_task() -> int:
 
 
 def process_resource_alerts_task() -> int:
-    """Scheduler tick：資源閾值告警評估（間隔由 GovernanceConfig 控制）。"""
+    """Scheduler tick：資源閾值警告評估（間隔由 GovernanceConfig 控制）。"""
     from app.services.monitoring import (
         alert_service,  # noqa: PLC0415 — 避免 import cycle
     )

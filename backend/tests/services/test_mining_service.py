@@ -164,7 +164,7 @@ def test_respond_suspend_failure_stays_detected(
     )
     assert incident.status is MiningIncidentStatus.detected
     assert incident.suspended_at is None
-    # 告警與通知仍送出
+    # 警告與通知仍送出
     assert pve_calls["alerts"] == [101]
     assert pve_calls["emails"] == [101]
 

@@ -23,7 +23,7 @@ export function countRows(response) {
 
 export function buildAdminIssues(checks) {
   const issues = [];
-  if (checks.alerts > 0) issues.push({ key: "alerts", tone: "danger", icon: "error", title: "系統有尚未解除的告警", description: "前往資源監控確認節點或容量問題", count: checks.alerts, path: "/monitoring" });
+  if (checks.alerts > 0) issues.push({ key: "alerts", tone: "danger", icon: "error", title: "系統有尚未解除的警告", description: "前往資源監控確認節點或容量問題", count: checks.alerts, path: "/monitoring" });
   if (checks.failedJobs > 0) issues.push({ key: "jobs", tone: "danger", icon: "error_outline", title: "背景任務失敗或受阻", description: "查看失敗原因與相關執行紀錄", count: checks.failedJobs, path: "/jobs" });
   if (checks.requests > 0) issues.push({ key: "requests", tone: "info", icon: "pending_actions", title: "有申請等待審核", description: "處理 VM、規格調整或刪除申請", count: checks.requests, path: "/request-review" });
   if (checks.batches > 0) issues.push({ key: "batches", tone: "info", icon: "library_add_check", title: "有班級批量建機等待審核", description: "確認教師提交的機器與排程", count: checks.batches, path: "/batch-review" });
@@ -89,7 +89,7 @@ export default function AdminDashboardPage() {
 
     <section className={styles.attention} aria-labelledby="admin-attention-title">
       <div className={styles.sectionHeading}><div><span className={styles.eyebrow}>優先處理</span><h2 id="admin-attention-title">需要前往確認</h2></div><button type="button" onClick={() => navigate("/monitoring")}>開啟系統監控<MIcon name="arrow_forward" size={16} /></button></div>
-      {loading ? <div className={styles.checking}><MIcon name="sync" size={20} />正在確認需要處理的項目…</div> : issues.length ? <div className={styles.issueList}>{issues.map((issue) => <button type="button" key={issue.key} className={styles[`issue_${issue.tone}`]} onClick={() => navigate(issue.path)}><span className={styles.issueIcon}><MIcon name={issue.icon} size={20} /></span><span><strong>{issue.title}</strong><small>{issue.description}</small></span><em>{issue.count}</em><MIcon name="arrow_forward" size={18} /></button>)}</div> : <div className={styles.allClear}><span><MIcon name="check_circle" size={21} /></span><div><strong>目前沒有需要立即處理的項目</strong><p>待審核申請、失敗任務與系統告警都已清空。</p></div></div>}
+      {loading ? <div className={styles.checking}><MIcon name="sync" size={20} />正在確認需要處理的項目…</div> : issues.length ? <div className={styles.issueList}>{issues.map((issue) => <button type="button" key={issue.key} className={styles[`issue_${issue.tone}`]} onClick={() => navigate(issue.path)}><span className={styles.issueIcon}><MIcon name={issue.icon} size={20} /></span><span><strong>{issue.title}</strong><small>{issue.description}</small></span><em>{issue.count}</em><MIcon name="arrow_forward" size={18} /></button>)}</div> : <div className={styles.allClear}><span><MIcon name="check_circle" size={21} /></span><div><strong>目前沒有需要立即處理的項目</strong><p>待審核申請、失敗任務與系統警告都已清空。</p></div></div>}
     </section>
 
     <section className={`${styles.assistantSection} ${conversationPrompt ? styles.assistantSectionExpanded : ""}`} aria-labelledby="admin-assistant-title">

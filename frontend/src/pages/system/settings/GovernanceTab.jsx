@@ -5,23 +5,23 @@ import { GovernanceService } from "../../../services/governance";
 import { useToast } from "../../../hooks/useToast";
 
 /**
- * 治理設定分頁：閾值告警 / TTL 回收 / 閒置偵測 / 自動判斷 /
+ * 治理設定分頁：閾值警告 / TTL 回收 / 閒置偵測 / 自動判斷 /
  * 反挖礦 / 快照治理 / 克隆併發。單一儲存鍵送出全部欄位。
  */
 
 const SECTIONS = [
   {
-    title: "資源告警",
-    desc: "超過閾值時建立告警事件並通知管理員（站內 + Email）。",
+    title: "資源警告",
+    desc: "超過閾值時建立警告事件並通知管理員（站內 + Email）。",
     toggles: [
-      { key: "alerts_enabled", label: "啟用告警", hint: "定期檢查叢集/節點/VM 資源使用率" },
-      { key: "alert_email_enabled", label: "Email 通知", hint: "告警建立時寄送 Email 給管理員" },
+      { key: "alerts_enabled", label: "啟用警告", hint: "定期檢查叢集/節點/VM 資源使用率" },
+      { key: "alert_email_enabled", label: "Email 通知", hint: "警告建立時寄送 Email 給管理員" },
     ],
     fields: [
       { key: "alert_cpu_threshold", label: "CPU 閾值（%）", min: 50, max: 100, step: 0.5 },
       { key: "alert_memory_threshold", label: "記憶體閾值（%）", min: 50, max: 100, step: 0.5 },
       { key: "alert_disk_threshold", label: "磁碟閾值（%）", min: 50, max: 100, step: 0.5 },
-      { key: "alert_cooldown_minutes", label: "冷卻期（分鐘）", min: 1, max: 1440, hint: "同一目標同一指標在冷卻期內不重發告警" },
+      { key: "alert_cooldown_minutes", label: "冷卻期（分鐘）", min: 1, max: 1440, hint: "同一目標同一指標在冷卻期內不重發警告" },
       { key: "alert_check_interval_seconds", label: "檢查間隔（秒）", min: 15, max: 3600 },
     ],
   },

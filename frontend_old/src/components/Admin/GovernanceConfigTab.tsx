@@ -199,21 +199,21 @@ export default function GovernanceConfigTab() {
   return (
     <Form {...form}>
       <div className="space-y-5">
-        {/* 告警 */}
+        {/* 警告 */}
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base">
               <Bell className="h-4 w-4" />
-              資源告警
+              資源警告
             </CardTitle>
             <CardDescription>
-              超過閾值時建立告警事件並通知管理員（站內 + Email）。
+              超過閾值時建立警告事件並通知管理員（站內 + Email）。
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {switchField(
               "alerts_enabled",
-              "啟用告警",
+              "啟用警告",
               "定期檢查叢集/節點/VM 資源使用率",
             )}
             <div className="grid gap-4 md:grid-cols-3">
@@ -237,7 +237,7 @@ export default function GovernanceConfigTab() {
               {numberField("alert_cooldown_minutes", "冷卻期（分鐘）", {
                 min: 1,
                 max: 1440,
-                description: "同一目標同一指標在冷卻期內不重發告警",
+                description: "同一目標同一指標在冷卻期內不重發警告",
               })}
               {numberField("alert_check_interval_seconds", "檢查間隔（秒）", {
                 min: 15,
@@ -247,7 +247,7 @@ export default function GovernanceConfigTab() {
             {switchField(
               "alert_email_enabled",
               "Email 通知",
-              "告警建立時寄送 Email 給管理員",
+              "警告建立時寄送 Email 給管理員",
             )}
           </CardContent>
         </Card>

@@ -1,4 +1,4 @@
-"""治理設定與告警事件的 DB 存取。"""
+"""治理設定與警告事件的 DB 存取。"""
 
 from __future__ import annotations
 
@@ -49,7 +49,7 @@ def get_open_alerts(*, session: Session) -> list[AlertEvent]:
 
 
 def get_latest_alerts_by_key(*, session: Session) -> list[AlertEvent]:
-    """回傳所有告警（供冷卻期判斷用最近事件）。量大時以 limit 控制。"""
+    """回傳所有警告（供冷卻期判斷用最近事件）。量大時以 limit 控制。"""
     stmt = (
         select(AlertEvent)
         .order_by(AlertEvent.created_at.desc())  # type: ignore[attr-defined]

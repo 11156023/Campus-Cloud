@@ -986,7 +986,7 @@ export const AlertEventPublicSchema = {
         'created_at'
     ],
     title: 'AlertEventPublic',
-    description: '告警事件（open = resolved_at 為 None）。'
+    description: '警告事件（open = resolved_at 為 None）。'
 } as const;
 
 export const AlertMetricSchema = {
