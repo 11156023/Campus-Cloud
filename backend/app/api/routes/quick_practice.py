@@ -18,7 +18,6 @@ def _serialize_template(session: SessionDep, environment, version) -> dict:
     return {
         "id": environment.id,
         "version_id": version.id,
-        "code": environment.code,
         "name": environment.name,
         "description": environment.description,
         "version": version.version,
@@ -38,12 +37,12 @@ def _serialize_template(session: SessionDep, environment, version) -> dict:
 
 @router.get("/templates")
 def list_templates(
-    session: SessionDep, _current_user: CurrentUser
+    session: SessionDep, current_user: CurrentUser
 ) -> list[dict]:
     return [
         _serialize_template(session, environment, version)
         for environment, version in quick_practice_service.list_published_templates(
-            session
+            session, user=current_user
         )
     ]
 
@@ -52,10 +51,10 @@ def list_templates(
 def get_template(
     environment_id: uuid.UUID,
     session: SessionDep,
-    _current_user: CurrentUser,
+    current_user: CurrentUser,
 ) -> dict:
     environment, version = quick_practice_service.get_published_template(
-        session, environment_id=environment_id
+        session, environment_id=environment_id, user=current_user
     )
     return _serialize_template(session, environment, version)
 
@@ -68,6 +67,19 @@ def launch_template(
 ) -> dict:
     item = quick_practice_service.launch(
         session, user=current_user, environment_id=environment_id
+    )
+    return quick_practice_service.serialize_session(session, item)
+
+
+@router.post("/sessions/{practice_id}/end")
+def end_session(
+    practice_id: uuid.UUID,
+    session: SessionDep,
+    current_user: CurrentUser,
+) -> dict:
+    """提早結束自己的練習，整組立刻進入回收。"""
+    item = quick_practice_service.end_session(
+        session, user=current_user, practice_id=practice_id
     )
     return quick_practice_service.serialize_session(session, item)
 

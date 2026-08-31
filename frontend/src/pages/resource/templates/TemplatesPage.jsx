@@ -240,7 +240,12 @@ function ManagementRow({ template, cycleBusy, onClone, onEdit, onManual, onRetry
       <td className={styles.td}>
         <TemplateStatusBadge status={template.status} />
       </td>
-      <td className={`${styles.td} ${styles.mutedCell}`}>{visibilityLabel(template)}</td>
+      <td className={`${styles.td} ${styles.mutedCell}`}>
+        {visibilityLabel(template)}
+        {template.student_requestable && (
+          <span className={styles.typeChip}>學生可申請</span>
+        )}
+      </td>
       <td className={`${styles.td} ${styles.mutedCell}`}>v{template.version}</td>
       <td className={`${styles.td} ${styles.tdMenu}`}>
         <div className={styles.menuWrap}>
@@ -316,11 +321,11 @@ function StudentCatalog({ templates, onClone, onManual }) {
               <span className={styles.typeChip}>{template.default_disk} GB 磁碟</span>
             )}
             <span className={styles.typeChip}>v{template.version}</span>
-            {template.requires_gpu && (
-              <span className={styles.typeChip}>需要 GPU</span>
-            )}
             {template.allow_password_change === false && (
               <span className={styles.typeChip}>固定帳密</span>
+            )}
+            {template.student_requestable && (
+              <span className={styles.typeChip}>學生可申請</span>
             )}
           </div>
           <div className={styles.catalogActions}>
@@ -492,7 +497,7 @@ export default function TemplatesPage() {
 
   return (
     <div className={styles.page}>
-      <PageHeader title="機器範本" subtitle={canManage ? "把設定好的母機轉為範本，學生即可一鍵克隆出自己的環境" : "從老師提供的範本一鍵克隆出自己的環境，開好即用"}>
+      <PageHeader title="機器母範本" subtitle="管理教師組裝多機環境時使用的單機來源；學生不會直接看到或複製母範本。">
         <div className={styles.pageActions}>
           <button
             type="button"

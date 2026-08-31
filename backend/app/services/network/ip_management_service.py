@@ -195,7 +195,11 @@ def reserve_ips(
     teaching_class_id,
     reservation_keys: list[str],
 ) -> dict[str, str]:
-    """Atomically reserve concrete IPs for a complete class before provisioning."""
+    """Atomically reserve concrete IPs for one complete environment group.
+
+    ``teaching_class_id`` is set for formal classes. Quick-practice sessions use
+    globally unique ``quick:<session>:<node>`` keys with a null class id.
+    """
     config = session.exec(
         select(SubnetConfig).where(SubnetConfig.id == 1).with_for_update()
     ).first()
@@ -205,7 +209,7 @@ def reserve_ips(
     existing_rows = session.exec(
         select(IpAllocation).where(
             IpAllocation.teaching_class_id == teaching_class_id,
-            IpAllocation.reservation_key.isnot(None),  # type: ignore[union-attr]
+            IpAllocation.reservation_key.in_(reservation_keys),  # type: ignore[union-attr]
         )
     ).all()
     result = {
@@ -222,7 +226,8 @@ def reserve_ips(
     available = [str(ip) for ip in network.hosts() if str(ip) not in allocated]
     if len(available) < len(missing):
         raise ConflictError(
-            f"全班需要再預留 {len(missing)} 個 IP，但目前只剩 {len(available)} 個"
+            f"整組環境需要再預留 {len(missing)} 個 IP，"
+            f"但目前只剩 {len(available)} 個"
         )
     for key, ip_address in zip(
         missing, available[: len(missing)], strict=True
@@ -230,10 +235,18 @@ def reserve_ips(
         session.add(
             IpAllocation(
                 ip_address=ip_address,
-                purpose="class_reserved",
+                purpose=(
+                    "class_reserved"
+                    if teaching_class_id is not None
+                    else "quick_practice_reserved"
+                ),
                 reservation_key=key,
                 teaching_class_id=teaching_class_id,
-                description=f"班級預留 {key}",
+                description=(
+                    f"班級預留 {key}"
+                    if teaching_class_id is not None
+                    else f"快速練習預留 {key}"
+                ),
             )
         )
         result[key] = ip_address
@@ -245,6 +258,20 @@ def release_class_reservations(session: Session, teaching_class_id) -> int:
     rows = session.exec(
         select(IpAllocation).where(
             IpAllocation.teaching_class_id == teaching_class_id,
+            IpAllocation.vmid.is_(None),  # type: ignore[union-attr]
+        )
+    ).all()
+    for row in rows:
+        session.delete(row)
+    session.flush()
+    return len(rows)
+
+
+def release_reservations_by_prefix(session: Session, prefix: str) -> int:
+    """Release unused group reservations after rollback or final reclaim."""
+    rows = session.exec(
+        select(IpAllocation).where(
+            IpAllocation.reservation_key.startswith(prefix),  # type: ignore[union-attr]
             IpAllocation.vmid.is_(None),  # type: ignore[union-attr]
         )
     ).all()

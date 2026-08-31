@@ -15,6 +15,7 @@ from app.core.db import engine
 
 NEW_TABLE_NAMES = [
     "course_environments",
+    "course_environment_audiences",
     "course_environment_versions",
     "course_environment_nodes",
     "course_environment_edges",
@@ -36,6 +37,15 @@ def _add_column(table: str, name: str, definition: str) -> None:
         connection.execute(text(f'ALTER TABLE "{table}" ADD COLUMN {definition}'))
 
 
+def _drop_not_null(table: str, name: str) -> None:
+    if name not in _column_names(table):
+        return
+    with engine.begin() as connection:
+        connection.execute(
+            text(f'ALTER TABLE "{table}" ALTER COLUMN {name} DROP NOT NULL')
+        )
+
+
 def apply() -> None:
     new_tables = [SQLModel.metadata.tables[name] for name in NEW_TABLE_NAMES]
     SQLModel.metadata.create_all(engine, tables=new_tables, checkfirst=True)
@@ -44,6 +54,27 @@ def apply() -> None:
         "course_environments",
         "usage_scope",
         "usage_scope VARCHAR(24) NOT NULL DEFAULT 'course'",
+    )
+    # Existing rows keep today's behaviour: visible to every signed-in user.
+    _add_column(
+        "course_environments",
+        "audience",
+        "audience VARCHAR(24) NOT NULL DEFAULT 'campus'",
+    )
+    # The environment code was removed; legacy databases keep the column but
+    # must not block inserts that no longer provide a value.
+    _drop_not_null("course_environments", "code")
+    # 母範本目錄旗標；requires_gpu 已移除，殘留欄位不得擋住新增
+    _add_column(
+        "vm_templates",
+        "student_requestable",
+        "student_requestable BOOLEAN NOT NULL DEFAULT FALSE",
+    )
+    _drop_not_null("vm_templates", "requires_gpu")
+    _add_column(
+        "course_environments",
+        "max_concurrent_sessions",
+        "max_concurrent_sessions INTEGER NULL",
     )
     _add_column(
         "course_environment_nodes",
@@ -54,6 +85,31 @@ def apply() -> None:
         "course_environment_nodes",
         "position_y",
         "position_y DOUBLE PRECISION NOT NULL DEFAULT 120",
+    )
+    _add_column(
+        "quick_practice_sessions",
+        "status",
+        "status VARCHAR(24) NOT NULL DEFAULT 'creating'",
+    )
+    _add_column(
+        "quick_practice_sessions",
+        "topology_applied_at",
+        "topology_applied_at TIMESTAMP WITH TIME ZONE NULL",
+    )
+    _add_column(
+        "quick_practice_sessions",
+        "reclaim_started_at",
+        "reclaim_started_at TIMESTAMP WITH TIME ZONE NULL",
+    )
+    _add_column(
+        "quick_practice_sessions",
+        "reclaimed_at",
+        "reclaimed_at TIMESTAMP WITH TIME ZONE NULL",
+    )
+    _add_column(
+        "quick_practice_sessions",
+        "last_error",
+        "last_error VARCHAR(2000) NULL",
     )
     _add_column(
         "teaching_classes",
@@ -130,6 +186,20 @@ def apply() -> None:
                 "CREATE INDEX IF NOT EXISTS "
                 "ix_ip_allocation_teaching_class_id "
                 'ON "ip_allocation" (teaching_class_id)'
+            )
+        )
+        connection.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS "
+                "ix_quick_practice_sessions_status "
+                'ON "quick_practice_sessions" (status)'
+            )
+        )
+        connection.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS "
+                "ix_quick_practice_sessions_reclaimed_at "
+                'ON "quick_practice_sessions" (reclaimed_at)'
             )
         )
 

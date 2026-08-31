@@ -328,7 +328,6 @@ def _serialize(session: SessionDep, item: TeachingClass) -> dict:
                 "id": environment.id,
                 "version_id": version.id,
                 "name": environment.name,
-                "code": environment.code,
                 "version": version.version,
                 "status": version.status,
             }

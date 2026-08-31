@@ -205,6 +205,8 @@ export default function RequestFormPage({ onBack, className }) {
 
   /* 範本系統 2.0：LXC 可選範本，選了走克隆路徑（免映像檔） */
   const [sysTemplates, setSysTemplates]   = useState([]);
+  /* 學生看到的是「開放申請」的應用範本目錄，不是完整母範本清單 */
+  const [catalog, setCatalog]             = useState([]);
   const [sysTplLoading, setSysTplLoading] = useState(false);
   const [selectedTplId, setSelectedTplId] = useState("");
 
@@ -276,12 +278,78 @@ export default function RequestFormPage({ onBack, className }) {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
+    // 單機母範本只供教師／管理員組裝環境或建立管理用資源。
+    // 學生的一般申請仍可選擇平台提供的 VM/LXC 基礎映像，但不讀取
+    // VMTemplate 目錄，也不會取得直接克隆入口。
+    if (!isPrivileged) return;
     setSysTplLoading(true);
     TemplatesService.list()
       .then((res) => setSysTemplates(res?.data ?? []))
       .catch(() => {})
       .finally(() => setSysTplLoading(false));
-  }, []);
+  }, [isPrivileged]);
+
+  useEffect(() => {
+    // 學生／一般使用者：只拿教師標記「開放學生自行申請」的應用範本。
+    // 規格由範本決定，送出後仍走一般審核流程。
+    if (isPrivileged) return;
+    setSysTplLoading(true);
+    TemplatesService.catalog()
+      .then((res) => {
+        const rows = res?.data ?? [];
+        setCatalog(rows);
+        setSysTemplates(
+          rows
+            .filter((item) => item.resource_type === "lxc")
+            .map((item) => ({
+              id: item.id,
+              pve_vmid: item.pve_vmid,
+              name: item.name,
+              description: item.description,
+              resource_type: "lxc",
+              status: "ready",
+              version: item.version,
+              default_cores: item.cores,
+              default_memory: item.memory_mb,
+              default_disk: item.disk_gb,
+            })),
+        );
+      })
+      .catch(() => {})
+      .finally(() => setSysTplLoading(false));
+  }, [isPrivileged]);
+
+  /* 申請一律是單台；範本只是「來源」，VM 或 LXC 由範本本身決定 */
+  const catalogChoices = useMemo(
+    () => catalog.map((item) => ({
+      ...item,
+      choice: item.resource_type === "lxc"
+        ? `tpl:${item.id}`
+        : `vm:${item.pve_vmid}`,
+    })),
+    [catalog],
+  );
+
+  /* VM 選項 = 應用範本目錄 + 平台基礎映像（後端已依角色過濾清單） */
+  const catalogVmChoices = useMemo(
+    () => catalog
+      .filter((item) => item.resource_type !== "lxc")
+      .map((item) => ({
+        vmid: item.pve_vmid,
+        name: item.name,
+        node: item.node,
+        is_windows: item.is_windows,
+        cores: item.cores,
+        memory_mb: item.memory_mb,
+        disk_gb: item.disk_gb,
+        catalog: true,
+      })),
+    [catalog],
+  );
+  const vmChoices = useMemo(
+    () => [...catalogVmChoices, ...vmTemplates],
+    [catalogVmChoices, vmTemplates],
+  );
 
   const lxcSysTemplates = useMemo(
     () => sysTemplates.filter(
@@ -293,8 +361,16 @@ export default function RequestFormPage({ onBack, className }) {
 
   /* Windows 範本帳號由 cloudbase-init 固定（PVE 的 ciuser 對 Windows 無效），不開放自訂 */
   const selectedVmTemplate =
-    vmTemplates.find((t) => String(t.vmid) === String(form.template_id)) || null;
+    vmChoices.find((t) => String(t.vmid) === String(form.template_id)) || null;
   const isWindowsVm = resourceType === "vm" && Boolean(selectedVmTemplate?.is_windows);
+
+  /* 目前選到的應用範本：帶入建議規格並顯示說明；規格仍可調整，
+     但磁碟不得小於範本本身（克隆只能放大，後端會再守一次） */
+  const selectedCatalogItem = useMemo(() => catalogChoices.find((item) => (
+    item.resource_type === "lxc"
+      ? item.id === selectedTplId
+      : String(item.pve_vmid) === String(form.template_id)
+  )) ?? null, [catalogChoices, selectedTplId, form.template_id]);
 
   /* 是否已完成作業系統選擇（型別確定後，帳密欄位才顯示） */
   const osChosen = resourceType === "vm"
@@ -304,7 +380,7 @@ export default function RequestFormPage({ onBack, className }) {
   /* 所選作業系統是否標記需要 GPU（範本名稱 / 映像檔名結尾 -GPU） */
   const selectedOsNeedsGpu = useMemo(() => {
     if (resourceType === "vm") {
-      const tpl = vmTemplates.find((t) => String(t.vmid) === String(form.template_id));
+      const tpl = vmChoices.find((t) => String(t.vmid) === String(form.template_id));
       return tpl ? osNameNeedsGpu(tpl.name) : false;
     }
     if (selectedTplId) {
@@ -312,7 +388,7 @@ export default function RequestFormPage({ onBack, className }) {
       return tpl ? osNameNeedsGpu(tpl.name) : false;
     }
     return form.ostemplate ? parseLxcImage(form.ostemplate).needsGpu : false;
-  }, [resourceType, vmTemplates, form.template_id, selectedTplId, lxcSysTemplates, form.ostemplate]);
+  }, [resourceType, vmChoices, form.template_id, selectedTplId, lxcSysTemplates, form.ostemplate]);
   const canLoadGpu = resourceType === "vm" && selectedOsNeedsGpu;
   const gpuWindowReady = Boolean(mode === "scheduled" && form.start_at && form.end_at);
   const selectedGpuProfiles = useMemo(() => {
@@ -464,20 +540,30 @@ export default function RequestFormPage({ onBack, className }) {
       value: template.volid,
       label: formatOstemplate(template.volid),
     })),
-    vm_os_options: vmTemplates.map((template) => ({
+    vm_os_options: vmChoices.map((template) => ({
       template_id: Number(template.vmid),
       label: template.name || String(template.vmid),
       node: template.node || "",
     })),
+    /* 應用範本的候選由後端提供，前端不送，避免候選清單可被偽造 */
     resource_options_from_client: true,
-  }), [resourceType, mode, form, gpuOptions, availabilityData, lxcTemplates, vmTemplates]);
+  }), [resourceType, mode, form, gpuOptions, availabilityData, lxcTemplates, vmChoices]);
 
   function applyAiPrefill(prefill) {
     if (!prefill) return;
     const nextResourceType = prefill.resource_type === "vm" ? "vm" : "lxc";
     setResourceType(nextResourceType);
+    /* AI 選了容器應用範本時給的是 PVE VMID，要換回目錄項目的 id */
+    const lxcCatalogPick = nextResourceType === "lxc" && prefill.lxc_template_id
+      ? catalogChoices.find((item) => (
+        item.resource_type === "lxc"
+          && String(item.pve_vmid) === String(prefill.lxc_template_id)
+      ))
+      : null;
     if (nextResourceType === "vm") {
       setAutoOsChoice(prefill.vm_template_id ? `vm:${prefill.vm_template_id}` : "");
+    } else if (lxcCatalogPick) {
+      setAutoOsChoice(`tpl:${lxcCatalogPick.id}`);
     } else {
       setAutoOsChoice(prefill.lxc_os_image ? `img:${prefill.lxc_os_image}` : "");
     }
@@ -488,6 +574,7 @@ export default function RequestFormPage({ onBack, className }) {
     }
 
     if (nextResourceType !== "lxc") setSelectedTplId("");
+    else setSelectedTplId(lxcCatalogPick ? lxcCatalogPick.id : "");
 
     setForm((prev) => {
       const disk = Number(prefill.disk_gb || 0);
@@ -495,7 +582,7 @@ export default function RequestFormPage({ onBack, className }) {
         ...prev,
         hostname: prefill.hostname ? normalizeHostname(prefill.hostname) : prev.hostname,
         ostemplate: nextResourceType === "lxc"
-          ? (prefill.lxc_os_image || prev.ostemplate)
+          ? (lxcCatalogPick ? "" : (prefill.lxc_os_image || prev.ostemplate))
           : prev.ostemplate,
         template_id: nextResourceType === "vm" && prefill.vm_template_id
           ? String(prefill.vm_template_id)
@@ -662,7 +749,7 @@ export default function RequestFormPage({ onBack, className }) {
               disk_size: form.disk_size,
               os_info:
                 stripGpuMarker(
-                  vmTemplates.find((t) => String(t.vmid) === String(form.template_id))?.name ?? "",
+                  vmChoices.find((t) => String(t.vmid) === String(form.template_id))?.name ?? "",
                 ) || null,
             }),
         ...(selectedGpuId ? { gpu_mapping_id: selectedGpuId } : {}),
@@ -688,7 +775,7 @@ export default function RequestFormPage({ onBack, className }) {
   function handleSelectVmTemplate(v) {
     set("template_id", v);
     if (errors.template_id) setErrors((prev) => ({ ...prev, template_id: "" }));
-    const tpl = vmTemplates.find((t) => String(t.vmid) === String(v));
+    const tpl = vmChoices.find((t) => String(t.vmid) === String(v));
     if (!tpl) return;
     if (tpl.cores)     set("cores", Math.min(8, Math.max(1, tpl.cores)));
     if (tpl.memory_mb) set("memory", Math.min(32768, Math.max(512, tpl.memory_mb)));
@@ -810,16 +897,25 @@ export default function RequestFormPage({ onBack, className }) {
               <FieldGroup label="作業系統" required
                 error={errors.template_id || errors.ostemplate}
                 hint={osChosen
-                  ? `將建立為「${resourceType === "vm" ? "虛擬機" : "LXC 容器"}」`
-                  : "虛擬機與容器的作業系統一起列出，選擇後由系統自動決定建立方式"}>
+                  ? `一次申請一台，將建立為「${resourceType === "vm" ? "虛擬機" : "LXC 容器"}」`
+                  : "可直接套用老師／官方準備好的環境範本，或從作業系統映像自行安裝；一次申請一台"}>
                 <SelectField
                   value={autoOsChoice}
                   onChange={handleAutoOsSelect}
                   disabled={vmLoading || lxcLoading || sysTplLoading}
                   placeholder={(vmLoading || lxcLoading || sysTplLoading) ? "載入中…" : "選擇作業系統"}
                 >
+                  {catalogChoices.length > 0 && (
+                    <optgroup label="老師／官方提供的環境範本">
+                      {catalogChoices.map((t) => (
+                        <option key={`cat-${t.id}`} value={t.choice}>
+                          {withGpuTag(stripGpuMarker(t.name), osNameNeedsGpu(t.name))}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
                   {vmTemplates.length > 0 && (
-                    <optgroup label="虛擬機範本">
+                    <optgroup label={isPrivileged ? "虛擬機範本" : "作業系統映像（虛擬機）"}>
                       {vmTemplates.map((t) => (
                         <option key={`vm-${t.vmid}`} value={`vm:${t.vmid}`}>
                           {withGpuTag(stripGpuMarker(t.name), osNameNeedsGpu(t.name))}
@@ -827,7 +923,7 @@ export default function RequestFormPage({ onBack, className }) {
                       ))}
                     </optgroup>
                   )}
-                  {lxcSysTemplates.length > 0 && (
+                  {isPrivileged && lxcSysTemplates.length > 0 && (
                     <optgroup label="容器範本（克隆建立）">
                       {lxcSysTemplates.map((t) => (
                         <option key={`tpl-${t.id}`} value={`tpl:${t.id}`}>
@@ -849,6 +945,17 @@ export default function RequestFormPage({ onBack, className }) {
                     </optgroup>
                   )}
                 </SelectField>
+                {selectedCatalogItem && (
+                  <p className={styles.fieldHint}>
+                    {selectedCatalogItem.description
+                      || "老師／官方已裝好的環境，建立後可直接使用。"}
+                    {" "}範本建議規格：{selectedCatalogItem.cores ?? "—"} 核心 ·{" "}
+                    {selectedCatalogItem.memory_mb
+                      ? `${(selectedCatalogItem.memory_mb / 1024).toFixed(1)} GB RAM`
+                      : "— RAM"}
+                    {selectedCatalogItem.disk_gb ? ` · ${selectedCatalogItem.disk_gb} GB` : ""}
+                  </p>
+                )}
               </FieldGroup>
 
               {/* 帳密欄位：選定作業系統（型別確定）後才顯示 */}
@@ -901,6 +1008,12 @@ export default function RequestFormPage({ onBack, className }) {
             {/* ── 硬體資源配置 ── */}
             <div className={styles.formSection}>
               <h2 className={styles.sectionTitle}>硬體資源配置</h2>
+
+              {selectedCatalogItem && (
+                <p className={styles.fieldHint}>
+                  已帶入範本的建議規格，可依需求調整；硬碟不可小於範本本身的大小。
+                </p>
+              )}
 
               <FieldGroup label="CPU 核心數" labelRight={`${form.cores} 核心`}>
                 <input
@@ -1225,7 +1338,7 @@ export default function RequestFormPage({ onBack, className }) {
                     <span className={styles.summaryLabel}>作業系統</span>
                     <span className={`${styles.summaryValue} ${!form.template_id ? styles.summaryValueMuted : ""}`}>
                       {form.template_id
-                        ? (vmTemplates.find((t) => String(t.vmid) === String(form.template_id))?.name ?? form.template_id)
+                        ? (vmChoices.find((t) => String(t.vmid) === String(form.template_id))?.name ?? form.template_id)
                         : "未選擇"}
                     </span>
                   </div>

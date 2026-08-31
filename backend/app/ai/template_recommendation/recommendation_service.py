@@ -322,6 +322,7 @@ async def generate_ai_plan(
             "mode": "immediate|scheduled",
             "hostname": "string",
             "lxc_os_image": "real-lxc-os-image-or-empty",
+            "lxc_template_id": "integer-or-0",
             "vm_template_id": "integer-or-0",
             "gpu_mapping_id": "gpu-mapping-id-or-empty",
             "start_at": "ISO-8601-datetime-or-empty",
@@ -417,21 +418,45 @@ def normalize_ai_result(
     if not hostname:
         hostname = "ai-generated-host"
 
+    application_templates = list(resource_options.get("application_templates") or [])
+    catalog_by_id = {
+        int(item.get("template_id") or 0): item for item in application_templates
+    }
+
+    # 應用範本優先：選到範本就走克隆路徑，基礎映像欄位必須清空
+    selected_lxc_template_id = 0
+    if resource_type == "lxc":
+        requested_lxc_template_id = safe_int(
+            raw_prefill.get("lxc_template_id"), 0, minimum=0, extract_digits=True
+        )
+        candidate = catalog_by_id.get(requested_lxc_template_id)
+        if candidate is not None and str(candidate.get("resource_type")) == "lxc":
+            selected_lxc_template_id = requested_lxc_template_id
+
     selected_lxc_image = ""
-    if resource_type == "lxc" and lxc_os_images:
+    if resource_type == "lxc" and not selected_lxc_template_id and lxc_os_images:
         requested_image = str(raw_prefill.get("lxc_os_image") or (form_context.lxc_os_image if form_context else "") or "").strip()
         selected_lxc_image = next(
             (item["value"] for item in lxc_os_images if item["value"] == requested_image),
             lxc_os_images[0]["value"],
         )
 
+    # VM 的候選 = 基礎映像 + 應用範本（後者在伺服器端不會出現在基礎映像清單裡）
+    vm_candidates = list(vm_operating_systems) + [
+        {"template_id": int(item.get("template_id") or 0), "label": item.get("name") or ""}
+        for item in application_templates
+        if str(item.get("resource_type")) != "lxc"
+        and int(item.get("template_id") or 0)
+        not in {int(row.get("template_id") or 0) for row in vm_operating_systems}
+    ]
+
     selected_vm_template_id = 0
     selected_vm_os = ""
-    if resource_type == "vm" and vm_operating_systems:
+    if resource_type == "vm" and vm_candidates:
         requested_vm_template_id = safe_int(raw_prefill.get("vm_template_id") or (form_context.vm_template_id if form_context else 0), 0, minimum=0, extract_digits=True)
         selected_vm = next(
-            (item for item in vm_operating_systems if int(item.get("template_id") or 0) == requested_vm_template_id),
-            vm_operating_systems[0],
+            (item for item in vm_candidates if int(item.get("template_id") or 0) == requested_vm_template_id),
+            vm_candidates[0],
         )
         selected_vm_template_id = int(selected_vm.get("template_id") or 0)
         selected_vm_os = str(selected_vm.get("label") or "").strip()
@@ -540,6 +565,7 @@ def normalize_ai_result(
         "mode": mode,
         "hostname": hostname,
         "lxc_os_image": selected_lxc_image if resource_type == "lxc" else "",
+        "lxc_template_id": selected_lxc_template_id if resource_type == "lxc" else 0,
         "vm_os_choice": selected_vm_os if resource_type == "vm" else "",
         "vm_template_id": selected_vm_template_id if resource_type == "vm" else 0,
         "gpu_mapping_id": selected_gpu_mapping_id if resource_type == "vm" else "",
