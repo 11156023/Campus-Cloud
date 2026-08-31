@@ -20,6 +20,7 @@ from app.schemas.template import (
     TaskRecordsPublic,
     TemplateAttachmentPublic,
     TemplateAttachmentsPublic,
+    TemplateCatalogPublic,
     TemplateCloneRequest,
     TemplateCloneResponse,
     VMTemplateCreate,
@@ -59,6 +60,15 @@ def get_task(
     ):
         raise NotFoundError("Task not found")
     return TaskRecordPublic.from_record(record)
+
+
+@router.get("/catalog", response_model=TemplateCatalogPublic)
+def list_template_catalog(
+    session: SessionDep, _current_user: CurrentUser
+) -> TemplateCatalogPublic:
+    """開放給學生自行申請的應用範本目錄（建立機器仍走審核）。"""
+    data = template_service.list_student_catalog(session=session)
+    return TemplateCatalogPublic(data=data, count=len(data))
 
 
 # --- 範本 CRUD ---

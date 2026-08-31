@@ -235,7 +235,12 @@ function ManagementRow({ template, cycleBusy, onClone, onEdit, onManual, onRetry
       <td className={styles.td}>
         <TemplateStatusBadge status={template.status} />
       </td>
-      <td className={`${styles.td} ${styles.mutedCell}`}>{visibilityLabel(template)}</td>
+      <td className={`${styles.td} ${styles.mutedCell}`}>
+        {visibilityLabel(template)}
+        {template.student_requestable && (
+          <span className={styles.typeChip}>學生可申請</span>
+        )}
+      </td>
       <td className={`${styles.td} ${styles.mutedCell}`}>v{template.version}</td>
       <td className={`${styles.td} ${styles.tdMenu}`}>
         <div className={styles.menuWrap}>
@@ -312,6 +317,9 @@ function StudentCatalog({ templates, onClone, onManual }) {
             <span className={styles.typeChip}>v{template.version}</span>
             {template.allow_password_change === false && (
               <span className={styles.typeChip}>固定帳密</span>
+            )}
+            {template.student_requestable && (
+              <span className={styles.typeChip}>學生可申請</span>
             )}
           </div>
           <div className={styles.catalogActions}>

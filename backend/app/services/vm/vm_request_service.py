@@ -11,7 +11,7 @@ from app.core.authorizers import (
     require_vm_request_cancel,
     require_vm_request_review,
 )
-from app.core.permissions import is_admin
+from app.core.permissions import Permission, has_permission, is_admin
 from app.core.security import encrypt_value
 from app.exceptions import (
     BadRequestError,
@@ -24,6 +24,7 @@ from app.models import (
     VMProvisioningStatus,
     VMRequest,
     VMRequestStatus,
+    VMTemplate,
     VMTemplateStatus,
 )
 from app.repositories import governance as governance_repo
@@ -265,7 +266,7 @@ def _prepare_quick_template_request(
         raise BadRequestError("Quick templates currently support LXC only")
 
     # 範本系統克隆路徑：template_id 已在 create() 由
-    # _validate_lxc_template_clone 驗證（存在 / ready / 可見範圍）。
+    # _validate_template_source 驗證（存在 / ready / 可見範圍）。
     if not request_in.template_id:
         raise BadRequestError("Quick template mode requires a template")
 
@@ -302,25 +303,53 @@ def _prepare_quick_template_request(
     request_in.gpu_mdev_profile = None
 
 
-def _validate_lxc_template_clone(
-    *, session: Session, template_vmid: int, user: User
-) -> None:
-    """LXC 走範本系統克隆路徑時，建立當下先驗證範本狀態與可見範圍。
+def _validate_template_source(
+    *, session: Session, template_vmid: int, user: User, resource_type: str
+) -> VMTemplate | None:
+    """驗證申請所選的來源，回傳對應的平台母範本（基礎映像則回 None）。
 
-    provision 時（provisioning_service）仍會再查一次範本節點；這裡提前擋掉
-    不存在 / 未 ready / 無權限的範本，避免審核通過後才失敗。
+    母範本同時也是 PVE template，所以不能只靠前端清單擋：任何帶
+    template_id 的申請都要在建立當下確認範本存在、ready，且申請者確實有
+    權限使用它。教師依可見範圍，其他角色則必須是已開放學生申請的範本。
+    provision 時仍會再查一次範本節點，這裡是為了不讓審核通過後才失敗。
     """
     template = vm_template_repo.get_template_by_pve_vmid(
         session=session, pve_vmid=template_vmid
     )
-    if template is None or template.resource_type != "lxc":
-        raise BadRequestError("Selected LXC template is not registered")
+    if template is None:
+        if resource_type == "lxc":
+            raise BadRequestError("Selected LXC template is not registered")
+        # 未註冊的 PVE template 就是平台基礎映像，任何人都能申請。
+        return None
+    expected_type = "lxc" if resource_type == "lxc" else "qemu"
+    if template.resource_type.lower() != expected_type:
+        raise BadRequestError("Selected template type does not match the request")
     if template.status != VMTemplateStatus.ready:
-        raise BadRequestError("Selected LXC template is not ready")
-    if not is_admin(user) and not vm_template_repo.is_template_visible_to_user(
-        template=template, user_id=user.id
-    ):
-        raise BadRequestError("Selected LXC template is not accessible")
+        raise BadRequestError("Selected template is not ready")
+    if is_admin(user):
+        return template
+    if has_permission(user, Permission.TEMPLATE_MANAGE):
+        if not vm_template_repo.is_template_visible_to_user(
+            template=template, user_id=user.id
+        ):
+            raise BadRequestError("Selected template is not accessible")
+        return template
+    if not template.student_requestable:
+        raise BadRequestError("Selected template is not open for self-service")
+    return template
+
+
+def _apply_catalog_defaults(request_in: VMRequestCreate, template: VMTemplate) -> None:
+    """目錄範本的規格由教師決定，申請者不能改。"""
+    if template.default_cores:
+        request_in.cores = template.default_cores
+    if template.default_memory:
+        request_in.memory = template.default_memory
+    if template.default_disk:
+        if request_in.resource_type == "lxc":
+            request_in.rootfs_size = template.default_disk
+        else:
+            request_in.disk_size = template.default_disk
 
 
 def create(
@@ -328,6 +357,21 @@ def create(
 ) -> VMRequestPublic:
     if request_in.resource_type not in ("lxc", "vm"):
         raise BadRequestError("resource_type must be 'lxc' or 'vm'")
+
+    # ---------- 來源範本：先驗證再算配額（目錄範本會覆寫規格） ----------
+    source_template: VMTemplate | None = None
+    source_vmid = getattr(request_in, "template_id", None)
+    if source_vmid:
+        source_template = _validate_template_source(
+            session=session,
+            template_vmid=source_vmid,
+            user=user,
+            resource_type=request_in.resource_type,
+        )
+        if source_template is not None and not has_permission(
+            user, Permission.TEMPLATE_MANAGE
+        ):
+            _apply_catalog_defaults(request_in, source_template)
 
     # ---------- 配額執法（E7）：寫入前先擋 ----------
     quota_service.check_quota(
@@ -357,13 +401,7 @@ def create(
         if advice.resource_type != request_in.resource_type:
             auto_decision_reason += "（提交值與伺服器建議不同）"
     if request_in.resource_type == "lxc":
-        if request_in.template_id:
-            _validate_lxc_template_clone(
-                session=session,
-                template_vmid=request_in.template_id,
-                user=user,
-            )
-        elif not request_in.ostemplate:
+        if not request_in.template_id and not request_in.ostemplate:
             raise BadRequestError("LXC request requires ostemplate or template_id")
     if request_in.resource_type == "vm":
         if not request_in.template_id:

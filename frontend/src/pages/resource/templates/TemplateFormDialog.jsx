@@ -32,6 +32,7 @@ export default function TemplateFormDialog({ template, onClose, onSaved }) {
   );
   const [defaultCores, setDefaultCores] = useState(template?.default_cores || 2);
   const [defaultMemory, setDefaultMemory] = useState(template?.default_memory || 2048);
+  const [studentRequestable, setStudentRequestable] = useState(Boolean(template?.student_requestable));
   const [resources, setResources] = useState([]);
   const [resourcesLoading, setResourcesLoading] = useState(!isEdit);
   const [busy, setBusy] = useState(false);
@@ -64,6 +65,7 @@ export default function TemplateFormDialog({ template, onClose, onSaved }) {
       visibility,
       default_cores: useCustomSpec ? Number(defaultCores) : null,
       default_memory: useCustomSpec ? Number(defaultMemory) : null,
+      student_requestable: studentRequestable,
     };
 
     if (!isEdit) {
@@ -186,6 +188,15 @@ export default function TemplateFormDialog({ template, onClose, onSaved }) {
             </label>
           </div>
         </div>
+
+        <label className={styles.checkLine}>
+          <input
+            type="checkbox"
+            checked={studentRequestable}
+            onChange={(e) => setStudentRequestable(e.target.checked)}
+          />
+          開放學生自行申請（學生可在申請機器時直接選用這個範本，仍需審核；規格固定為下方預設值）
+        </label>
 
         <label className={styles.checkLine}>
           <input

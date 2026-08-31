@@ -40,6 +40,7 @@ from app.models import (
 from app.repositories import task_record as task_record_repo
 from app.repositories import vm_template as template_repo
 from app.schemas.template import (
+    TemplateCatalogItem,
     VMTemplateCreate,
     VMTemplatePublic,
     VMTemplateUpdate,
@@ -123,6 +124,46 @@ def list_templates(*, session: Session, user: User) -> list[VMTemplatePublic]:
         )
         for t in templates
     ]
+
+
+def list_student_catalog(*, session: Session) -> list[TemplateCatalogItem]:
+    """The application catalogue any signed-in user may request a machine from.
+
+    Only ready, explicitly opened templates appear, and each row is enriched
+    with the PVE facts the request form needs (OS family and the source
+    machine's own spec, which is the clone's floor).
+    """
+    from app.services.proxmox import provisioning_service  # noqa: PLC0415
+
+    templates = template_repo.list_student_catalog(session=session)
+    if not templates:
+        return []
+    pve_by_vmid = {
+        int(item.vmid): item for item in provisioning_service.get_vm_templates()
+    }
+    catalog: list[TemplateCatalogItem] = []
+    for template in templates:
+        pve = pve_by_vmid.get(template.pve_vmid)
+        is_lxc = template.resource_type.lower() == "lxc"
+        if not is_lxc and pve is None:
+            # A VM template PVE can no longer see would fail at provision time.
+            continue
+        catalog.append(
+            TemplateCatalogItem(
+                id=template.id,
+                pve_vmid=template.pve_vmid,
+                name=template.name,
+                description=template.description,
+                resource_type=template.resource_type,
+                node=template.node,
+                version=template.version,
+                is_windows=bool(pve.is_windows) if pve else False,
+                cores=template.default_cores or (pve.cores if pve else None),
+                memory_mb=template.default_memory or (pve.memory_mb if pve else None),
+                disk_gb=template.default_disk or (pve.disk_gb if pve else None),
+            )
+        )
+    return catalog
 
 
 def get_template_for_user(
@@ -254,6 +295,7 @@ async def create_template(
             default_cores=data.default_cores,
             default_memory=data.default_memory,
             allow_password_change=data.allow_password_change,
+            student_requestable=data.student_requestable,
             source_vmid=data.source_vmid,
         )
     else:
@@ -269,6 +311,7 @@ async def create_template(
             default_cores=data.default_cores,
             default_memory=data.default_memory,
             allow_password_change=data.allow_password_change,
+            student_requestable=data.student_requestable,
             source_vmid=data.source_vmid,
         )
     try:
