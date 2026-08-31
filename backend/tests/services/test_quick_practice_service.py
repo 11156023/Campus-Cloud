@@ -7,6 +7,7 @@ import pytest
 from sqlalchemy.pool import StaticPool
 from sqlmodel import Session, SQLModel, create_engine
 
+from app.exceptions import BadRequestError, NotFoundError
 from app.models import (
     CourseEnvironment,
     CourseEnvironmentAudience,
@@ -514,3 +515,114 @@ def test_class_audience_ignores_dropped_students(quick_db: Session) -> None:
     assert not quick_practice.is_visible_to(
         quick_db, environment=environment, user=student
     )
+
+
+def test_environment_cap_blocks_a_launch_when_it_is_full(
+    quick_db: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    environment, _teacher, student = _audience_fixture(quick_db, "campus")
+    environment.max_concurrent_sessions = 1
+    version = CourseEnvironmentVersion(
+        environment_id=environment.id,
+        version=1,
+        status=CourseEnvironmentVersionStatus.published,
+        published_at=datetime.now(UTC),
+    )
+    quick_db.add(version)
+    quick_db.flush()
+    quick_db.add(
+        CourseEnvironmentNode(
+            version_id=version.id,
+            node_key="web",
+            source_type="custom",
+            custom_image_ref="9000",
+            name="Web",
+            role="網站",
+            resource_type="qemu",
+            cpu=1,
+            memory_mb=1024,
+            disk_gb=10,
+            network="lab-net",
+            sort_order=0,
+        )
+    )
+    other = User(
+        email=f"other-{uuid.uuid4()}@example.edu",
+        hashed_password="hash",
+        role=UserRole.student,
+    )
+    quick_db.add(other)
+    quick_db.flush()
+    # 另一位學生已經佔用唯一的名額
+    running = QuickPracticeSession(
+        user_id=other.id,
+        environment_version_id=version.id,
+        expires_at=datetime.now(UTC) + timedelta(hours=2),
+        status="ready",
+    )
+    quick_db.add(running)
+    quick_db.commit()
+    monkeypatch.setattr(
+        quick_practice, "_session_has_live_request", lambda session, item: True
+    )
+
+    with pytest.raises(BadRequestError, match="額滿"):
+        quick_practice.launch(quick_db, user=student, environment_id=environment.id)
+
+
+def test_ending_a_session_early_reclaims_it(quick_db: Session) -> None:
+    environment, _teacher, student = _audience_fixture(quick_db, "campus")
+    version = CourseEnvironmentVersion(
+        environment_id=environment.id,
+        version=1,
+        status=CourseEnvironmentVersionStatus.published,
+        published_at=datetime.now(UTC),
+    )
+    quick_db.add(version)
+    quick_db.flush()
+    practice = QuickPracticeSession(
+        user_id=student.id,
+        environment_version_id=version.id,
+        expires_at=datetime.now(UTC) + timedelta(hours=2),
+        status="ready",
+    )
+    quick_db.add(practice)
+    quick_db.commit()
+
+    # 沒有任何機器時，回收直接完成
+    ended = quick_practice.end_session(
+        quick_db, user=student, practice_id=practice.id
+    )
+
+    assert ended.status == "reclaimed"
+    assert ended.reclaimed_at is not None
+
+
+def test_another_student_cannot_end_someone_elses_session(quick_db: Session) -> None:
+    environment, _teacher, student = _audience_fixture(quick_db, "campus")
+    version = CourseEnvironmentVersion(
+        environment_id=environment.id,
+        version=1,
+        status=CourseEnvironmentVersionStatus.published,
+        published_at=datetime.now(UTC),
+    )
+    quick_db.add(version)
+    quick_db.flush()
+    practice = QuickPracticeSession(
+        user_id=student.id,
+        environment_version_id=version.id,
+        expires_at=datetime.now(UTC) + timedelta(hours=2),
+        status="ready",
+    )
+    intruder = User(
+        email=f"intruder-{uuid.uuid4()}@example.edu",
+        hashed_password="hash",
+        role=UserRole.student,
+    )
+    quick_db.add_all([practice, intruder])
+    quick_db.commit()
+
+    with pytest.raises(NotFoundError):
+        quick_practice.end_session(
+            quick_db, user=intruder, practice_id=practice.id
+        )

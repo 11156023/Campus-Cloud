@@ -20,7 +20,7 @@ from typing import Any
 import pytest
 
 from app.core.security import decrypt_value
-from app.exceptions import BadRequestError
+from app.exceptions import BadRequestError, ConflictError
 from app.models import VMTemplate, VMTemplateStatus
 from app.schemas.template import TemplateCloneRequest
 from app.services.proxmox import provisioning_service
@@ -505,3 +505,35 @@ def test_lxc_templates_are_not_offered_as_vm_sources(
     monkeypatch.setattr(provisioning_service, "_template_ostype", lambda vm: "l26")
 
     assert [item.vmid for item in provisioning_service.get_vm_templates()] == [9002]
+
+
+# ---------------------------------------------------------------------------
+# 刪除保護：已被多機環境引用的母範本不得硬刪
+# ---------------------------------------------------------------------------
+
+
+async def test_delete_template_refuses_while_an_environment_references_it(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    template = make_template()
+    monkeypatch.setattr(
+        template_service, "_get_or_404", lambda session, template_id: template
+    )
+    monkeypatch.setattr(
+        template_service, "_require_owner", lambda user, template: None
+    )
+    monkeypatch.setattr(
+        template_service, "_clone_children_vmids", lambda session, pve_vmid: []
+    )
+    monkeypatch.setattr(
+        template_service,
+        "_environments_referencing",
+        lambda session, template_id: ["Linux 三層式", "資安攻防"],
+    )
+
+    with pytest.raises(ConflictError, match="Linux 三層式"):
+        await template_service.delete_template(
+            session=None,  # type: ignore[arg-type]
+            user=make_user("teacher"),
+            template_id=template.id,
+        )

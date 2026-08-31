@@ -619,6 +619,31 @@ def launch(
     if int(recent_count or 0) >= MAX_SESSIONS_PER_24_HOURS:
         raise BadRequestError("已達 24 小時內快速練習建立上限")
 
+    if environment.max_concurrent_sessions:
+        version_ids = list(
+            session.exec(
+                select(CourseEnvironmentVersion.id).where(
+                    CourseEnvironmentVersion.environment_id == environment.id
+                )
+            ).all()
+        )
+        running = [
+            item
+            for item in session.exec(
+                select(QuickPracticeSession).where(
+                    col(QuickPracticeSession.environment_version_id).in_(version_ids),
+                    QuickPracticeSession.expires_at > now,
+                    QuickPracticeSession.status != "reclaimed",
+                )
+            ).all()
+            if _session_has_live_request(session, item)
+        ]
+        if len(running) >= environment.max_concurrent_sessions:
+            raise BadRequestError(
+                "這個環境目前已額滿（同時最多 "
+                f"{environment.max_concurrent_sessions} 組），請稍後再試"
+            )
+
     quota_service.check_quota(
         session,
         user.id,
@@ -683,6 +708,24 @@ def launch(
     session.refresh(practice)
     for request_id in request_ids:
         vm_request_service.submit_course_provision(request_id)
+    return practice
+
+
+def end_session(
+    session: Session, *, user, practice_id: uuid.UUID
+) -> QuickPracticeSession:
+    """學生自己結束練習：立刻回收整組，不必等到期。
+
+    只有本人或管理員能結束；建立次數已經計入 24 小時上限，提早結束只釋放
+    資源與「同時一組」的名額，不會退還次數。
+    """
+    practice = session.get(QuickPracticeSession, practice_id)
+    if practice is None or (practice.user_id != user.id and not is_admin(user)):
+        raise NotFoundError("Quick-practice session not found")
+    if practice.status in {"reclaiming", "reclaimed"} or practice.reclaimed_at:
+        return practice
+    _queue_session_reclaim(session, practice=practice)
+    session.refresh(practice)
     return practice
 
 

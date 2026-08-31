@@ -340,8 +340,27 @@ function EnvironmentMachineRow({ machine, groupStatus, onUpdated }) {
   </>;
 }
 
-function EnvironmentGroupRows({ group, onUpdated }) {
+function EnvironmentGroupRows({ group, onUpdated, onEnded }) {
   const [expanded, setExpanded] = useState(true);
+  const [ending, setEnding] = useState(false);
+  const [endConfirm, setEndConfirm] = useState(false);
+  const toast = useToast();
+  const canEnd = group.kind === "quick_practice" && !["reclaiming", "reclaimed"].includes(group.status);
+
+  async function endPractice() {
+    setEnding(true);
+    try {
+      await QuickPracticeService.endSession(group.id);
+      toast.success("已開始回收這組練習環境");
+      setEndConfirm(false);
+      onEnded?.();
+    } catch (error) {
+      toast.error(error?.message ?? "結束練習失敗");
+    } finally {
+      setEnding(false);
+    }
+  }
+
   return <>
     <tr className={`${styles.tr} ${styles.environmentGroupRow}`}>
       <td className={styles.td}><button type="button" className={styles.environmentToggle} aria-expanded={expanded} onClick={() => setExpanded((value) => !value)}><MIcon name={expanded ? "expand_more" : "chevron_right"} size={20} /><span className={styles.environmentIcon}><MIcon name={group.kind === "course" ? "school" : "bolt"} size={19} /></span><span><strong>{group.kindLabel}｜{group.title}</strong><small>{group.machines.length} 台機器 · 整組管理</small></span></button></td>
@@ -350,9 +369,13 @@ function EnvironmentGroupRows({ group, onUpdated }) {
       <td className={styles.td}><span className={styles.muted}>展開查看</span></td>
       <td className={styles.td}><strong className={styles.environmentTiming}>{group.timingLabel}</strong></td>
       <td className={styles.td}>{group.nodeLabel}</td>
-      <td className={styles.td}><button type="button" className={styles.terminalBtn} onClick={() => setExpanded((value) => !value)}><MIcon name="dns" size={14} />{expanded ? "收合機器" : "使用機器"}</button></td>
+      <td className={styles.td}><div className={styles.groupActions}>
+        <button type="button" className={styles.terminalBtn} onClick={() => setExpanded((value) => !value)}><MIcon name="dns" size={14} />{expanded ? "收合機器" : "使用機器"}</button>
+        {canEnd && <button type="button" className={styles.terminalBtn} disabled={ending} onClick={() => setEndConfirm(true)}><MIcon name="stop_circle" size={14} />{ending ? "結束中…" : "結束練習"}</button>}
+      </div></td>
     </tr>
     {expanded && group.machines.map((machine) => <EnvironmentMachineRow key={machine.id} machine={machine} groupStatus={group.status} onUpdated={onUpdated} />)}
+    {endConfirm && createPortal(<ConfirmModal title="結束這組練習？" desc="整組機器會立刻回收，未儲存的內容會消失；已使用的建立次數不會退還。" confirmLabel="結束練習" danger loading={ending} onConfirm={endPractice} onClose={() => setEndConfirm(false)} />, document.body)}
   </>;
 }
 
@@ -492,7 +515,7 @@ export default function ResourcesPage() {
               </thead>
               <tbody>
                 {loading ? [0, 1, 2].map((i) => <SkeletonRow key={i} />) : <>
-                  {environmentGroups.map((group) => <EnvironmentGroupRows key={group.id} group={group} onUpdated={handleUpdated} />)}
+                  {environmentGroups.map((group) => <EnvironmentGroupRows key={group.id} group={group} onUpdated={handleUpdated} onEnded={() => fetchResources(true)} />)}
                   {visiblePending.map((req) => <CreatingRow key={`creating:${req.id}`} request={req} onCancelled={refreshPending} />)}
                   {visibleResources.map((r, index) => <ResourceRow key={resourceRowKey(r, index)} resource={r} onUpdated={handleUpdated} onDeleted={handleDeleted} />)}
                 </>}

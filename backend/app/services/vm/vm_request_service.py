@@ -54,12 +54,6 @@ from app.services.vm.placement_service import CurrentPlacementSelection
 
 logger = logging.getLogger(__name__)
 
-QUICK_TEMPLATE_DURATION_HOURS = 3
-QUICK_TEMPLATE_MAX_ACTIVE_PER_USER = 1
-QUICK_TEMPLATE_MAX_CREATED_PER_24H = 3
-QUICK_TEMPLATE_MAX_CORES = 2
-QUICK_TEMPLATE_MAX_MEMORY_MB = 4096
-QUICK_TEMPLATE_MAX_DISK_GB = 32
 
 
 def _utc_now() -> datetime:
@@ -255,54 +249,6 @@ def _approve_and_place(
     return selections.get(db_request.id)
 
 
-def _prepare_quick_template_request(
-    *,
-    session: Session,
-    request_in: VMRequestCreate,
-    user,
-    now: datetime,
-) -> None:
-    if request_in.resource_type != "lxc":
-        raise BadRequestError("Quick templates currently support LXC only")
-
-    # 範本系統克隆路徑：template_id 已在 create() 由
-    # _validate_template_source 驗證（存在 / ready / 可見範圍）。
-    if not request_in.template_id:
-        raise BadRequestError("Quick template mode requires a template")
-
-    if request_in.gpu_mapping_id:
-        raise BadRequestError("Quick template mode does not support GPU allocation")
-    if not request_in.rootfs_size:
-        raise BadRequestError("Quick template mode requires rootfs_size")
-    if int(request_in.cores or 0) > QUICK_TEMPLATE_MAX_CORES:
-        raise BadRequestError("Quick template CPU exceeds the allowed limit")
-    if int(request_in.memory or 0) > QUICK_TEMPLATE_MAX_MEMORY_MB:
-        raise BadRequestError("Quick template memory exceeds the allowed limit")
-    if int(request_in.rootfs_size or 0) > QUICK_TEMPLATE_MAX_DISK_GB:
-        raise BadRequestError("Quick template disk size exceeds the allowed limit")
-
-    active_count = vm_request_repo.count_quick_template_requests_for_user(
-        session=session,
-        user_id=user.id,
-        active_at=now,
-    )
-    if active_count >= QUICK_TEMPLATE_MAX_ACTIVE_PER_USER:
-        raise BadRequestError("You already have an active quick template")
-
-    recent_count = vm_request_repo.count_quick_template_requests_for_user(
-        session=session,
-        user_id=user.id,
-        since=now - timedelta(hours=24),
-    )
-    if recent_count >= QUICK_TEMPLATE_MAX_CREATED_PER_24H:
-        raise BadRequestError("Quick template daily limit reached")
-
-    request_in.start_at = now
-    request_in.end_at = now + timedelta(hours=QUICK_TEMPLATE_DURATION_HOURS)
-    request_in.gpu_mapping_id = None
-    request_in.gpu_mdev_profile = None
-
-
 def _validate_template_source(
     *, session: Session, template_vmid: int, user: User, resource_type: str
 ) -> VMTemplate | None:
@@ -437,14 +383,12 @@ def create(
     mode = getattr(request_in, "mode", "scheduled") or "scheduled"
 
     if mode == "quick_template":
-        now = _utc_now()
-        _prepare_quick_template_request(
-            session=session,
-            request_in=request_in,
-            user=user,
-            now=now,
+        # 舊的學生自助路徑會自動核准，繞過本次建立的目錄與審核治理。
+        # 快速練習改由 quick_practice 服務整組建立（仍用同一個 request_kind）。
+        raise BadRequestError(
+            "此模式已停用；請改用快速練習環境，或以一般申請選用開放的應用範本"
         )
-    elif mode == "immediate":
+    if mode == "immediate":
         require_immediate_vm_request_access(user)
         # Set start_at to now; end_at can be None (infinite) or user-specified.
         request_in.start_at = _utc_now()

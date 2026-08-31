@@ -29,6 +29,9 @@ from app.infrastructure.proxmox import get_proxmox_settings_for_node
 from app.infrastructure.proxmox import operations as proxmox_ops
 from app.infrastructure.queue import enqueue_task, report_progress
 from app.models import (
+    CourseEnvironment,
+    CourseEnvironmentNode,
+    CourseEnvironmentVersion,
     Resource,
     TaskRecord,
     TaskRecordStatus,
@@ -620,6 +623,28 @@ def _clone_children_vmids(session: Session, pve_vmid: int) -> list[int]:
     return list(session.exec(stmt).all())
 
 
+def _environments_referencing(session: Session, template_id: uuid.UUID) -> list[str]:
+    """引用這個母範本的多機環境名稱（含草稿與已下架版本）。
+
+    已發布的環境會在學生按下啟動時才用到來源範本，所以刪除前必須先盤點；
+    草稿與已下架版本一樣要算，否則教師之後建立新版本會拿到空的來源。
+    """
+    rows = session.exec(
+        select(CourseEnvironment.name)
+        .join(
+            CourseEnvironmentVersion,
+            col(CourseEnvironmentVersion.environment_id) == col(CourseEnvironment.id),
+        )
+        .join(
+            CourseEnvironmentNode,
+            col(CourseEnvironmentNode.version_id) == col(CourseEnvironmentVersion.id),
+        )
+        .where(CourseEnvironmentNode.source_template_id == template_id)
+        .distinct()
+    ).all()
+    return [str(name) for name in rows]
+
+
 async def delete_template(
     *, session: Session, user: User, template_id: uuid.UUID
 ) -> TaskRecord:
@@ -636,6 +661,15 @@ async def delete_template(
             "Template still has cloned VMs: "
             + ", ".join(str(v) for v in sorted(children))
             + ". Delete them first."
+        )
+
+    environments = _environments_referencing(session, template.id)
+    if environments:
+        shown = "、".join(environments[:3])
+        more = f" 等 {len(environments)} 個" if len(environments) > 3 else ""
+        raise ConflictError(
+            f"多機環境「{shown}」{more}正在引用這個母範本，"
+            "請先把那些環境改用其他來源或下架後再刪除。"
         )
 
     return await enqueue_task(

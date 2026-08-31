@@ -342,36 +342,10 @@ def _seed_lxc_template(
     return template
 
 
-def test_student_quick_template_is_limited_and_auto_approved(
-    db: Session, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_legacy_quick_template_mode_is_rejected(db: Session) -> None:
+    """舊的自助模式會自動核准，已停用；學生只能走快速練習或一般申請。"""
     user = _create_user(db, role=UserRole.student)
     _seed_lxc_template(db, pve_vmid=9100)
-    calls: list[uuid.UUID] = []
-
-    monkeypatch.setattr(
-        "app.services.vm.vm_request_service.vm_request_availability_service.validate_request_window",
-        lambda **kwargs: None,
-    )
-
-    def fake_approve_and_place(*, session: Session, db_request: VMRequest, reviewer_id: uuid.UUID):
-        db_request.status = VMRequestStatus.approved
-        db_request.reviewer_id = reviewer_id
-        db_request.assigned_node = "pve-a"
-        db_request.desired_node = "pve-a"
-        session.add(db_request)
-        session.flush()
-        return None
-
-    monkeypatch.setattr(
-        "app.services.vm.vm_request_service._approve_and_place",
-        fake_approve_and_place,
-    )
-    monkeypatch.setattr(
-        "app.services.vm.vm_request_service.submit_sync",
-        lambda _fn, request_id, **_kwargs: calls.append(request_id),
-    )
-
     request_in = VMRequestCreate(
         reason="Need a short PostgreSQL lab environment",
         resource_type="lxc",
@@ -384,23 +358,14 @@ def test_student_quick_template_is_limited_and_auto_approved(
         mode="quick_template",
     )
 
-    result = vm_request_service.create(session=db, request_in=request_in, user=user)
-
-    db.expire_all()
-    saved = db.exec(select(VMRequest).where(VMRequest.id == result.id)).first()
-    assert saved is not None
-    assert result.request_kind == "quick_template"
-    assert saved.request_kind == "quick_template"
-    assert saved.status == VMRequestStatus.approved
-    assert saved.template_id == 9100
-    assert saved.start_at is not None
-    assert saved.end_at is not None
-    assert saved.end_at - saved.start_at == timedelta(hours=3)
-    assert calls == [saved.id]
+    with pytest.raises(BadRequestError, match="已停用"):
+        vm_request_service.create(session=db, request_in=request_in, user=user)
 
 
-def test_student_quick_template_requires_template(db: Session) -> None:
-    """quick_template 模式必須帶範本系統的 template_id（不再接受安裝腳本）。"""
+def test_legacy_quick_template_mode_is_rejected_without_a_template(
+    db: Session,
+) -> None:
+    """停用後不論帶不帶範本都不接受，錯誤訊息一致。"""
     user = _create_user(db, role=UserRole.student)
     request_in = VMRequestCreate(
         reason="Need a short lab without a template",
@@ -418,7 +383,9 @@ def test_student_quick_template_requires_template(db: Session) -> None:
         vm_request_service.create(session=db, request_in=request_in, user=user)
 
 
-def test_student_quick_template_rejects_not_ready_template(db: Session) -> None:
+def test_legacy_quick_template_mode_is_rejected_for_unready_templates(
+    db: Session,
+) -> None:
     user = _create_user(db, role=UserRole.student)
     _seed_lxc_template(db, pve_vmid=9200, status=VMTemplateStatus.creating)
     request_in = VMRequestCreate(

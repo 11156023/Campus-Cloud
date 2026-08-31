@@ -20,6 +20,7 @@ from app.models import (
     CourseEnvironmentNode,
     CourseEnvironmentVersion,
     CourseEnvironmentVersionStatus,
+    QuickPracticeSession,
     TeachingClass,
     User,
     VMTemplate,
@@ -89,6 +90,7 @@ class EnvironmentCreate(BaseModel):
     description: str | None = Field(default=None, max_length=2000)
     usage_scope: Literal["course", "quick_practice", "both"] = "course"
     audience: Literal["owner", "class", "campus"] = "class"
+    max_concurrent_sessions: int | None = Field(default=None, ge=1, le=500)
     audience_class_ids: list[uuid.UUID] = Field(default_factory=list, max_length=50)
     nodes: list[EnvironmentNodeIn] = Field(min_length=1, max_length=3)
     edges: list[EnvironmentEdgeIn] = Field(default_factory=list, max_length=6)
@@ -287,6 +289,7 @@ def _serialize_version(
         "description": environment.description,
         "usage_scope": environment.usage_scope,
         "audience": environment.audience,
+        "max_concurrent_sessions": environment.max_concurrent_sessions,
         "audience_class_ids": _audience_class_ids(session, environment.id),
         "version": version.version,
         "status": version.status,
@@ -388,6 +391,7 @@ def create_environment(
         description=body.description,
         usage_scope=body.usage_scope,
         audience=body.audience,
+        max_concurrent_sessions=body.max_concurrent_sessions,
     )
     version = CourseEnvironmentVersion(environment_id=environment.id, version=1)
     session.add(environment)
@@ -419,6 +423,7 @@ def update_environment(
     environment.description = body.description
     environment.usage_scope = body.usage_scope
     environment.audience = body.audience
+    environment.max_concurrent_sessions = body.max_concurrent_sessions
     environment.updated_at = get_datetime_utc()
     _replace_audience(
         session,
@@ -507,3 +512,98 @@ def create_environment_version(
     session.add(environment)
     session.commit()
     return _serialize_version(session, environment, version)
+
+
+@router.post("/{environment_id}/retire")
+def retire_environment(
+    environment_id: uuid.UUID,
+    session: SessionDep,
+    current_user: InstructorUser,
+) -> dict[str, Any]:
+    """下架：停止新的啟動與套用，既有 Session 與班級不受影響。
+
+    退役是版本層的動作，因為班級與練習 Session 都鎖在某一個版本上；把已發布
+    版本改為 `retired` 之後，它就不再出現在學生清單與班級可選清單，但既有
+    Session 仍照自己的期限走完。
+    """
+    environment = _get_environment(session, current_user, environment_id)
+    versions = _versions(session, environment.id)
+    published = [
+        version
+        for version in versions
+        if version.status == CourseEnvironmentVersionStatus.published
+    ]
+    if not published:
+        raise BadRequestError("這個環境沒有已發布的版本可以下架")
+    for version in published:
+        version.status = CourseEnvironmentVersionStatus.retired
+        session.add(version)
+    environment.updated_at = get_datetime_utc()
+    session.add(environment)
+    session.commit()
+    return _serialize_version(session, environment, _latest(session, environment))
+
+
+def _environment_references(
+    session: SessionDep, environment_id: uuid.UUID
+) -> list[str]:
+    """刪除前的引用盤點：有引用就不能硬刪，只能下架。"""
+    version_ids = [version.id for version in _versions(session, environment_id)]
+    if not version_ids:
+        return []
+    reasons: list[str] = []
+    class_count = session.exec(
+        select(func.count(col(TeachingClass.id))).where(
+            col(TeachingClass.course_version_id).in_(version_ids)
+        )
+    ).one()
+    if int(class_count or 0):
+        reasons.append(f"{int(class_count)} 個班級正在使用")
+    session_count = session.exec(
+        select(func.count(col(QuickPracticeSession.id))).where(
+            col(QuickPracticeSession.environment_version_id).in_(version_ids)
+        )
+    ).one()
+    if int(session_count or 0):
+        reasons.append(f"{int(session_count)} 筆快速練習紀錄引用")
+    return reasons
+
+
+@router.delete("/{environment_id}")
+def delete_environment(
+    environment_id: uuid.UUID,
+    session: SessionDep,
+    current_user: InstructorUser,
+) -> dict[str, str]:
+    """硬刪除；只允許沒有任何引用的環境，其餘一律走下架。"""
+    environment = _get_environment(session, current_user, environment_id)
+    reasons = _environment_references(session, environment.id)
+    if reasons:
+        raise BadRequestError(
+            "無法刪除：" + "、".join(reasons) + "。請改用「下架」停止新的啟動。"
+        )
+    version_ids = [version.id for version in _versions(session, environment.id)]
+    if version_ids:
+        session.exec(
+            delete(CourseEnvironmentEdge).where(
+                col(CourseEnvironmentEdge.version_id).in_(version_ids)
+            )
+        )
+        session.exec(
+            delete(CourseEnvironmentNode).where(
+                col(CourseEnvironmentNode.version_id).in_(version_ids)
+            )
+        )
+        session.exec(
+            delete(CourseEnvironmentVersion).where(
+                col(CourseEnvironmentVersion.id).in_(version_ids)
+            )
+        )
+    session.exec(
+        delete(CourseEnvironmentAudience).where(
+            col(CourseEnvironmentAudience.environment_id) == environment.id
+        )
+    )
+    session.delete(environment)
+    session.commit()
+    return {"status": "deleted"}

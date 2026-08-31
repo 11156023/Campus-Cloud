@@ -72,6 +72,11 @@ def apply() -> None:
     )
     _drop_not_null("vm_templates", "requires_gpu")
     _add_column(
+        "course_environments",
+        "max_concurrent_sessions",
+        "max_concurrent_sessions INTEGER NULL",
+    )
+    _add_column(
         "course_environment_nodes",
         "position_x",
         "position_x DOUBLE PRECISION NOT NULL DEFAULT 80",

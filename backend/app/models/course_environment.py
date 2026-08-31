@@ -45,6 +45,13 @@ class CourseEnvironment(SQLModel, table=True):
         max_length=24,
         description="course, quick_practice, or both",
     )
+    max_concurrent_sessions: int | None = Field(
+        default=None,
+        description=(
+            "Quick-practice sessions this environment may run at once across "
+            "all students; None means only the per-student limits apply"
+        ),
+    )
     audience: str = Field(
         default="class",
         max_length=24,

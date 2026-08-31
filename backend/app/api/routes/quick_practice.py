@@ -71,6 +71,19 @@ def launch_template(
     return quick_practice_service.serialize_session(session, item)
 
 
+@router.post("/sessions/{practice_id}/end")
+def end_session(
+    practice_id: uuid.UUID,
+    session: SessionDep,
+    current_user: CurrentUser,
+) -> dict:
+    """提早結束自己的練習，整組立刻進入回收。"""
+    item = quick_practice_service.end_session(
+        session, user=current_user, practice_id=practice_id
+    )
+    return quick_practice_service.serialize_session(session, item)
+
+
 @router.get("/sessions/my")
 def list_my_sessions(
     session: SessionDep, current_user: CurrentUser
