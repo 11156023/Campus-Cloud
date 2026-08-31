@@ -95,6 +95,10 @@ export const ipcRouters: IpcRouters = {
     openSsh: {
       path: "system/openSsh",
       controller: "systemController.openSsh"
+    },
+    openRdp: {
+      path: "system/openRdp",
+      controller: "systemController.openRdp"
     }
   }
 };

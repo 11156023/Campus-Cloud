@@ -11,8 +11,8 @@ const STUDENT_HOME_GUIDE = {
   steps: [
     {
       selector: '[data-guide="home-schedule"]',
-      title: "從今天的課程開始",
-      text: "這裡只放今天會用到的課。綠色課程代表正在上課，點整張課程卡就能查看課堂環境與今天的任務。",
+      title: "從你的進行中課程開始",
+      text: "課程期間內都會顯示在這裡，不必等到上課當天。綠色代表正在上課；其他課程仍可點入使用機器、查看任務或課後練習。",
     },
     {
       selector: '[data-guide="home-quick-templates"]',
@@ -47,7 +47,7 @@ const STUDENT_HOME_GUIDE = {
     {
       selector: '[data-guide="home-tasks"]',
       title: "完成數量看這裡",
-      text: "例如「2 / 4 已完成」表示共有 4 個任務、已完成 2 個。標示「下一步」的項目是建議你接著做的內容。",
+      text: "展開任務後，可以先查看老師上傳的任務 PDF，再依檢查項目完成操作並送出 AI Check。",
     },
     {
       selector: '[data-guide="course-ai-assignments"]',

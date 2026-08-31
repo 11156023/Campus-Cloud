@@ -51,7 +51,7 @@ class SystemController extends BaseController {
 
   openSsh(req: ControllerParam) {
     const port = Number(req.args?.port);
-    if (!Number.isFinite(port) || port <= 0) {
+    if (!Number.isInteger(port) || port <= 0 || port > 65535) {
       req.event.reply(
         req.channel,
         ResponseUtils.fail(new Error("invalid port"))
@@ -65,6 +65,26 @@ class SystemController extends BaseController {
       })
       .catch((err: Error) => {
         Logger.error("SystemController.openSsh", err);
+        req.event.reply(req.channel, ResponseUtils.fail(err));
+      });
+  }
+
+  openRdp(req: ControllerParam) {
+    const port = Number(req.args?.port);
+    if (!Number.isInteger(port) || port <= 0 || port > 65535) {
+      req.event.reply(
+        req.channel,
+        ResponseUtils.fail(new Error("invalid port"))
+      );
+      return;
+    }
+    this._systemService
+      .openRdp(port)
+      .then(() => {
+        req.event.reply(req.channel, ResponseUtils.success());
+      })
+      .catch((err: Error) => {
+        Logger.error("SystemController.openRdp", err);
         req.event.reply(req.channel, ResponseUtils.fail(err));
       });
   }

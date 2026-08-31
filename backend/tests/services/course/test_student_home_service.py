@@ -13,12 +13,20 @@ from app.models import (
     TeachingClass,
     TeachingClassStatus,
     TeachingClassStudent,
+    TeachingClassTaskFile,
     TeachingClassWeek,
     User,
     UserRole,
     VMRequest,
     VMRequestStatus,
 )
+from app.models.teacher_judge_file import TeacherJudgeFile
+from app.models.teacher_judge_script_artifact import (
+    TeacherJudgeScriptArtifact,
+    TeacherJudgeScriptStatus,
+)
+from app.models.teacher_judge_session import TeacherJudgeSession
+from app.services.course import weekly_task_service
 from app.services.course.course_service import ensure_class_path, list_student_schedule
 from app.services.course.reminder_service import list_student_reminders
 
@@ -101,6 +109,179 @@ def test_schedule_uses_real_class_time_teacher_and_location() -> None:
     assert rows[0].start_at.hour == 9
 
 
+def test_schedule_keeps_active_course_visible_outside_its_class_day() -> None:
+    session = _session()
+    teacher = _user("teacher@example.edu", UserRole.teacher)
+    student = _user("student@example.edu", UserRole.student)
+    monday = date(2026, 8, 24)
+    teaching_class, path = _linked_class(
+        session,
+        teacher=teacher,
+        student=student,
+        session_date=monday,
+    )
+    teaching_class.weekday = 3
+    session.add(teaching_class)
+    session.commit()
+
+    rows = list_student_schedule(
+        session,
+        user_id=student.id,
+        now=datetime(2026, 8, 24, 2, 0, tzinfo=UTC),
+    )
+
+    assert len(rows) == 1
+    assert rows[0].id == path.id
+    assert rows[0].state == "available"
+    assert rows[0].label == "可課後練習"
+    assert rows[0].session_date == date(2026, 8, 27)
+
+
+def test_weekly_tasks_only_show_published_content_and_pdf(tmp_path, monkeypatch) -> None:
+    session = _session()
+    teacher = _user("teacher@example.edu", UserRole.teacher)
+    student = _user("student@example.edu", UserRole.student)
+    today = date(2026, 8, 25)
+    teaching_class, path = _linked_class(
+        session,
+        teacher=teacher,
+        student=student,
+        session_date=today,
+    )
+    published = TeachingClassWeek(
+        class_id=teaching_class.id,
+        week_number=1,
+        session_date=today,
+        title="Linux 權限任務",
+        status="published",
+    )
+    draft = TeachingClassWeek(
+        class_id=teaching_class.id,
+        week_number=2,
+        session_date=today + timedelta(days=7),
+        title="尚未公開任務",
+        status="draft",
+    )
+    session.add(published)
+    session.add(draft)
+    session.commit()
+    task_file = TeachingClassTaskFile(
+        week_id=published.id,
+        filename="permissions.pdf",
+        storage_key="permissions.task",
+    )
+    session.add(task_file)
+    judge_session = TeacherJudgeSession(
+        teaching_class_id=teaching_class.id,
+        teaching_class_week_id=published.id,
+        title="Linux 權限檢查",
+    )
+    session.add(judge_session)
+    session.flush()
+    session.add(
+        TeacherJudgeScriptArtifact(
+            teaching_class_id=teaching_class.id,
+            session_id=judge_session.id,
+            name="Linux 權限檢查",
+            template_key="linux",
+            rubric_snapshot_json={
+                "items": [
+                    {"id": "mode", "title": "確認權限模式", "detectable": "auto"},
+                    {"id": "owner", "title": "確認檔案擁有者", "detectable": "auto"},
+                ]
+            },
+            script_content="print('{}')",
+            status=TeacherJudgeScriptStatus.approved,
+        )
+    )
+    session.commit()
+    (tmp_path / "permissions.task").write_bytes(b"%PDF-1.4 test")
+    monkeypatch.setattr(weekly_task_service, "TASK_FILE_ROOT", tmp_path)
+
+    rows = weekly_task_service.list_student_weekly_tasks(
+        session,
+        user_id=student.id,
+        path_id=path.id,
+    )
+    stored_path, filename = weekly_task_service.get_student_weekly_task_pdf(
+        session,
+        user_id=student.id,
+        path_id=path.id,
+        week_id=published.id,
+        file_id=task_file.id,
+    )
+
+    assert [row.title for row in rows] == ["Linux 權限任務"]
+    assert rows[0].files[0].filename == "permissions.pdf"
+    assert [item.title for item in rows[0].checkpoints] == [
+        "確認權限模式",
+        "確認檔案擁有者",
+    ]
+    assert stored_path == tmp_path / "permissions.task"
+    assert filename == "permissions.pdf"
+
+
+def test_weekly_tasks_show_ai_extracted_items_before_script_is_approved() -> None:
+    session = _session()
+    teacher = _user("teacher@example.edu", UserRole.teacher)
+    student = _user("student@example.edu", UserRole.student)
+    teaching_class, path = _linked_class(
+        session,
+        teacher=teacher,
+        student=student,
+        session_date=date(2026, 8, 25),
+    )
+    week = TeachingClassWeek(
+        class_id=teaching_class.id,
+        week_number=1,
+        session_date=date(2026, 8, 25),
+        title="Week one task",
+        status="published",
+    )
+    source = TeacherJudgeFile(
+        teaching_class_id=teaching_class.id,
+        uploaded_by=teacher.id,
+        original_filename="week-one.pdf",
+        display_name="Week one AI task",
+        template_key="linux",
+        analysis_json={
+            "items": [
+                {
+                    "id": "boot",
+                    "title": "Boot the machine",
+                    "description": "Start the assigned Linux machine.",
+                    "detectable": "auto",
+                }
+            ]
+        },
+    )
+    session.add(week)
+    session.add(source)
+    session.commit()
+    session.add(
+        TeacherJudgeSession(
+            teaching_class_id=teaching_class.id,
+            teaching_class_week_id=week.id,
+            selected_file_id=source.id,
+            created_by=teacher.id,
+            title="Week one AI check",
+        )
+    )
+    session.commit()
+
+    rows = weekly_task_service.list_student_weekly_tasks(
+        session,
+        user_id=student.id,
+        path_id=path.id,
+    )
+
+    assert len(rows) == 1
+    assert rows[0].checkpoints[0].title == "Boot the machine"
+    assert rows[0].checkpoints[0].assignment_title == "Week one AI task"
+    assert rows[0].checkpoints[0].check_available is False
+    assert rows[0].checkpoints[0].assignment_id is None
+
+
 def test_class_course_shell_exists_without_tasks_and_publishes_with_class() -> None:
     session = _session()
     teacher = _user("teacher@example.edu", UserRole.teacher)
@@ -177,6 +358,7 @@ def test_reminders_derive_expiry_review_and_class_task() -> None:
             week_number=1,
             session_date=today,
             title="完成檔案權限 Checkpoint",
+            status="published",
         )
     )
     session.commit()

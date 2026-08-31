@@ -35,7 +35,11 @@ class SystemService {
     });
   }
 
-  async openSsh(port: number, user = "root", host = "127.0.0.1"): Promise<void> {
+  async openSsh(
+    port: number,
+    user = "root",
+    host = "127.0.0.1"
+  ): Promise<void> {
     const sshCmd = `ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p ${port} ${user}@${host}`;
     if (process.platform === "win32") {
       const batPath = path.join(
@@ -64,6 +68,34 @@ class SystemService {
         stdio: "ignore"
       }).unref();
     }
+  }
+
+  async openRdp(port: number, host = "127.0.0.1"): Promise<void> {
+    const target = `${host}:${port}`;
+    if (process.platform === "win32") {
+      await this._spawnDetached("mstsc.exe", [`/v:${target}`]);
+      return;
+    }
+    if (process.platform === "darwin") {
+      await shell.openExternal(`rdp://full%20address=s:${target}`);
+      return;
+    }
+    await this._spawnDetached("xfreerdp", [`/v:${target}`]);
+  }
+
+  private _spawnDetached(command: string, args: string[]): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const child = spawn(command, args, {
+        detached: true,
+        stdio: "ignore",
+        windowsHide: false
+      });
+      child.once("error", reject);
+      child.once("spawn", () => {
+        child.unref();
+        resolve();
+      });
+    });
   }
 }
 

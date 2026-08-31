@@ -604,6 +604,139 @@
   gap: $spacing-8;
 }
 
+.weeklyTaskList {
+  display: grid;
+  gap: $spacing-8;
+}
+
+.weeklyTaskRow {
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: $radius-12;
+  background: var(--color-surface);
+}
+
+.weeklyTaskRowOpen {
+  border-color: color-mix(in srgb, var(--color-primary) 38%, var(--color-border));
+  box-shadow: var(--shadow-sm);
+}
+
+.weeklyTaskToggle {
+  display: grid;
+  width: 100%;
+  min-height: 70px;
+  padding: 12px $spacing-16;
+  grid-template-columns: 30px minmax(0, 1fr) auto 22px;
+  align-items: center;
+  gap: 12px;
+  border: 0;
+  color: var(--color-text-muted);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+
+  &:hover { background: var(--color-hover); }
+}
+
+.weeklyTaskHint {
+  color: var(--color-primary);
+  font-size: $font-size-12;
+  font-weight: $font-weight-700;
+}
+
+.weeklyTaskDetail {
+  display: grid;
+  gap: 12px;
+  padding: $spacing-16;
+  border-top: 1px solid var(--color-divider);
+  background: color-mix(in srgb, var(--color-primary) 2%, var(--color-surface));
+  animation: fadeIn .15s ease;
+}
+
+.weeklyTaskFiles {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 8px;
+}
+
+.checkpointList {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.checkpointRow {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: $radius-8;
+  background: var(--color-surface);
+}
+
+.checkpointContent {
+  min-width: 0;
+
+  > .checkpointSource { display: block; margin-bottom: 3px; color: var(--color-primary); font-size: $font-size-10; font-weight: $font-weight-700; }
+  > strong { color: var(--color-text-primary); font-size: $font-size-14; }
+  > p { margin-top: 3px; color: var(--color-text-secondary); font-size: $font-size-12; line-height: 1.5; }
+}
+
+.checkpointCheckButton {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: $radius-8;
+  color: var(--color-text-on-primary);
+  background: var(--color-primary);
+  font-size: $font-size-12;
+  font-weight: $font-weight-700;
+  cursor: pointer;
+
+  &:disabled { cursor: not-allowed; opacity: .55; }
+}
+
+.checkpointResult {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: $radius-8;
+  color: var(--color-text-secondary);
+  background: var(--color-hover);
+  font-size: $font-size-12;
+
+  > span { @include flex-column; gap: 2px; }
+  b { font-weight: $font-weight-500; }
+  small { color: var(--color-text-muted); }
+}
+
+.checkpointResult_completed { color: var(--color-success); background: color-mix(in srgb, var(--color-success) 8%, transparent); }
+.checkpointResult_failed { color: var(--color-danger); background: color-mix(in srgb, var(--color-danger) 8%, transparent); }
+
+.checkpointEmpty {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  color: var(--color-text-muted);
+  font-size: $font-size-12;
+}
+
+.noTaskFile {
+  color: var(--color-text-muted);
+  font-size: $font-size-12;
+}
+
 .assignmentRow {
   overflow: hidden;
   border: 1px solid var(--color-border);
@@ -719,6 +852,45 @@
     color: var(--color-text-secondary);
     font-size: $font-size-12;
     line-height: 1.6;
+  }
+}
+
+.assignmentDocumentMeta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--color-danger) 24%, var(--color-border));
+  border-radius: $radius-8;
+  background: color-mix(in srgb, var(--color-danger) 5%, var(--color-surface));
+
+  > span {
+    @include flex-center;
+    width: 36px;
+    height: 36px;
+    flex: 0 0 auto;
+    border-radius: $radius-8;
+    color: var(--color-danger);
+    background: color-mix(in srgb, var(--color-danger) 10%, transparent);
+  }
+
+  > div {
+    @include flex-column;
+    min-width: 0;
+    gap: 2px;
+  }
+
+  strong,
+  small { @include text-truncate; }
+
+  strong {
+    color: var(--color-text-primary);
+    font-size: $font-size-12;
+  }
+
+  small {
+    color: var(--color-text-secondary);
+    font-size: 11px;
   }
 }
 
@@ -914,6 +1086,43 @@
   }
 }
 
+.assignmentActionButtons {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.pdfButton {
+  display: inline-flex;
+  min-height: 40px;
+  padding: 8px 12px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid color-mix(in srgb, var(--color-danger) 42%, var(--color-border));
+  border-radius: $radius-8;
+  color: var(--color-danger);
+  background: color-mix(in srgb, var(--color-danger) 6%, var(--color-surface));
+  font: inherit;
+  font-size: $font-size-12;
+  font-weight: $font-weight-700;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    border-color: var(--color-danger);
+    background: color-mix(in srgb, var(--color-danger) 11%, var(--color-surface));
+  }
+
+  &:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--color-danger) 45%, transparent);
+    outline-offset: 2px;
+  }
+
+  &:disabled { cursor: not-allowed; opacity: .45; }
+}
+
 .aiCheckButton {
   display: inline-flex;
   min-height: 40px;
@@ -932,6 +1141,115 @@
 
   &:hover:not(:disabled) { background: var(--color-primary-dark); }
   &:disabled { cursor: not-allowed; opacity: .4; }
+}
+
+.pdfBackdrop {
+  position: fixed;
+  z-index: 1400;
+  inset: 0;
+  display: flex;
+  padding: 24px;
+  align-items: center;
+  justify-content: center;
+  background: rgb(4 10 22 / 76%);
+  backdrop-filter: blur(4px);
+}
+
+.pdfDialog {
+  display: grid;
+  width: min(1120px, 100%);
+  height: min(860px, calc(100vh - 48px));
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: $radius-12;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-lg);
+
+  > header {
+    display: flex;
+    min-height: 62px;
+    padding: 10px 12px 10px $spacing-16;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    border-bottom: 1px solid var(--color-divider);
+  }
+
+  > header > div:first-child {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 10px;
+
+    > span {
+      @include flex-center;
+      width: 36px;
+      height: 36px;
+      flex: 0 0 auto;
+      border-radius: $radius-8;
+      color: var(--color-danger);
+      background: color-mix(in srgb, var(--color-danger) 10%, transparent);
+    }
+
+    > div {
+      @include flex-column;
+      min-width: 0;
+      gap: 2px;
+    }
+
+    strong,
+    small { @include text-truncate; }
+
+    strong {
+      color: var(--color-text-primary);
+      font-size: $font-size-14;
+    }
+
+    small {
+      color: var(--color-text-muted);
+      font-size: $font-size-12;
+    }
+  }
+
+  iframe {
+    width: 100%;
+    height: 100%;
+    border: 0;
+    background: #fff;
+  }
+}
+
+.pdfDialogActions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+
+  a,
+  button {
+    display: inline-flex;
+    min-height: 36px;
+    padding: 7px 10px;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border: 0;
+    border-radius: $radius-8;
+    color: var(--color-text-secondary);
+    background: var(--color-hover);
+    font: inherit;
+    font-size: $font-size-12;
+    font-weight: $font-weight-700;
+    text-decoration: none;
+    cursor: pointer;
+
+    &:hover { color: var(--color-primary); }
+  }
+
+  button {
+    width: 36px;
+    padding: 0;
+  }
 }
 
 @keyframes fadeIn {
@@ -1685,7 +2003,39 @@
     flex-direction: column;
   }
 
+  .weeklyTaskRow {
+    .weeklyTaskToggle { grid-template-columns: 30px minmax(0, 1fr) 20px; }
+    .weeklyTaskHint { display: none; }
+  }
+
+  .checkpointRow { grid-template-columns: 26px minmax(0, 1fr); }
+  .checkpointCheckButton { grid-column: 2; justify-self: stretch; justify-content: center; }
+
+  .assignmentActionButtons {
+    width: 100%;
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .pdfButton,
   .aiCheckButton { width: 100%; }
+
+  .pdfBackdrop { padding: 0; }
+
+  .pdfDialog {
+    width: 100%;
+    height: 100%;
+    border: 0;
+    border-radius: 0;
+
+    > header { padding-left: 12px; }
+  }
+
+  .pdfDialogActions a {
+    width: 36px;
+    padding: 0;
+    font-size: 0;
+  }
 
   .aiRequirementItem {
     grid-template-columns: auto minmax(0, 1fr);

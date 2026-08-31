@@ -23,7 +23,8 @@ app.use(i18n).use(router).use(ElementPlus).use(pinia);
 const appStore = useAppStore(pinia);
 
 router.beforeEach((to, _from, next) => {
-  if (!appStore.loggedIn && to.name !== "Login") {
+  const publicRoutes = new Set(["Login", "Config"]);
+  if (!appStore.loggedIn && !publicRoutes.has(String(to.name))) {
     next({ name: "Login" });
   } else if (appStore.loggedIn && to.name === "Login") {
     next({ name: "Home" });
@@ -51,7 +52,7 @@ app.mount("#app").$nextTick(() => {
     () => appStore.loggedIn,
     loggedIn => {
       const currentName = router.currentRoute.value.name;
-      if (!loggedIn && currentName !== "Login") {
+      if (!loggedIn && !["Login", "Config"].includes(String(currentName))) {
         router.replace({ name: "Login" });
       } else if (loggedIn && currentName === "Login") {
         router.replace({ name: "Home" });

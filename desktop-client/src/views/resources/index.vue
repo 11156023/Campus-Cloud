@@ -1,35 +1,45 @@
 <script lang="ts" setup>
 import Breadcrumb from "@/layout/compoenets/Breadcrumb.vue";
 import { useAppStore } from "@/store/app";
-import { computed, defineComponent, onMounted } from "vue";
+import { groupResourcesByCourse } from "@/utils/resourceGroups";
+import { computed, defineComponent, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import ResourceTable from "./ResourceTable.vue";
 
 defineComponent({ name: "Resources" });
 
 const { t } = useI18n();
 const appStore = useAppStore();
+const expandedCourses = ref<string[]>([]);
 
 const refresh = () => {
   if (appStore.loggedIn) appStore.refreshResources();
 };
 
 const runningCount = computed(
-  () => appStore.resources.filter(resource => resource.status === "running").length
+  () =>
+    appStore.resources.filter(resource => resource.status === "running").length
 );
-
 const stoppedCount = computed(
-  () => appStore.resources.filter(resource => resource.status === "stopped").length
+  () =>
+    appStore.resources.filter(resource => resource.status === "stopped").length
+);
+const groupedResources = computed(() =>
+  groupResourcesByCourse(appStore.resources)
 );
 
-onMounted(() => {
-  refresh();
-});
+watch(
+  () => groupedResources.value.courseGroups.map(group => group.id),
+  ids => {
+    const available = new Set(ids);
+    const retained = expandedCourses.value.filter(id => available.has(id));
+    const added = ids.filter(id => !retained.includes(id));
+    expandedCourses.value = [...retained, ...added];
+  },
+  { immediate: true }
+);
 
-const statusTagType = (status: string) => {
-  if (status === "running") return "success";
-  if (status === "stopped") return "info";
-  return "danger";
-};
+onMounted(refresh);
 </script>
 
 <template>
@@ -41,7 +51,12 @@ const statusTagType = (status: string) => {
           <div>
             <div class="page-title">{{ t("resources.title") }}</div>
             <div class="page-subtitle">
-              {{ appStore.resources.length }} / {{ runningCount }} / {{ stoppedCount }}
+              {{
+                t("resources.summary", {
+                  total: appStore.resources.length,
+                  courses: groupedResources.courseGroups.length
+                })
+              }}
             </div>
           </div>
           <el-button size="small" type="primary" @click="refresh">
@@ -52,61 +67,104 @@ const statusTagType = (status: string) => {
 
         <div class="metric-grid">
           <div class="metric-item">
-            <div class="metric-label">{{ t("resources.title") }}</div>
+            <div class="metric-label">{{ t("resources.metrics.total") }}</div>
             <div class="metric-value">{{ appStore.resources.length }}</div>
           </div>
           <div class="metric-item">
-            <div class="metric-label">{{ t("home.status.running") }}</div>
-            <div class="metric-value metric-value--success">{{ runningCount }}</div>
+            <div class="metric-label">
+              {{ t("resources.metrics.courseGroups") }}
+            </div>
+            <div class="metric-value">
+              {{ groupedResources.courseGroups.length }}
+            </div>
           </div>
           <div class="metric-item">
-            <div class="metric-label">{{ t("home.status.stopped") }}</div>
-            <div class="metric-value metric-value--muted">{{ stoppedCount }}</div>
+            <div class="metric-label">{{ t("home.status.running") }}</div>
+            <div class="metric-value metric-value--success">
+              {{ runningCount }}
+            </div>
+          </div>
+          <div class="metric-item">
+            <div class="metric-label">{{ t("resources.status.stopped") }}</div>
+            <div class="metric-value metric-value--muted">
+              {{ stoppedCount }}
+            </div>
           </div>
         </div>
 
-        <section class="section-panel">
-          <div class="section-header">
-            <div class="section-title">{{ t("resources.title") }}</div>
-          </div>
-
-          <el-table
-            v-if="appStore.resources.length"
-            :data="appStore.resources"
-            size="small"
-            stripe
+        <template v-if="appStore.resources.length">
+          <section
+            v-if="groupedResources.courseGroups.length"
+            class="section-panel course-section"
           >
-            <el-table-column prop="name" :label="t('resources.table.name')" min-width="170">
-              <template #default="{ row }">
-                <div class="resource-name">
-                  <IconifyIconOffline icon="deployed-code-rounded" />
-                  <span>{{ row.name }}</span>
+            <div class="section-header">
+              <div>
+                <div class="section-title">
+                  {{ t("resources.course.title") }}
                 </div>
-              </template>
-            </el-table-column>
-            <el-table-column prop="vmid" :label="t('resources.table.vmid')" width="80" />
-            <el-table-column prop="type" :label="t('resources.table.type')" width="90" />
-            <el-table-column :label="t('resources.table.status')" width="110">
-              <template #default="{ row }">
-                <el-tag size="small" :type="statusTagType(row.status)">
-                  {{ row.status }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column prop="node" :label="t('resources.table.node')" width="110" />
-            <el-table-column prop="ip_address" :label="t('resources.table.ip')" min-width="150">
-              <template #default="{ row }">
-                <span class="font-mono">{{ row.ip_address || "-" }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column
-              prop="environment_type"
-              :label="t('resources.table.environment')"
-              width="130"
-            />
-          </el-table>
+                <div class="section-subtitle">
+                  {{ t("resources.course.description") }}
+                </div>
+              </div>
+            </div>
 
-          <div v-else class="empty-state">
+            <el-collapse v-model="expandedCourses" class="course-collapse">
+              <el-collapse-item
+                v-for="group in groupedResources.courseGroups"
+                :key="group.id"
+                :name="group.id"
+              >
+                <template #title>
+                  <div class="course-header">
+                    <span class="course-icon">
+                      <IconifyIconOffline icon="school" />
+                    </span>
+                    <span class="course-copy">
+                      <strong>{{ group.title }}</strong>
+                      <small>{{
+                        t("resources.course.machineCount", {
+                          count: group.resources.length
+                        })
+                      }}</small>
+                    </span>
+                    <span class="course-meta">
+                      <el-tag size="small" type="success">
+                        {{
+                          t("resources.course.runningCount", {
+                            running: group.runningCount,
+                            total: group.resources.length
+                          })
+                        }}
+                      </el-tag>
+                      <span>{{ group.nodeLabel }}</span>
+                    </span>
+                  </div>
+                </template>
+                <ResourceTable :resources="group.resources" />
+              </el-collapse-item>
+            </el-collapse>
+          </section>
+
+          <section
+            v-if="groupedResources.personalResources.length"
+            class="section-panel"
+          >
+            <div class="section-header">
+              <div>
+                <div class="section-title">
+                  {{ t("resources.personal.title") }}
+                </div>
+                <div class="section-subtitle">
+                  {{ t("resources.personal.description") }}
+                </div>
+              </div>
+            </div>
+            <ResourceTable :resources="groupedResources.personalResources" />
+          </section>
+        </template>
+
+        <section v-else class="section-panel">
+          <div class="empty-state">
             <div class="empty-icon">
               <IconifyIconOffline icon="cloud-off-rounded" />
             </div>
@@ -133,18 +191,90 @@ const statusTagType = (status: string) => {
   color: var(--color-text-muted);
 }
 
-.resource-name {
-  display: inline-flex;
-  max-width: 100%;
-  align-items: center;
-  gap: 8px;
-  color: var(--color-text-primary);
-  font-weight: 700;
+.section-subtitle {
+  margin-top: 3px;
+  color: var(--color-text-muted);
+  font-size: 12px;
 }
 
-.resource-name span {
+.course-section {
   overflow: hidden;
+}
+
+.course-collapse {
+  border: 0;
+}
+
+.course-collapse :deep(.el-collapse-item__header) {
+  height: auto;
+  min-height: 66px;
+  padding: 10px 16px;
+  color: var(--color-text-primary);
+  background: color-mix(in srgb, var(--color-hover) 55%, transparent);
+  border-bottom-color: var(--color-divider);
+}
+
+.course-collapse :deep(.el-collapse-item__content) {
+  padding-bottom: 0;
+}
+
+.course-collapse :deep(.el-collapse-item__wrap) {
+  border-bottom-color: var(--color-divider);
+}
+
+.course-header {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+  padding-right: 12px;
+}
+
+.course-icon {
+  display: flex;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-primary);
+  font-size: 20px;
+  background: var(--color-surface);
+  border-radius: 8px;
+  box-shadow: var(--shadow-sm);
+}
+
+.course-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.course-copy strong {
+  overflow: hidden;
+  font-size: 14px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.course-copy small,
+.course-meta {
+  color: var(--color-text-muted);
+  font-size: 11px;
+}
+
+.course-meta {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 10px;
+}
+
+@media (max-width: 760px) {
+  .course-meta > span:last-child {
+    display: none;
+  }
 }
 </style>

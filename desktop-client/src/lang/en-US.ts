@@ -36,6 +36,13 @@
   },
   login: {
     title: "Sign in to SkyLab",
+    connectTitle: "Connect to your machines",
+    connectDescription:
+      "Press connect. On first use, sign in in your browser and the secure connection will start automatically.",
+    connect: "Connect",
+    waitingShort: "Verifying",
+    firstUseHint:
+      "First use requires browser sign-in. You will return here automatically when it is complete.",
     description:
       "Click the button below; your browser will open to complete sign-in.",
     startButton: "Open browser to sign in",
@@ -58,6 +65,18 @@
       stop: "Disconnect",
       refresh: "Refresh"
     },
+    connect: {
+      title: "Connect to SkyLab",
+      description:
+        "Create a secure connection, then view and access your virtual machines directly.",
+      button: "Connect",
+      connecting: "Connecting"
+    },
+    machines: {
+      summary:
+        "Connected · {machines} machines · {courses} course environments",
+      unavailable: "No connection"
+    },
     empty: {
       notLoggedIn: "Not signed in. Please sign in to SkyLab first.",
       noTunnels: "No tunnels available.",
@@ -68,12 +87,49 @@
       title: "Available VM connections",
       empty: "Tunnel details will appear once connected",
       action: "Action",
-      connectSsh: "SSH Connect"
+      service: "Service",
+      endpoint: "Local endpoint",
+      machines: "Reachable machines",
+      ready: "Ready",
+      groupSummary: "{machines} machines · {connections} connections",
+      connectSsh: "SSH Connect",
+      connectRdp: "RDP Connect",
+      machineStopped: "The machine is not running",
+      invalidPort: "This connection has an invalid local port"
     }
   },
   resources: {
     title: "My Virtual Machines",
+    webTitle: "My Resources",
+    webSubtitle:
+      "View and connect to your assigned virtual machines and containers",
     refresh: "Refresh",
+    summary: "{total} machines across {courses} course environments",
+    connect: "Connect",
+    customEnvironment: "Custom environment",
+    metrics: {
+      total: "Machines",
+      courseGroups: "Course environments"
+    },
+    course: {
+      kind: "Course",
+      title: "Course machines",
+      description: "Review machines by course and expand a group for details",
+      machineCount: "{count} machines · grouped management",
+      runningCount: "{running}/{total} running"
+    },
+    personal: {
+      title: "Personal resources",
+      description: "Individually requested or assigned machines"
+    },
+    status: {
+      running: "Running",
+      stopped: "Stopped",
+      paused: "Paused",
+      provisioning: "Provisioning",
+      failed: "Failed",
+      unknown: "Unknown"
+    },
     table: {
       name: "Name",
       vmid: "VMID",
@@ -81,13 +137,14 @@
       status: "Status",
       node: "Node",
       ip: "Private IP",
-      environment: "Env"
+      environment: "Env",
+      expiry: "Expires"
     },
-    empty:
-      "No virtual machines assigned. Please request one on SkyLab web."
+    empty: "No virtual machines assigned. Please request one on SkyLab web."
   },
   config: {
     title: "Settings",
+    back: "Back to connection",
     language: {
       label: "Language",
       zhCN: "Traditional Chinese",

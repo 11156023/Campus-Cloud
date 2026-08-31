@@ -1,5 +1,5 @@
 ﻿<script lang="ts" setup>
-import Breadcrumb from "@/layout/compoenets/Breadcrumb.vue";
+import router from "@/router";
 import { useAppStore } from "@/store/app";
 import { on, removeRouterListeners, send } from "@/utils/ipcUtils";
 import { ElMessage } from "element-plus";
@@ -37,6 +37,10 @@ const handleLogout = () => {
   appStore.logout();
 };
 
+const goBack = () => {
+  router.replace({ name: appStore.loggedIn ? "Home" : "Login" });
+};
+
 watch(
   () => appStore.language,
   lang => {
@@ -70,16 +74,22 @@ onUnmounted(() => {
 
 <template>
   <div class="main">
-    <breadcrumb />
-    <div class="app-container-breadcrumb">
+    <div class="app-container-breadcrumb settings-container">
       <div class="page-surface">
         <div class="page-header">
           <div>
             <div class="page-title">{{ t("config.title") }}</div>
           </div>
+          <el-button text @click="goBack">
+            {{ t("config.back") }}
+          </el-button>
         </div>
 
-        <el-form class="settings-form section-panel" label-width="140px" label-position="left">
+        <el-form
+          class="settings-form section-panel"
+          label-width="140px"
+          label-position="left"
+        >
           <el-form-item :label="t('config.language.label')">
             <el-radio-group v-model="form.language">
               <el-radio value="zh-CN">{{ t("config.language.zhCN") }}</el-radio>
@@ -95,7 +105,10 @@ onUnmounted(() => {
           </el-form-item>
 
           <el-form-item :label="t('config.backend.label')">
-            <el-input v-model="form.backendUrl" placeholder="http://localhost:8000" />
+            <el-input
+              v-model="form.backendUrl"
+              placeholder="http://localhost:8000"
+            />
             <div class="form-hint form-hint--block">
               {{ t("config.backend.tips") }}
             </div>
@@ -129,6 +142,10 @@ onUnmounted(() => {
 <style lang="scss" scoped>
 .settings-form {
   padding: 20px 20px 6px;
+}
+
+.settings-container {
+  height: 100%;
 }
 
 .form-hint {

@@ -2,7 +2,11 @@
   @include flex-center;
   min-height: 100vh;
   min-height: 100dvh;
-  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%);
+  background: linear-gradient(
+    135deg,
+    var(--color-primary) 0%,
+    var(--color-primary-dark) 100%
+  );
   padding: $spacing-16;
 
   @include respond-to(sm) {
@@ -63,7 +67,9 @@
   font-size: $font-size-14;
   color: var(--color-text-secondary);
   cursor: pointer;
-  transition: background $transition-base, color $transition-base;
+  transition:
+    background $transition-base,
+    color $transition-base;
 
   &:hover {
     background: var(--color-hover);
@@ -118,7 +124,8 @@
 
     &:focus {
       border-color: var(--color-primary);
-      box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 15%, transparent);
+      box-shadow: 0 0 0 3px
+        color-mix(in srgb, var(--color-primary) 15%, transparent);
     }
 
     @include respond-to(sm) {
@@ -224,6 +231,66 @@
   }
 }
 
+.deviceNotice {
+  display: flex;
+  align-items: flex-start;
+  gap: $spacing-8;
+  margin-bottom: $spacing-16;
+  padding: $spacing-8 $spacing-16;
+  border: 1px solid
+    color-mix(in srgb, var(--color-primary) 25%, var(--color-border));
+  border-radius: $radius-8;
+  background: color-mix(in srgb, var(--color-primary) 8%, transparent);
+  color: var(--color-text-secondary);
+  font-size: $font-size-14;
+  line-height: 1.5;
+  text-align: left;
+
+  > span:first-child {
+    flex: 0 0 auto;
+    color: var(--color-primary);
+  }
+}
+
+.deviceProgress {
+  @include flex-center;
+  min-height: 96px;
+  color: var(--color-primary);
+}
+
+.spin {
+  animation: device-spin 1s linear infinite;
+}
+
+.deviceHelp {
+  margin: $spacing-16 0;
+  color: var(--color-text-secondary);
+  font-size: $font-size-14;
+  line-height: 1.5;
+}
+
+.btnLink {
+  display: block;
+  width: 100%;
+  padding: 10px $spacing-16;
+  border-radius: $radius-8;
+  background: var(--color-primary);
+  color: var(--color-text-on-primary);
+  font-size: $font-size-16;
+  font-weight: $font-weight-500;
+  text-decoration: none;
+
+  &:hover {
+    background: var(--color-primary-dark);
+  }
+}
+
+@keyframes device-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .oauthArea {
   margin-top: $spacing-16;
 }
@@ -275,7 +342,9 @@
   font-size: $font-size-16;
   font-weight: $font-weight-500;
   border-radius: $radius-8;
-  transition: background $transition-base, opacity $transition-base;
+  transition:
+    background $transition-base,
+    opacity $transition-base;
   cursor: pointer;
 
   &:hover:not(:disabled) {

@@ -1,14 +1,12 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { useAuth }  from "../../contexts/AuthContext";
+import { useAuth } from "../../contexts/AuthContext";
 import styles from "./Sidebar.module.scss";
 import MIcon from "../MIcon";
 import Avatar from "../Avatar/Avatar";
 import JobsButton from "../Jobs/JobsButton";
 
-const topItems = [
-  { key: "dashboard", label: "首頁", icon: "dashboard" },
-];
+const topItems = [{ key: "dashboard", label: "首頁", icon: "dashboard" }];
 
 const navGroups = [
   {
@@ -16,11 +14,16 @@ const navGroups = [
     label: "資源",
     icon: "storage",
     items: [
-      { key: "my-resources",  label: "我的資源",    icon: "inventory_2" },
-      { key: "my-requests",   label: "我的申請",    icon: "assignment" },
-      { key: "resource-mgmt", label: "資源管理",    icon: "storage", adminOnly: true },
-      { key: "templates",     label: "機器範本",    icon: "library_books" },
-      { key: "gpu-mgmt",      label: "GPU 管理",    icon: "memory", adminOnly: true },
+      { key: "my-resources", label: "我的資源", icon: "inventory_2" },
+      { key: "my-requests", label: "我的申請", icon: "assignment" },
+      {
+        key: "resource-mgmt",
+        label: "資源管理",
+        icon: "storage",
+        adminOnly: true,
+      },
+      { key: "templates", label: "機器範本", icon: "library_books" },
+      { key: "gpu-mgmt", label: "GPU 管理", icon: "memory", adminOnly: true },
     ],
   },
   {
@@ -28,8 +31,18 @@ const navGroups = [
     label: "審核",
     icon: "fact_check",
     items: [
-      { key: "request-review", label: "申請審核", icon: "fact_check", adminOnly: true },
-      { key: "batch-review",   label: "批量審核", icon: "library_add_check", adminOnly: true },
+      {
+        key: "request-review",
+        label: "申請審核",
+        icon: "fact_check",
+        adminOnly: true,
+      },
+      {
+        key: "batch-review",
+        label: "批量審核",
+        icon: "library_add_check",
+        adminOnly: true,
+      },
     ],
   },
   {
@@ -37,8 +50,8 @@ const navGroups = [
     label: "網路",
     icon: "router",
     items: [
-      { key: "firewall",      label: "防火牆",     icon: "security" },
-      { key: "reverse-proxy", label: "反向代理",   icon: "swap_horiz" },
+      { key: "firewall", label: "防火牆", icon: "security" },
+      { key: "reverse-proxy", label: "反向代理", icon: "swap_horiz" },
     ],
   },
   {
@@ -46,11 +59,26 @@ const navGroups = [
     label: "AI 服務",
     icon: "smart_toy",
     items: [
-      { key: "ai-api",        label: "AI API",   icon: "psychology" },
-      { key: "ai-api-review", label: "申請審核", icon: "rate_review", adminOnly: true },
-      { key: "ai-api-keys",   label: "金鑰管理", icon: "vpn_key", adminOnly: true },
-      { key: "ai-monitoring", label: "使用監控", icon: "monitor_heart", adminOnly: true },
-      { key: "ai-pve",        label: "PVE 維運助手", icon: "dns", adminOnly: true },
+      { key: "ai-api", label: "AI API", icon: "psychology" },
+      {
+        key: "ai-api-review",
+        label: "申請審核",
+        icon: "rate_review",
+        adminOnly: true,
+      },
+      {
+        key: "ai-api-keys",
+        label: "金鑰管理",
+        icon: "vpn_key",
+        adminOnly: true,
+      },
+      {
+        key: "ai-monitoring",
+        label: "使用監控",
+        icon: "monitor_heart",
+        adminOnly: true,
+      },
+      { key: "ai-pve", label: "PVE 維運助手", icon: "dns", adminOnly: true },
     ],
   },
   {
@@ -58,10 +86,19 @@ const navGroups = [
     label: "教學",
     icon: "school",
     items: [
-      { key: "class-setup", label: "一鍵建立班級", icon: "add_circle", instructorOnly: true },
-      { key: "class-management", label: "班級管理", icon: "groups_2", instructorOnly: true },
-      { key: "course-template-management", label: "多機環境模板", icon: "view_quilt", instructorOnly: true },
-      { key: "courses",    label: "課程學習（非正式）", icon: "flag" },
+      {
+        key: "class-management",
+        label: "班級管理",
+        icon: "groups_2",
+        instructorOnly: true,
+      },
+      {
+        key: "course-template-management",
+        label: "多機環境模板",
+        icon: "view_quilt",
+        instructorOnly: true,
+      },
+      { key: "courses", label: "課程學習（非正式）", icon: "flag" },
     ],
   },
   {
@@ -69,12 +106,17 @@ const navGroups = [
     label: "系統管理",
     icon: "tune",
     items: [
-      { key: "admin",         label: "使用者管理", icon: "admin_panel_settings", adminOnly: true },
-      { key: "quotas",        label: "配額管理",   icon: "data_usage", adminOnly: true },
-      { key: "ip-management", label: "IP 管理",    icon: "lan", adminOnly: true },
-      { key: "domain",        label: "網域管理",   icon: "domain", adminOnly: true },
-      { key: "gateway",       label: "閘道 VM",    icon: "dns", adminOnly: true },
-      { key: "settings",      label: "系統設定",   icon: "settings", adminOnly: true },
+      {
+        key: "admin",
+        label: "使用者管理",
+        icon: "admin_panel_settings",
+        adminOnly: true,
+      },
+      { key: "quotas", label: "配額管理", icon: "data_usage", adminOnly: true },
+      { key: "ip-management", label: "IP 管理", icon: "lan", adminOnly: true },
+      { key: "domain", label: "網域管理", icon: "domain", adminOnly: true },
+      { key: "gateway", label: "閘道 VM", icon: "dns", adminOnly: true },
+      { key: "settings", label: "系統設定", icon: "settings", adminOnly: true },
     ],
   },
   {
@@ -82,17 +124,25 @@ const navGroups = [
     label: "監控與日誌",
     icon: "insights",
     items: [
-      { key: "monitoring",    label: "資源監控",       icon: "monitor_heart", adminOnly: true },
-      { key: "jobs",          label: "背景任務",       icon: "task_alt" },
-      { key: "audit",         label: "Audit Logs",     icon: "receipt_long", adminOnly: true },
+      {
+        key: "monitoring",
+        label: "資源監控",
+        icon: "monitor_heart",
+        adminOnly: true,
+      },
+      { key: "jobs", label: "背景任務", icon: "task_alt" },
+      {
+        key: "audit",
+        label: "Audit Logs",
+        icon: "receipt_long",
+        adminOnly: true,
+      },
     ],
   },
 ];
 
 function NavGroup({ group, active, onSelect, collapsed, onExpand }) {
-  const [open, setOpen] = useState(
-    group.items.some((i) => i.key === active)
-  );
+  const [open, setOpen] = useState(group.items.some((i) => i.key === active));
 
   const hasActive = group.items.some((i) => i.key === active);
 
@@ -119,7 +169,9 @@ function NavGroup({ group, active, onSelect, collapsed, onExpand }) {
         {!collapsed && (
           <>
             <span className={styles.groupLabel}>{group.label}</span>
-            <span className={`${styles.groupChevron} ${open ? styles.open : ""}`}>
+            <span
+              className={`${styles.groupChevron} ${open ? styles.open : ""}`}
+            >
               <MIcon name="chevron_right" size={16} />
             </span>
           </>
@@ -177,7 +229,14 @@ function usePopup(DURATION = 150) {
 }
 
 /** 通用彈出選單，供外觀與語言共用 */
-function SelectPopup({ options, value, onSelect, onClose, triggerRef, closing }) {
+function SelectPopup({
+  options,
+  value,
+  onSelect,
+  onClose,
+  triggerRef,
+  closing,
+}) {
   const ref = useRef(null);
 
   useEffect(() => {
@@ -191,19 +250,26 @@ function SelectPopup({ options, value, onSelect, onClose, triggerRef, closing })
   }, [onClose, triggerRef]);
 
   return (
-    <div className={`${styles.appearancePopup} ${closing ? styles.popupClosing : styles.popupOpening}`} ref={ref}>
+    <div
+      className={`${styles.appearancePopup} ${closing ? styles.popupClosing : styles.popupOpening}`}
+      ref={ref}
+    >
       {options.map((opt) => (
         <button
           key={opt.key}
           type="button"
           className={`${styles.appearanceOption} ${value === opt.key ? styles.appearanceOptionActive : ""} ${opt.disabled ? styles.appearanceOptionDisabled : ""}`}
           disabled={opt.disabled}
-          onClick={() => { onSelect(opt.key); onClose(); }}
+          onClick={() => {
+            onSelect(opt.key);
+            onClose();
+          }}
         >
-          {opt.flag
-            ? <span className={styles.optionFlag}>{opt.flag}</span>
-            : <MIcon name={opt.icon} size={18} />
-          }
+          {opt.flag ? (
+            <span className={styles.optionFlag}>{opt.flag}</span>
+          ) : (
+            <MIcon name={opt.icon} size={18} />
+          )}
           <span>{opt.label}</span>
           {opt.hint && <span className={styles.optionHint}>{opt.hint}</span>}
         </button>
@@ -212,7 +278,14 @@ function SelectPopup({ options, value, onSelect, onClose, triggerRef, closing })
   );
 }
 
-function UserPopup({ user, onLogout, onSettings, onClose, triggerRef, closing }) {
+function UserPopup({
+  user,
+  onLogout,
+  onSettings,
+  onClose,
+  triggerRef,
+  closing,
+}) {
   const ref = useRef(null);
 
   useEffect(() => {
@@ -226,7 +299,10 @@ function UserPopup({ user, onLogout, onSettings, onClose, triggerRef, closing })
   }, [onClose, triggerRef]);
 
   return (
-    <div className={`${styles.userPopup} ${closing ? styles.popupClosing : styles.popupOpening}`} ref={ref}>
+    <div
+      className={`${styles.userPopup} ${closing ? styles.popupClosing : styles.popupOpening}`}
+      ref={ref}
+    >
       <div className={styles.userPopupHeader}>
         <Avatar user={user} size={32} />
         <div className={styles.userPopupInfo}>
@@ -235,14 +311,24 @@ function UserPopup({ user, onLogout, onSettings, onClose, triggerRef, closing })
         </div>
       </div>
       <div className={styles.userPopupDivider} />
-      <button type="button" className={styles.userPopupItem} onClick={() => { onClose(); onSettings(); }}>
+      <button
+        type="button"
+        className={styles.userPopupItem}
+        onClick={() => {
+          onClose();
+          onSettings();
+        }}
+      >
         <MIcon name="settings" size={18} />
         <span>User Settings</span>
       </button>
       <button
         type="button"
         className={`${styles.userPopupItem} ${styles.userPopupItemDanger}`}
-        onClick={() => { onClose(); onLogout(); }}
+        onClick={() => {
+          onClose();
+          onLogout();
+        }}
       >
         <MIcon name="logout" size={18} />
         <span>Log Out</span>
@@ -254,17 +340,17 @@ function UserPopup({ user, onLogout, onSettings, onClose, triggerRef, closing })
 // 介面尚未接 i18n，僅繁體中文可用；其餘語言待字串抽取完成後開放
 const LANG_OPTIONS = [
   { key: "zh-TW", label: "繁體中文", flag: "🇹🇼" },
-  { key: "en",    label: "English",  flag: "🇬🇧", disabled: true, hint: "即將推出" },
-  { key: "ja",    label: "日本語",   flag: "🇯🇵", disabled: true, hint: "即將推出" },
+  { key: "en", label: "English", flag: "🇬🇧", disabled: true, hint: "即將推出" },
+  { key: "ja", label: "日本語", flag: "🇯🇵", disabled: true, hint: "即將推出" },
 ];
 
 export default function Sidebar({ collapsed, mobileOpen, onToggle, onClose }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const active   = location.pathname.split("/")[1] || "dashboard";
+  const active = location.pathname.split("/")[1] || "dashboard";
   const [lang, setLang] = useState("zh-TW");
-  const langPopup  = usePopup();
-  const userPopup  = usePopup();
+  const langPopup = usePopup();
+  const userPopup = usePopup();
   const langBtnRef = useRef(null);
   const userBtnRef = useRef(null);
   const { user, logout } = useAuth();
@@ -273,8 +359,9 @@ export default function Sidebar({ collapsed, mobileOpen, onToggle, onClose }) {
   const visibleNavGroups = navGroups
     .map((group) => ({
       ...group,
-      items: group.items.filter((item) =>
-        (!item.adminOnly || isAdmin) && (!item.instructorOnly || canTeach)
+      items: group.items.filter(
+        (item) =>
+          (!item.adminOnly || isAdmin) && (!item.instructorOnly || canTeach),
       ),
     }))
     .filter((group) => group.items.length > 0);
@@ -295,7 +382,10 @@ export default function Sidebar({ collapsed, mobileOpen, onToggle, onClose }) {
   return (
     <aside className={cls}>
       {/* ===== Brand ===== */}
-      <div className={styles.brand} onClick={() => window.innerWidth >= 768 && onToggle?.()}>
+      <div
+        className={styles.brand}
+        onClick={() => window.innerWidth >= 768 && onToggle?.()}
+      >
         <span className={styles.brandIcon}>
           <img src="/favicon.png" alt="SkyLab" />
         </span>
@@ -320,7 +410,9 @@ export default function Sidebar({ collapsed, mobileOpen, onToggle, onClose }) {
             aria-label={item.label}
           >
             <MIcon name={item.icon} size={20} />
-            {!collapsed && <span className={styles.navLabel}>{item.label}</span>}
+            {!collapsed && (
+              <span className={styles.navLabel}>{item.label}</span>
+            )}
           </button>
         ))}
         {visibleNavGroups.map((group) => (
@@ -362,8 +454,14 @@ export default function Sidebar({ collapsed, mobileOpen, onToggle, onClose }) {
             aria-expanded={langPopup.open}
           >
             <MIcon name="language" size={20} />
-            {!collapsed && <span className={styles.navLabel}>語言 / Language</span>}
-            {!collapsed && <span className={styles.navHint}>{LANG_OPTIONS.find(o => o.key === lang)?.label}</span>}
+            {!collapsed && (
+              <span className={styles.navLabel}>語言 / Language</span>
+            )}
+            {!collapsed && (
+              <span className={styles.navHint}>
+                {LANG_OPTIONS.find((o) => o.key === lang)?.label}
+              </span>
+            )}
           </button>
         </div>
 
@@ -392,10 +490,19 @@ export default function Sidebar({ collapsed, mobileOpen, onToggle, onClose }) {
             {!collapsed && (
               <>
                 <div className={styles.userInfo}>
-                  <span className={styles.userName}>{user?.full_name ?? "—"}</span>
+                  <span className={styles.userName}>
+                    {user?.full_name ?? "—"}
+                  </span>
                   <span className={styles.userEmail}>{user?.email ?? "—"}</span>
                 </div>
-                <MIcon name={userPopup.open && !userPopup.closing ? "expand_more" : "unfold_more"} size={16} />
+                <MIcon
+                  name={
+                    userPopup.open && !userPopup.closing
+                      ? "expand_more"
+                      : "unfold_more"
+                  }
+                  size={16}
+                />
               </>
             )}
           </button>

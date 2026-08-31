@@ -54,6 +54,15 @@ class TeacherJudgeSession(SQLModel, table=True):
             index=True,
         )
     )
+    teaching_class_week_id: uuid.UUID | None = Field(
+        default=None,
+        sa_column=Column(
+            sa.Uuid,
+            sa.ForeignKey("teaching_class_weeks.id", ondelete="SET NULL"),
+            nullable=True,
+            index=True,
+        ),
+    )
     title: str = Field(max_length=255)
     status: TeacherJudgeSessionStatus = Field(
         default=TeacherJudgeSessionStatus.active,

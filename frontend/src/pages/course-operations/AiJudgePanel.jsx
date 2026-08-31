@@ -413,11 +413,13 @@ function ConfirmModal({ title, description, actions, onClose }) {
   );
 }
 
-function CreateCheckDialog({ classId, sourceOnly = false, onClose, onCreated }) {
+function CreateCheckDialog({ classId, weeks = [], sourceOnly = false, onClose, onCreated }) {
   const toast = useToast();
   const requestVersionRef = useRef(0);
   const [mode, setMode] = useState("");
   const [title, setTitle] = useState("");
+  const availableWeeks = weeks.filter((week) => week.title?.trim());
+  const [selectedWeekId, setSelectedWeekId] = useState(availableWeeks[0]?.id ?? "");
   const [rubricName, setRubricName] = useState("");
   const [environmentKeys, setEnvironmentKeys] = useState([]);
   const [files, setFiles] = useState([]);
@@ -507,6 +509,7 @@ function CreateCheckDialog({ classId, sourceOnly = false, onClose, onCreated }) 
       } else {
         const created = await AiJudgeService.createSession(classId, {
           title,
+          teachingClassWeekId: selectedWeekId,
           creationMode: mode,
           rubricName: mode === "blank" ? rubricName : undefined,
           environmentKeys: mode === "blank" ? environmentKeys : undefined,
@@ -527,11 +530,12 @@ function CreateCheckDialog({ classId, sourceOnly = false, onClose, onCreated }) 
         <div className={styles.modalHeader}><div><h2 id="create-check-title">{sourceOnly ? "新增評分表來源" : "新增檢查"}</h2><p>{sourceOnly ? "建立或選用一份班級評分表，完成後會套用到目前檢查。" : "選擇如何準備這次檢查的評分表。"}</p></div><button type="button" className={styles.iconBtn} aria-label="關閉" disabled={creating || uploading} onClick={onClose}><MIcon name="close" size={18} /></button></div>
         <form onSubmit={submit}>
           {!sourceOnly && <label className={styles.dialogField}><span>檢查名稱</span><input autoFocus value={title} maxLength={255} placeholder="例如：期中 Python 環境檢查" onChange={(event) => setTitle(event.target.value)} /></label>}
+          {!sourceOnly && <label className={styles.dialogField}><span>放到哪一週任務？</span><select value={selectedWeekId} onChange={(event) => setSelectedWeekId(event.target.value)} required><option value="" disabled>{availableWeeks.length ? "請選擇週任務" : "請先建立有名稱的週任務"}</option>{availableWeeks.map((week) => <option key={week.id} value={week.id}>第 {week.week ?? week.week_number} 週 · {week.title}{["published", "completed"].includes(week.status) ? "" : "（草稿）"}</option>)}</select><small>AI 檢查核准後，這份任務的所有 Checkpoint 才會顯示在學生端；草稿週次發布後才會讓學生看到。</small></label>}
           <fieldset className={styles.modeFieldset}><legend>如何建立評分表？</legend><div className={styles.modeChoices}><label className={mode === "blank" ? styles.modeChoiceActive : styles.modeChoice}><input type="radio" name="creation-mode" checked={mode === "blank"} onChange={() => setMode("blank")} /><span><b>從零開始建立</b><small>建立空白評分表，接著手動新增項目或請 AI 產生初稿。</small></span></label><label className={mode === "existing" ? styles.modeChoiceActive : styles.modeChoice}><input type="radio" name="creation-mode" checked={mode === "existing"} onChange={() => setMode("existing")} /><span><b>使用已有評分文件</b><small>選擇班級已保存的評分表，或上傳 .docx／.pdf。</small></span></label></div></fieldset>
           {mode === "blank" && <div className={styles.modeFields}><label className={styles.dialogField}><span>評分表名稱</span><input autoFocus={sourceOnly} value={rubricName} maxLength={255} placeholder="例如：期中 Python 評分表" onChange={(event) => setRubricName(event.target.value)} /></label><fieldset className={styles.modeFieldset}><legend>評分環境（可複選）</legend><div className={styles.dialogChips}>{TEMPLATE_OPTIONS.map((option) => <label key={option.key} className={environmentKeys.includes(option.key) ? styles.dialogChipActive : styles.dialogChip}><input type="checkbox" checked={environmentKeys.includes(option.key)} onChange={() => toggleEnvironment(option.key)} />{option.label}</label>)}</div></fieldset></div>}
            {mode === "existing" && <div className={styles.existingPicker}><div className={styles.existingPickerHead}><span>已保存評分表</span><label className={styles.uploadSourceButton}><input type="file" accept=".docx,.pdf" disabled={uploading} onChange={upload} />{uploading ? <><Spinner size={14} />分析中…</> : <><MIcon name="upload_file" size={15} />上傳評分文件</>}</label></div>{files.length ? <div className={styles.existingList}>{files.map((file) => <label key={file.id} className={selectedFileId === file.id ? styles.existingRowActive : styles.existingRow}><input type="radio" name="saved-rubric" checked={selectedFileId === file.id} onChange={() => setSelectedFileId(file.id)} /><span><b>{file.display_name ?? file.original_filename ?? "未命名評分表"}</b><small>{(file.environment_keys?.length ? file.environment_keys : [file.template_key]).map(getTemplateLabel).join("、")} · {file.analysis_json?.items?.length ?? 0} 項 · {formatDateTime(file.updated_at)}</small></span></label>)}</div> : <p className={styles.mutedText}>尚未有可用的評分表，請上傳評分文件。</p>}{conflictFile && <div className={styles.conflictActions} role="alert"><span>「{conflictFile.name}」已存在：</span><button type="button" className={styles.btnSecondary} disabled={uploading} onClick={() => uploadFile(conflictFile, "copy")}>建立副本</button><button type="button" className={styles.btnDanger} disabled={uploading} onClick={() => uploadFile(conflictFile, "overwrite")}>覆蓋原本</button><button type="button" className={styles.iconBtn} aria-label="取消同名處理" onClick={() => setConflictFile(null)}><MIcon name="close" size={16} /></button></div>}</div>}
           {error && <p className={styles.dialogError} role="alert">{error}</p>}
-          <div className={styles.modalActions}><button type="button" className={styles.btnSecondary} disabled={creating || uploading} onClick={onClose}>取消</button><button type="submit" className={styles.btnPrimary} disabled={(!sourceOnly && !title.trim()) || !mode || (mode === "blank" ? !rubricName.trim() || !environmentKeys.length : !selectedFileId) || creating || uploading}>{creating ? <><Spinner size={15} />建立中…</> : sourceOnly ? "新增來源" : mode === "blank" ? "開始建立" : "建立檢查"}</button></div>
+          <div className={styles.modalActions}><button type="button" className={styles.btnSecondary} disabled={creating || uploading} onClick={onClose}>取消</button><button type="submit" className={styles.btnPrimary} disabled={(!sourceOnly && (!title.trim() || !selectedWeekId)) || !mode || (mode === "blank" ? !rubricName.trim() || !environmentKeys.length : !selectedFileId) || creating || uploading}>{creating ? <><Spinner size={15} />建立中…</> : sourceOnly ? "新增來源" : mode === "blank" ? "開始建立" : "建立檢查"}</button></div>
         </form>
       </section>
     </div>
@@ -2363,7 +2367,7 @@ const TEACHER_JUDGE_TABS = [
   { key: "execution", label: "執行與結果", icon: "play_circle_outline" },
 ];
 
-function TeacherWorkspacePanel({ classId, members }) {
+function TeacherWorkspacePanel({ classId, members, weeks = [] }) {
   const navigate = useNavigate();
   const toast = useToast();
   const [activeTab, setActiveTab] = useState("rubrics");
@@ -2645,13 +2649,13 @@ function TeacherWorkspacePanel({ classId, members }) {
          {activeSession && <RubricSourceRail classId={classId} judgeSession={activeSession} readOnly={activeSession.status === "archived"} open={sourceRailOpen} onClose={() => setSourceRailOpen(false)} onSessionUpdated={updateSessionInList} onAddSource={() => { setSourceRailOpen(false); setSourceOnly(true); setCreateOpen(true); }} />}
       </div>
 
-      {createOpen && <CreateCheckDialog classId={classId} sourceOnly={sourceOnly} onClose={() => { setCreateOpen(false); setSourceOnly(false); }} onCreated={handleCreated} />}
+      {createOpen && <CreateCheckDialog classId={classId} weeks={weeks} sourceOnly={sourceOnly} onClose={() => { setCreateOpen(false); setSourceOnly(false); }} onCreated={handleCreated} />}
        {renameTarget && <div className={styles.modalOverlay} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setRenameTarget(null); }}><form className={`${styles.confirm} ${styles.renameDialog}`} role="dialog" aria-modal="true" aria-labelledby="rename-check-title" onSubmit={renameSession}><div className={styles.modalHeader}><h2 id="rename-check-title">重新命名檢查</h2><button type="button" className={styles.iconBtn} aria-label="關閉" onClick={() => setRenameTarget(null)}><MIcon name="close" size={18} /></button></div><label className={styles.dialogField}><span>檢查名稱</span><input autoFocus value={renameTitle} maxLength={255} onChange={(event) => setRenameTitle(event.target.value)} /></label><div className={styles.modalActions}><button type="button" className={styles.btnSecondary} onClick={() => setRenameTarget(null)}>取消</button><button type="submit" className={styles.btnPrimary} disabled={!renameTitle.trim() || busySessionIds.has(renameTarget.id)}>儲存</button></div></form></div>}
       {deleteTarget && <ConfirmModal title="確認刪除檢查？" description={`「${deleteTarget.title}」及其對話、檢查腳本與執行紀錄將直接刪除，且無法復原。共用評分表來源不會刪除。`} onClose={() => { if (!deleting) setDeleteTarget(null); }} actions={<><button type="button" className={styles.btnSecondary} disabled={deleting} onClick={() => setDeleteTarget(null)}>取消</button><button type="button" className={styles.btnDanger} disabled={deleting} onClick={deleteSession}>{deleting ? "刪除中…" : "確認刪除"}</button></>} />}
     </div>
   );
 }
 
-export default function AiJudgePanel({ classId, members }) {
-  return <TeacherWorkspacePanel classId={classId} members={members} />;
+export default function AiJudgePanel({ classId, members, weeks = [] }) {
+  return <TeacherWorkspacePanel classId={classId} members={members} weeks={weeks} />;
 }

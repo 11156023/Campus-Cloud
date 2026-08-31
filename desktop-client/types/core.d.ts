@@ -61,19 +61,30 @@ interface DeviceCodeResponse {
 }
 
 interface SkyLabResource {
-  vmid: number;
+  vmid: number | null;
+  request_id?: string | null;
+  teaching_class_id?: string | null;
+  allocation_scope?: "personal" | "teaching_class";
+  control_policy?: "owner" | "class_member";
   name: string;
   type: string;
   status: string;
   node?: string;
-  ip_address?: string;
-  environment_type?: string;
+  ip_address?: string | null;
+  environment_type?: string | null;
+  os_info?: string | null;
+  expiry_date?: string | null;
+  is_placeholder?: boolean;
+  can_control?: boolean;
+  can_delete?: boolean;
   [key: string]: any;
 }
 
 interface SkyLabTunnelInfo {
   vmid?: number;
   name?: string;
+  vm_name?: string;
+  proxy_name?: string;
   service?: string;
   visitor_port?: number;
   [key: string]: any;

@@ -47,6 +47,7 @@ export const AiJudgeService = {
 
   createSession(classId, {
     title,
+    teachingClassWeekId = null,
     selectedFileId = null,
     creationMode,
     rubricName,
@@ -56,6 +57,7 @@ export const AiJudgeService = {
       title,
       selected_file_id: selectedFileId,
     };
+    if (teachingClassWeekId) payload.teaching_class_week_id = teachingClassWeekId;
     if (creationMode) payload.creation_mode = creationMode;
     if (rubricName !== undefined) payload.rubric_name = rubricName;
     if (environmentKeys !== undefined) payload.environment_keys = environmentKeys;

@@ -4,9 +4,9 @@ $danger-color: var(--color-danger);
 .main-container {
   position: relative;
   z-index: 1;
-  width: calc(100% - 72px);
+  width: 100%;
   height: 100vh;
-  padding: 24px;
+  padding: 20px;
   overflow: hidden;
   background: transparent;
 
@@ -108,7 +108,8 @@ $danger-color: var(--color-danger);
     .menu-selected {
       color: $primary-color;
       background: var(--color-hover);
-      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-primary) 14%, transparent);
+      box-shadow: inset 0 0 0 1px
+        color-mix(in srgb, var(--color-primary) 14%, transparent);
     }
 
     .menu:hover,

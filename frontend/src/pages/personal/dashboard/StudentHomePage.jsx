@@ -356,12 +356,16 @@ function formatScheduleTime(value) {
 }
 
 function normalizeSchedule(row) {
+  const sessionDate = row.session_date ? new Date(`${row.session_date}T00:00:00`) : null;
+  const sessionLabel = sessionDate && !Number.isNaN(sessionDate.getTime())
+    ? new Intl.DateTimeFormat("zh-TW", { month: "numeric", day: "numeric", weekday: "short" }).format(sessionDate)
+    : "";
   return {
     ...row,
     schedule: {
       state: row.state,
       label: row.label,
-      time: `${formatScheduleTime(row.start_at)}–${formatScheduleTime(row.end_at)}`,
+      time: `${row.state === "available" && sessionLabel ? `下次 ${sessionLabel} · ` : ""}${formatScheduleTime(row.start_at)}–${formatScheduleTime(row.end_at)}`,
       teacher: row.teacher,
       place: row.location,
     },
@@ -381,15 +385,21 @@ export default function StudentHomePage({ courseView = false }) {
     pathDetail: null,
     roomDetail: null,
     aiAssignments: [],
+    weeklyTasks: [],
     practiceMachines: [],
   });
   const [quickTemplates, setQuickTemplates] = useState([]);
   const [templatesLoading, setTemplatesLoading] = useState(!courseView);
   const [expandedAssignmentId, setExpandedAssignmentId] = useState(null);
+  const [expandedWeeklyTaskId, setExpandedWeeklyTaskId] = useState(null);
   const [assignmentChecks, setAssignmentChecks] = useState({});
+  const [checkpointChecks, setCheckpointChecks] = useState({});
   const [checkingAssignmentId, setCheckingAssignmentId] = useState(null);
+  const [checkingCheckpointKey, setCheckingCheckpointKey] = useState(null);
   const [activePracticeResource, setActivePracticeResource] = useState(null);
   const [openingMachineId, setOpeningMachineId] = useState(null);
+  const [documentPreview, setDocumentPreview] = useState(null);
+  const [openingDocumentId, setOpeningDocumentId] = useState(null);
 
   const todayLabel = useMemo(
     () => new Intl.DateTimeFormat("zh-TW", {
@@ -430,12 +440,14 @@ export default function StudentHomePage({ courseView = false }) {
       let pathDetail = null;
       let roomDetail = null;
       let aiAssignments = [];
+      let weeklyTasks = [];
       let practiceMachines = [];
 
       if (activePath) {
-        const [pathDetailResult, aiAssignmentsResult, practiceMachinesResult] = await Promise.allSettled([
+        const [pathDetailResult, aiAssignmentsResult, weeklyTasksResult, practiceMachinesResult] = await Promise.allSettled([
           CoursesService.getPath(activePath.id),
           courseView ? CoursesService.getAiAssignments(activePath.id) : Promise.resolve([]),
+          courseView ? CoursesService.getWeeklyTasks(activePath.id) : Promise.resolve([]),
           CoursesService.getPracticeMachines(activePath.id),
         ]);
         if (pathDetailResult.status === "fulfilled") {
@@ -452,6 +464,10 @@ export default function StudentHomePage({ courseView = false }) {
         aiAssignments = aiAssignmentsResult.status === "fulfilled"
           && Array.isArray(aiAssignmentsResult.value)
           ? aiAssignmentsResult.value
+          : [];
+        weeklyTasks = weeklyTasksResult.status === "fulfilled"
+          && Array.isArray(weeklyTasksResult.value)
+          ? weeklyTasksResult.value
           : [];
         practiceMachines = practiceMachinesResult.status === "fulfilled"
           && Array.isArray(practiceMachinesResult.value)
@@ -471,6 +487,7 @@ export default function StudentHomePage({ courseView = false }) {
           pathDetail,
           roomDetail,
           aiAssignments,
+          weeklyTasks,
           practiceMachines,
         });
       }
@@ -537,6 +554,51 @@ export default function StudentHomePage({ courseView = false }) {
     };
   }, [assignmentChecks, courseView, view.activePath?.id, view.aiAssignments]);
 
+  useEffect(() => {
+    if (!courseView || !view.activePath?.id) return undefined;
+    const activeChecks = Object.entries(checkpointChecks)
+      .filter(([, entry]) => entry.check?.status === "pending" || entry.check?.status === "running");
+    if (activeChecks.length === 0) return undefined;
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      const updates = await Promise.all(activeChecks.map(async ([key, entry]) => {
+        try {
+          const check = await CoursesService.getAiCheck(
+            view.activePath.id,
+            entry.assignmentId,
+            entry.check.run_id,
+          );
+          return [key, { ...entry, check }];
+        } catch {
+          return null;
+        }
+      }));
+      if (cancelled) return;
+      setCheckpointChecks((current) => {
+        const next = { ...current };
+        updates.filter(Boolean).forEach(([key, entry]) => { next[key] = entry; });
+        return next;
+      });
+    }, 2500);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [checkpointChecks, courseView, view.activePath?.id]);
+
+  useEffect(() => () => {
+    if (documentPreview?.url) window.URL.revokeObjectURL(documentPreview.url);
+  }, [documentPreview?.url]);
+
+  useEffect(() => {
+    if (!documentPreview) return undefined;
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") setDocumentPreview(null);
+    };
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [documentPreview]);
+
   const nextRoom = chooseNextRoom(view.pathDetail?.rooms ?? []);
   const roomProgress = toPercent(nextRoom?.progress_percent);
   const deployment = view.roomDetail?.my_deployment;
@@ -547,6 +609,18 @@ export default function StudentHomePage({ courseView = false }) {
     view.roomDetail?.title,
   );
   const aiAssignments = assignmentsUntilToday(view.aiAssignments);
+  const weeklyAssignmentIds = new Set(
+    view.weeklyTasks.flatMap((task) => (task.checkpoints ?? [])
+      .map((checkpoint) => checkpoint.assignment_id ? String(checkpoint.assignment_id) : null)
+      .filter(Boolean)),
+  );
+  const standaloneAiAssignments = aiAssignments.filter(
+    (assignment) => !weeklyAssignmentIds.has(String(assignment.id)),
+  );
+  const weeklyCheckpointCount = view.weeklyTasks.reduce(
+    (count, task) => count + (task.checkpoints?.length ?? 0),
+    0,
+  );
   const aiRequirementCount = aiAssignments.reduce(
     (count, assignment) => count + (assignment.items?.length ?? 0),
     0,
@@ -614,6 +688,45 @@ export default function StudentHomePage({ courseView = false }) {
     setExpandedAssignmentId((current) => current === assignmentId ? null : assignmentId);
   };
 
+  const openAssignmentDocument = async (assignment) => {
+    if (!view.activePath?.id || !assignment?.source_document) return;
+    setOpeningDocumentId(assignment.id);
+    try {
+      const blob = await CoursesService.getAiAssignmentDocument(
+        view.activePath.id,
+        assignment.id,
+      );
+      const url = window.URL.createObjectURL(blob);
+      setDocumentPreview({
+        url,
+        filename: assignment.source_document.filename,
+        displayName: assignment.source_document.display_name,
+      });
+    } catch (error) {
+      toast.error(error?.message ?? "目前無法開啟老師上傳的任務 PDF");
+    } finally {
+      setOpeningDocumentId(null);
+    }
+  };
+
+  const openWeeklyTaskDocument = async (task, file) => {
+    if (!view.activePath?.id || !task?.id || !file?.id) return;
+    setOpeningDocumentId(file.id);
+    try {
+      const blob = await CoursesService.getWeeklyTaskDocument(
+        view.activePath.id,
+        task.id,
+        file.id,
+      );
+      const url = window.URL.createObjectURL(blob);
+      setDocumentPreview({ url, filename: file.filename, displayName: file.filename });
+    } catch (error) {
+      toast.error(error?.message ?? "目前無法開啟老師上傳的任務 PDF");
+    } finally {
+      setOpeningDocumentId(null);
+    }
+  };
+
   const submitAiCheck = async (assignment) => {
     if (checkingAssignmentId) return;
     setCheckingAssignmentId(assignment.id);
@@ -629,6 +742,28 @@ export default function StudentHomePage({ courseView = false }) {
       toast.error(error?.message ?? "目前無法送出 AI Check");
     } finally {
       setCheckingAssignmentId(null);
+    }
+  };
+
+  const submitCheckpointCheck = async (checkpoint) => {
+    if (!view.activePath?.id || checkingCheckpointKey || !checkpoint.assignment_id) return;
+    const key = `${checkpoint.task_id}:${checkpoint.id}`;
+    setCheckingCheckpointKey(key);
+    try {
+      const check = await CoursesService.startAiCheck(
+        view.activePath.id,
+        checkpoint.assignment_id,
+        checkpoint.id,
+      );
+      setCheckpointChecks((current) => ({
+        ...current,
+        [key]: { assignmentId: checkpoint.assignment_id, itemId: checkpoint.id, check },
+      }));
+      toast.success(check.status === "completed" ? "Checkpoint 檢查完成" : "已送出，正在檢查這個 Checkpoint");
+    } catch (error) {
+      toast.error(error?.message ?? "目前無法檢查這個 Checkpoint");
+    } finally {
+      setCheckingCheckpointKey(null);
     }
   };
 
@@ -650,7 +785,7 @@ export default function StudentHomePage({ courseView = false }) {
             onClick={() => navigate(location.state?.from ?? "/dashboard")}
           >
             <MIcon name="arrow_back" size={18} />
-            返回今日課表
+            返回我的課程
           </button>
           <div className={styles.coursePageTitle}>
             <p className={styles.eyebrow}>課程總覽</p>
@@ -673,8 +808,8 @@ export default function StudentHomePage({ courseView = false }) {
       {!courseView && (
         <>
           <PageHeader
-            title={`今日課表 · ${todayLabel}`}
-            subtitle={view.paths.length > 0 ? `目前有 ${view.paths.length} 堂課` : "目前沒有課程"}
+            title="我的課程"
+            subtitle={view.paths.length > 0 ? `${todayLabel} · ${view.paths.length} 堂進行中課程` : `${todayLabel} · 目前沒有進行中課程`}
           >
             {view.paths.some((path) => path.schedule?.state === "now") && (
               <div className={styles.scheduleActions}>
@@ -682,7 +817,7 @@ export default function StudentHomePage({ courseView = false }) {
               </div>
             )}
           </PageHeader>
-          <section className={styles.todaySchedule} aria-label="今日課表" data-guide="home-schedule">
+          <section className={styles.todaySchedule} aria-label="進行中的課程" data-guide="home-schedule">
             {view.paths.length > 0 ? (
             <div className={styles.scheduleGrid}>
               {view.paths.map((path, index) => (
@@ -851,15 +986,54 @@ export default function StudentHomePage({ courseView = false }) {
       <section className={styles.taskSection} aria-labelledby="task-title" data-student-tour="tasks" data-guide="home-tasks">
         <div className={styles.sectionHeading}>
           <div>
-            <p className={styles.eyebrow}>老師已發布 · 完成後可直接送檢</p>
-            <h2 id="task-title">截至今天的所有任務</h2>
+            <p className={styles.eyebrow}>老師已發布 · 任務與檢查集中在這裡</p>
+            <h2 id="task-title">課程任務</h2>
           </div>
-          {aiRequirementCount > 0 && <span>{aiAssignments.length} 個任務 · {aiRequirementCount} 個檢查項目</span>}
+          {(view.weeklyTasks.length > 0 || aiRequirementCount > 0) && <span>{view.weeklyTasks.length} 個課堂任務 · {weeklyCheckpointCount + standaloneAiAssignments.reduce((count, assignment) => count + (assignment.items?.length ?? 0), 0)} 個 Checkpoint</span>}
         </div>
 
-        {aiAssignments.length > 0 ? (
+        {view.weeklyTasks.length > 0 && (
+          <div className={styles.weeklyTaskList} aria-label="老師發布的課堂任務">
+            {view.weeklyTasks.map((task, index) => {
+              const expanded = expandedWeeklyTaskId === task.id;
+              const checkpoints = task.checkpoints ?? [];
+              return <article className={`${styles.weeklyTaskRow} ${expanded ? styles.weeklyTaskRowOpen : ""}`} key={task.id}>
+                <button type="button" className={styles.weeklyTaskToggle} onClick={() => setExpandedWeeklyTaskId(expanded ? null : task.id)} aria-expanded={expanded} aria-controls={`weekly-task-${task.id}`}>
+                  <span className={styles.taskNumber}>{index + 1}</span>
+                  <span className={styles.assignmentTitle}>
+                    <strong>{task.title}</strong>
+                    <small>第 {task.week_number} 週 · {task.session_date} · {checkpoints.length} 個 Checkpoint</small>
+                  </span>
+                  <span className={styles.weeklyTaskHint}>{expanded ? "收合" : "展開任務"}</span>
+                  <MIcon name={expanded ? "expand_less" : "expand_more"} size={22} />
+                </button>
+                {expanded && <div className={styles.weeklyTaskDetail} id={`weekly-task-${task.id}`}>
+                  <div className={styles.weeklyTaskFiles}>
+                    {(task.files ?? []).length > 0 ? task.files.map((file) => <button type="button" className={styles.pdfButton} key={file.id} onClick={() => openWeeklyTaskDocument(task, file)} disabled={openingDocumentId !== null} title={file.filename}><MIcon name={openingDocumentId === file.id ? "hourglass_top" : "picture_as_pdf"} size={18} />{openingDocumentId === file.id ? "正在開啟…" : `查看 PDF · ${file.filename}`}</button>) : <span className={styles.noTaskFile}>本週沒有附加 PDF</span>}
+                  </div>
+                  {checkpoints.length > 0 ? <ol className={styles.checkpointList}>
+                    {checkpoints.map((checkpoint, checkpointIndex) => {
+                      const key = `${checkpoint.task_id}:${checkpoint.id}`;
+                      const check = checkpointChecks[key]?.check ?? checkpoint.latest_check;
+                      const checkMeta = check ? AI_CHECK_STATUS_META[check.status] : null;
+                      const running = check?.status === "pending" || check?.status === "running";
+                      const resultItem = check?.items?.[0];
+                      return <li className={styles.checkpointRow} key={key}>
+                        <span className={styles.aiRequirementNumber}>{checkpointIndex + 1}</span>
+                        <div className={styles.checkpointContent}><small className={styles.checkpointSource}>AI 檢查任務 · {checkpoint.assignment_title}</small><strong>{checkpoint.title}</strong>{checkpoint.description && <p>{checkpoint.description}</p>}{check && !running && <div className={`${styles.checkpointResult} ${styles[`checkpointResult_${check.status}`]}`}><MIcon name={check.status === "completed" ? "task_alt" : "error_outline"} size={17} /><span><b>{resultItem?.comment || check.error || check.summary || checkMeta?.label}</b>{typeof resultItem?.score === "number" && <small>得分 {resultItem.score}/{resultItem.max_score ?? 1}</small>}</span></div>}</div>
+                        <button type="button" className={styles.checkpointCheckButton} onClick={() => submitCheckpointCheck(checkpoint)} disabled={Boolean(checkingCheckpointKey) || running || !checkpoint.check_available} title={checkpoint.check_available ? "" : "老師尚未產生並核准這份任務的檢查腳本"}><MIcon name={running ? "sync" : checkpoint.check_available && check?.status === "completed" ? "refresh" : checkpoint.check_available ? "fact_check" : "schedule"} size={17} />{running ? "檢查中…" : checkingCheckpointKey === key ? "送出中…" : !checkpoint.check_available ? "等待老師啟用" : check ? "重新檢查" : "檢查這一項"}</button>
+                      </li>;
+                    })}
+                  </ol> : <div className={styles.checkpointEmpty}><MIcon name="pending_actions" size={20} /><span>老師尚未為這週發布 Checkpoint。</span></div>}
+                </div>}
+              </article>;
+            })}
+          </div>
+        )}
+
+        {standaloneAiAssignments.length > 0 ? (
           <div className={styles.assignmentList}>
-            {aiAssignments.map((assignment, index) => {
+            {standaloneAiAssignments.map((assignment, index) => {
               const expanded = expandedAssignmentId === assignment.id;
               const check = assignmentChecks[assignment.id] ?? assignment.latest_check;
               const checkMeta = check ? AI_CHECK_STATUS_META[check.status] : null;
@@ -899,6 +1073,19 @@ export default function StudentHomePage({ courseView = false }) {
                           <p>{assignment.summary || "依照下面的項目完成操作，完成後再送出 AI Check。"}</p>
                         </div>
                       </div>
+
+                      {assignment.source_document && (
+                        <div className={styles.assignmentDocumentMeta}>
+                          <span><MIcon name="picture_as_pdf" size={21} /></span>
+                          <div>
+                            <strong>老師上傳的任務 PDF</strong>
+                            <small>
+                              {assignment.source_document.display_name || assignment.source_document.filename}
+                              {` · 對應下方 ${assignment.items?.length ?? 0} 個檢查項目`}
+                            </small>
+                          </div>
+                        </div>
+                      )}
 
                       <ol className={styles.aiRequirementList}>
                         {(assignment.items ?? []).map((item, itemIndex) => {
@@ -948,21 +1135,35 @@ export default function StudentHomePage({ courseView = false }) {
 
                       <footer className={styles.assignmentActions}>
                         <span><MIcon name="info" size={16} />送出前請先啟動課堂機器，AI 只會檢查你自己的環境。</span>
-                        <button
-                          type="button"
-                          className={styles.aiCheckButton}
-                          onClick={() => submitAiCheck(assignment)}
-                          disabled={checkingAssignmentId !== null || checkRunning}
-                        >
-                          <MIcon name={checkRunning ? "sync" : "fact_check"} size={18} />
-                          {checkRunning
-                            ? "AI 檢查中…"
-                            : checkingAssignmentId === assignment.id
-                              ? "正在送出…"
-                              : check?.status === "completed"
-                                ? "完成修正，再次 AI Check"
-                                : "我完成了，送出 AI Check"}
-                        </button>
+                        <div className={styles.assignmentActionButtons}>
+                          {assignment.source_document && (
+                            <button
+                              type="button"
+                              className={styles.pdfButton}
+                              onClick={() => openAssignmentDocument(assignment)}
+                              disabled={openingDocumentId !== null}
+                              title={assignment.source_document.filename}
+                            >
+                              <MIcon name={openingDocumentId === assignment.id ? "hourglass_top" : "picture_as_pdf"} size={18} />
+                              {openingDocumentId === assignment.id ? "正在開啟…" : "查看任務 PDF"}
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            className={styles.aiCheckButton}
+                            onClick={() => submitAiCheck(assignment)}
+                            disabled={checkingAssignmentId !== null || checkRunning}
+                          >
+                            <MIcon name={checkRunning ? "sync" : "fact_check"} size={18} />
+                            {checkRunning
+                              ? "AI 檢查中…"
+                              : checkingAssignmentId === assignment.id
+                                ? "正在送出…"
+                                : check?.status === "completed"
+                                  ? "完成修正，再次 AI Check"
+                                  : "我完成了，送出 AI Check"}
+                          </button>
+                        </div>
                       </footer>
                     </div>
                   )}
@@ -970,15 +1171,15 @@ export default function StudentHomePage({ courseView = false }) {
               );
             })}
           </div>
-        ) : (
+        ) : view.weeklyTasks.length === 0 ? (
           <div className={styles.taskEmpty}>
             <MIcon name="checklist" size={24} />
             <div>
-              <strong>截至今天沒有需要送檢的任務</strong>
-              <p>老師發布並核准 AI 任務後，會依發布日期完整列在這裡。</p>
+              <strong>老師尚未發布 AI 檢查任務</strong>
+              <p>老師在 AI 檢查頁建立、綁定週次並核准後，任務與 Checkpoint 就會出現在這裡。</p>
             </div>
           </div>
-        )}
+        ) : null}
       </section>
         </>
       )}
@@ -1082,6 +1283,37 @@ export default function StudentHomePage({ courseView = false }) {
       )}
       {activePracticeResource && activePracticeResource.type !== "lxc" && (
         <VncDialog resource={activePracticeResource} onClose={() => setActivePracticeResource(null)} />
+      )}
+
+      {documentPreview && (
+        <div className={styles.pdfBackdrop} role="presentation" onMouseDown={() => setDocumentPreview(null)}>
+          <section
+            className={styles.pdfDialog}
+            role="dialog"
+            aria-modal="true"
+            aria-label={`任務 PDF：${documentPreview.displayName}`}
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <header>
+              <div>
+                <span><MIcon name="picture_as_pdf" size={22} /></span>
+                <div>
+                  <strong>{documentPreview.displayName}</strong>
+                  <small>{documentPreview.filename}</small>
+                </div>
+              </div>
+              <div className={styles.pdfDialogActions}>
+                <a href={documentPreview.url} target="_blank" rel="noreferrer">
+                  <MIcon name="open_in_new" size={18} />新分頁開啟
+                </a>
+                <button type="button" onClick={() => setDocumentPreview(null)} aria-label="關閉任務 PDF">
+                  <MIcon name="close" size={20} />
+                </button>
+              </div>
+            </header>
+            <iframe src={documentPreview.url} title={documentPreview.displayName} />
+          </section>
+        </div>
       )}
 
     </div>
