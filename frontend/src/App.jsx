@@ -104,6 +104,7 @@ function LegacyAiJudgeEditorRedirect() {
 function App() {
   const { user, loading, authStatus, retrySession } = useAuth();
   const isAdmin = Boolean(user?.is_superuser || user?.role === "admin");
+  const canTeach = isAdmin || user?.role === "teacher";
 
   if (authStatus === AuthSessionStatus.UNAVAILABLE && !user) {
     return (
@@ -156,7 +157,10 @@ function App() {
               <Route path="/batch-review"   element={<BatchReviewPage />} />
             </>
           )}
-          <Route path="/templates"      element={<TemplatesPage />} />
+          <Route
+            path="/templates"
+            element={canTeach ? <TemplatesPage /> : <Navigate to="/dashboard" replace />}
+          />
 
           {/* AI */}
           <Route path="/ai-api"         element={<AiApiPage />} />
@@ -179,19 +183,19 @@ function App() {
           <Route path="/course-cms"            element={<CourseCmsPage />} />
 
           {/* 課務管理 */}
-          <Route path="/course-template-management" element={<CourseTemplateManagementPage />} />
-          <Route path="/course-template-management/new" element={<CourseTemplateEditorPage />} />
-          <Route path="/course-template-management/:templateId" element={<CourseTemplateEditorPage />} />
-          <Route path="/class-management" element={<ClassManagementPage />} />
-          <Route path="/class-management/new" element={<Navigate to="/class-setup" replace />} />
-          <Route path="/class-setup" element={<ClassSetupPage />} />
+          <Route path="/course-template-management" element={canTeach ? <CourseTemplateManagementPage /> : <Navigate to="/dashboard" replace />} />
+          <Route path="/course-template-management/new" element={canTeach ? <CourseTemplateEditorPage /> : <Navigate to="/dashboard" replace />} />
+          <Route path="/course-template-management/:templateId" element={canTeach ? <CourseTemplateEditorPage /> : <Navigate to="/dashboard" replace />} />
+          <Route path="/class-management" element={canTeach ? <ClassManagementPage /> : <Navigate to="/dashboard" replace />} />
+          <Route path="/class-management/new" element={<Navigate to={canTeach ? "/class-setup" : "/dashboard"} replace />} />
+          <Route path="/class-setup" element={canTeach ? <ClassSetupPage /> : <Navigate to="/dashboard" replace />} />
           {/* 舊評分表連結保留導回主工作頁，避免書籤落到不存在的獨立 editor。 */}
           <Route
             path="/class-management/:classId/ai/checks/:sessionId/edit"
-            element={<LegacyAiJudgeEditorRedirect />}
+            element={canTeach ? <LegacyAiJudgeEditorRedirect /> : <Navigate to="/dashboard" replace />}
           />
-          <Route path="/class-management/:classId" element={<ClassWorkspacePage />} />
-          <Route path="/class-management/:classId/:section" element={<ClassWorkspacePage />} />
+          <Route path="/class-management/:classId" element={canTeach ? <ClassWorkspacePage /> : <Navigate to="/dashboard" replace />} />
+          <Route path="/class-management/:classId/:section" element={canTeach ? <ClassWorkspacePage /> : <Navigate to="/dashboard" replace />} />
 
           {/* 系統管理 */}
           {isAdmin && (

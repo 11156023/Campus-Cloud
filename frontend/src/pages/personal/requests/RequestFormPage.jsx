@@ -276,12 +276,16 @@ export default function RequestFormPage({ onBack, className }) {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
+    // 單機母範本只供教師／管理員組裝環境或建立管理用資源。
+    // 學生的一般申請仍可選擇平台提供的 VM/LXC 基礎映像，但不讀取
+    // VMTemplate 目錄，也不會取得直接克隆入口。
+    if (!isPrivileged) return;
     setSysTplLoading(true);
     TemplatesService.list()
       .then((res) => setSysTemplates(res?.data ?? []))
       .catch(() => {})
       .finally(() => setSysTplLoading(false));
-  }, []);
+  }, [isPrivileged]);
 
   const lxcSysTemplates = useMemo(
     () => sysTemplates.filter(

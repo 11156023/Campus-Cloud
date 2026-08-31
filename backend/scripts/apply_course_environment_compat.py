@@ -56,6 +56,31 @@ def apply() -> None:
         "position_y DOUBLE PRECISION NOT NULL DEFAULT 120",
     )
     _add_column(
+        "quick_practice_sessions",
+        "status",
+        "status VARCHAR(24) NOT NULL DEFAULT 'creating'",
+    )
+    _add_column(
+        "quick_practice_sessions",
+        "topology_applied_at",
+        "topology_applied_at TIMESTAMP WITH TIME ZONE NULL",
+    )
+    _add_column(
+        "quick_practice_sessions",
+        "reclaim_started_at",
+        "reclaim_started_at TIMESTAMP WITH TIME ZONE NULL",
+    )
+    _add_column(
+        "quick_practice_sessions",
+        "reclaimed_at",
+        "reclaimed_at TIMESTAMP WITH TIME ZONE NULL",
+    )
+    _add_column(
+        "quick_practice_sessions",
+        "last_error",
+        "last_error VARCHAR(2000) NULL",
+    )
+    _add_column(
         "teaching_classes",
         "course_version_id",
         "course_version_id UUID NULL REFERENCES "
@@ -130,6 +155,20 @@ def apply() -> None:
                 "CREATE INDEX IF NOT EXISTS "
                 "ix_ip_allocation_teaching_class_id "
                 'ON "ip_allocation" (teaching_class_id)'
+            )
+        )
+        connection.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS "
+                "ix_quick_practice_sessions_status "
+                'ON "quick_practice_sessions" (status)'
+            )
+        )
+        connection.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS "
+                "ix_quick_practice_sessions_reclaimed_at "
+                'ON "quick_practice_sessions" (reclaimed_at)'
             )
         )
 

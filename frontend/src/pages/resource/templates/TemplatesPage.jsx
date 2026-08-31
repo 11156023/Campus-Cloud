@@ -481,7 +481,7 @@ export default function TemplatesPage() {
 
   return (
     <div className={styles.page}>
-      <PageHeader title="機器範本" subtitle={canManage ? "把設定好的母機轉為範本，學生即可一鍵克隆出自己的環境" : "從老師提供的範本一鍵克隆出自己的環境，開好即用"}>
+      <PageHeader title="機器母範本" subtitle="管理教師組裝多機環境時使用的單機來源；學生不會直接看到或複製母範本。">
         <div className={styles.pageActions}>
           <button
             type="button"

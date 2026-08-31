@@ -1,8 +1,8 @@
 """範本系統 2.0 API 路由。
 
 權限規則（詳見 core/authorizers.py 與 template_service）：
-- 列表/單筆查詢：全部角色（依可見範圍過濾）
-- 建立/更新/刪除/更新循環：TEMPLATE_MANAGE（teacher/admin），且僅擁有者或 admin
+- 列表/單筆查詢：teacher/admin（依可見範圍過濾）
+- 建立/更新/刪除/克隆/更新循環：TEMPLATE_MANAGE（teacher/admin），且僅擁有者或 admin
 - 任務查詢：本人或 admin
 """
 
@@ -11,7 +11,7 @@ import uuid
 from fastapi import APIRouter, File, UploadFile
 from fastapi.responses import FileResponse
 
-from app.api.deps import CurrentUser, SessionDep
+from app.api.deps import CurrentUser, InstructorUser, SessionDep
 from app.core.permissions import is_admin
 from app.exceptions import NotFoundError
 from app.repositories import task_record as task_record_repo
@@ -66,9 +66,9 @@ def get_task(
 
 @router.get("/", response_model=VMTemplatesPublic)
 def list_templates(
-    session: SessionDep, current_user: CurrentUser
+    session: SessionDep, current_user: InstructorUser
 ) -> VMTemplatesPublic:
-    """列出可見範本（admin 全部；teacher 自有+可見；student 僅 ready 且可見）。"""
+    """列出教師可用的單機母範本（admin 全部；teacher 自有+可見）。"""
     data = template_service.list_templates(session=session, user=current_user)
     return VMTemplatesPublic(data=data, count=len(data))
 
@@ -88,7 +88,7 @@ async def create_template(
 
 @router.get("/{template_id}", response_model=VMTemplatePublic)
 def get_template(
-    session: SessionDep, current_user: CurrentUser, template_id: uuid.UUID
+    session: SessionDep, current_user: InstructorUser, template_id: uuid.UUID
 ) -> VMTemplatePublic:
     return template_service.get_template_for_user(
         session=session, user=current_user, template_id=template_id
@@ -140,11 +140,11 @@ async def delete_template(
 @router.post("/{template_id}/clone", response_model=TemplateCloneResponse)
 async def clone_template(
     session: SessionDep,
-    current_user: CurrentUser,
+    current_user: InstructorUser,
     template_id: uuid.UUID,
     body: TemplateCloneRequest,
 ) -> TemplateCloneResponse:
-    """從範本克隆開通（student 單台套配額；teacher/admin 可批量）。"""
+    """從單機母範本克隆開通；只允許教師與管理員。"""
     records = await clone_service.request_clone(
         session=session, user=current_user, template_id=template_id, data=body
     )
@@ -207,7 +207,7 @@ def delete_template_icon(
     "/{template_id}/attachments", response_model=TemplateAttachmentsPublic
 )
 def list_template_attachments(
-    session: SessionDep, current_user: CurrentUser, template_id: uuid.UUID
+    session: SessionDep, current_user: InstructorUser, template_id: uuid.UUID
 ) -> TemplateAttachmentsPublic:
     """列出範本附件（可見範本的使用者皆可）。"""
     attachments = template_service.list_attachments(
@@ -242,7 +242,7 @@ async def upload_template_attachment(
 @router.get("/{template_id}/attachments/{attachment_id}/download")
 def download_template_attachment(
     session: SessionDep,
-    current_user: CurrentUser,
+    current_user: InstructorUser,
     template_id: uuid.UUID,
     attachment_id: uuid.UUID,
 ) -> FileResponse:

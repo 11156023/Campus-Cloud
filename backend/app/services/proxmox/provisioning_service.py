@@ -5,7 +5,7 @@ from collections.abc import Iterable
 from datetime import UTC, datetime
 from urllib.parse import quote
 
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from app.core.security import decrypt_value, encrypt_value
 from app.domain.placement import advisor as placement_advisor
@@ -702,7 +702,28 @@ def plan_provision(*, session: Session, db_request) -> dict:
     # 取得網路配置並分配 IP（需在 session 中完成）
     net_cfg = ip_management_service.get_network_config_for_vm(session)
     purpose = "lxc" if db_request.resource_type == "lxc" else "vm"
-    allocated_ip = ip_management_service.allocate_ip(session, new_vmid, purpose)
+    ip_reservation_key: str | None = None
+    if getattr(db_request, "request_kind", "") == "quick_template":
+        # Multi-machine quick-practice reserves every IP in one launch
+        # transaction. Resolve the stable key from the request-to-session map
+        # so the generic VMRequest schema does not expose infrastructure data.
+        from app.models import QuickPracticeSessionMachine  # noqa: PLC0415
+
+        practice_machine = session.exec(
+            select(QuickPracticeSessionMachine).where(
+                QuickPracticeSessionMachine.vm_request_id == db_request.id
+            )
+        ).first()
+        if practice_machine is not None:
+            ip_reservation_key = (
+                f"quick:{practice_machine.session_id}:{practice_machine.node_key}"
+            )
+    allocated_ip = ip_management_service.allocate_ip(
+        session,
+        new_vmid,
+        purpose,
+        reservation_key=ip_reservation_key,
+    )
 
     plan: dict = {
         "vmid": new_vmid,
@@ -722,6 +743,7 @@ def plan_provision(*, session: Session, db_request) -> dict:
         "ssh_private_key_encrypted": encrypt_value(private_key_pem),
         "ssh_public_key": public_key,
         "allocated_ip": allocated_ip,
+        "ip_reservation_key": ip_reservation_key,
         "net_cfg": net_cfg,
     }
 
