@@ -30,8 +30,9 @@ class VMTemplateCreate(BaseModel):
     allow_password_change: bool = Field(
         default=True, description="克隆時允許使用者自訂/重設登入密碼"
     )
-    requires_gpu: bool = Field(
-        default=False, description="使用此範本需要 GPU（僅 qemu 範本可設）"
+    student_requestable: bool = Field(
+        default=False,
+        description="開放學生在一般申請表單選用（仍走審核）",
     )
 
 
@@ -45,7 +46,7 @@ class VMTemplateUpdate(BaseModel):
     default_memory: int | None = Field(default=None, ge=128)
     # default_disk 不開放更新：跟母機一致
     allow_password_change: bool | None = None
-    requires_gpu: bool | None = None
+    student_requestable: bool | None = None
 
 
 # ===== Response Schemas =====
@@ -68,7 +69,7 @@ class VMTemplatePublic(BaseModel):
     default_memory: int | None = None
     default_disk: int | None = None
     allow_password_change: bool = True
-    requires_gpu: bool = False
+    student_requestable: bool = False
     icon_url: str | None = None
     attachment_count: int = 0
     source_vmid: int | None = None
@@ -79,6 +80,27 @@ class VMTemplatePublic(BaseModel):
     )
     created_at: datetime
     updated_at: datetime
+
+
+class TemplateCatalogItem(BaseModel):
+    """A template opened for student self-service requests."""
+
+    id: uuid.UUID
+    pve_vmid: int
+    name: str
+    description: str | None = None
+    resource_type: str
+    node: str
+    version: int
+    is_windows: bool = False
+    cores: int | None = None
+    memory_mb: int | None = None
+    disk_gb: int | None = None
+
+
+class TemplateCatalogPublic(BaseModel):
+    data: list[TemplateCatalogItem]
+    count: int
 
 
 class VMTemplatesPublic(BaseModel):
@@ -158,7 +180,7 @@ class TemplateCloneRequest(BaseModel):
         description="自訂登入密碼（範本 allow_password_change 時才接受）",
     )
     gpu_mapping_id: str | None = Field(
-        default=None, description="GPU mapping（範本 requires_gpu 時必填）"
+        default=None, description="GPU mapping（選填；LXC 範本不支援）"
     )
     gpu_mdev_profile: str | None = Field(
         default=None, description="vGPU 規格；未填時自動配最小可用規格"

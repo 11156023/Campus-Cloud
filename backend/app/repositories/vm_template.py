@@ -26,7 +26,7 @@ def create_template(
     default_cores: int | None = None,
     default_memory: int | None = None,
     allow_password_change: bool = True,
-    requires_gpu: bool = False,
+    student_requestable: bool = False,
     source_vmid: int | None = None,
     commit: bool = True,
 ) -> VMTemplate:
@@ -42,7 +42,7 @@ def create_template(
         default_cores=default_cores,
         default_memory=default_memory,
         allow_password_change=allow_password_change,
-        requires_gpu=requires_gpu,
+        student_requestable=student_requestable,
         source_vmid=source_vmid,
     )
     session.add(template)
@@ -82,7 +82,7 @@ def revive_deleted_template(
     default_cores: int | None = None,
     default_memory: int | None = None,
     allow_password_change: bool = True,
-    requires_gpu: bool = False,
+    student_requestable: bool = False,
     source_vmid: int | None = None,
     commit: bool = True,
 ) -> VMTemplate:
@@ -104,7 +104,7 @@ def revive_deleted_template(
     template.default_memory = default_memory
     template.default_disk = None
     template.allow_password_change = allow_password_change
-    template.requires_gpu = requires_gpu
+    template.student_requestable = student_requestable
     template.icon_url = None
     template.source_vmid = source_vmid
     template.version = 1
@@ -151,6 +151,27 @@ def list_visible_templates(
         stmt = stmt.where(VMTemplate.status == VMTemplateStatus.ready)
     stmt = stmt.order_by(col(VMTemplate.created_at).desc())
     return list(session.exec(stmt).all())
+
+def list_student_catalog(*, session: Session) -> list[VMTemplate]:
+    """Templates a student may pick in the ordinary request form."""
+    stmt = (
+        select(VMTemplate)
+        .where(
+            VMTemplate.status == VMTemplateStatus.ready,
+            VMTemplate.student_requestable == True,  # noqa: E712
+        )
+        .order_by(col(VMTemplate.name))
+    )
+    return list(session.exec(stmt).all())
+
+
+def registered_pve_vmids(*, session: Session) -> set[int]:
+    """PVE VMIDs already registered as platform templates (any live status)."""
+    stmt = select(VMTemplate.pve_vmid).where(
+        VMTemplate.status != VMTemplateStatus.deleted
+    )
+    return {int(vmid) for vmid in session.exec(stmt).all()}
+
 
 def touch(*, session: Session, template: VMTemplate, commit: bool = True) -> None:
     template.updated_at = datetime.now(timezone.utc)

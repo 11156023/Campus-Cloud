@@ -11,7 +11,7 @@ from app.core.authorizers import (
     require_vm_request_cancel,
     require_vm_request_review,
 )
-from app.core.permissions import is_admin
+from app.core.permissions import Permission, has_permission, is_admin
 from app.core.security import encrypt_value
 from app.exceptions import (
     BadRequestError,
@@ -24,6 +24,7 @@ from app.models import (
     VMProvisioningStatus,
     VMRequest,
     VMRequestStatus,
+    VMTemplate,
     VMTemplateStatus,
 )
 from app.repositories import governance as governance_repo
@@ -53,12 +54,6 @@ from app.services.vm.placement_service import CurrentPlacementSelection
 
 logger = logging.getLogger(__name__)
 
-QUICK_TEMPLATE_DURATION_HOURS = 3
-QUICK_TEMPLATE_MAX_ACTIVE_PER_USER = 1
-QUICK_TEMPLATE_MAX_CREATED_PER_24H = 3
-QUICK_TEMPLATE_MAX_CORES = 2
-QUICK_TEMPLATE_MAX_MEMORY_MB = 4096
-QUICK_TEMPLATE_MAX_DISK_GB = 32
 
 
 def _utc_now() -> datetime:
@@ -254,73 +249,57 @@ def _approve_and_place(
     return selections.get(db_request.id)
 
 
-def _prepare_quick_template_request(
-    *,
-    session: Session,
-    request_in: VMRequestCreate,
-    user,
-    now: datetime,
-) -> None:
-    if request_in.resource_type != "lxc":
-        raise BadRequestError("Quick templates currently support LXC only")
+def _validate_template_source(
+    *, session: Session, template_vmid: int, user: User, resource_type: str
+) -> VMTemplate | None:
+    """驗證申請所選的來源，回傳對應的平台母範本（基礎映像則回 None）。
 
-    # 範本系統克隆路徑：template_id 已在 create() 由
-    # _validate_lxc_template_clone 驗證（存在 / ready / 可見範圍）。
-    if not request_in.template_id:
-        raise BadRequestError("Quick template mode requires a template")
-
-    if request_in.gpu_mapping_id:
-        raise BadRequestError("Quick template mode does not support GPU allocation")
-    if not request_in.rootfs_size:
-        raise BadRequestError("Quick template mode requires rootfs_size")
-    if int(request_in.cores or 0) > QUICK_TEMPLATE_MAX_CORES:
-        raise BadRequestError("Quick template CPU exceeds the allowed limit")
-    if int(request_in.memory or 0) > QUICK_TEMPLATE_MAX_MEMORY_MB:
-        raise BadRequestError("Quick template memory exceeds the allowed limit")
-    if int(request_in.rootfs_size or 0) > QUICK_TEMPLATE_MAX_DISK_GB:
-        raise BadRequestError("Quick template disk size exceeds the allowed limit")
-
-    active_count = vm_request_repo.count_quick_template_requests_for_user(
-        session=session,
-        user_id=user.id,
-        active_at=now,
-    )
-    if active_count >= QUICK_TEMPLATE_MAX_ACTIVE_PER_USER:
-        raise BadRequestError("You already have an active quick template")
-
-    recent_count = vm_request_repo.count_quick_template_requests_for_user(
-        session=session,
-        user_id=user.id,
-        since=now - timedelta(hours=24),
-    )
-    if recent_count >= QUICK_TEMPLATE_MAX_CREATED_PER_24H:
-        raise BadRequestError("Quick template daily limit reached")
-
-    request_in.start_at = now
-    request_in.end_at = now + timedelta(hours=QUICK_TEMPLATE_DURATION_HOURS)
-    request_in.gpu_mapping_id = None
-    request_in.gpu_mdev_profile = None
-
-
-def _validate_lxc_template_clone(
-    *, session: Session, template_vmid: int, user: User
-) -> None:
-    """LXC 走範本系統克隆路徑時，建立當下先驗證範本狀態與可見範圍。
-
-    provision 時（provisioning_service）仍會再查一次範本節點；這裡提前擋掉
-    不存在 / 未 ready / 無權限的範本，避免審核通過後才失敗。
+    母範本同時也是 PVE template，所以不能只靠前端清單擋：任何帶
+    template_id 的申請都要在建立當下確認範本存在、ready，且申請者確實有
+    權限使用它。教師依可見範圍，其他角色則必須是已開放學生申請的範本。
+    provision 時仍會再查一次範本節點，這裡是為了不讓審核通過後才失敗。
     """
     template = vm_template_repo.get_template_by_pve_vmid(
         session=session, pve_vmid=template_vmid
     )
-    if template is None or template.resource_type != "lxc":
-        raise BadRequestError("Selected LXC template is not registered")
+    if template is None:
+        if resource_type == "lxc":
+            raise BadRequestError("Selected LXC template is not registered")
+        # 未註冊的 PVE template 就是平台基礎映像，任何人都能申請。
+        return None
+    # 其他模組一律把「非 lxc」視為 qemu，這裡沿用同一個判定
+    template_kind = "lxc" if template.resource_type.lower() == "lxc" else "qemu"
+    if template_kind != ("lxc" if resource_type == "lxc" else "qemu"):
+        raise BadRequestError("Selected template type does not match the request")
     if template.status != VMTemplateStatus.ready:
-        raise BadRequestError("Selected LXC template is not ready")
-    if not is_admin(user) and not vm_template_repo.is_template_visible_to_user(
-        template=template, user_id=user.id
-    ):
-        raise BadRequestError("Selected LXC template is not accessible")
+        raise BadRequestError("Selected template is not ready")
+    if is_admin(user):
+        return template
+    if has_permission(user, Permission.TEMPLATE_MANAGE):
+        if not vm_template_repo.is_template_visible_to_user(
+            template=template, user_id=user.id
+        ):
+            raise BadRequestError("Selected template is not accessible")
+        return template
+    if not template.student_requestable:
+        raise BadRequestError("Selected template is not open for self-service")
+    return template
+
+
+def _apply_template_floor(request_in: VMRequestCreate, template: VMTemplate) -> None:
+    """套用範本後仍可自訂規格，但磁碟不得小於範本本身。
+
+    CPU 與記憶體由申請者決定（配額仍會把關）；磁碟是物理限制：克隆出來的
+    機器天生就是範本的大小，PVE 只能放大不能縮小，所以低於範本的值一律
+    提高到範本大小，再進配額計算。
+    """
+    floor = template.default_disk
+    if not floor:
+        return
+    if request_in.resource_type == "lxc":
+        request_in.rootfs_size = max(int(request_in.rootfs_size or 0), floor)
+    else:
+        request_in.disk_size = max(int(request_in.disk_size or 0), floor)
 
 
 def create(
@@ -328,6 +307,19 @@ def create(
 ) -> VMRequestPublic:
     if request_in.resource_type not in ("lxc", "vm"):
         raise BadRequestError("resource_type must be 'lxc' or 'vm'")
+
+    # ---------- 來源範本：先驗證再算配額（磁碟下限會提高用量） ----------
+    source_template: VMTemplate | None = None
+    source_vmid = getattr(request_in, "template_id", None)
+    if source_vmid:
+        source_template = _validate_template_source(
+            session=session,
+            template_vmid=source_vmid,
+            user=user,
+            resource_type=request_in.resource_type,
+        )
+        if source_template is not None:
+            _apply_template_floor(request_in, source_template)
 
     # ---------- 配額執法（E7）：寫入前先擋 ----------
     quota_service.check_quota(
@@ -357,13 +349,7 @@ def create(
         if advice.resource_type != request_in.resource_type:
             auto_decision_reason += "（提交值與伺服器建議不同）"
     if request_in.resource_type == "lxc":
-        if request_in.template_id:
-            _validate_lxc_template_clone(
-                session=session,
-                template_vmid=request_in.template_id,
-                user=user,
-            )
-        elif not request_in.ostemplate:
+        if not request_in.template_id and not request_in.ostemplate:
             raise BadRequestError("LXC request requires ostemplate or template_id")
     if request_in.resource_type == "vm":
         if not request_in.template_id:
@@ -397,14 +383,12 @@ def create(
     mode = getattr(request_in, "mode", "scheduled") or "scheduled"
 
     if mode == "quick_template":
-        now = _utc_now()
-        _prepare_quick_template_request(
-            session=session,
-            request_in=request_in,
-            user=user,
-            now=now,
+        # 舊的學生自助路徑會自動核准，繞過本次建立的目錄與審核治理。
+        # 快速練習改由 quick_practice 服務整組建立（仍用同一個 request_kind）。
+        raise BadRequestError(
+            "此模式已停用；請改用快速練習環境，或以一般申請選用開放的應用範本"
         )
-    elif mode == "immediate":
+    if mode == "immediate":
         require_immediate_vm_request_access(user)
         # Set start_at to now; end_at can be None (infinite) or user-specified.
         request_in.start_at = _utc_now()

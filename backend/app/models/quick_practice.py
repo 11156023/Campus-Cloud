@@ -36,6 +36,20 @@ class QuickPracticeSession(SQLModel, table=True):
     expires_at: datetime = Field(
         sa_column=Column(DateTime(timezone=True), nullable=False, index=True)
     )
+    status: str = Field(default="creating", max_length=24, index=True)
+    topology_applied_at: datetime | None = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True), nullable=True),
+    )
+    reclaim_started_at: datetime | None = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True), nullable=True),
+    )
+    reclaimed_at: datetime | None = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True), nullable=True, index=True),
+    )
+    last_error: str | None = Field(default=None, max_length=2000)
 
 
 class QuickPracticeSessionMachine(SQLModel, table=True):

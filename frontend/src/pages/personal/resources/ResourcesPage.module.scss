@@ -409,6 +409,7 @@
 }
 
 /* ── Terminal / Console button ── */
+.groupActions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .terminalBtn {
   display: inline-flex;
   align-items: center;

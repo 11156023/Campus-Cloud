@@ -26,7 +26,10 @@ import { buildEnvironmentGroups, groupedResourceKeys } from "../../../utils/envi
 const STATUS_MAP = {
   scheduled:    { label: "已排程",   color: "info",    icon: "event"          },
   provisioning: { label: "建立中",   color: "info",    icon: "settings"       },
+  partial_failed:{ label: "需要處理", color: "danger",  icon: "error_outline"  },
   running:      { label: "執行中",   color: "success", icon: "play_circle"    },
+  stopping:     { label: "準備回收", color: "muted",   icon: "power_settings_new" },
+  reclaiming:   { label: "回收中",   color: "danger",  icon: "delete_sweep"   },
   stopped:      { label: "已關機",   color: "muted",   icon: "stop_circle"    },
   paused:       { label: "已暫停",   color: "muted",   icon: "pause_circle"   },
   deleting:     { label: "刪除中",   color: "danger",  icon: "hourglass_empty"},
@@ -293,14 +296,17 @@ function ResourceRow({ resource, onUpdated, onDeleted }) {
   </>;
 }
 
-function EnvironmentMachineRow({ machine, onUpdated }) {
+function EnvironmentMachineRow({ machine, groupStatus, onUpdated }) {
   const toast = useToast();
   const type = TYPE_MAP[machine.type] ?? { label: machine.type, icon: "computer" };
   const [consoleOpen, setConsoleOpen] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const resource = machine.resource;
   const isLxc = machine.type === "lxc";
-  const canControl = Boolean(resource?.vmid && resource.can_control !== false);
+  const environmentReady = ["running", "active"].includes(groupStatus);
+  const canControl = Boolean(
+    environmentReady && resource?.vmid && resource.can_control !== false,
+  );
   const canOpen = canControl && resource.status === "running";
   const controlAction = resource?.status === "running" ? "shutdown" : "start";
 
@@ -334,20 +340,42 @@ function EnvironmentMachineRow({ machine, onUpdated }) {
   </>;
 }
 
-function EnvironmentGroupRows({ group, onUpdated }) {
+function EnvironmentGroupRows({ group, onUpdated, onEnded }) {
   const [expanded, setExpanded] = useState(true);
-  const running = group.machines.filter((machine) => machine.status === "running").length;
+  const [ending, setEnding] = useState(false);
+  const [endConfirm, setEndConfirm] = useState(false);
+  const toast = useToast();
+  const canEnd = group.kind === "quick_practice" && !["reclaiming", "reclaimed"].includes(group.status);
+
+  async function endPractice() {
+    setEnding(true);
+    try {
+      await QuickPracticeService.endSession(group.id);
+      toast.success("已開始回收這組練習環境");
+      setEndConfirm(false);
+      onEnded?.();
+    } catch (error) {
+      toast.error(error?.message ?? "結束練習失敗");
+    } finally {
+      setEnding(false);
+    }
+  }
+
   return <>
     <tr className={`${styles.tr} ${styles.environmentGroupRow}`}>
       <td className={styles.td}><button type="button" className={styles.environmentToggle} aria-expanded={expanded} onClick={() => setExpanded((value) => !value)}><MIcon name={expanded ? "expand_more" : "chevron_right"} size={20} /><span className={styles.environmentIcon}><MIcon name={group.kind === "course" ? "school" : "bolt"} size={19} /></span><span><strong>{group.kindLabel}｜{group.title}</strong><small>{group.machines.length} 台機器 · 整組管理</small></span></button></td>
       <td className={styles.td}><div className={styles.envPrimary}>{group.kind === "course" ? "課程多機環境" : "快速練習環境"}</div><div className={styles.envSub}>整組檢視、逐台操作</div></td>
-      <td className={styles.td}><span className={`${styles.badge} ${styles.badge_info}`}>{running}/{group.machines.length} 執行中</span></td>
+      <td className={styles.td}><StatusBadge status={group.status} /></td>
       <td className={styles.td}><span className={styles.muted}>展開查看</span></td>
       <td className={styles.td}><strong className={styles.environmentTiming}>{group.timingLabel}</strong></td>
       <td className={styles.td}>{group.nodeLabel}</td>
-      <td className={styles.td}><button type="button" className={styles.terminalBtn} onClick={() => setExpanded((value) => !value)}><MIcon name="dns" size={14} />{expanded ? "收合機器" : "使用機器"}</button></td>
+      <td className={styles.td}><div className={styles.groupActions}>
+        <button type="button" className={styles.terminalBtn} onClick={() => setExpanded((value) => !value)}><MIcon name="dns" size={14} />{expanded ? "收合機器" : "使用機器"}</button>
+        {canEnd && <button type="button" className={styles.terminalBtn} disabled={ending} onClick={() => setEndConfirm(true)}><MIcon name="stop_circle" size={14} />{ending ? "結束中…" : "結束練習"}</button>}
+      </div></td>
     </tr>
-    {expanded && group.machines.map((machine) => <EnvironmentMachineRow key={machine.id} machine={machine} onUpdated={onUpdated} />)}
+    {expanded && group.machines.map((machine) => <EnvironmentMachineRow key={machine.id} machine={machine} groupStatus={group.status} onUpdated={onUpdated} />)}
+    {endConfirm && createPortal(<ConfirmModal title="結束這組練習？" desc="整組機器會立刻回收，未儲存的內容會消失；已使用的建立次數不會退還。" confirmLabel="結束練習" danger loading={ending} onConfirm={endPractice} onClose={() => setEndConfirm(false)} />, document.body)}
   </>;
 }
 
@@ -487,7 +515,7 @@ export default function ResourcesPage() {
               </thead>
               <tbody>
                 {loading ? [0, 1, 2].map((i) => <SkeletonRow key={i} />) : <>
-                  {environmentGroups.map((group) => <EnvironmentGroupRows key={group.id} group={group} onUpdated={handleUpdated} />)}
+                  {environmentGroups.map((group) => <EnvironmentGroupRows key={group.id} group={group} onUpdated={handleUpdated} onEnded={() => fetchResources(true)} />)}
                   {visiblePending.map((req) => <CreatingRow key={`creating:${req.id}`} request={req} onCancelled={refreshPending} />)}
                   {visibleResources.map((r, index) => <ResourceRow key={resourceRowKey(r, index)} resource={r} onUpdated={handleUpdated} onDeleted={handleDeleted} />)}
                 </>}
