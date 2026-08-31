@@ -390,6 +390,37 @@ import MIcon from "../components/MIcon";
 // 使用：animation: fadeIn 0.15s ease;
 ```
 
+### Dialog / Popup 的進出場（標準作法）
+
+Dialog 一律「遮罩 `fadeIn` + 內容 `slideUp`」進場；離場由共用 hook `hooks/useDialogPresence.js` 處理——關閉時先保留 DOM 150ms 套上 `Out` class 播放淡出，再卸載：
+
+```jsx
+import useDialogPresence from "../hooks/useDialogPresence";
+
+const dialog = useDialogPresence(editTarget);   // 布林或資料物件皆可
+// 關閉期間 dialog.item 會保留最後一筆資料，避免內容閃爍
+{dialog.open && (
+  <div className={`${styles.modalOverlay} ${dialog.closing ? styles.modalOverlayOut : ""}`}>
+    <EditModal target={dialog.item} … />
+  </div>
+)}
+```
+
+```scss
+.modalOverlay {
+  /* …定位與遮罩… */
+  animation: fadeIn 0.15s ease;
+  transition: opacity 0.15s ease;
+}
+.modalOverlayOut {
+  animation: none;   // 覆蓋入場 animation，讓 transition 接管
+  opacity: 0;
+  pointer-events: none;
+}
+```
+
+共用 Dialog 元件（如 `ConnectionDialog`、`ReverseProxyRuleModal`）接受 `closing` prop 套用 Out class，由父層的 `useDialogPresence` 控制。自含式 Dialog（如 `VncDialog`、`TerminalDialog`）則在內部 `setClosing(true)` 後 `setTimeout(onClose, 150)`。
+
 ### 離場動畫（關閉）
 
 優先使用 **`setTimeout` + CSS `transition`**，不使用 `onAnimationEnd`（有已知邊界問題）：

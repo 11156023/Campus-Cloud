@@ -10,6 +10,7 @@ import JobsProvider from "../components/Jobs/JobsProvider";
 import SubnetBanner from "../components/SubnetBanner/SubnetBanner";
 import SessionWarningDialog from "../components/SessionWarning/SessionWarningDialog";
 import useSessionWarning from "../hooks/useSessionWarning";
+import useDialogPresence from "../hooks/useDialogPresence";
 import ErrorBoundary from "../components/ErrorBoundary/ErrorBoundary";
 import UserGuide from "../components/UserGuide/UserGuide";
 import styles from "./DashboardLayout.module.scss";
@@ -24,6 +25,7 @@ export default function DashboardLayout() {
   const [compactFooter, setCompactFooter] = useState(false);
   const [assistantOpen, setAssistantOpen] = useState(false);
   const { active: sessionWarning, dismiss, dismissPermanent } = useSessionWarning();
+  const mobileOverlay = useDialogPresence(mobileOpen);
 
   useEffect(() => {
     function handleResize() {
@@ -42,9 +44,9 @@ export default function DashboardLayout() {
     {/* 任務狀態全站常駐（WS + toast + 詳情 dialog）；顯示按鈕在 Sidebar 底部 */}
     <JobsProvider>
     <div className={`${styles.layout} ${collapsed ? styles.collapsed : ""}`}>
-      {mobileOpen && (
+      {mobileOverlay.open && (
         <div
-          className={styles.overlay}
+          className={`${styles.overlay} ${mobileOverlay.closing ? styles.overlayOut : ""}`}
           onClick={() => setMobileOpen(false)}
         />
       )}

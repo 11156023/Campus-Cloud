@@ -11,6 +11,14 @@ export default function TerminalDialog({ resource, onClose }) {
   const [status, setStatus]       = useState("connecting");
   const [error, setError]         = useState("");
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [closing, setClosing] = useState(false);
+
+  // 先播放離場動畫，再通知父層卸載
+  function handleClose() {
+    if (closing) return;
+    setClosing(true);
+    setTimeout(onClose, 150);
+  }
   const termDivRef  = useRef(null);
   const termRef     = useRef(null);
   const wsRef       = useRef(null);
@@ -128,7 +136,7 @@ export default function TerminalDialog({ resource, onClose }) {
   }, [resource?.vmid]);
 
   return (
-    <div className={styles.overlay} onClick={onClose}>
+    <div className={`${styles.overlay} ${closing ? styles.overlayOut : ""}`} onClick={handleClose}>
       <div ref={dialogRef} className={styles.dialog} onClick={(e) => e.stopPropagation()}>
         <div className={styles.header}>
           <span className={styles.headerIcon}><MIcon name="terminal" size={18} /></span>
@@ -150,7 +158,7 @@ export default function TerminalDialog({ resource, onClose }) {
           <button type="button" className={styles.headerBtn} title={isFullscreen ? "離開全螢幕" : "全螢幕"} onClick={toggleFullscreen}>
             <MIcon name={isFullscreen ? "fullscreen_exit" : "fullscreen"} size={16} />
           </button>
-          <button type="button" className={styles.closeBtn} onClick={onClose}>
+          <button type="button" className={styles.closeBtn} onClick={handleClose}>
             <MIcon name="close" size={18} />
           </button>
         </div>

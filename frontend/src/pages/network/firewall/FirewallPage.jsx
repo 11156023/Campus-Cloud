@@ -30,6 +30,7 @@ import ConnectionEdge   from "./edges/ConnectionEdge";
 import { buildFlow, portLabel } from "./utils/buildFlow";
 import { useTheme } from "../../../contexts/ThemeContext";
 import useAutoRefresh from "../../../hooks/useAutoRefresh";
+import useDialogPresence from "../../../hooks/useDialogPresence";
 import styles from "./FirewallPage.module.scss";
 import MIcon from "../../../components/MIcon";
 import PageHeader from "../../../components/PageHeader/PageHeader";
@@ -57,6 +58,8 @@ export default function FirewallPage() {
   const [deleteEdge,   setDeleteEdge]   = useState(null);
   const [showLabels,   setShowLabels]   = useState(false);
   const [showMiniMap,  setShowMiniMap]  = useState(true);
+  const connDialog    = useDialogPresence(showDialog);
+  const deleteConfirm = useDialogPresence(deleteEdge);
   const rfInstance = useRef(null);
   const saveTimer  = useRef(null);
 
@@ -313,23 +316,27 @@ export default function FirewallPage() {
       </div>
 
       {/* ── 新增連線 Dialog ── */}
-      {showDialog && (
+      {connDialog.open && (
         <ConnectionDialog
           nodes={vmNodes}
           onConfirm={handleCreateConnection}
           onClose={() => setShowDialog(false)}
+          closing={connDialog.closing}
         />
       )}
 
       {/* ── 刪除確認 ── */}
-      {deleteEdge && (
-        <div className={styles.confirmOverlay} onClick={() => setDeleteEdge(null)}>
+      {deleteConfirm.open && (
+        <div
+          className={`${styles.confirmOverlay} ${deleteConfirm.closing ? styles.confirmOverlayOut : ""}`}
+          onClick={() => setDeleteEdge(null)}
+        >
           <div className={styles.confirmDialog} onClick={(e) => e.stopPropagation()}>
             <h3 className={styles.confirmTitle}>刪除連線</h3>
             <p className={styles.confirmMsg}>
               確定要刪除此連線嗎？
-              {deleteEdge.ports?.length > 0 && (
-                <><br /><small>{portLabel(deleteEdge.ports)}</small></>
+              {deleteConfirm.item.ports?.length > 0 && (
+                <><br /><small>{portLabel(deleteConfirm.item.ports)}</small></>
               )}
             </p>
             <div className={styles.confirmActions}>

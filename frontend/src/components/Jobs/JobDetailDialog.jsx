@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import MIcon from "../MIcon";
 import { useAuth } from "../../contexts/AuthContext";
+import useDialogPresence from "../../hooks/useDialogPresence";
 import { JobsService } from "../../services/jobs";
 import { JOB_KIND_LABEL, JOB_STATUS_META } from "./JobRow";
 import styles from "./Jobs.module.scss";
@@ -81,18 +82,24 @@ const ACTIVE_STATUSES = new Set(["pending", "running", "blocked"]);
 
 export default function JobDetailDialog({ jobId, onClose }) {
   const open = jobId !== null;
+  // 關閉時先播放離場動畫再卸載；動畫期間保留內容避免閃爍
+  const presence = useDialogPresence(jobId);
   const { user } = useAuth();
   const showVmid = user?.is_superuser || user?.role === "admin" || user?.role === "teacher";
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
 
+  // 完全關閉（離場動畫結束）後才清空內容
   useEffect(() => {
-    if (!open) {
+    if (!presence.open) {
       setData(null);
       setError(null);
-      return;
     }
+  }, [presence.open]);
+
+  useEffect(() => {
+    if (!open) return;
     let cancelled = false;
     let timer = null;
 
@@ -129,7 +136,7 @@ export default function JobDetailDialog({ jobId, onClose }) {
     return () => document.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
-  if (!open) return null;
+  if (!presence.open) return null;
 
   const item = data?.item;
   const statusMeta = item ? JOB_STATUS_META[item.status] : null;
@@ -145,7 +152,10 @@ export default function JobDetailDialog({ jobId, onClose }) {
   // Portal 到 body：banner 的 backdrop-filter 會建立 stacking context，
   // 直接 render 會讓 fixed overlay 被限制在 banner 內
   return createPortal(
-    <div className={styles.dialogOverlay} onClick={onClose}>
+    <div
+      className={`${styles.dialogOverlay} ${presence.closing ? styles.dialogOverlayOut : ""}`}
+      onClick={onClose}
+    >
       <div
         className={styles.dialog}
         role="dialog"

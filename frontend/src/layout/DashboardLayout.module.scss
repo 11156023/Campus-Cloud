@@ -32,10 +32,23 @@
   inset: 0;
   background: var(--color-overlay);
   z-index: 99;
+  animation: fadeIn 0.15s ease;
+  transition: opacity 0.15s ease;
 
   @include respond-to(md) {
     display: none;
   }
+}
+
+.overlayOut {
+  animation: none;
+  opacity: 0;
+  pointer-events: none;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 /* Main content area */

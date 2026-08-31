@@ -45,7 +45,7 @@ const formatBytes = (bytes) => {
  * template 有值 = 編輯模式。
  * icon / 附件：編輯模式即時上傳；建立模式先暫存，create 成功後補上傳。
  */
-export default function TemplateFormDialog({ template, onClose, onSaved }) {
+export default function TemplateFormDialog({ template, closing = false, onClose, onSaved }) {
   const toast = useToast();
   const confirm = useConfirm();
   const { user } = useAuth();
@@ -305,7 +305,10 @@ export default function TemplateFormDialog({ template, onClose, onSaved }) {
       }));
 
   return (
-    <div className={styles.modalOverlay} onClick={onClose}>
+    <div
+      className={`${styles.modalOverlay} ${closing ? styles.modalOverlayOut : ""}`}
+      onClick={onClose}
+    >
       <div className={`${styles.modal} ${styles.modalWide}`} onClick={(e) => e.stopPropagation()}>
         <span className={styles.modalTitle}>
           <MIcon name="library_books" size={20} />
