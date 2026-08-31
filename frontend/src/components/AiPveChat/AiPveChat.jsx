@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import rehypeSanitize from "rehype-sanitize";
 import MIcon from "../MIcon";
 import { useToast } from "../../hooks/useToast";
 import { AiPveLogService } from "../../services/aiPveLog";
@@ -12,6 +14,17 @@ export function sanitizeAiPveContent(value) {
     .replace(/<think>[\s\S]*?<\/think>/g, "")
     .replace(/<\|[^>]*\|>/g, "")
     .trim();
+}
+
+/** 將 AI 回覆以安全的 Markdown 呈現，避免格式標記以原始文字顯示。 */
+export function AiPveMarkdownContent({ content }) {
+  return (
+    <div className={`${styles.msgContent} ${styles.msgMarkdown}`}>
+      <ReactMarkdown rehypePlugins={[rehypeSanitize]}>
+        {sanitizeAiPveContent(content)}
+      </ReactMarkdown>
+    </div>
+  );
 }
 
 export default function AiPveChat({ initialPrompt = "", compact = false }) {
@@ -172,7 +185,13 @@ export default function AiPveChat({ initialPrompt = "", compact = false }) {
               <MIcon name={message.role === "assistant" ? "smart_toy" : "person"} size={16} />
               <span>{message.role === "assistant" ? "AI-PVE" : "你"}</span>
             </div>
-            <p className={styles.msgContent}>{sanitizeAiPveContent(message.content)}</p>
+            {message.role === "assistant" ? (
+              <AiPveMarkdownContent content={message.content} />
+            ) : (
+              <p className={`${styles.msgContent} ${styles.msgPlain}`}>
+                {sanitizeAiPveContent(message.content)}
+              </p>
+            )}
             {message.tools?.length > 0 && (
               <div className={styles.toolRow}>
                 <span className={styles.toolLabel}>

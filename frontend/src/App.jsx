@@ -31,7 +31,6 @@ const AiApiPage = lazy(() => import("./pages/ai/ai-api/AiApiPage"));
 const AiApiReviewPage = lazy(() => import("./pages/ai/ai-api-review/AiApiReviewPage"));
 const AiApiKeysPage = lazy(() => import("./pages/ai/ai-api-keys/AiApiKeysPage"));
 const AiMonitoringPage = lazy(() => import("./pages/ai/ai-monitoring/AiMonitoringPage"));
-const AiPvePage = lazy(() => import("./pages/system/ai-pve/AiPvePage"));
 
 // 教學
 const CoursePathsPage = lazy(() => import("./pages/courses/paths/CoursePathsPage"));
@@ -165,7 +164,6 @@ function App() {
               <Route path="/ai-api-review" element={<AiApiReviewPage />} />
               <Route path="/ai-api-keys" element={<AiApiKeysPage />} />
               <Route path="/ai-monitoring" element={<AiMonitoringPage />} />
-              <Route path="/ai-pve" element={<AiPvePage />} />
             </>
           )}
           <Route

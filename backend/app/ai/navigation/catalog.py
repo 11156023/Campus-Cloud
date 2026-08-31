@@ -105,14 +105,6 @@ _ROUTES: tuple[NavigationRoute, ...] = (
         keywords=("ai api", "token 用量", "金鑰", "ai 用量"),
     ),
     NavigationRoute(
-        path="/ai-pve",
-        title="AI PVE 維運助手",
-        summary="查詢全站 PVE 狀態並協助執行維運操作。",
-        keywords=("ai pve", "pve 維運", "節點狀態", "vm 維運"),
-        allow_student=False,
-        allow_teacher=False,
-    ),
-    NavigationRoute(
         path="/admin",
         title="管理主頁",
         summary="系統管理總覽。",

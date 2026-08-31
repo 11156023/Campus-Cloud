@@ -21,7 +21,6 @@ const PAGE_CONTEXTS = [
   { match: /^\/ai-api-review/, title: "AI API 申請審核", suggestions: ["帶我到金鑰管理", "帶我到使用監控", "說明 AI API 申請流程"] },
   { match: /^\/ai-api-keys/, title: "AI API 金鑰管理", suggestions: ["帶我到使用監控", "帶我到申請審核", "說明 API 金鑰安全原則"] },
   { match: /^\/ai-monitoring/, title: "AI API 使用監控", suggestions: ["帶我到金鑰管理", "帶我到申請審核", "如何管理 AI API 配額？"] },
-  { match: /^\/ai-pve/, title: "AI PVE 維運助手", suggestions: ["查看節點狀態", "檢查 VM 資源用量", "說明安全指令確認流程"] },
   { match: /^\/ai-api/, title: "AI API", suggestions: ["說明 AI API 申請流程", "如何保護 API 金鑰？", "我適合使用哪種 AI 服務？"] },
   { match: /^\/templates/, title: "模板管理", suggestions: ["說明 LXC 與 VM 模板差異", "帶我到資源管理", "如何選擇 GPU？"] },
   { match: /^\/gpu-mgmt/, title: "GPU 管理", suggestions: ["如何選擇 GPU？", "帶我到資源管理", "帶我到申請審核"] },
