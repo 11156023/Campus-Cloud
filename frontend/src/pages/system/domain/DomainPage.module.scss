@@ -56,6 +56,15 @@
 .list {
   @include flex-column;
   gap: $spacing-8;
+
+  @include respond-to(lg) {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    /* row hover 陰影會貼邊被裁，留一點內距 */
+    padding: 2px;
+    margin: -2px;
+  }
 }
 
 .row {
@@ -222,7 +231,8 @@
 
   @include respond-to(lg) {
     grid-template-columns: 280px minmax(0, 1fr);
-    align-items: start;
+    grid-template-rows: minmax(0, 1fr);
+    min-height: 0;
   }
 }
 
@@ -233,6 +243,10 @@
   padding: $spacing-16;
   @include glass-surface($shadow: var(--shadow-sm));
   border-radius: $radius-12;
+
+  @include respond-to(lg) {
+    min-height: 0;
+  }
 }
 
 .panelTitle {
@@ -251,6 +265,12 @@
 .zoneList {
   @include flex-column;
   gap: $spacing-4;
+
+  @include respond-to(lg) {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+  }
 }
 
 .zoneItem,

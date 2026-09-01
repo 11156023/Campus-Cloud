@@ -994,7 +994,6 @@ export default function StudentHomePage({ courseView = false }) {
 
         <div className={styles.needGrid}>
           <article className={styles.needCard} data-student-tour="practice">
-            <span className={`${styles.needIcon} ${styles.needIcon_primary}`}><MIcon name="history" size={22} /></span>
             <div>
               <span className={styles.needBadge}>下課後練習 · 沿用原環境</span>
               <h3>繼續上次的課堂進度</h3>
@@ -1007,7 +1006,6 @@ export default function StudentHomePage({ courseView = false }) {
           </article>
 
           <article className={`${styles.needCard} ${styles.researchCard}`} data-student-tour="research">
-            <span className={`${styles.needIcon} ${styles.needIcon_info}`}><MIcon name="science" size={22} /></span>
             <div>
               <span className={`${styles.needBadge} ${styles.needBadge_info}`}>自主研究 · 需要申請</span>
               <h3>建立自己的研究環境</h3>

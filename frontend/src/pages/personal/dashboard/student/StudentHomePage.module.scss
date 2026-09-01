@@ -358,11 +358,11 @@
   min-height: 38px;
   padding: 8px 12px;
   border-radius: $radius-8;
-  background: color-mix(in srgb, var(--color-primary) 9%, var(--color-surface));
-  color: var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-text-on-primary);
 
-  &:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--color-primary) 15%, var(--color-surface));
+  &:hover {
+    background: var(--color-primary-dark);
   }
 }
 
@@ -1160,21 +1160,6 @@
     grid-column: 1 / -1;
     justify-self: start;
   }
-}
-
-.needIcon {
-  width: 42px;
-  height: 42px;
-}
-
-.needIcon_primary {
-  background: color-mix(in srgb, var(--color-primary) 12%, transparent);
-  color: var(--color-primary);
-}
-
-.needIcon_info {
-  background: color-mix(in srgb, var(--color-info) 12%, transparent);
-  color: var(--color-info);
 }
 
 .needBadge {

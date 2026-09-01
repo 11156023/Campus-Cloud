@@ -70,21 +70,18 @@ function UsageBar({ pct }) {
   );
 }
 
-function OverviewCard({ title, icon, pct, detail }) {
+function OverviewCard({ title, pct, detail }) {
   return (
     <div className={styles.overviewCard}>
       <div className={styles.overviewTop}>
         <div className={styles.overviewInfo}>
           <span className={styles.overviewLabel}>{title}</span>
-          <span className={styles.overviewValue}>
-            {pct.toFixed(1)}
-            <span className={styles.overviewUnit}>%</span>
-          </span>
           <span className={styles.overviewDetail}>{detail}</span>
         </div>
-        <div className={styles.overviewIcon}>
-          <MIcon name={icon} size={20} />
-        </div>
+        <span className={styles.overviewValue}>
+          {pct.toFixed(1)}
+          <span className={styles.overviewUnit}>%</span>
+        </span>
       </div>
       <UsageBar pct={pct} />
     </div>
@@ -342,19 +339,16 @@ export default function MonitoringPage() {
       <div className={styles.statRow}>
         <OverviewCard
           title="CPU 用量"
-          icon="memory"
           pct={cpuPct}
           detail={`${overview.cpu_used.toFixed(1)} / ${overview.cpu_total} 核心`}
         />
         <OverviewCard
           title="記憶體用量"
-          icon="sd_card"
           pct={memPct}
           detail={`${formatBytes(overview.mem_used)} / ${formatBytes(overview.mem_total)}`}
         />
         <OverviewCard
           title="磁碟用量"
-          icon="storage"
           pct={diskPct}
           detail={`${formatBytes(overview.disk_used)} / ${formatBytes(overview.disk_total)}`}
         />
