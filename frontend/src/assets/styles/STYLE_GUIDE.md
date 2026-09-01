@@ -90,6 +90,7 @@ src/pages/personal/resources/
 | `--color-border` | 一般邊框 |
 | `--color-divider` | 分隔線 |
 | `--color-hover` | Hover 背景 |
+| `--color-row-hover` | 表格列 hover 背景（比 `--color-hover` 深，避免與表頭同色） |
 | `--color-overlay` | Modal 遮罩 |
 
 #### 陰影

@@ -9,7 +9,7 @@
   padding: $spacing-8 $spacing-16;
   animation: slideInRight 0.18s ease-out;
 
-  @include respond-to(md) {
+  @media (min-width: $breakpoint-sidebar) {
     padding: 0;
   }
 }

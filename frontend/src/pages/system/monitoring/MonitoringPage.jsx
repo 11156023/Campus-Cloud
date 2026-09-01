@@ -70,21 +70,18 @@ function UsageBar({ pct }) {
   );
 }
 
-function OverviewCard({ title, icon, pct, detail }) {
+function OverviewCard({ title, pct, detail }) {
   return (
     <div className={styles.overviewCard}>
       <div className={styles.overviewTop}>
         <div className={styles.overviewInfo}>
           <span className={styles.overviewLabel}>{title}</span>
-          <span className={styles.overviewValue}>
-            {pct.toFixed(1)}
-            <span className={styles.overviewUnit}>%</span>
-          </span>
           <span className={styles.overviewDetail}>{detail}</span>
         </div>
-        <div className={styles.overviewIcon}>
-          <MIcon name={icon} size={20} />
-        </div>
+        <span className={styles.overviewValue}>
+          {pct.toFixed(1)}
+          <span className={styles.overviewUnit}>%</span>
+        </span>
       </div>
       <UsageBar pct={pct} />
     </div>
@@ -158,7 +155,7 @@ function AlertsCard() {
       await MonitoringService.ackAlert(alertId);
       await load();
     } catch (e) {
-      toast.error(e?.message ?? "確認告警失敗");
+      toast.error(e?.message ?? "確認警告失敗");
     } finally {
       setAckBusy(null);
     }
@@ -170,9 +167,9 @@ function AlertsCard() {
         <div>
           <h2 className={styles.cardTitle}>
             <MIcon name="notifications" size={18} />
-            活動告警
+            活動警告
           </h2>
-          <p className={styles.cardDesc}>超過閾值的資源使用告警（每 30 秒更新）</p>
+          <p className={styles.cardDesc}>超過閾值的資源使用警告（每 30 秒更新）</p>
         </div>
         {alerts && alerts.length > 0 && (
           <span className={styles.alertCount}>{alerts.length}</span>
@@ -182,7 +179,7 @@ function AlertsCard() {
       {alerts === null ? (
         <LoadingState />
       ) : alerts.length === 0 ? (
-        <EmptyState icon="notifications_off" title="目前沒有活動告警" />
+        <EmptyState icon="notifications_off" title="目前沒有活動警告" />
       ) : (
         <div className={styles.alertList}>
           {alerts.map((alert) => (
@@ -321,7 +318,7 @@ export default function MonitoringPage() {
 
   return (
     <div className={styles.page}>
-      <PageHeader title="資源監控" subtitle="叢集資源使用、節點趨勢與閾值告警">
+      <PageHeader title="資源監控" subtitle="叢集資源使用、節點趨勢與閾值警告">
         <div className={styles.pageActions}>
           <div className={styles.segment}>
             {TIMEFRAMES.map((t) => (
@@ -342,19 +339,16 @@ export default function MonitoringPage() {
       <div className={styles.statRow}>
         <OverviewCard
           title="CPU 用量"
-          icon="memory"
           pct={cpuPct}
           detail={`${overview.cpu_used.toFixed(1)} / ${overview.cpu_total} 核心`}
         />
         <OverviewCard
           title="記憶體用量"
-          icon="sd_card"
           pct={memPct}
           detail={`${formatBytes(overview.mem_used)} / ${formatBytes(overview.mem_total)}`}
         />
         <OverviewCard
           title="磁碟用量"
-          icon="storage"
           pct={diskPct}
           detail={`${formatBytes(overview.disk_used)} / ${formatBytes(overview.disk_total)}`}
         />
@@ -388,7 +382,7 @@ export default function MonitoringPage() {
         </div>
       </div>
 
-      {/* 活動告警 */}
+      {/* 活動警告 */}
       <AlertsCard />
 
       {/* 挖礦事件（模組 D，位置比照舊版監控頁） */}

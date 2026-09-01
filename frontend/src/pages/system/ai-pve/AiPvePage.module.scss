@@ -5,5 +5,5 @@
   flex: 1;
   min-height: 0;
 
-  @include respond-to(md) { padding: 0; }
+  @media (min-width: $breakpoint-sidebar) { padding: 0; }
 }

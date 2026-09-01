@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import styles from "./ResourceDetailPage.module.scss";
 import MIcon from "../../../../components/MIcon";
 import LoadingState from "../../../../components/LoadingState/LoadingState";
@@ -6,6 +6,7 @@ import EmptyState from "../../../../components/EmptyState/EmptyState";
 import { ResourcesService } from "../../../../services/resources";
 import { useToast } from "../../../../hooks/useToast";
 import useDialogPresence from "../../../../hooks/useDialogPresence";
+import { focusInvalidField } from "../../../../utils/focusField";
 
 const INIT_SNAPSHOT_NAME = "skylab-init";
 
@@ -45,6 +46,8 @@ export default function SnapshotsTab({ vmid }) {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [rollbackTarget, setRollbackTarget] = useState(null);
   const [snapname, setSnapname] = useState("");
+  const [nameInvalid, setNameInvalid] = useState(false);
+  const snapnameRef = useRef(null);
   const [description, setDescription] = useState("");
   const [busy, setBusy] = useState(false);
   const createDialog    = useDialogPresence(createOpen);
@@ -83,7 +86,8 @@ export default function SnapshotsTab({ vmid }) {
 
   const handleCreate = () => {
     if (!snapname.trim()) {
-      toast.error("請輸入快照名稱");
+      setNameInvalid(true);
+      focusInvalidField(snapnameRef.current);
       return;
     }
     run(
@@ -97,6 +101,7 @@ export default function SnapshotsTab({ vmid }) {
       () => {
         setCreateOpen(false);
         setSnapname("");
+        setNameInvalid(false);
         setDescription("");
       },
     );
@@ -138,7 +143,7 @@ export default function SnapshotsTab({ vmid }) {
             <button
               type="button"
               className={styles.btnPrimary}
-              onClick={() => setCreateOpen(true)}
+              onClick={() => { setNameInvalid(false); setCreateOpen(true); }}
             >
               <MIcon name="add" size={14} />
               建立快照
@@ -217,14 +222,16 @@ export default function SnapshotsTab({ vmid }) {
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
             <span className={styles.modalTitle}>建立快照</span>
             <p className={styles.modalDesc}>快照會保留目前磁碟狀態，可隨時還原</p>
-            <div className={styles.field}>
+            <div className={`${styles.field} ${nameInvalid ? styles.fieldInvalid : ""}`}>
               <label htmlFor="snap-name">名稱 *</label>
               <input
                 id="snap-name"
+                ref={snapnameRef}
                 type="text"
                 placeholder="snap-2026-07-04"
+                aria-invalid={nameInvalid}
                 value={snapname}
-                onChange={(e) => setSnapname(e.target.value)}
+                onChange={(e) => { setSnapname(e.target.value); setNameInvalid(false); }}
               />
             </div>
             <div className={styles.field}>

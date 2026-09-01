@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import LoadingState from "../../components/LoadingState/LoadingState";
-import MIcon from "../../components/MIcon";
-import { useConfirm } from "../../components/ConfirmDialog/ConfirmProvider";
-import { CourseEnvironmentsService } from "../../services/courseEnvironments";
-import EmptyState from "../../components/EmptyState/EmptyState";
-import styles from "./CourseOperations.module.scss";
-import PageHeader from "../../components/PageHeader/PageHeader";
+import LoadingState from "../../../components/LoadingState/LoadingState";
+import MIcon from "../../../components/MIcon";
+import { useConfirm } from "../../../components/ConfirmDialog/ConfirmProvider";
+import { CourseEnvironmentsService } from "../../../services/courseEnvironments";
+import EmptyState from "../../../components/EmptyState/EmptyState";
+import styles from "../CourseOperations.module.scss";
+import PageHeader from "../../../components/PageHeader/PageHeader";
 
 const STATUS_LABEL = { published: "已發布", draft: "草稿", retired: "已停用" };
 const USAGE_LABEL = { course: "正式課程", quick_practice: "快速練習", both: "課程＋快速練習" };

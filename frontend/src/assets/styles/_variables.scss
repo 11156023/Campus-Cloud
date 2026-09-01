@@ -33,6 +33,8 @@ $breakpoint-sm: 576px;
 $breakpoint-md: 768px;
 $breakpoint-lg: 992px;
 $breakpoint-xl: 1200px;
+/* Sidebar 抽屜/固定模式切換點（手機 vs 桌面版面） */
+$breakpoint-sidebar: 1024px;
 
 /* ----- Layout Sizes ----- */
 $header-height: 60px;

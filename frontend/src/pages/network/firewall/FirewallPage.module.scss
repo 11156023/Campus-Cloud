@@ -10,7 +10,7 @@
   min-height: 0;
   padding: $spacing-8 $spacing-16;
 
-  @include respond-to(md) { padding: 0; }
+  @media (min-width: $breakpoint-sidebar) { padding: 0; }
 }
 
 /* ── Header ── */

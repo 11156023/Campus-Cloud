@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import MIcon from "../../components/MIcon";
-import { TeachingClassesService } from "../../services/teachingClasses";
-import styles from "./CourseOperations.module.scss";
+import MIcon from "../../../components/MIcon";
+import { TeachingClassesService } from "../../../services/teachingClasses";
+import styles from "../CourseOperations.module.scss";
 
 export default function ClassCreateDialog({ item = null, closing = false, onClose, onCreated, onUpdated }) {
   const isEdit = Boolean(item);

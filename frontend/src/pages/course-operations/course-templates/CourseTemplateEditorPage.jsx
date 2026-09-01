@@ -7,17 +7,17 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import LoadingState from "../../components/LoadingState/LoadingState";
-import MIcon from "../../components/MIcon";
-import { useConfirm } from "../../components/ConfirmDialog/ConfirmProvider";
-import { CourseEnvironmentsService } from "../../services/courseEnvironments";
-import { TeachingClassesService } from "../../services/teachingClasses";
-import { apiGet } from "../../services/api";
-import EmptyState from "../../components/EmptyState/EmptyState";
-import { TemplatesService } from "../../services/templates";
-import ConnectionEdge from "../network/firewall/edges/ConnectionEdge";
-import styles from "./CourseOperations.module.scss";
-import PageHeader from "../../components/PageHeader/PageHeader";
+import LoadingState from "../../../components/LoadingState/LoadingState";
+import MIcon from "../../../components/MIcon";
+import { useConfirm } from "../../../components/ConfirmDialog/ConfirmProvider";
+import { CourseEnvironmentsService } from "../../../services/courseEnvironments";
+import { TeachingClassesService } from "../../../services/teachingClasses";
+import { apiGet } from "../../../services/api";
+import EmptyState from "../../../components/EmptyState/EmptyState";
+import { TemplatesService } from "../../../services/templates";
+import ConnectionEdge from "../../network/firewall/edges/ConnectionEdge";
+import styles from "../CourseOperations.module.scss";
+import PageHeader from "../../../components/PageHeader/PageHeader";
 
 const TABS = [
   ["basic", "基本資料"],

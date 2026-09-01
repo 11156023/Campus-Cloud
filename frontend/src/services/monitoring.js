@@ -18,7 +18,7 @@ export const MonitoringService = {
     return apiGet(`/api/v1/monitoring/vms/${vmid}/rrd?timeframe=${timeframe}`);
   },
 
-  /** 告警事件列表（active=true 只列未解除的） */
+  /** 警告事件列表（active=true 只列未解除的） */
   listAlerts({ active = false, limit = 200 } = {}) {
     const q = new URLSearchParams();
     q.set("active", String(active));
@@ -26,7 +26,7 @@ export const MonitoringService = {
     return apiGet(`/api/v1/monitoring/alerts?${q.toString()}`);
   },
 
-  /** 確認（ack）一筆告警 */
+  /** 確認（ack）一筆警告 */
   ackAlert(alertId) {
     return apiPost(`/api/v1/monitoring/alerts/${alertId}/ack`, {});
   },

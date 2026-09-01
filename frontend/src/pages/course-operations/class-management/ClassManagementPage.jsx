@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import LoadingState from "../../components/LoadingState/LoadingState";
-import MIcon from "../../components/MIcon";
-import EmptyState from "../../components/EmptyState/EmptyState";
-import { TeachingClassesService } from "../../services/teachingClasses";
-import styles from "./CourseOperations.module.scss";
-import PageHeader from "../../components/PageHeader/PageHeader";
+import LoadingState from "../../../components/LoadingState/LoadingState";
+import MIcon from "../../../components/MIcon";
+import EmptyState from "../../../components/EmptyState/EmptyState";
+import { TeachingClassesService } from "../../../services/teachingClasses";
+import styles from "../CourseOperations.module.scss";
+import PageHeader from "../../../components/PageHeader/PageHeader";
 
 const STATUS = {
   planning: "準備中",
@@ -146,7 +146,6 @@ export default function ClassManagementPage() {
       icon="school"
       title={classes.length ? "沒有符合搜尋或篩選條件的班級。" : "還沒有任何班級。"}
       description={classes.length ? undefined : "建立班級後，SkyLab 會替每位學生準備好上課機器。"}
-      action={classes.length ? undefined : <button type="button" className={styles.btnSecondary} onClick={() => navigate("/class-setup")}><MIcon name="add" size={17} />一鍵建立班級</button>}
     />}
   </div>;
 }

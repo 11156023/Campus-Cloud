@@ -12,7 +12,7 @@ import {
   getVisibleRubricSources,
   resolveActiveSessionId,
 } from "./AiJudgePanel";
-import { RUBRIC_POLISH_PROMPT } from "../../services/aiJudge";
+import { RUBRIC_POLISH_PROMPT } from "../../../services/aiJudge";
 
 describe("RubricStats", () => {
   const items = [

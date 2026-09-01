@@ -295,7 +295,7 @@ export default function Sidebar({ collapsed, mobileOpen, onToggle, onClose }) {
   return (
     <aside className={cls}>
       {/* ===== Brand ===== */}
-      <div className={styles.brand} onClick={() => window.innerWidth >= 768 && onToggle?.()}>
+      <div className={styles.brand} onClick={() => window.innerWidth >= 1024 && onToggle?.()}>
         <span className={styles.brandIcon}>
           <img src="/favicon.png" alt="SkyLab" />
         </span>

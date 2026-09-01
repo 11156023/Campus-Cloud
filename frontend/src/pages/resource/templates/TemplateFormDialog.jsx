@@ -6,6 +6,7 @@ import { ResourcesService } from "../../../services/resources";
 import { TemplatesService } from "../../../services/templates";
 import { useToast } from "../../../hooks/useToast";
 import { useConfirm } from "../../../components/ConfirmDialog/ConfirmProvider";
+import { focusInvalidField } from "../../../utils/focusField";
 
 const CORE_MIN = 1;
 const CORE_MAX = 8;
@@ -24,6 +25,9 @@ export default function TemplateFormDialog({ template, closing = false, onClose,
   const isAdmin = user?.role === "admin" || user?.is_superuser === true;
 
   const [sourceVmid, setSourceVmid] = useState("");
+  const [invalid, setInvalid] = useState("");
+  const sourceRef = useRef(null);
+  const nameRef = useRef(null);
   const [name, setName] = useState(template?.name ?? "");
   const [description, setDescription] = useState(template?.description ?? "");
   const [visibility, setVisibility] = useState(template?.visibility ?? "private");
@@ -51,11 +55,13 @@ export default function TemplateFormDialog({ template, closing = false, onClose,
 
   const handleSubmit = async () => {
     if (!isEdit && !sourceVmid) {
-      toast.error("請選擇要轉換的來源 VM");
+      setInvalid("source");
+      focusInvalidField(sourceRef.current);
       return;
     }
     if (!name.trim()) {
-      toast.error("請輸入範本名稱");
+      setInvalid("name");
+      focusInvalidField(nameRef.current);
       return;
     }
 
@@ -114,12 +120,14 @@ export default function TemplateFormDialog({ template, closing = false, onClose,
         </p>
 
         {!isEdit && (
-          <div className={styles.field}>
+          <div className={`${styles.field} ${invalid === "source" ? styles.fieldInvalid : ""}`}>
             <label htmlFor="tpl-source">來源母機</label>
             <select
               id="tpl-source"
+              ref={sourceRef}
               value={sourceVmid}
-              onChange={(e) => setSourceVmid(e.target.value)}
+              aria-invalid={invalid === "source"}
+              onChange={(e) => { setSourceVmid(e.target.value); setInvalid(""); }}
             >
               <option value="">選擇要轉換的 VM/LXC…</option>
               {resources
@@ -136,15 +144,17 @@ export default function TemplateFormDialog({ template, closing = false, onClose,
           </div>
         )}
 
-        <div className={styles.field}>
+        <div className={`${styles.field} ${invalid === "name" ? styles.fieldInvalid : ""}`}>
           <label htmlFor="tpl-name">範本名稱</label>
           <input
             id="tpl-name"
+            ref={nameRef}
             type="text"
             maxLength={255}
             placeholder="例如 Ubuntu 22.04 + Docker 實驗環境"
+            aria-invalid={invalid === "name"}
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e) => { setName(e.target.value); setInvalid(""); }}
           />
         </div>
 

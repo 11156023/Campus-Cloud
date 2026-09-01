@@ -11,6 +11,7 @@
 import { useState } from "react";
 import styles from "./ConnectionDialog.module.scss";
 import MIcon from "../MIcon";
+import { focusInvalidField } from "../../utils/focusField";
 
 const PROTOCOLS = ["tcp", "udp", "icmp", "icmpv6", "sctp"];
 
@@ -28,7 +29,7 @@ function newForwardRow() {
 }
 
 /* ── 入站模式：純防火牆 ── */
-function FirewallOnlyForm({ rows, setRows }) {
+function FirewallOnlyForm({ rows, setRows, invalid }) {
   const add = () => setRows((r) => [...r, newPortRow()]);
   const remove = (id) => setRows((r) => r.filter((x) => x.id !== id));
   const update = (id, key, val) =>
@@ -46,7 +47,8 @@ function FirewallOnlyForm({ rows, setRows }) {
             placeholder="Port"
             value={row.port}
             onChange={(e) => update(row.id, "port", e.target.value)}
-            className={styles.portInput}
+            aria-invalid={Boolean(invalid && !row.port)}
+            className={`${styles.portInput} ${invalid && !row.port ? styles.portInputInvalid : ""}`}
           />
           <select
             value={row.protocol}
@@ -69,7 +71,7 @@ function FirewallOnlyForm({ rows, setRows }) {
 }
 
 /* ── 入站模式：Port Forwarding ── */
-function PortForwardForm({ rows, setRows }) {
+function PortForwardForm({ rows, setRows, invalid }) {
   const add = () => setRows((r) => [...r, newForwardRow()]);
   const remove = (id) => setRows((r) => r.filter((x) => x.id !== id));
   const update = (id, key, val) =>
@@ -90,13 +92,15 @@ function PortForwardForm({ rows, setRows }) {
             type="number" min="1" max="65535" placeholder="外部"
             value={row.externalPort}
             onChange={(e) => update(row.id, "externalPort", e.target.value)}
-            className={styles.portInput}
+            aria-invalid={Boolean(invalid && !row.externalPort)}
+            className={`${styles.portInput} ${invalid && !row.externalPort ? styles.portInputInvalid : ""}`}
           />
           <input
             type="number" min="1" max="65535" placeholder="內部"
             value={row.internalPort}
             onChange={(e) => update(row.id, "internalPort", e.target.value)}
-            className={styles.portInput}
+            aria-invalid={Boolean(invalid && !row.internalPort)}
+            className={`${styles.portInput} ${invalid && !row.internalPort ? styles.portInputInvalid : ""}`}
           />
           <select
             value={row.protocol}
@@ -137,6 +141,10 @@ export default function ConnectionDialog({ nodes, onConfirm, onClose, closing = 
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [portsInvalid, setPortsInvalid] = useState(false);
+
+  /* 任何一列 port 有異動就把紅框拿掉 */
+  const editRows = (setter) => (updater) => { setPortsInvalid(false); setter(updater); };
 
   const isInternetSrc = sourceKey === "internet";
   const isInternetTgt = targetKey === "internet";
@@ -187,7 +195,8 @@ export default function ConnectionDialog({ nodes, onConfirm, onClose, closing = 
     e.preventDefault();
     const ports = buildPorts();
     if (!isOutbound && ports.length === 0) {
-      setError("請至少填寫一個 Port");
+      setPortsInvalid(true);
+      focusInvalidField(e.currentTarget.querySelector('input[type="number"]'));
       return;
     }
     setError("");
@@ -282,8 +291,8 @@ export default function ConnectionDialog({ nodes, onConfirm, onClose, closing = 
                 </button>
               </div>
               {inboundMode === "port"
-                ? <PortForwardForm rows={fwdRows} setRows={setFwdRows} />
-                : <FirewallOnlyForm rows={fwRows} setRows={setFwRows} />
+                ? <PortForwardForm rows={fwdRows} setRows={editRows(setFwdRows)} invalid={portsInvalid} />
+                : <FirewallOnlyForm rows={fwRows} setRows={editRows(setFwRows)} invalid={portsInvalid} />
               }
             </>
           )}
@@ -310,7 +319,7 @@ export default function ConnectionDialog({ nodes, onConfirm, onClose, closing = 
                   </button>
                 </div>
               </div>
-              <FirewallOnlyForm rows={vmRows} setRows={setVmRows} />
+              <FirewallOnlyForm rows={vmRows} setRows={editRows(setVmRows)} invalid={portsInvalid} />
             </>
           )}
 
