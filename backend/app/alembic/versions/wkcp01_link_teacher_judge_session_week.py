@@ -1,15 +1,21 @@
-"""Link Teacher Judge checks to one teaching-class week.
+"""Link Teacher Judge sessions to an optional teaching-class week.
 
 Revision ID: wkcp01
-Revises: tjpy01_python_entrypoint
-Create Date: 2026-08-30
+Revises: tjmerge03_all_heads
+Create Date: 2026-08-31
+
+This revision restores the migration already recorded by existing Campus Cloud
+databases.  Keeping it in the repository preserves the real schema history and
+lets later revisions upgrade normally without stamping over deployed state.
 """
+
+from __future__ import annotations
 
 import sqlalchemy as sa
 from alembic import op
 
 revision = "wkcp01"
-down_revision = "tjpy01_python_entrypoint"
+down_revision = "tjmerge03_all_heads"
 branch_labels = None
 depends_on = None
 
@@ -31,7 +37,6 @@ def upgrade() -> None:
         "ix_teacher_judge_sessions_teaching_class_week_id",
         "teacher_judge_sessions",
         ["teaching_class_week_id"],
-        unique=False,
     )
 
 

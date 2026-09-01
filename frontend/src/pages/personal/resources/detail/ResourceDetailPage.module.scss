@@ -4,7 +4,7 @@
   padding: $spacing-8 $spacing-16;
   flex: 1;
 
-  @include respond-to(md) {
+  @media (min-width: $breakpoint-sidebar) {
     padding: 0;
   }
 }
@@ -673,6 +673,19 @@
   z-index: 300;
   @include flex-center;
   padding: $spacing-16;
+  animation: fadeIn 0.15s ease;
+  transition: opacity 0.15s ease;
+}
+
+.modalOverlayOut {
+  animation: none;
+  opacity: 0;
+  pointer-events: none;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 .modal {
@@ -684,6 +697,12 @@
   background: var(--color-surface);
   border-radius: $radius-16;
   box-shadow: var(--shadow-lg);
+  animation: slideUp 0.18s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 .modalTitle {
@@ -845,5 +864,18 @@
   &:hover {
     background: color-mix(in srgb, var(--color-danger) 12%, transparent);
     color: var(--color-danger);
+  }
+}
+
+/* ── 未填欄位：紅框 ── */
+.fieldInvalid {
+  input,
+  textarea {
+    border-color: var(--color-danger);
+
+    &:focus {
+      border-color: var(--color-danger);
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-danger) 18%, transparent);
+    }
   }
 }

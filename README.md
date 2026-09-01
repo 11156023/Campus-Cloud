@@ -184,6 +184,7 @@ python resource_ssh_ls.py --vmid 101 --ssh-user ubuntu --path /etc
 
 ## 文件索引
 
+- [`docs/multi-machine-environment-sop.md`](docs/multi-machine-environment-sop.md) — 多機教學環境建構、發布與學生使用的正式 SOP
 - [`development.md`](development.md) — 完整開發環境設置
 - [`deployment.md`](deployment.md) — 生產部署指引
 - [`placement.md`](placement.md) — VM placement 演算法說明

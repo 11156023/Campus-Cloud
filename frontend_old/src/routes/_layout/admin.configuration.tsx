@@ -1616,7 +1616,7 @@ function AdminConfigPage() {
               <ClusterOverviewTab />
             </TabsContent>
 
-            {/* ═══ 治理（告警/TTL/閒置/Auto 判斷）═══ */}
+            {/* ═══ 治理（警告/TTL/閒置/Auto 判斷）═══ */}
             <TabsContent value="governance" className="mt-5">
               <GovernanceConfigTab />
             </TabsContent>

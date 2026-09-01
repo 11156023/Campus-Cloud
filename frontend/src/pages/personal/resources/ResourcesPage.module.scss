@@ -8,7 +8,7 @@
   padding: $spacing-8 $spacing-16;
   flex: 1;
 
-  @include respond-to(md) {
+  @media (min-width: $breakpoint-sidebar) {
     padding: 0;
   }
 }
@@ -409,6 +409,7 @@
 }
 
 /* ── Terminal / Console button ── */
+.groupActions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .terminalBtn {
   display: inline-flex;
   align-items: center;

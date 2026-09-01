@@ -70,7 +70,7 @@
   min-height: 0;
   --form-header-h: 76px;
 
-  @include respond-to(md) {
+  @media (min-width: $breakpoint-sidebar) {
     padding: 0;
   }
 
@@ -819,6 +819,20 @@
 
   &:focus { border-color: var(--color-primary); }
   &:disabled { opacity: 0.6; cursor: not-allowed; }
+}
+
+/* ── 未填欄位：紅框 ── */
+.formGroupInvalid {
+  .input,
+  .textarea,
+  .select {
+    border-color: var(--color-danger);
+
+    &:focus {
+      border-color: var(--color-danger);
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-danger) 18%, transparent);
+    }
+  }
 }
 
 /* ── Field hint / error ── */

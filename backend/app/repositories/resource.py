@@ -151,19 +151,12 @@ def get_resource_network_by_vmid(
 
 def get_cached_ip_address(*, session: Session, vmid: int) -> str | None:
     network = get_resource_network_by_vmid(session=session, vmid=vmid)
-    if network and network.ip_address:
-        return network.ip_address
-
-    resource = get_resource_by_vmid(session=session, vmid=vmid)
-    return getattr(resource, "ip_address", None) if resource else None
+    return network.ip_address if network else None
 
 
 def is_ip_address_fresh(*, session: Session, vmid: int, ttl_seconds: int = 3600) -> bool:
     network = get_resource_network_by_vmid(session=session, vmid=vmid)
     cached_at = network.cached_at if network and network.ip_address else None
-    if cached_at is None:
-        resource = get_resource_by_vmid(session=session, vmid=vmid)
-        cached_at = getattr(resource, "ip_address_cached_at", None) if resource else None
     if cached_at is None:
         return False
     age = (datetime.now(timezone.utc) - cached_at).total_seconds()

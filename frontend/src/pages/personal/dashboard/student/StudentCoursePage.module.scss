@@ -1,0 +1,752 @@
+@use "../../../../assets/styles/variables" as *;
+@use "../../../../assets/styles/mixins" as *;
+@use "./studentShared" as *;
+
+/* ── 頁首 ── */
+
+.coursePageHeader {
+  @include glass-surface($shadow: none);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: $spacing-16;
+  padding: $spacing-16;
+  border-radius: $radius-16;
+}
+
+.courseBackButton {
+  display: inline-flex;
+  align-items: center;
+  gap: $spacing-8;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: $radius-8;
+  background: var(--color-hover);
+  color: var(--color-text-primary);
+  font: inherit;
+  font-size: 13px;
+  font-weight: $font-weight-700;
+  cursor: pointer;
+}
+
+.coursePageTitle {
+  min-width: 0;
+
+  h1 {
+    @include text-truncate;
+    margin: 2px 0 3px;
+    color: var(--color-text-primary);
+    font-size: $font-size-24;
+  }
+
+  > p:last-child {
+    @include text-truncate;
+    color: var(--color-text-secondary);
+    font-size: 13px;
+  }
+}
+
+.eyebrow {
+  margin: 0;
+  color: var(--color-primary);
+  font-size: $font-size-12;
+  font-weight: $font-weight-700;
+  letter-spacing: 0.04em;
+}
+
+/* ── 課堂卡片 ── */
+
+.mainGrid {
+  display: block;
+}
+
+.classCard {
+  @include glass-surface;
+  border-radius: $radius-16;
+  @include flex-column;
+  gap: $spacing-16;
+  padding: $spacing-16;
+  overflow: hidden;
+  position: relative;
+
+  @include respond-to(sm) { padding: $spacing-24; }
+
+  &::after {
+    content: "";
+    position: absolute;
+    top: -90px;
+    right: -80px;
+    width: 230px;
+    height: 230px;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--color-primary) 9%, transparent);
+    pointer-events: none;
+  }
+}
+
+.classCardTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: $spacing-16;
+  position: relative;
+  z-index: 1;
+
+  > div { min-width: 0; }
+
+  h2 {
+    margin: 5px 0 6px;
+    color: var(--color-text-primary);
+    font-size: $font-size-24;
+    line-height: 1.35;
+  }
+}
+
+.classDescription {
+  max-width: 680px;
+  color: var(--color-text-secondary);
+  font-size: $font-size-14;
+  line-height: $line-height-base;
+}
+
+.statusBadge {
+  @include badge-base;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 9px;
+  flex-shrink: 0;
+  background: color-mix(in srgb, currentColor 10%, transparent);
+}
+
+.success { color: var(--color-success); }
+
+.info { color: var(--color-info); }
+
+.warning { color: var(--color-warning); }
+
+.danger { color: var(--color-danger); }
+
+.muted { color: var(--color-text-muted); }
+
+.courseContext {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: $spacing-16;
+  color: var(--color-text-secondary);
+  font-size: $font-size-12;
+
+  span {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+}
+
+.progressTrack {
+  height: 6px;
+  overflow: hidden;
+  border-radius: $radius-pill;
+  background: color-mix(in srgb, var(--color-primary) 12%, var(--color-surface));
+
+  span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--color-primary);
+    transition: width $transition-slow;
+  }
+}
+
+.simpleCourseHint {
+  display: inline-flex;
+  align-items: center;
+  gap: $spacing-8;
+  align-self: flex-start;
+  padding: 8px 10px;
+  border-radius: $radius-8;
+  background: color-mix(in srgb, var(--color-success) 8%, transparent);
+  color: var(--color-success);
+  font-size: $font-size-12;
+
+  span {
+    color: var(--color-text-secondary);
+  }
+}
+
+.primaryActions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: $spacing-8;
+}
+
+.primaryButton {
+  @include student-action-button;
+  min-height: 42px;
+  padding: 9px 16px;
+  border-radius: $radius-8;
+  background: var(--color-primary);
+  color: var(--color-text-on-primary);
+
+  &:hover:not(:disabled) { background: var(--color-primary-dark); }
+}
+
+/* ── 課堂機器 ── */
+
+.machinePicker {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--color-primary) 28%, var(--color-border));
+  border-radius: $radius-12;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+  animation: fadeIn .15s ease;
+
+  > header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  > header > div {
+    @include flex-column;
+    gap: 2px;
+  }
+
+  > header strong {
+    color: var(--color-text-primary);
+    font-size: $font-size-14;
+  }
+
+  > header span {
+    color: var(--color-text-secondary);
+    font-size: $font-size-12;
+  }
+
+  > header button {
+    @include flex-center;
+    width: 30px;
+    height: 30px;
+    flex: 0 0 auto;
+    border: 0;
+    border-radius: $radius-8;
+    color: var(--color-text-muted);
+    background: transparent;
+    cursor: pointer;
+
+    &:hover:not(:disabled) { background: var(--color-hover); }
+    &:disabled { cursor: not-allowed; opacity: .4; }
+  }
+}
+
+.machineGrid {
+  display: grid;
+  gap: $spacing-8;
+
+  @include respond-to(md) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+.machineOption {
+  display: grid;
+  min-width: 0;
+  min-height: 66px;
+  padding: 5px;
+  grid-template-columns: minmax(0, 1fr) 38px;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--color-border);
+  border-radius: $radius-8;
+  color: var(--color-text-muted);
+  background: var(--color-surface);
+  transition: border-color $transition-base, background $transition-base, box-shadow $transition-base, transform $transition-base;
+
+  &:has(.machineLaunchButton:hover:not(:disabled)) {
+    border-color: color-mix(in srgb, var(--color-primary) 58%, var(--color-border));
+    background: color-mix(in srgb, var(--color-primary) 6%, var(--color-surface));
+    box-shadow: var(--shadow-sm);
+    transform: translateY(-1px);
+  }
+
+  &:only-child { grid-column: 1 / -1; }
+}
+
+.machineLaunchButton {
+  display: grid;
+  min-width: 0;
+  min-height: 54px;
+  padding: 5px 7px;
+  grid-template-columns: 38px minmax(0, 1fr) auto 18px;
+  align-items: center;
+  gap: 10px;
+  border: 0;
+  border-radius: $radius-8;
+  color: inherit;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    .machineCopy strong,
+    .machineArrow { color: var(--color-primary); }
+  }
+
+  &:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--color-primary) 55%, transparent);
+    outline-offset: 1px;
+  }
+
+  &:disabled { cursor: not-allowed; opacity: .4; }
+}
+
+.machineIcon {
+  @include flex-center;
+  width: 38px;
+  height: 38px;
+  border-radius: $radius-8;
+  color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+}
+
+.machineCopy {
+  @include flex-column;
+  min-width: 0;
+  gap: 3px;
+
+  strong,
+  small { @include text-truncate; }
+
+  strong {
+    color: var(--color-text-primary);
+    font-size: $font-size-12;
+  }
+
+  small {
+    color: var(--color-text-muted);
+    font-size: 11px;
+  }
+}
+
+.machineState {
+  @include badge-base;
+  padding: 4px 7px;
+  color: var(--color-text-muted);
+  background: var(--color-hover);
+  white-space: nowrap;
+}
+
+.machineStateReady {
+  color: var(--color-success);
+  background: color-mix(in srgb, var(--color-success) 10%, transparent);
+}
+
+.machineArrow {
+  @include flex-center;
+  color: var(--color-text-muted);
+  transition: color $transition-base, transform $transition-base;
+}
+
+.machineLaunchButton:hover:not(:disabled) .machineArrow { transform: translateX(2px); }
+
+.machineInfoButton {
+  @include flex-center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid color-mix(in srgb, var(--color-primary) 22%, var(--color-border));
+  border-radius: 50%;
+  color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 7%, var(--color-surface));
+  cursor: pointer;
+  transition: background $transition-base, border-color $transition-base, transform $transition-base;
+
+  &:hover:not(:disabled) {
+    border-color: var(--color-primary);
+    background: color-mix(in srgb, var(--color-primary) 14%, var(--color-surface));
+    transform: translateY(-1px);
+  }
+
+  &:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--color-primary) 55%, transparent);
+    outline-offset: 2px;
+  }
+
+  &:disabled { cursor: not-allowed; opacity: .35; }
+}
+
+/* ── AI 任務列表 ── */
+
+.taskSection {
+  @include glass-surface;
+  border-radius: $radius-16;
+  @include flex-column;
+  gap: $spacing-16;
+  padding: $spacing-16;
+
+  @include respond-to(sm) { padding: $spacing-24; }
+}
+
+.taskNumber {
+  @include flex-center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: color-mix(in srgb, var(--color-text-muted) 9%, transparent);
+  color: var(--color-text-secondary);
+  font-size: $font-size-12;
+  font-weight: $font-weight-700;
+}
+
+.assignmentList {
+  display: grid;
+  gap: $spacing-8;
+}
+
+.assignmentRow {
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: $radius-12;
+  background: var(--color-surface);
+  transition: border-color $transition-base, box-shadow $transition-base;
+}
+
+.assignmentRowOpen {
+  border-color: color-mix(in srgb, var(--color-primary) 38%, var(--color-border));
+  box-shadow: var(--shadow-sm);
+}
+
+.assignmentToggle {
+  display: grid;
+  width: 100%;
+  min-height: 70px;
+  padding: 12px $spacing-16;
+  grid-template-columns: 30px minmax(0, 1fr) auto 22px;
+  align-items: center;
+  gap: 12px;
+  border: 0;
+  color: var(--color-text-muted);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+
+  &:hover:not(:disabled) { background: var(--color-hover); }
+  &:disabled { cursor: not-allowed; opacity: .4; }
+}
+
+.assignmentTitle {
+  @include flex-column;
+  min-width: 0;
+  gap: 3px;
+
+  strong,
+  small { @include text-truncate; }
+
+  strong {
+    color: var(--color-text-primary);
+    font-size: $font-size-14;
+  }
+
+  small {
+    color: var(--color-text-muted);
+    font-size: $font-size-12;
+  }
+}
+
+.assignmentStatus {
+  @include badge-base;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 8px;
+  white-space: nowrap;
+}
+
+.assignmentStatus_ready,
+.assignmentStatus_pending,
+.assignmentStatus_cancelled {
+  background: var(--color-hover);
+  color: var(--color-text-muted);
+}
+
+.assignmentStatus_running {
+  background: color-mix(in srgb, var(--color-info) 10%, transparent);
+  color: var(--color-info);
+}
+
+.assignmentStatus_completed {
+  background: color-mix(in srgb, var(--color-success) 11%, transparent);
+  color: var(--color-success);
+}
+
+.assignmentStatus_failed {
+  background: color-mix(in srgb, var(--color-danger) 10%, transparent);
+  color: var(--color-danger);
+}
+
+.assignmentDetail {
+  display: grid;
+  gap: 12px;
+  padding: $spacing-16;
+  border-top: 1px solid var(--color-divider);
+  background: color-mix(in srgb, var(--color-primary) 2%, var(--color-surface));
+  animation: fadeIn .15s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── 任務展開後的內容與 AI 回覆 ── */
+
+.aiBrief {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+
+  > span {
+    @include flex-center;
+    width: 34px;
+    height: 34px;
+    flex: 0 0 auto;
+    border-radius: $radius-8;
+    background: color-mix(in srgb, var(--color-primary) 11%, transparent);
+    color: var(--color-primary);
+  }
+
+  strong {
+    color: var(--color-text-primary);
+    font-size: $font-size-14;
+  }
+
+  p {
+    margin-top: 4px;
+    color: var(--color-text-secondary);
+    font-size: $font-size-12;
+    line-height: 1.6;
+  }
+}
+
+.aiRequirementList {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 12px $spacing-16 $spacing-16;
+  list-style: none;
+}
+
+.aiRequirementItem {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: $radius-8;
+  background: var(--color-surface-glass);
+}
+
+.aiRequirementNumber {
+  @include flex-center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+  color: var(--color-primary);
+  font-size: $font-size-12;
+  font-weight: $font-weight-700;
+}
+
+.aiRequirementContent {
+  min-width: 0;
+
+  strong {
+    color: var(--color-text-primary);
+    font-size: $font-size-14;
+  }
+
+  p {
+    margin-top: 3px;
+    color: var(--color-text-secondary);
+    font-size: $font-size-12;
+    line-height: 1.5;
+  }
+}
+
+.aiCheckBadge {
+  @include badge-base;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 7px;
+  white-space: nowrap;
+
+  &.auto {
+    background: color-mix(in srgb, var(--color-success) 10%, transparent);
+    color: var(--color-success);
+  }
+
+  &.partial {
+    background: color-mix(in srgb, var(--color-info) 10%, transparent);
+    color: var(--color-info);
+  }
+
+  &.manual {
+    background: color-mix(in srgb, var(--color-warning) 10%, transparent);
+    color: var(--color-warning);
+  }
+}
+
+.aiReply {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--color-info) 25%, var(--color-border));
+  border-radius: $radius-12;
+  background: color-mix(in srgb, var(--color-info) 6%, var(--color-surface));
+
+  > header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  > header > span {
+    @include flex-center;
+    width: 36px;
+    height: 36px;
+    flex: 0 0 auto;
+    border-radius: $radius-8;
+    background: color-mix(in srgb, var(--color-info) 11%, transparent);
+    color: var(--color-info);
+  }
+
+  > header > div {
+    @include flex-column;
+    gap: 2px;
+  }
+
+  > header strong {
+    color: var(--color-text-primary);
+    font-size: $font-size-14;
+  }
+
+  > header small {
+    color: var(--color-text-muted);
+    font-size: $font-size-12;
+  }
+
+  > p {
+    margin: 0;
+    color: var(--color-text-secondary);
+    font-size: $font-size-12;
+    line-height: 1.6;
+  }
+}
+
+.aiReply_completed {
+  border-color: color-mix(in srgb, var(--color-success) 28%, var(--color-border));
+  background: color-mix(in srgb, var(--color-success) 6%, var(--color-surface));
+
+  > header > span {
+    background: color-mix(in srgb, var(--color-success) 11%, transparent);
+    color: var(--color-success);
+  }
+}
+
+.aiReply_failed,
+.aiReply_cancelled {
+  border-color: color-mix(in srgb, var(--color-danger) 28%, var(--color-border));
+  background: color-mix(in srgb, var(--color-danger) 5%, var(--color-surface));
+
+  > header > span {
+    background: color-mix(in srgb, var(--color-danger) 10%, transparent);
+    color: var(--color-danger);
+  }
+}
+
+.aiReplyItems {
+  display: grid;
+  gap: 6px;
+
+  > div {
+    display: grid;
+    padding: 9px 10px;
+    grid-template-columns: 20px minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 8px;
+    border-radius: $radius-8;
+    background: var(--color-surface);
+    color: var(--color-success);
+  }
+
+  span {
+    @include flex-column;
+    gap: 2px;
+  }
+
+  strong {
+    color: var(--color-text-primary);
+    font-size: $font-size-12;
+  }
+
+  small {
+    color: var(--color-text-secondary);
+    font-size: 11px;
+    line-height: 1.45;
+  }
+
+  em {
+    color: var(--color-text-muted);
+    font-size: $font-size-12;
+    font-style: normal;
+    font-weight: $font-weight-700;
+  }
+}
+
+.assignmentActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+
+  > span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--color-text-muted);
+    font-size: $font-size-12;
+  }
+}
+
+.aiCheckButton {
+  display: inline-flex;
+  min-height: 40px;
+  padding: 8px 14px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid var(--color-primary);
+  border-radius: $radius-8;
+  color: var(--color-text-on-primary);
+  background: var(--color-primary);
+  font: inherit;
+  font-size: $font-size-12;
+  font-weight: $font-weight-700;
+  cursor: pointer;
+
+  &:hover:not(:disabled) { background: var(--color-primary-dark); }
+  &:disabled { cursor: not-allowed; opacity: .4; }
+}
+
+/* ── 手機版 ── */
+
+@media (max-width: $breakpoint-sm) {
+  
+}

@@ -29,7 +29,7 @@
     transform: translateX(0);
   }
 
-  @include respond-to(md) {
+  @media (min-width: $breakpoint-sidebar) {
     position: sticky;
     top: var(--layout-py);
     left: auto;
@@ -360,6 +360,26 @@
   }
 }
 
+/* 液態玻璃的折射濾鏡會讓彈窗被背後的側欄文字干擾，
+   彈窗改用毛玻璃預設濾鏡確保可讀性
+   （表面塗層 liquid 已不覆寫、即為預設值，這裡毋須再蓋回） */
+:global(body[data-style="liquid"]) {
+  .userPopup,
+  .appearancePopup {
+    --color-surface-glass-border: rgba(255, 255, 255, 0.5);
+    --glass-backdrop-filter: blur(12px) saturate(1.4);
+  }
+}
+
+/* 深色底加重塗層，蓋住彈窗背後的側欄文字 */
+:global(body.dark[data-style="liquid"]) {
+  .userPopup,
+  .appearancePopup {
+    --color-surface-glass: rgba(22, 27, 38, 0.85);
+    --color-surface-glass-border: rgba(255, 255, 255, 0.07);
+  }
+}
+
 .userPopupHeader {
   display: flex;
   align-items: center;
@@ -411,7 +431,7 @@
   &.userPopupItemDanger {
     color: var(--color-danger);
     &:hover {
-      background: color-mix(in srgb, var(--color-danger) 10%, transparent);
+      background: color-mix(in srgb, var(--color-danger) 10%, var(--color-surface));
     }
   }
 }

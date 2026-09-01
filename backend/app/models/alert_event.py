@@ -1,4 +1,4 @@
-"""資源告警事件模型。"""
+"""資源警告事件模型。"""
 
 import enum
 import uuid
@@ -21,7 +21,7 @@ class AlertMetric(str, enum.Enum):
 
 
 class AlertEvent(SQLModel, table=True):
-    """資源閾值告警事件（open = resolved_at IS NULL）。"""
+    """資源閾值警告事件（open = resolved_at IS NULL）。"""
 
     __tablename__ = "alert_events"
     __table_args__ = (

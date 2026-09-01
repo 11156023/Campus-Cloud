@@ -5,6 +5,7 @@ import LoadingState from "../../../../components/LoadingState/LoadingState";
 import ReverseProxyRuleModal from "../../../../components/ReverseProxyRuleModal/ReverseProxyRuleModal";
 import { useAuth } from "../../../../contexts/AuthContext";
 import { useToast } from "../../../../hooks/useToast";
+import useDialogPresence from "../../../../hooks/useDialogPresence";
 import { ReverseProxyService } from "../../../../services/reverseProxy";
 import { ResourcesService } from "../../../../services/resources";
 
@@ -19,6 +20,7 @@ export default function AdvancedSettingsTab({ vmid }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [modal, setModal] = useState(null); // { kind: "rule", rule? } | { kind: "delete", rule }
+  const modalPresence = useDialogPresence(modal);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -194,23 +196,27 @@ export default function AdvancedSettingsTab({ vmid }) {
         </div>
       </div>
 
-      {modal?.kind === "rule" && (
+      {modalPresence.item?.kind === "rule" && (
         <ReverseProxyRuleModal
-          rule={modal.rule}
+          rule={modalPresence.item.rule}
           setupContext={setupContext}
           isAdmin={isAdmin}
           fixedResource={{ vmid, name: resource?.name }}
           loading={saving}
           onClose={() => setModal(null)}
           onSubmit={handleSubmitRule}
+          closing={modalPresence.closing}
         />
       )}
-      {modal?.kind === "delete" && (
-        <div className={styles.modalOverlay} onMouseDown={() => setModal(null)}>
+      {modalPresence.item?.kind === "delete" && (
+        <div
+          className={`${styles.modalOverlay} ${modalPresence.closing ? styles.modalOverlayOut : ""}`}
+          onMouseDown={() => setModal(null)}
+        >
           <div className={styles.modal} onMouseDown={(e) => e.stopPropagation()}>
             <h2 className={styles.modalTitle}>刪除網址</h2>
             <p className={styles.modalDesc}>
-              確定要刪除 <strong>{modal.rule.domain}</strong> 嗎？刪除後這個網址會立刻失效，
+              確定要刪除 <strong>{modalPresence.item.rule.domain}</strong> 嗎？刪除後這個網址會立刻失效，
               相關設定也會一併清除。
             </p>
             <div className={styles.modalActions}>

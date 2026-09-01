@@ -8,24 +8,40 @@ from sqlmodel import Session, select
 
 from app.models.teacher_judge_template_command import TeacherJudgeTemplateCommand
 
-SUPPORTED_TEMPLATE_KEYS = {"linux", "python", "n8n"}
+SUPPORTED_TEMPLATE_KEYS = {"linux", "python", "n8n", "postgresql"}
 
 
 def get_enabled_template_commands(
     session: Session,
     template_key: str,
+    *,
+    include_cross_template: bool = False,
 ) -> list[TeacherJudgeTemplateCommand]:
-    """Return enabled command catalog rows for one template."""
+    """Return enabled commands, optionally including controlled cross-template capabilities."""
     statement = (
         select(TeacherJudgeTemplateCommand)
-        .where(TeacherJudgeTemplateCommand.template_key == template_key)
         .where(TeacherJudgeTemplateCommand.enabled == True)  # noqa: E712
         .order_by(
+            TeacherJudgeTemplateCommand.template_key,
             TeacherJudgeTemplateCommand.category,
             TeacherJudgeTemplateCommand.command_key,
         )
     )
-    return list(session.exec(statement).all())
+    if not include_cross_template:
+        statement = statement.where(
+            TeacherJudgeTemplateCommand.template_key == template_key
+        )
+    commands = list(session.exec(statement).all())
+    if include_cross_template:
+        commands.sort(
+            key=lambda command: (
+                command.template_key != template_key,
+                command.template_key,
+                command.category,
+                command.command_key,
+            )
+        )
+    return commands
 
 
 def format_template_commands_for_prompt(
@@ -40,7 +56,8 @@ def format_template_commands_for_prompt(
         lines.append(
             "\n".join(
                 [
-                    f"- command_key: {command.command_key}",
+                    f"- template_key: {command.template_key}",
+                    f"  command_key: {command.command_key}",
                     f"  command_label: {command.command_label}",
                     f"  category: {command.category}",
                     f"  description: {command.description}",
@@ -63,7 +80,9 @@ def validate_check_steps(
     This helper accepts item-shaped dictionaries so tests and callers can validate
     raw LLM payloads without needing to instantiate Pydantic schemas first.
     """
-    valid_commands = {command.command_key: command for command in commands}
+    valid_commands = {
+        (command.template_key, command.command_key): command for command in commands
+    }
     normalized_items: list[dict[str, Any]] = []
     for item in items:
         next_item = dict(item)
@@ -75,12 +94,12 @@ def validate_check_steps(
                     continue
                 step_template_key = str(raw_step.get("template_key") or template_key).strip()
                 command_key = str(raw_step.get("command_key") or "").strip()
-                command = valid_commands.get(command_key)
-                if step_template_key != template_key or command is None:
+                command = valid_commands.get((step_template_key, command_key))
+                if command is None:
                     continue
                 valid_steps.append(
                     {
-                        "template_key": template_key,
+                        "template_key": command.template_key,
                         "command_key": command.command_key,
                         "command_label": command.command_label,
                     }

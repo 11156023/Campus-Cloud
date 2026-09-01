@@ -4,7 +4,7 @@
   padding: $spacing-8 $spacing-16;
   flex: 1;
 
-  @include respond-to(md) {
+  @media (min-width: $breakpoint-sidebar) {
     padding: 0;
   }
 }
@@ -145,7 +145,21 @@
   }
 }
 
+@keyframes menuIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.rowMenuOut {
+  animation: none !important;
+  opacity: 0;
+  transform: translateY(6px);
+  pointer-events: none;
+}
+
 .rowMenu {
+  animation: menuIn 0.13s ease;
+  transition: opacity 0.13s ease, transform 0.13s ease;
   position: absolute;
   top: calc(100% + 4px);
   right: 0;
@@ -306,9 +320,28 @@
   z-index: 300;
   @include flex-center;
   padding: $spacing-16;
+  animation: fadeIn 0.15s ease;
+  transition: opacity 0.15s ease;
+}
+
+.modalOverlayOut {
+  animation: none;
+  opacity: 0;
+  pointer-events: none;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 .modal {
+  animation: slideUp 0.18s cubic-bezier(0.25, 0.8, 0.25, 1);
   @include flex-column;
   gap: $spacing-16;
   width: 100%;
@@ -540,12 +573,6 @@
   background: var(--color-hover);
 }
 
-.iconUploadRow {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
 /* ── 附件（使用手冊） ── */
 .attachList {
   display: flex;
@@ -615,4 +642,18 @@
   margin-top: auto;
 
   > * { flex: 1; }
+}
+
+/* ── 未填欄位：紅框 ── */
+.fieldInvalid {
+  input,
+  textarea,
+  select {
+    border-color: var(--color-danger);
+
+    &:focus {
+      border-color: var(--color-danger);
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-danger) 18%, transparent);
+    }
+  }
 }

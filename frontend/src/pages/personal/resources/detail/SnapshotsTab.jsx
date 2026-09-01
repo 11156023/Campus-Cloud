@@ -1,17 +1,22 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import styles from "./ResourceDetailPage.module.scss";
 import MIcon from "../../../../components/MIcon";
 import LoadingState from "../../../../components/LoadingState/LoadingState";
 import EmptyState from "../../../../components/EmptyState/EmptyState";
 import { ResourcesService } from "../../../../services/resources";
 import { useToast } from "../../../../hooks/useToast";
+import useDialogPresence from "../../../../hooks/useDialogPresence";
+import { focusInvalidField } from "../../../../utils/focusField";
 
 const INIT_SNAPSHOT_NAME = "skylab-init";
 
 /** 輕量確認 dialog（比照 ResourcesPage 的 ConfirmModal 行為） */
-function ConfirmModal({ title, desc, confirmLabel = "確定", danger = false, loading = false, onConfirm, onClose }) {
+function ConfirmModal({ title, desc, confirmLabel = "確定", danger = false, loading = false, closing = false, onConfirm, onClose }) {
   return (
-    <div className={styles.modalOverlay} onClick={onClose}>
+    <div
+      className={`${styles.modalOverlay} ${closing ? styles.modalOverlayOut : ""}`}
+      onClick={onClose}
+    >
       <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
         <span className={styles.modalTitle}>{title}</span>
         {desc && <p className={styles.modalDesc}>{desc}</p>}
@@ -41,8 +46,14 @@ export default function SnapshotsTab({ vmid }) {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [rollbackTarget, setRollbackTarget] = useState(null);
   const [snapname, setSnapname] = useState("");
+  const [nameInvalid, setNameInvalid] = useState(false);
+  const snapnameRef = useRef(null);
   const [description, setDescription] = useState("");
   const [busy, setBusy] = useState(false);
+  const createDialog    = useDialogPresence(createOpen);
+  const resetDialog     = useDialogPresence(resetConfirm);
+  const rollbackDialog  = useDialogPresence(rollbackTarget);
+  const deleteDialog    = useDialogPresence(deleteTarget);
 
   const load = useCallback(async () => {
     try {
@@ -75,7 +86,8 @@ export default function SnapshotsTab({ vmid }) {
 
   const handleCreate = () => {
     if (!snapname.trim()) {
-      toast.error("請輸入快照名稱");
+      setNameInvalid(true);
+      focusInvalidField(snapnameRef.current);
       return;
     }
     run(
@@ -89,6 +101,7 @@ export default function SnapshotsTab({ vmid }) {
       () => {
         setCreateOpen(false);
         setSnapname("");
+        setNameInvalid(false);
         setDescription("");
       },
     );
@@ -130,7 +143,7 @@ export default function SnapshotsTab({ vmid }) {
             <button
               type="button"
               className={styles.btnPrimary}
-              onClick={() => setCreateOpen(true)}
+              onClick={() => { setNameInvalid(false); setCreateOpen(true); }}
             >
               <MIcon name="add" size={14} />
               建立快照
@@ -201,19 +214,24 @@ export default function SnapshotsTab({ vmid }) {
         )}
       </div>
 
-      {createOpen && (
-        <div className={styles.modalOverlay} onClick={() => setCreateOpen(false)}>
+      {createDialog.open && (
+        <div
+          className={`${styles.modalOverlay} ${createDialog.closing ? styles.modalOverlayOut : ""}`}
+          onClick={() => setCreateOpen(false)}
+        >
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
             <span className={styles.modalTitle}>建立快照</span>
             <p className={styles.modalDesc}>快照會保留目前磁碟狀態，可隨時還原</p>
-            <div className={styles.field}>
+            <div className={`${styles.field} ${nameInvalid ? styles.fieldInvalid : ""}`}>
               <label htmlFor="snap-name">名稱 *</label>
               <input
                 id="snap-name"
+                ref={snapnameRef}
                 type="text"
                 placeholder="snap-2026-07-04"
+                aria-invalid={nameInvalid}
                 value={snapname}
-                onChange={(e) => setSnapname(e.target.value)}
+                onChange={(e) => { setSnapname(e.target.value); setNameInvalid(false); }}
               />
             </div>
             <div className={styles.field}>
@@ -247,13 +265,14 @@ export default function SnapshotsTab({ vmid }) {
         </div>
       )}
 
-      {resetConfirm && (
+      {resetDialog.open && (
         <ConfirmModal
           title="重置到初始狀態？"
           desc="VM 會還原到初始快照並重新開機，之後的所有變更將會消失。"
           confirmLabel="重置"
           danger
           loading={busy}
+          closing={resetDialog.closing}
           onConfirm={() =>
             run(() => ResourcesService.resetToInit(vmid), "重置任務已排入背景執行", () =>
               setResetConfirm(false),
@@ -263,16 +282,17 @@ export default function SnapshotsTab({ vmid }) {
         />
       )}
 
-      {rollbackTarget && (
+      {rollbackDialog.open && (
         <ConfirmModal
-          title={`還原到快照「${rollbackTarget}」？`}
+          title={`還原到快照「${rollbackDialog.item}」？`}
           desc="還原後，快照之後的變更將會消失。"
           confirmLabel="還原"
           danger
           loading={busy}
+          closing={rollbackDialog.closing}
           onConfirm={() =>
             run(
-              () => ResourcesService.rollbackSnapshot(vmid, rollbackTarget),
+              () => ResourcesService.rollbackSnapshot(vmid, rollbackDialog.item),
               "還原已開始",
               () => setRollbackTarget(null),
             )
@@ -281,16 +301,17 @@ export default function SnapshotsTab({ vmid }) {
         />
       )}
 
-      {deleteTarget && (
+      {deleteDialog.open && (
         <ConfirmModal
-          title={`刪除快照「${deleteTarget}」？`}
+          title={`刪除快照「${deleteDialog.item}」？`}
           desc="刪除後無法復原。"
           confirmLabel="刪除"
           danger
           loading={busy}
+          closing={deleteDialog.closing}
           onConfirm={() =>
             run(
-              () => ResourcesService.deleteSnapshot(vmid, deleteTarget),
+              () => ResourcesService.deleteSnapshot(vmid, deleteDialog.item),
               "快照已刪除",
               () => setDeleteTarget(null),
             )

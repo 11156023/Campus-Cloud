@@ -1,9 +1,8 @@
 """範本政策（密碼/GPU/磁碟鎖定）與 icon/附件檔案的單元測試。
 
 mock PVE operations 與 repo，無 DB / Redis：
-- request_clone：密碼政策、requires_gpu 強制、GPU 節點相容、payload 加密
+- request_clone：密碼政策、GPU 節點相容、payload 加密
 - _reconfigure_qemu：login_password=None 時不得帶 cipassword
-- create/update template：LXC 不可設 requires_gpu
 - template_files：icon 與附件的實體檔案生命週期
 - add_attachment：副檔名 / 大小 / 數量上限
 """
@@ -21,13 +20,9 @@ from typing import Any
 import pytest
 
 from app.core.security import decrypt_value
-from app.exceptions import BadRequestError
+from app.exceptions import BadRequestError, ConflictError
 from app.models import VMTemplate, VMTemplateStatus
-from app.schemas.template import (
-    TemplateCloneRequest,
-    VMTemplateCreate,
-    VMTemplateUpdate,
-)
+from app.schemas.template import TemplateCloneRequest
 from app.services.proxmox import provisioning_service
 from app.services.template import clone_service, template_files, template_service
 
@@ -81,20 +76,6 @@ async def test_request_clone_rejects_custom_password_when_locked(
         )
 
 
-async def test_request_clone_requires_gpu_selection(
-    clone_target: VMTemplate,
-) -> None:
-    clone_target.requires_gpu = True
-
-    with pytest.raises(BadRequestError, match="需要 GPU"):
-        await clone_service.request_clone(
-            session=None,  # type: ignore[arg-type]
-            user=make_user("teacher"),
-            template_id=clone_target.id,
-            data=TemplateCloneRequest(count=1),
-        )
-
-
 async def test_request_clone_rejects_gpu_on_lxc_template(
     clone_target: VMTemplate,
 ) -> None:
@@ -112,7 +93,6 @@ async def test_request_clone_rejects_gpu_on_lxc_template(
 async def test_request_clone_rejects_gpu_not_on_template_node(
     clone_target: VMTemplate, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    clone_target.requires_gpu = True
     monkeypatch.setattr(
         provisioning_service, "_gpu_mapping_nodes", lambda mapping_id: {"pve2"}
     )
@@ -129,7 +109,6 @@ async def test_request_clone_rejects_gpu_not_on_template_node(
 async def test_request_clone_payload_encrypts_password_and_locks_disk(
     clone_target: VMTemplate, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    clone_target.requires_gpu = True
     monkeypatch.setattr(
         provisioning_service, "_gpu_mapping_nodes", lambda mapping_id: {"pve1"}
     )
@@ -234,58 +213,6 @@ def test_reconfigure_qemu_sets_custom_password(
 ) -> None:
     captured = _reconfigure(monkeypatch, "Custom1234")
     assert captured["cipassword"] == "Custom1234"
-
-
-# ---------------------------------------------------------------------------
-# create / update template：LXC 不可設 requires_gpu
-# ---------------------------------------------------------------------------
-
-
-async def test_create_template_rejects_requires_gpu_for_lxc(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    import app.core.authorizers as authorizers
-
-    monkeypatch.setattr(authorizers, "require_template_manage", lambda user: None)
-    monkeypatch.setattr(
-        template_service.template_repo,
-        "get_template_by_pve_vmid",
-        lambda **kw: None,
-    )
-    monkeypatch.setattr(
-        template_service.proxmox_ops,
-        "find_resource",
-        lambda vmid: {"vmid": vmid, "type": "lxc", "node": "pve1"},
-    )
-
-    with pytest.raises(BadRequestError, match="LXC"):
-        await template_service.create_template(
-            session=None,  # type: ignore[arg-type]
-            user=make_user("teacher"),
-            data=VMTemplateCreate(
-                source_vmid=321, name="ct-tpl", requires_gpu=True
-            ),
-        )
-
-
-def test_update_template_rejects_requires_gpu_for_lxc(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    template = make_template(resource_type="lxc")
-    monkeypatch.setattr(
-        template_service, "_get_or_404", lambda session, template_id: template
-    )
-    monkeypatch.setattr(
-        template_service, "_require_owner", lambda user, template: None
-    )
-
-    with pytest.raises(BadRequestError, match="LXC"):
-        template_service.update_template(
-            session=None,  # type: ignore[arg-type]
-            user=make_user("teacher"),
-            template_id=template.id,
-            data=VMTemplateUpdate(requires_gpu=True),
-        )
 
 
 # ---------------------------------------------------------------------------
@@ -492,4 +419,121 @@ def test_manual_download_validates_attachment_id(
             session=None,  # type: ignore[arg-type]
             vmid=400,
             attachment_id=uuid.uuid4(),
+        )
+
+
+# ---------------------------------------------------------------------------
+# 學生可申請的應用範本目錄
+# ---------------------------------------------------------------------------
+
+
+def _catalog_rows() -> list[VMTemplate]:
+    return [
+        make_template(
+            pve_vmid=9001,
+            name="n8n",
+            resource_type="lxc",
+            student_requestable=True,
+        ),
+        make_template(
+            pve_vmid=9002,
+            name="jupyter",
+            resource_type="qemu",
+            student_requestable=True,
+            default_cores=4,
+            default_memory=8192,
+            default_disk=60,
+        ),
+        make_template(pve_vmid=9003, name="gone", student_requestable=True),
+    ]
+
+
+def test_student_catalog_uses_pve_facts_and_skips_missing_templates(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        template_service.template_repo,
+        "list_student_catalog",
+        lambda **kwargs: _catalog_rows(),
+    )
+    monkeypatch.setattr(
+        template_service.proxmox_ops,
+        "get_vm_templates",
+        lambda: [
+            # 16 GiB disk, 2 GiB RAM
+            {"vmid": 9001, "type": "lxc", "maxcpu": 2, "maxmem": 2147483648, "maxdisk": 17179869184},
+            {"vmid": 9002, "type": "qemu", "maxcpu": 2, "maxmem": 2147483648, "maxdisk": 21474836480},
+        ],
+    )
+    monkeypatch.setattr(
+        "app.services.proxmox.provisioning_service.is_windows_template",
+        lambda vmid: False,
+    )
+
+    catalog = template_service.list_student_catalog(session=None)  # type: ignore[arg-type]
+
+    by_vmid = {item.pve_vmid: item for item in catalog}
+    # PVE 上已經不存在的範本不能留在目錄裡，否則學生按下去才失敗
+    assert set(by_vmid) == {9001, 9002}
+    # 沒有設定預設值的容器範本，規格與磁碟下限來自 PVE 本身
+    assert (by_vmid[9001].cores, by_vmid[9001].memory_mb, by_vmid[9001].disk_gb) == (
+        2,
+        2048,
+        16,
+    )
+    # 教師設定過的預設值優先於 PVE 的實際大小
+    assert (by_vmid[9002].cores, by_vmid[9002].memory_mb, by_vmid[9002].disk_gb) == (
+        4,
+        8192,
+        60,
+    )
+
+
+def test_lxc_templates_are_not_offered_as_vm_sources(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.services.proxmox import provisioning_service
+
+    monkeypatch.setattr(
+        provisioning_service.proxmox_service,
+        "get_vm_templates",
+        lambda: [
+            {"vmid": 9001, "type": "lxc", "name": "n8n", "node": "pve1"},
+            {"vmid": 9002, "type": "qemu", "name": "ubuntu", "node": "pve1"},
+        ],
+    )
+    monkeypatch.setattr(provisioning_service, "_template_ostype", lambda vm: "l26")
+
+    assert [item.vmid for item in provisioning_service.get_vm_templates()] == [9002]
+
+
+# ---------------------------------------------------------------------------
+# 刪除保護：已被多機環境引用的母範本不得硬刪
+# ---------------------------------------------------------------------------
+
+
+async def test_delete_template_refuses_while_an_environment_references_it(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    template = make_template()
+    monkeypatch.setattr(
+        template_service, "_get_or_404", lambda session, template_id: template
+    )
+    monkeypatch.setattr(
+        template_service, "_require_owner", lambda user, template: None
+    )
+    monkeypatch.setattr(
+        template_service, "_clone_children_vmids", lambda session, pve_vmid: []
+    )
+    monkeypatch.setattr(
+        template_service,
+        "_environments_referencing",
+        lambda session, template_id: ["Linux 三層式", "資安攻防"],
+    )
+
+    with pytest.raises(ConflictError, match="Linux 三層式"):
+        await template_service.delete_template(
+            session=None,  # type: ignore[arg-type]
+            user=make_user("teacher"),
+            template_id=template.id,
         )

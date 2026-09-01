@@ -7,6 +7,7 @@ import { QuotasService } from "../../../services/quotas";
 import { UsersService } from "../../../services/users";
 import { useConfirm } from "../../../components/ConfirmDialog/ConfirmProvider";
 import { useToast } from "../../../hooks/useToast";
+import useDialogPresence from "../../../hooks/useDialogPresence";
 import PageHeader from "../../../components/PageHeader/PageHeader";
 
 // fallback：取消「無限制」勾選時回填的預設值；0 = 無限制
@@ -88,6 +89,7 @@ function formatUser(user) {
 function UserPicker({ users, loading, value, onChange }) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
+  const list = useDialogPresence(open, 130);
   const wrapRef = useRef(null);
 
   const selected = users.find((u) => u.id === value) ?? null;
@@ -134,8 +136,8 @@ function UserPicker({ users, loading, value, onChange }) {
             if (value) onChange("");
           }}
         />
-        {open && (
-          <ul className={styles.pickerList}>
+        {list.open && (
+          <ul className={`${styles.pickerList} ${list.closing ? styles.pickerListOut : ""}`}>
             {matches.length === 0 ? (
               <li className={styles.pickerEmpty}>
                 {loading ? "載入中…" : "查無符合的使用者"}
@@ -164,7 +166,7 @@ function UserPicker({ users, loading, value, onChange }) {
 }
 
 /* ── 新增／編輯個人覆寫 ───────────────────────────────────────────────── */
-function QuotaDialog({ mode, quota, candidates, loadingUsers, defaults, onClose, onSaved }) {
+function QuotaDialog({ mode, quota, candidates, loadingUsers, defaults, closing = false, onClose, onSaved }) {
   const toast = useToast();
   const isEdit = mode === "edit";
   const baseline = useMemo(
@@ -190,7 +192,6 @@ function QuotaDialog({ mode, quota, candidates, loadingUsers, defaults, onClose,
         toast.success("配額已更新");
       } else {
         await QuotasService.create({
-          scope: "user",
           user_id: userId,
           ...normNumbers(form, baseline),
         });
@@ -205,7 +206,10 @@ function QuotaDialog({ mode, quota, candidates, loadingUsers, defaults, onClose,
   };
 
   return (
-    <div className={styles.modalOverlay} onClick={onClose}>
+    <div
+      className={`${styles.modalOverlay} ${closing ? styles.modalOverlayOut : ""}`}
+      onClick={onClose}
+    >
       <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
         <span className={styles.modalTitle}>
           <MIcon name="data_usage" size={18} />
@@ -354,6 +358,7 @@ export default function QuotasPage() {
   const [users, setUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [dialog, setDialog] = useState(null);
+  const dialogPresence = useDialogPresence(dialog);
   const [deleting, setDeleting] = useState(null);
 
   const load = useCallback(async () => {
@@ -489,13 +494,14 @@ export default function QuotasPage() {
         )}
       </div>
 
-      {dialog && (
+      {dialogPresence.open && (
         <QuotaDialog
-          mode={dialog.mode}
-          quota={dialog.quota}
+          mode={dialogPresence.item.mode}
+          quota={dialogPresence.item.quota}
           candidates={candidates}
           loadingUsers={loadingUsers}
           defaults={globalQuota}
+          closing={dialogPresence.closing}
           onClose={() => setDialog(null)}
           onSaved={() => {
             setDialog(null);

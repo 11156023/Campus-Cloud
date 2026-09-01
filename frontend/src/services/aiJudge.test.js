@@ -1,5 +1,12 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
-import { AiJudgeService } from "./aiJudge";
+import {
+  AiJudgeService,
+  RUBRIC_POLISH_PROMPT,
+  RUBRIC_REASSESS_PROMPT,
+  TEMPLATE_OPTIONS,
+  getTemplateLabel,
+  shouldDisplayChatMessage,
+} from "./aiJudge";
 
 function fakeStorage() {
   const values = new Map();
@@ -25,6 +32,26 @@ beforeEach(() => {
 });
 
 describe("AiJudgeService persistent sessions", () => {
+  test("評分環境提供 PostgreSQL 模板", () => {
+    expect(TEMPLATE_OPTIONS.map((option) => option.key)).toContain("postgresql");
+    expect(getTemplateLabel("postgresql")).toBe("PostgreSQL");
+  });
+
+  test("上傳評分表會帶上主要與候選評分環境", async () => {
+    const file = new File(["rubric"], "rubric.pdf", { type: "application/pdf" });
+    await AiJudgeService.uploadFile(
+      "class-1",
+      file,
+      "python",
+      null,
+      ["python", "linux"],
+    );
+
+    const [, init] = fetchMock.mock.calls[0];
+    expect(init.body.get("template_key")).toBe("python");
+    expect(init.body.getAll("environment_keys")).toEqual(["python", "linux"]);
+  });
+
   test("blank 建立請求會帶上評分表名稱與多選環境", async () => {
     await AiJudgeService.createSession("class-1", {
       title: "期中環境檢查",
@@ -42,6 +69,19 @@ describe("AiJudgeService persistent sessions", () => {
       creation_mode: "blank",
       rubric_name: "期中評分表",
       environment_keys: ["python", "linux"],
+    });
+  });
+
+  test("直接建立空白檢查使用可在編輯頁修改的預設值", async () => {
+    await AiJudgeService.createBlankSession("class-1");
+
+    const [, init] = fetchMock.mock.calls[0];
+    expect(JSON.parse(init.body)).toEqual({
+      title: "未命名檢查",
+      selected_file_id: null,
+      creation_mode: "blank",
+      rubric_name: "空白評分表",
+      environment_keys: ["n8n"],
     });
   });
 
@@ -69,7 +109,7 @@ describe("AiJudgeService persistent sessions", () => {
     expect(JSON.parse(init.body)).toEqual({ is_pinned: true });
   });
 
-  test("複製檢查使用 class-scoped fork endpoint，不傳 rubric snapshot", async () => {
+  test("重構使用 class-scoped fork endpoint，不傳 rubric snapshot", async () => {
     await AiJudgeService.forkSession("class-1", "check-1");
 
     const [url, init] = fetchMock.mock.calls[0];
@@ -87,6 +127,27 @@ describe("AiJudgeService persistent sessions", () => {
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toContain("/judge/files/file-1/analysis");
     expect(JSON.parse(init.body)).toEqual({ analysis, expected_revision: 7 });
+  });
+
+  test("清除 session 對話使用 messages DELETE endpoint", async () => {
+    await AiJudgeService.clearSessionMessages("class-1", "session-1");
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toContain(
+      "/api/v1/teaching-classes/class-1/judge/sessions/session-1/messages",
+    );
+    expect(init.method).toBe("DELETE");
+  });
+
+  test("標記為 UI 隱藏的 refine 訊息不會顯示在聊天室", () => {
+    expect(shouldDisplayChatMessage({ role: "user", content: "內部提示詞" })).toBe(true);
+    expect(shouldDisplayChatMessage({
+      role: "user",
+      content: "內部提示詞",
+      metadata_json: { ui_hidden: true },
+    })).toBe(false);
+    expect(shouldDisplayChatMessage({ role: "user", content: RUBRIC_POLISH_PROMPT })).toBe(false);
+    expect(shouldDisplayChatMessage({ role: "user", content: RUBRIC_REASSESS_PROMPT })).toBe(false);
   });
 
   test("只送出一則新訊息，不回傳 client history", async () => {
@@ -108,6 +169,39 @@ describe("AiJudgeService persistent sessions", () => {
       content: "補充檢查步驟",
       analysis_revision: 4,
     });
+  });
+
+  test("潤飾評分表請求會沿用目前評分表 revision 並啟用 refine 模式", async () => {
+    await AiJudgeService.sendSessionMessage(
+      "class-1",
+      "check-1",
+      RUBRIC_POLISH_PROMPT,
+      4,
+      { isRefine: true },
+    );
+
+    const [, init] = fetchMock.mock.calls[0];
+    expect(JSON.parse(init.body)).toEqual({
+      content: RUBRIC_POLISH_PROMPT,
+      analysis_revision: 4,
+      is_refine: true,
+    });
+  });
+
+  test("重新評估提示會要求 AI 更新可偵測分類與評分計劃", () => {
+    expect(RUBRIC_REASSESS_PROMPT).toContain("可自動偵測程度");
+    expect(RUBRIC_REASSESS_PROMPT).toContain("評分計劃書");
+    expect(RUBRIC_REASSESS_PROMPT).toContain("不改變原始評分目標");
+    expect(RUBRIC_REASSESS_PROMPT).toContain("工作目錄");
+    expect(RUBRIC_REASSESS_PROMPT).toContain("主要情境");
+    expect(RUBRIC_REASSESS_PROMPT).toContain("其他已啟用的受控能力");
+  });
+
+  test("潤飾提示會保留老師目標並要求補足下一層 AI 的執行資訊", () => {
+    expect(RUBRIC_POLISH_PROMPT).toContain("下一層檢查 AI");
+    expect(RUBRIC_POLISH_PROMPT).toContain("成功條件");
+    expect(RUBRIC_POLISH_PROMPT).toContain("不要改成較容易但不同的檢查目標");
+    expect(RUBRIC_POLISH_PROMPT).toContain("非硬性範圍");
   });
 
   test("session script endpoint 不接受 client rubric snapshot", async () => {

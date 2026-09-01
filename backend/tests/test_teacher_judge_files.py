@@ -14,6 +14,7 @@ from app.ai.teacher_judge.schemas import (
     RubricItem,
     TeacherJudgeFileMetadataUpdateRequest,
 )
+from app.api.routes.teacher_judge_files import _normalize_supported_environment_keys
 from app.models.teacher_judge_file import TeacherJudgeFile, TeacherJudgeFileStatus
 from app.models.teacher_judge_script_artifact import (
     TeacherJudgeScriptArtifact,
@@ -118,6 +119,29 @@ def test_save_file_requires_conflict_strategy_for_same_active_name(
 
     assert exc_info.value.status_code == 409
     assert exc_info.value.detail["file_id"] == first.id
+
+
+def test_uploaded_file_display_name_uses_filename_stem(
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(file_service, "DATA_ROOT", tmp_path)
+    session = _session()
+
+    saved = file_service.save_analyzed_file(
+        session=session,
+        teaching_class_id=uuid.uuid4(),
+        uploaded_by=uuid.uuid4(),
+        original_filename="AI評分表審核系統_Python服務Running狀態檢測_簡短版.docx",
+        file_hash="a" * 64,
+        template_key="python",
+        file_bytes=b"document",
+        analysis=_analysis(),
+        conflict_strategy=None,
+    )
+
+    assert saved.original_filename.endswith(".docx")
+    assert saved.display_name == "AI評分表審核系統_Python服務Running狀態檢測_簡短版"
 
 
 def test_copy_strategy_creates_filename_copy(
@@ -235,6 +259,8 @@ def test_blank_file_has_created_source_metadata() -> None:
         display_name="Python 期中評分表",
         environment_keys=["python", "linux", "python"],
     )
+
+
     session.commit()
     session.refresh(file)
 
@@ -246,6 +272,35 @@ def test_blank_file_has_created_source_metadata() -> None:
     assert file.template_key == "python"
     assert file.analysis_revision == 1
     assert file.analysis_json["items"] == []
+
+
+def test_upload_environment_keys_are_normalized_with_primary_first() -> None:
+    assert _normalize_supported_environment_keys(
+        ["python", "linux", "python"], "python"
+    ) == ["python", "linux"]
+    assert _normalize_supported_environment_keys(
+        ["python", "linux"], "linux"
+    ) == ["linux", "python"]
+    assert _normalize_supported_environment_keys(None, "linux") == ["linux"]
+
+    with pytest.raises(HTTPException) as exc_info:
+        _normalize_supported_environment_keys(["unknown"], "linux")
+
+    assert exc_info.value.status_code == 400
+
+
+def test_blank_file_accepts_postgresql_environment() -> None:
+    session = _session()
+    file = file_service.create_blank_file(
+        session=session,
+        teaching_class_id=uuid.uuid4(),
+        created_by=uuid.uuid4(),
+        display_name="PostgreSQL 評分表",
+        environment_keys=["postgresql"],
+    )
+
+    assert file.template_key == "postgresql"
+    assert file.environment_keys == ["postgresql"]
 
 
 def test_analysis_update_requires_current_revision() -> None:
@@ -261,14 +316,17 @@ def test_analysis_update_requires_current_revision() -> None:
     session.commit()
     session.refresh(file)
 
+    changed_analysis = _analysis("first")
+    changed_analysis.detectability_needs_review = True
     updated = file_service.update_file_analysis(
         session=session,
         teaching_class_id=teaching_class_id,
         file_id=file.id,
-        analysis=_analysis("first"),
+        analysis=changed_analysis,
         expected_revision=1,
     )
     assert updated.analysis_revision == 2
+    assert updated.analysis_json["detectability_needs_review"] is True
     stored_before = session.get(TeacherJudgeFile, file.id)
     assert stored_before is not None
     before_json = stored_before.analysis_json
@@ -487,3 +545,45 @@ async def test_delete_file_keeps_linked_script_with_snapshot(
     assert db_artifact.source_file_id is None
     assert db_artifact.script_content == SAFE_SCRIPT
     assert db_artifact.source_file_snapshot_json["original_filename"] == "rubric.pdf"
+
+
+def test_delete_file_clears_session_source_reference_and_bytes(
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(file_service, "DATA_ROOT", tmp_path)
+    session = _session()
+    teaching_class_id = uuid.uuid4()
+    saved_file = file_service.save_analyzed_file(
+        session=session,
+        teaching_class_id=teaching_class_id,
+        uploaded_by=uuid.uuid4(),
+        original_filename="rubric.pdf",
+        file_hash="a" * 64,
+        template_key="linux",
+        file_bytes=b"source bytes",
+        analysis=_analysis(),
+        conflict_strategy=None,
+    )
+    owner = TeacherJudgeSession(
+        teaching_class_id=teaching_class_id,
+        title="Owns source",
+        selected_file_id=uuid.UUID(saved_file.id),
+    )
+    session.add(owner)
+    session.commit()
+
+    stored_path = tmp_path / f"{saved_file.id}.pdf"
+    assert stored_path.read_bytes() == b"source bytes"
+
+    file_service.delete_file(
+        session=session,
+        teaching_class_id=teaching_class_id,
+        file_id=uuid.UUID(saved_file.id),
+    )
+
+    assert session.get(TeacherJudgeFile, uuid.UUID(saved_file.id)) is None
+    refreshed_owner = session.get(TeacherJudgeSession, owner.id)
+    assert refreshed_owner is not None
+    assert refreshed_owner.selected_file_id is None
+    assert not stored_path.exists()

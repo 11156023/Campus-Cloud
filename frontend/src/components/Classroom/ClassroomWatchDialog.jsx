@@ -23,6 +23,7 @@ export default function ClassroomWatchDialog({
   const [connected, setConnected] = useState(false);
   const [controlling, setControlling] = useState(false);
   const [controlBusy, setControlBusy] = useState(false);
+  const [closing, setClosing] = useState(false);
 
   useEffect(() => () => {
     // 卸載時保險斷線
@@ -50,16 +51,19 @@ export default function ClassroomWatchDialog({
   };
 
   const handleClose = () => {
+    if (closing) return;
     // 關閉前先釋放控制權，避免學生端持續被鎖定
     if (canControl && controlling && sessionId) {
       ClassroomService.setControl(sessionId, "release").catch(() => {});
     }
     vncRef.current?.disconnect?.();
-    onClose();
+    // 先播放離場動畫，再通知父層卸載
+    setClosing(true);
+    setTimeout(onClose, 150);
   };
 
   return (
-    <div className={styles.overlay} onClick={handleClose}>
+    <div className={`${styles.overlay} ${closing ? styles.overlayOut : ""}`} onClick={handleClose}>
       <div className={styles.dialog} onClick={(e) => e.stopPropagation()}>
         <div className={styles.header}>
           <span className={styles.headerIcon}>

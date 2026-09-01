@@ -7,6 +7,7 @@ import { useAuth } from "../../../contexts/AuthContext";
 import { TemplatesService, safeTemplateIconUrl } from "../../../services/templates";
 import { downloadBlob } from "../../../services/api";
 import { useToast } from "../../../hooks/useToast";
+import useDialogPresence from "../../../hooks/useDialogPresence";
 import { useConfirm } from "../../../components/ConfirmDialog/ConfirmProvider";
 import { TemplateStatusBadge } from "./TemplateBadges";
 import TemplateCloneDialog from "./TemplateCloneDialog";
@@ -27,7 +28,7 @@ const formatBytes = (bytes) => {
 };
 
 /** 使用手冊（附件）瀏覽與下載 */
-function ManualDialog({ template, onClose }) {
+function ManualDialog({ template, closing = false, onClose }) {
   const toast = useToast();
   const [attachments, setAttachments] = useState(null);
   const [downloadingId, setDownloadingId] = useState(null);
@@ -60,7 +61,10 @@ function ManualDialog({ template, onClose }) {
   };
 
   return (
-    <div className={styles.modalOverlay} onClick={onClose}>
+    <div
+      className={`${styles.modalOverlay} ${closing ? styles.modalOverlayOut : ""}`}
+      onClick={onClose}
+    >
       <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
         <span className={styles.modalTitle}>
           <MIcon name="description" size={20} />
@@ -101,7 +105,7 @@ function ManualDialog({ template, onClose }) {
 }
 
 /** 單列的「⋯」操作選單 */
-function RowMenu({ template, cycleBusy, onClone, onEdit, onManual, onRetry, onCycle, onDelete, onClose, anchorRef }) {
+function RowMenu({ template, cycleBusy, onClone, onEdit, onManual, onRetry, onCycle, onDelete, onClose, anchorRef, closing = false }) {
   const ref = useRef(null);
 
   useEffect(() => {
@@ -113,7 +117,7 @@ function RowMenu({ template, cycleBusy, onClone, onEdit, onManual, onRetry, onCy
   }, [onClose, anchorRef]);
 
   return (
-    <div ref={ref} className={styles.rowMenu}>
+    <div ref={ref} className={`${styles.rowMenu} ${closing ? styles.rowMenuOut : ""}`}>
       <button
         type="button"
         className={styles.rowMenuItem}
@@ -200,6 +204,7 @@ function RowMenu({ template, cycleBusy, onClone, onEdit, onManual, onRetry, onCy
 
 function ManagementRow({ template, cycleBusy, onClone, onEdit, onManual, onRetry, onCycle, onDelete }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const menu = useDialogPresence(menuOpen, 130);
   const menuBtnRef = useRef(null);
 
   return (
@@ -235,11 +240,16 @@ function ManagementRow({ template, cycleBusy, onClone, onEdit, onManual, onRetry
       <td className={styles.td}>
         <TemplateStatusBadge status={template.status} />
       </td>
-      <td className={`${styles.td} ${styles.mutedCell}`}>{visibilityLabel(template)}</td>
+      <td className={`${styles.td} ${styles.mutedCell}`}>
+        {visibilityLabel(template)}
+        {template.student_requestable && (
+          <span className={styles.typeChip}>學生可申請</span>
+        )}
+      </td>
       <td className={`${styles.td} ${styles.mutedCell}`}>v{template.version}</td>
       <td className={`${styles.td} ${styles.tdMenu}`}>
         <div className={styles.menuWrap}>
-          {menuOpen && (
+          {menu.open && (
             <RowMenu
               template={template}
               cycleBusy={cycleBusy}
@@ -251,6 +261,7 @@ function ManagementRow({ template, cycleBusy, onClone, onEdit, onManual, onRetry
               onDelete={onDelete}
               onClose={() => setMenuOpen(false)}
               anchorRef={menuBtnRef}
+              closing={menu.closing}
             />
           )}
           <button
@@ -310,11 +321,11 @@ function StudentCatalog({ templates, onClone, onManual }) {
               <span className={styles.typeChip}>{template.default_disk} GB 磁碟</span>
             )}
             <span className={styles.typeChip}>v{template.version}</span>
-            {template.requires_gpu && (
-              <span className={styles.typeChip}>需要 GPU</span>
-            )}
             {template.allow_password_change === false && (
               <span className={styles.typeChip}>固定帳密</span>
+            )}
+            {template.student_requestable && (
+              <span className={styles.typeChip}>學生可申請</span>
             )}
           </div>
           <div className={styles.catalogActions}>
@@ -357,6 +368,11 @@ export default function TemplatesPage() {
   const [cloneTarget, setCloneTarget] = useState(null);
   const [manualTarget, setManualTarget] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const createDialog  = useDialogPresence(createOpen);
+  const editDialog    = useDialogPresence(editTarget);
+  const manualDialog  = useDialogPresence(manualTarget);
+  const cloneDialog   = useDialogPresence(cloneTarget);
+  const deleteDialog  = useDialogPresence(deleteTarget);
   const [cycleBusy, setCycleBusy] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const timerRef = useRef(null);
@@ -481,7 +497,7 @@ export default function TemplatesPage() {
 
   return (
     <div className={styles.page}>
-      <PageHeader title="機器範本" subtitle={canManage ? "把設定好的母機轉為範本，學生即可一鍵克隆出自己的環境" : "從老師提供的範本一鍵克隆出自己的環境，開好即用"}>
+      <PageHeader title="機器母範本" subtitle="管理教師組裝多機環境時使用的單機來源；學生不會直接看到或複製母範本。">
         <div className={styles.pageActions}>
           <button
             type="button"
@@ -555,37 +571,44 @@ export default function TemplatesPage() {
         />
       )}
 
-      {createOpen && (
+      {createDialog.open && (
         <TemplateFormDialog
+          closing={createDialog.closing}
           onClose={() => setCreateOpen(false)}
           onSaved={() => load()}
         />
       )}
-      {editTarget && (
+      {editDialog.open && (
         <TemplateFormDialog
-          template={editTarget}
+          template={editDialog.item}
+          closing={editDialog.closing}
           onClose={() => setEditTarget(null)}
           onSaved={() => load()}
         />
       )}
-      {manualTarget && (
+      {manualDialog.open && (
         <ManualDialog
-          template={manualTarget}
+          template={manualDialog.item}
+          closing={manualDialog.closing}
           onClose={() => setManualTarget(null)}
         />
       )}
-      {cloneTarget && (
+      {cloneDialog.open && (
         <TemplateCloneDialog
-          template={cloneTarget}
+          template={cloneDialog.item}
           canBatch={canManage}
+          closing={cloneDialog.closing}
           onClose={() => setCloneTarget(null)}
         />
       )}
 
-      {deleteTarget && (
-        <div className={styles.modalOverlay} onClick={() => setDeleteTarget(null)}>
+      {deleteDialog.open && (
+        <div
+          className={`${styles.modalOverlay} ${deleteDialog.closing ? styles.modalOverlayOut : ""}`}
+          onClick={() => setDeleteTarget(null)}
+        >
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-            <span className={styles.modalTitle}>刪除範本「{deleteTarget.name}」？</span>
+            <span className={styles.modalTitle}>刪除範本「{deleteDialog.item.name}」？</span>
             <p className={styles.modalDesc}>
               PVE 端的範本磁碟會一併刪除，動作無法復原。如果還有從此範本克隆出的機器（linked
               clone），系統會拒絕刪除。

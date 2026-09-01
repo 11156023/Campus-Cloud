@@ -11,6 +11,13 @@
   @include flex-center;
   padding: $spacing-16;
   animation: fadeIn 0.15s ease;
+  transition: opacity 0.15s ease;
+}
+
+.overlayOut {
+  animation: none;
+  opacity: 0;
+  pointer-events: none;
 }
 
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }

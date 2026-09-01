@@ -62,11 +62,6 @@ class Resource(SQLModel, table=True):
     os_info: str | None = Field(default=None, description="Operating system info")
     expiry_date: date | None = Field(default=None, description="Expiration date")
     template_id: int | None = Field(default=None, description="Proxmox template ID")
-    ip_address: str | None = Field(default=None, max_length=64)
-    ip_address_cached_at: datetime | None = Field(
-        default=None,
-        sa_column=Column(DateTime(timezone=True), nullable=True),
-    )
     ssh_private_key_encrypted: str | None = Field(
         default=None,
         description="Encrypted private SSH key",

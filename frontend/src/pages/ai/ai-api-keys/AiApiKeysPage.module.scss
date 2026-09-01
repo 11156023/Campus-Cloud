@@ -7,7 +7,7 @@
   padding: $spacing-8 $spacing-16;
   flex: 1;
 
-  @include respond-to(md) { padding: 0; }
+  @media (min-width: $breakpoint-sidebar) { padding: 0; }
 }
 
 .pageActions {
@@ -266,6 +266,13 @@
   justify-content: center;
   z-index: 300;
   animation: fadeIn 0.15s ease;
+  transition: opacity 0.15s ease;
+}
+
+.dialogOverlayOut {
+  animation: none;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .dialog {

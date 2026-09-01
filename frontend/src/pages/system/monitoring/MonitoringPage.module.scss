@@ -4,7 +4,7 @@
   padding: $spacing-8 $spacing-16;
   flex: 1;
 
-  @include respond-to(md) {
+  @media (min-width: $breakpoint-sidebar) {
     padding: 0;
   }
 }
@@ -89,7 +89,7 @@
 }
 
 .overviewValue {
-  font-size: $font-size-28;
+  font-size: $font-size-32;
   font-weight: $font-weight-700;
   color: var(--color-text-primary);
   font-variant-numeric: tabular-nums;
@@ -99,6 +99,7 @@
 .overviewUnit {
   font-size: $font-size-16;
   font-weight: $font-weight-400;
+  margin-left: $spacing-4;
   color: var(--color-text-muted);
 }
 
@@ -189,7 +190,7 @@
   text-align: center;
 }
 
-/* ── 告警 ── */
+/* ── 警告 ── */
 .alertCount {
   @include flex-center;
   min-width: 24px;
@@ -490,9 +491,28 @@
   z-index: 300;
   @include flex-center;
   padding: $spacing-16;
+  animation: fadeIn 0.15s ease;
+  transition: opacity 0.15s ease;
+}
+
+.modalOverlayOut {
+  animation: none;
+  opacity: 0;
+  pointer-events: none;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 .modal {
+  animation: slideUp 0.18s cubic-bezier(0.25, 0.8, 0.25, 1);
   @include flex-column;
   gap: $spacing-16;
   width: 100%;

@@ -7,6 +7,7 @@ import SharedEmptyState from "../../../components/EmptyState/EmptyState";
 import { AiApiService } from "../../../services/aiApi";
 import { useToast } from "../../../hooks/useToast";
 import useAutoRefresh from "../../../hooks/useAutoRefresh";
+import useDialogPresence from "../../../hooks/useDialogPresence";
 import PageHeader from "../../../components/PageHeader/PageHeader";
 
 const TABS = [
@@ -35,8 +36,10 @@ function ReviewDialog({ open, onClose, request, action, onDone }) {
   const toast = useToast();
   const [comment, setComment] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  // 關閉時先播放離場動畫再卸載
+  const presence = useDialogPresence(open);
 
-  if (!open || !request) return null;
+  if (!presence.open || !request) return null;
 
   const isApprove = action === "approved";
 
@@ -61,7 +64,10 @@ function ReviewDialog({ open, onClose, request, action, onDone }) {
   // Portal 到 body：此 Dialog 由表格列觸發，若直接掛在 .tableWrap（backdrop-filter）
   // 底下，position: fixed 會以卡片為 containing block，遮罩蓋不滿整個視窗
   return createPortal(
-    <div className={styles.dialogOverlay} onClick={onClose}>
+    <div
+      className={`${styles.dialogOverlay} ${presence.closing ? styles.dialogOverlayOut : ""}`}
+      onClick={onClose}
+    >
       <div className={styles.dialog} onClick={(e) => e.stopPropagation()}>
         <div className={styles.dialogHeader}>
           <h3 className={styles.dialogTitle}>

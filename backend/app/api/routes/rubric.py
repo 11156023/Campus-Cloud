@@ -88,7 +88,9 @@ async def upload_rubric(
             detail="無法從文件中提取任何文字，請確認文件不是掃描版 PDF。",
         )
 
-    template_commands = get_enabled_template_commands(session, template_key)
+    template_commands = get_enabled_template_commands(
+        session, template_key, include_cross_template=True
+    )
 
     logger.info(f"User {current_user.email} uploaded rubric file: {filename}")
 
@@ -139,7 +141,9 @@ async def chat(
     template_key = chat_request.template_key.strip().lower() or "linux"
     if template_key not in SUPPORTED_TEMPLATE_KEYS:
         raise HTTPException(status_code=400, detail="未知的評分環境 template。")
-    template_commands = get_enabled_template_commands(session, template_key)
+    template_commands = get_enabled_template_commands(
+        session, template_key, include_cross_template=True
+    )
 
     try:
         reply, updated_items, metrics = await chat_with_rubric(

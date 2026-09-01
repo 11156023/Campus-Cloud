@@ -35,10 +35,210 @@ from app.models.teacher_judge_template_command import TeacherJudgeTemplateComman
 
 logger = logging.getLogger(__name__)
 
+_PYTHON_EXECUTION_INTENT_KEYWORDS = (
+    "報錯",
+    "錯誤",
+    "例外",
+    "執行",
+    "啟動",
+    "運行",
+    "error",
+    "exception",
+    "traceback",
+    "stderr",
+)
+_EXIT_CRITERIA_MARKERS = ("exit code", "return code", "returncode")
+_LONG_RUNNING_TERMS = ("常駐", "持續執行", "不會結束")
+_LONG_RUNNING_SIGNALS = ("timeout", "逾時", "秒", "分鐘", "連接埠", "port")
+
+
+def _normalize_for_matching(text: str) -> str:
+    """Collapse user-provided whitespace before literal matching."""
+    return " ".join(text.casefold().split())
+
+
+def _is_word_character(character: str) -> bool:
+    return character.isalnum() or character == "_"
+
+
+def _contains_python_filename(text: str) -> bool:
+    """Find a ``*.py`` filename without backtracking over user input."""
+    folded = text.casefold()
+    filename_candidate_start: int | None = None
+    for index, character in enumerate(folded):
+        if _is_word_character(character) or character in ".-":
+            previous = folded[index - 1] if index else ""
+            if _is_word_character(character) and (
+                index == 0 or not _is_word_character(previous)
+            ):
+                filename_candidate_start = index
+        else:
+            filename_candidate_start = None
+
+        if not folded.startswith(".py", index) or filename_candidate_start is None:
+            continue
+        if filename_candidate_start >= index:
+            continue
+
+        after = index + len(".py")
+        after_is_boundary = after >= len(folded) or not _is_word_character(
+            folded[after]
+        )
+        if after_is_boundary:
+            return True
+
+    return False
+
+
+def _is_python_interpreter(token: str) -> bool:
+    token = token.lstrip("'\"`()[]{}<>")
+    executable = token.replace("\\", "/").rsplit("/", 1)[-1].casefold()
+    if executable == "python":
+        return True
+    if not executable.startswith("python3"):
+        return False
+
+    suffix = executable[len("python3") :]
+    return not suffix or (suffix.startswith(".") and suffix[1:].isdigit())
+
+
+def _has_python_command(text: str) -> bool:
+    """Check for a Python interpreter followed by a script on the same line."""
+    for line in text.splitlines():
+        tokens = line.split()
+        interpreter_seen = False
+        for token in tokens:
+            if _is_python_interpreter(token):
+                interpreter_seen = True
+            elif interpreter_seen and _contains_python_filename(token):
+                return True
+    return False
+
+
+def _is_working_directory_path(value: str) -> bool:
+    if len(value) > 3 and value[0].isalpha() and value[1] == ":" and value[2] in "\\/":
+        return True
+    if value.startswith("/"):
+        return len(value) > 1
+    if value.startswith(("./", ".\\", "../", "..\\")):
+        return True
+    return value == "."
+
+
+def _has_working_directory(text: str) -> bool:
+    for line in text.splitlines():
+        folded = line.casefold()
+        for label in ("cwd", "工作目錄"):
+            search_from = 0
+            while True:
+                label_start = folded.find(label, search_from)
+                if label_start < 0:
+                    break
+
+                value = line[label_start + len(label) :].lstrip()
+                while value and value[0] in "=:：為是":
+                    value = value[1:].lstrip()
+                for delimiter in ("，", "。", "；"):
+                    value = value.split(delimiter, 1)[0]
+                value_parts = value.split(None, 1)
+                value = value_parts[0] if value_parts else ""
+                if _is_working_directory_path(value):
+                    return True
+                search_from = label_start + len(label)
+    return False
+
+
+def _has_exit_criteria(text: str) -> bool:
+    normalized = _normalize_for_matching(text)
+    for marker in _EXIT_CRITERIA_MARKERS:
+        search_from = 0
+        while True:
+            marker_start = normalized.find(marker, search_from)
+            if marker_start < 0:
+                break
+            value = normalized[marker_start + len(marker) :].lstrip(" =:：為是")
+            if value.startswith("0"):
+                return True
+            search_from = marker_start + len(marker)
+
+    return any(
+        phrase in normalized
+        for phrase in (
+            "正常結束",
+            "未捕捉例外",
+            "沒有報錯",
+            "沒有錯誤",
+            "沒有例外",
+            "無報錯",
+            "無錯誤",
+            "無例外",
+        )
+    )
+
+
+def _has_terms_within_distance(
+    text: str,
+    first_terms: tuple[str, ...],
+    second_terms: tuple[str, ...],
+) -> bool:
+    folded = text.casefold()
+    for first in first_terms:
+        search_from = 0
+        while True:
+            first_start = folded.find(first, search_from)
+            if first_start < 0:
+                break
+            window_start = first_start + len(first)
+            window = folded[
+                window_start : window_start + 30 + max(map(len, second_terms))
+            ]
+            if any(second in window for second in second_terms):
+                return True
+            search_from = window_start
+    return False
+
+
+def _has_long_running_criteria(text: str) -> bool:
+    return any(
+        _has_terms_within_distance(line, _LONG_RUNNING_TERMS, _LONG_RUNNING_SIGNALS)
+        or _has_terms_within_distance(line, _LONG_RUNNING_SIGNALS, _LONG_RUNNING_TERMS)
+        for line in text.splitlines()
+    )
+
 
 async def close_http_client() -> None:
     """Close Teacher Judge AI client; kept for older callers/tests."""
     await teacher_judge_client.aclose()
+
+
+def _is_python_entrypoint_execution_check(text: str) -> bool:
+    normalized = _normalize_for_matching(text)
+    return _contains_python_filename(text) and (
+        any(keyword in normalized for keyword in _PYTHON_EXECUTION_INTENT_KEYWORDS)
+        or "exit code" in normalized
+    )
+
+
+def _has_complete_python_execution_contract(text: str) -> bool:
+    return bool(
+        _has_python_command(text)
+        and _has_working_directory(text)
+        and (_has_exit_criteria(text) or _has_long_running_criteria(text))
+    )
+
+
+def _find_python_entrypoint_command(
+    template_commands: list[TeacherJudgeTemplateCommand] | None,
+) -> TeacherJudgeTemplateCommand | None:
+    return next(
+        (
+            command
+            for command in template_commands or []
+            if command.template_key == "python"
+            and command.command_key == "python.run_entrypoint"
+        ),
+        None,
+    )
 
 
 
@@ -122,6 +322,50 @@ def _normalize_rubric_items(
             template_key=template_key,
             template_commands=template_commands,
         )
+        item_text = "\n".join(
+            value
+            for value in (
+                title,
+                description,
+                str(detection_method or ""),
+                str(fallback or ""),
+            )
+            if value
+        )
+        if _is_python_entrypoint_execution_check(item_text):
+            entrypoint_command = _find_python_entrypoint_command(template_commands)
+            if entrypoint_command is None:
+                detectable = "manual"
+                check_steps = []
+                detection_method = "平台目前尚未啟用受控 Python 程式入口執行能力"
+                fallback = (
+                    "請先啟用 python.run_entrypoint command catalog；啟用後仍需提供"
+                    "工作目錄、實際 Python 命令／參數與結束判準。"
+                )
+            else:
+                check_steps = [
+                    TeacherJudgeRubricCheckStep(
+                        template_key="python",
+                        command_key=entrypoint_command.command_key,
+                        command_label=entrypoint_command.command_label,
+                    )
+                ]
+                if _has_complete_python_execution_contract(item_text):
+                    detectable = "auto"
+                    detection_method = (
+                        "透過平台 Python 能力，在指定工作目錄以受控 timeout 執行命令，收集 exit code、"
+                        "stdout、stderr 與未捕捉例外，並依評分表的結束判準判定"
+                    )
+                else:
+                    detectable = "partial"
+                    detection_method = (
+                        "不受主要評分環境限制；平台可執行 Python 程式並收集 exit code、stdout、stderr 與 timeout，"
+                        "但目前缺少安全執行與判定所需資訊"
+                    )
+                    fallback = (
+                        "請老師提供 main.py 的工作目錄、實際 Python 命令／虛擬環境與參數，"
+                        "並說明程式應正常結束，或會持續執行且應觀察多久。"
+                    )
         if template_commands is not None and detectable == "auto" and not check_steps:
             detectable = "partial"
             detection_method = (
@@ -220,6 +464,7 @@ async def analyze_rubric(
     raw_text: str,
     template_key: str = "linux",
     template_commands: list[TeacherJudgeTemplateCommand] | None = None,
+    environment_keys: list[str] | None = None,
 ) -> tuple[TeacherJudgeRubricAnalysis, VLLMMetrics]:
     """Send raw document text to AI, return structured rubric analysis."""
     if not settings.VLLM_MODEL_NAME:
@@ -230,6 +475,7 @@ async def analyze_rubric(
     user_content = f"# 評分表原文\n\n{raw_text}"
     template_command_context = TEMPLATE_COMMAND_CONTEXT_TEMPLATE.format(
         template_key=template_key,
+        environment_keys=", ".join(environment_keys or [template_key]),
         template_commands=format_template_commands_for_prompt(template_commands or []),
     )
     analyze_system_prompt = ANALYZE_SYSTEM_PROMPT.replace(
@@ -301,11 +547,12 @@ async def chat_with_rubric(
     is_refine: bool = False,
     template_key: str = "linux",
     template_commands: list[TeacherJudgeTemplateCommand] | None = None,
+    environment_keys: list[str] | None = None,
 ) -> tuple[str, list[dict[str, Any]] | None, VLLMMetrics]:
     """
     Multi-turn chat with rubric context injected into system prompt.
     Returns (reply_text, updated_items_or_None, metrics).
-    - is_refine: True 表示老師手動修改完表單後觸發的「全表潤飾」模式。
+    - is_refine: True 表示針對目前評分表執行「全表潤飾」模式。
     - updated_items: complete list of rubric item dicts when AI modified the rubric;
       None when AI only answered a question without changes.
     """
@@ -324,6 +571,7 @@ async def chat_with_rubric(
             "{template_command_context}",
             TEMPLATE_COMMAND_CONTEXT_TEMPLATE.format(
                 template_key=template_key,
+                environment_keys=", ".join(environment_keys or [template_key]),
                 template_commands=format_template_commands_for_prompt(
                     template_commands or []
                 ),

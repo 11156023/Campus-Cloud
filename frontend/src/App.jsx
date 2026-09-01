@@ -1,5 +1,5 @@
 import { lazy } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useParams } from "react-router-dom";
 import { useAuth } from "./contexts/AuthContext";
 import DashboardLayout from "./layout/DashboardLayout";
 import LoginPage from "./pages/login/LoginPage";
@@ -9,125 +9,59 @@ import { AuthSessionStatus } from "./services/authSession";
 import styles from "./App.module.scss";
 
 // 個人
-const AdminDashboardPage = lazy(
-  () => import("./pages/personal/dashboard/AdminDashboardPage"),
-);
-const TeacherDashboardPage = lazy(
-  () => import("./pages/personal/dashboard/TeacherDashboardPage"),
-);
-const StudentHomePage = lazy(
-  () => import("./pages/personal/dashboard/StudentHomePage"),
-);
-const StudentCoursePage = lazy(
-  () => import("./pages/personal/dashboard/StudentCoursePage"),
-);
-const QuickTemplateFormPage = lazy(
-  () => import("./pages/personal/dashboard/QuickTemplateFormPage"),
-);
-const ResourcesPage = lazy(
-  () => import("./pages/personal/resources/ResourcesPage"),
-);
-const ResourceDetailPage = lazy(
-  () => import("./pages/personal/resources/detail/ResourceDetailPage"),
-);
-const RequestsPage = lazy(
-  () => import("./pages/personal/requests/RequestsPage"),
-);
-const AccountSettingsPage = lazy(
-  () => import("./pages/personal/account/AccountSettingsPage"),
-);
+const AdminDashboardPage = lazy(() => import("./pages/personal/dashboard/admin/AdminDashboardPage"));
+const TeacherDashboardPage = lazy(() => import("./pages/personal/dashboard/teacher/TeacherDashboardPage"));
+const StudentHomePage = lazy(() => import("./pages/personal/dashboard/StudentHomePage"));
+const StudentCoursePage = lazy(() => import("./pages/personal/dashboard/student/StudentCoursePage"));
+const QuickTemplateFormPage = lazy(() => import("./pages/personal/quick-practice/QuickTemplateFormPage"));
+const ResourcesPage = lazy(() => import("./pages/personal/resources/ResourcesPage"));
+const ResourceDetailPage = lazy(() => import("./pages/personal/resources/detail/ResourceDetailPage"));
+const RequestsPage = lazy(() => import("./pages/personal/requests/RequestsPage"));
+const AccountSettingsPage = lazy(() => import("./pages/personal/account/AccountSettingsPage"));
 
 // 資源
-const ResourceMgmtPage = lazy(
-  () => import("./pages/resource/resource-mgmt/ResourceMgmtPage"),
-);
-const RequestReviewPage = lazy(
-  () => import("./pages/resource/request-review/RequestReviewPage"),
-);
+const ResourceMgmtPage = lazy(() => import("./pages/resource/resource-mgmt/ResourceMgmtPage"));
+const RequestReviewPage = lazy(() => import("./pages/resource/request-review/RequestReviewPage"));
 const GpuMgmtPage = lazy(() => import("./pages/resource/gpu-mgmt/GpuMgmtPage"));
-const BatchReviewPage = lazy(
-  () => import("./pages/resource/batch-review/BatchReviewPage"),
-);
-const TemplatesPage = lazy(
-  () => import("./pages/resource/templates/TemplatesPage"),
-);
+const BatchReviewPage = lazy(() => import("./pages/resource/batch-review/BatchReviewPage"));
+const TemplatesPage = lazy(() => import("./pages/resource/templates/TemplatesPage"));
 
 // AI
 const AiApiPage = lazy(() => import("./pages/ai/ai-api/AiApiPage"));
-const AiApiReviewPage = lazy(
-  () => import("./pages/ai/ai-api-review/AiApiReviewPage"),
-);
-const AiApiKeysPage = lazy(
-  () => import("./pages/ai/ai-api-keys/AiApiKeysPage"),
-);
-const AiMonitoringPage = lazy(
-  () => import("./pages/ai/ai-monitoring/AiMonitoringPage"),
-);
+const AiApiReviewPage = lazy(() => import("./pages/ai/ai-api-review/AiApiReviewPage"));
+const AiApiKeysPage = lazy(() => import("./pages/ai/ai-api-keys/AiApiKeysPage"));
+const AiMonitoringPage = lazy(() => import("./pages/ai/ai-monitoring/AiMonitoringPage"));
 const AiPvePage = lazy(() => import("./pages/system/ai-pve/AiPvePage"));
 
 // 教學
-const CoursePathsPage = lazy(
-  () => import("./pages/courses/paths/CoursePathsPage"),
-);
-const CourseRoomPage = lazy(
-  () => import("./pages/courses/room/CourseRoomPage"),
-);
-const CourseCmsPage = lazy(
-  () => import("./pages/teaching/course-cms/CourseCmsPage"),
-);
-const CourseTemplateManagementPage = lazy(
-  () => import("./pages/course-operations/CourseTemplateManagementPage"),
-);
-const CourseTemplateEditorPage = lazy(
-  () => import("./pages/course-operations/CourseTemplateEditorPage"),
-);
-const ClassManagementPage = lazy(
-  () => import("./pages/course-operations/ClassManagementPage"),
-);
-const ClassWorkspacePage = lazy(
-  () => import("./pages/course-operations/ClassWorkspacePage"),
-);
-const AiJudgeRubricEditorPage = lazy(
-  () => import("./pages/course-operations/AiJudgeRubricEditorPage"),
-);
-const ClassSetupPage = lazy(
-  () => import("./pages/course-operations/ClassSetupPage"),
-);
+const CoursePathsPage = lazy(() => import("./pages/courses/paths/CoursePathsPage"));
+const CourseRoomPage = lazy(() => import("./pages/courses/room/CourseRoomPage"));
+const CourseCmsPage = lazy(() => import("./pages/teaching/course-cms/CourseCmsPage"));
+const CourseTemplateManagementPage = lazy(() => import("./pages/course-operations/course-templates/CourseTemplateManagementPage"));
+const CourseTemplateEditorPage = lazy(() => import("./pages/course-operations/course-templates/CourseTemplateEditorPage"));
+const ClassManagementPage = lazy(() => import("./pages/course-operations/class-management/ClassManagementPage"));
+const ClassWorkspacePage = lazy(() => import("./pages/course-operations/class-workspace/ClassWorkspacePage"));
+const ClassSetupPage = lazy(() => import("./pages/course-operations/class-setup/ClassSetupPage"));
 
 // 系統管理
 const AdminPage = lazy(() => import("./pages/system/admin/AdminPage"));
 const SettingsPage = lazy(() => import("./pages/system/settings/SettingsPage"));
-const MonitoringPage = lazy(
-  () => import("./pages/system/monitoring/MonitoringPage"),
-);
+const MonitoringPage = lazy(() => import("./pages/system/monitoring/MonitoringPage"));
 const QuotasPage = lazy(() => import("./pages/system/quotas/QuotasPage"));
-const IpManagementPage = lazy(
-  () => import("./pages/system/ip-management/IpManagementPage"),
-);
+const IpManagementPage = lazy(() => import("./pages/system/ip-management/IpManagementPage"));
 const AuditPage = lazy(() => import("./pages/system/audit/AuditPage"));
 const JobsPage = lazy(() => import("./pages/system/jobs/JobsPage"));
 
 // 網路
-const FirewallPage = lazy(
-  () => import("./pages/network/firewall/FirewallPage"),
-);
+const FirewallPage = lazy(() => import("./pages/network/firewall/FirewallPage"));
 const DomainPage = lazy(() => import("./pages/system/domain/DomainPage"));
 const GatewayPage = lazy(() => import("./pages/system/gateway/GatewayPage"));
-const ReverseProxyPage = lazy(
-  () => import("./pages/network/reverse-proxy/ReverseProxyPage"),
-);
+const ReverseProxyPage = lazy(() => import("./pages/network/reverse-proxy/ReverseProxyPage"));
 
-function AuthBootstrapState({
-  unavailable = false,
-  retrying = false,
-  onRetry,
-}) {
+function AuthBootstrapState({ unavailable = false, retrying = false, onRetry }) {
   return (
     <main className={styles.authStatePage}>
-      <section
-        className={styles.authStateCard}
-        role={unavailable ? "alert" : "status"}
-      >
+      <section className={styles.authStateCard} role={unavailable ? "alert" : "status"}>
         {unavailable ? (
           <span className={styles.authStateIcon} aria-hidden="true">
             <MIcon name="cloud_off" size={42} />
@@ -161,9 +95,16 @@ function AuthBootstrapState({
   );
 }
 
+function LegacyAiJudgeEditorRedirect() {
+  const { classId, sessionId } = useParams();
+  const query = sessionId ? `?check=${encodeURIComponent(sessionId)}` : "";
+  return <Navigate to={`/class-management/${classId}/ai${query}`} replace />;
+}
+
 function App() {
   const { user, loading, authStatus, retrySession } = useAuth();
   const isAdmin = Boolean(user?.is_superuser || user?.role === "admin");
+  const canTeach = isAdmin || user?.role === "teacher";
   const isDeviceApproval = Boolean(
     new URLSearchParams(window.location.search).get("device_code"),
   );
@@ -201,48 +142,38 @@ function App() {
           <Route
             path="/dashboard"
             element={
-              isAdmin ? (
-                <AdminDashboardPage />
-              ) : user?.role === "teacher" ? (
-                <TeacherDashboardPage />
-              ) : (
-                <StudentHomePage />
-              )
+              isAdmin
+                ? <AdminDashboardPage />
+                : user?.role === "teacher"
+                  ? <TeacherDashboardPage />
+                  : <StudentHomePage />
             }
           />
-          <Route
-            path="/dashboard/course/:pathId"
-            element={<StudentCoursePage />}
-          />
-          <Route
-            path="/quick-template/:id"
-            element={<QuickTemplateFormPage />}
-          />
-          <Route path="/my-resources" element={<ResourcesPage />} />
-          <Route
-            path="/my-resources/:vmid"
-            element={<ResourceDetailPage backTo="/my-resources" />}
-          />
-          <Route path="/my-requests" element={<RequestsPage />} />
-          <Route path="/account" element={<AccountSettingsPage />} />
+          {/* 單一課程總覽：課堂環境、課堂機器與截至今天的 AI 任務 */}
+          <Route path="/dashboard/course/:pathId" element={<StudentCoursePage />} />
+          <Route path="/quick-template/:id"   element={<QuickTemplateFormPage />} />
+          <Route path="/my-resources"         element={<ResourcesPage />} />
+          <Route path="/my-resources/:vmid"   element={<ResourceDetailPage backTo="/my-resources" />} />
+          <Route path="/my-requests"          element={<RequestsPage />} />
+          <Route path="/account"              element={<AccountSettingsPage />} />
 
           {/* 資源 */}
           {isAdmin && (
             <>
-              <Route path="/resource-mgmt" element={<ResourceMgmtPage />} />
-              <Route
-                path="/resource-mgmt/:vmid"
-                element={<ResourceDetailPage backTo="/resource-mgmt" />}
-              />
+              <Route path="/resource-mgmt"  element={<ResourceMgmtPage />} />
+              <Route path="/resource-mgmt/:vmid" element={<ResourceDetailPage backTo="/resource-mgmt" />} />
               <Route path="/request-review" element={<RequestReviewPage />} />
-              <Route path="/gpu-mgmt" element={<GpuMgmtPage />} />
-              <Route path="/batch-review" element={<BatchReviewPage />} />
+              <Route path="/gpu-mgmt"       element={<GpuMgmtPage />} />
+              <Route path="/batch-review"   element={<BatchReviewPage />} />
             </>
           )}
-          <Route path="/templates" element={<TemplatesPage />} />
+          <Route
+            path="/templates"
+            element={canTeach ? <TemplatesPage /> : <Navigate to="/dashboard" replace />}
+          />
 
           {/* AI */}
-          <Route path="/ai-api" element={<AiApiPage />} />
+          <Route path="/ai-api"         element={<AiApiPage />} />
           {isAdmin && (
             <>
               <Route path="/ai-api-review" element={<AiApiReviewPage />} />
@@ -253,70 +184,51 @@ function App() {
           )}
           <Route
             path="/ai-management"
-            element={
-              <Navigate to={isAdmin ? "/ai-monitoring" : "/ai-api"} replace />
-            }
+            element={<Navigate to={isAdmin ? "/ai-monitoring" : "/ai-api"} replace />}
           />
 
           {/* 教學 */}
-          <Route path="/courses" element={<CoursePathsPage />} />
+          <Route path="/courses"               element={<CoursePathsPage />} />
           <Route path="/courses/rooms/:roomId" element={<CourseRoomPage />} />
-          <Route path="/course-cms" element={<CourseCmsPage />} />
+          <Route path="/course-cms"            element={<CourseCmsPage />} />
 
           {/* 課務管理 */}
-          <Route
-            path="/course-template-management"
-            element={<CourseTemplateManagementPage />}
-          />
-          <Route
-            path="/course-template-management/new"
-            element={<CourseTemplateEditorPage />}
-          />
-          <Route
-            path="/course-template-management/:templateId"
-            element={<CourseTemplateEditorPage />}
-          />
-          <Route path="/class-management" element={<ClassManagementPage />} />
-          <Route
-            path="/class-management/new"
-            element={<Navigate to="/class-setup" replace />}
-          />
-          <Route path="/class-setup" element={<ClassSetupPage />} />
+          <Route path="/course-template-management" element={canTeach ? <CourseTemplateManagementPage /> : <Navigate to="/dashboard" replace />} />
+          <Route path="/course-template-management/new" element={canTeach ? <CourseTemplateEditorPage /> : <Navigate to="/dashboard" replace />} />
+          <Route path="/course-template-management/:templateId" element={canTeach ? <CourseTemplateEditorPage /> : <Navigate to="/dashboard" replace />} />
+          <Route path="/class-management" element={canTeach ? <ClassManagementPage /> : <Navigate to="/dashboard" replace />} />
+          <Route path="/class-management/new" element={<Navigate to={canTeach ? "/class-setup" : "/dashboard"} replace />} />
+          <Route path="/class-setup" element={canTeach ? <ClassSetupPage /> : <Navigate to="/dashboard" replace />} />
+          {/* 舊評分表連結保留導回主工作頁，避免書籤落到不存在的獨立 editor。 */}
           <Route
             path="/class-management/:classId/ai/checks/:sessionId/edit"
-            element={<AiJudgeRubricEditorPage />}
+            element={canTeach ? <LegacyAiJudgeEditorRedirect /> : <Navigate to="/dashboard" replace />}
           />
-          <Route
-            path="/class-management/:classId"
-            element={<ClassWorkspacePage />}
-          />
-          <Route
-            path="/class-management/:classId/:section"
-            element={<ClassWorkspacePage />}
-          />
+          <Route path="/class-management/:classId" element={canTeach ? <ClassWorkspacePage /> : <Navigate to="/dashboard" replace />} />
+          <Route path="/class-management/:classId/:section" element={canTeach ? <ClassWorkspacePage /> : <Navigate to="/dashboard" replace />} />
 
           {/* 系統管理 */}
           {isAdmin && (
             <>
-              <Route path="/admin" element={<AdminPage />} />
-              <Route path="/settings" element={<SettingsPage />} />
-              <Route path="/quotas" element={<QuotasPage />} />
+              <Route path="/admin"     element={<AdminPage />} />
+              <Route path="/settings"  element={<SettingsPage />} />
+              <Route path="/quotas"    element={<QuotasPage />} />
               <Route path="/ip-management" element={<IpManagementPage />} />
               <Route path="/monitoring" element={<MonitoringPage />} />
-              <Route path="/audit" element={<AuditPage />} />
+              <Route path="/audit"     element={<AuditPage />} />
             </>
           )}
-          <Route path="/jobs" element={<JobsPage />} />
+          <Route path="/jobs"      element={<JobsPage />} />
 
           {/* 網路 */}
-          <Route path="/firewall" element={<FirewallPage />} />
+          <Route path="/firewall"       element={<FirewallPage />} />
           {isAdmin && (
             <>
-              <Route path="/domain" element={<DomainPage />} />
-              <Route path="/gateway" element={<GatewayPage />} />
+              <Route path="/domain"         element={<DomainPage />} />
+              <Route path="/gateway"        element={<GatewayPage />} />
             </>
           )}
-          <Route path="/reverse-proxy" element={<ReverseProxyPage />} />
+          <Route path="/reverse-proxy"  element={<ReverseProxyPage />} />
 
           {/* fallback */}
           <Route path="*" element={<Navigate to="/dashboard" replace />} />

@@ -39,6 +39,7 @@ export default function ReverseProxyRuleModal({
   loading,
   onClose,
   onSubmit,
+  closing = false,
 }) {
   const toast = useToast();
   const zones = setupContext?.zones ?? [];
@@ -116,7 +117,10 @@ export default function ReverseProxyRuleModal({
   }
 
   return (
-    <div className={styles.modalOverlay} onMouseDown={onClose}>
+    <div
+      className={`${styles.modalOverlay} ${closing ? styles.modalOverlayOut : ""}`}
+      onMouseDown={onClose}
+    >
       <form className={styles.modal} onSubmit={submit} onMouseDown={(e) => e.stopPropagation()}>
         <div className={styles.modalHeader}>
           <div>

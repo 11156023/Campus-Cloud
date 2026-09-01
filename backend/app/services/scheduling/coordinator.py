@@ -193,7 +193,11 @@ def _provision_new_resource(
         with Session(engine) as rollback_session:
             # Release IP allocated during planning
             try:
-                ip_management_service.release_ip(rollback_session, plan["vmid"])
+                ip_management_service.release_ip(
+                    rollback_session,
+                    plan["vmid"],
+                    restore_reservation=bool(plan.get("ip_reservation_key")),
+                )
                 rollback_session.commit()
             except Exception:
                 logger.warning("Failed to release IP for VMID %s during rollback", plan["vmid"])
@@ -478,6 +482,16 @@ def process_single_request_start(request_id: uuid.UUID) -> bool:
                 request=request,
                 now=_utc_now(),
             )
+            # A quick-practice environment becomes ready only after every
+            # machine is provisioned and its published network topology has
+            # been materialized. This callback is idempotent and row-locked.
+            from app.services import quick_practice  # noqa: PLC0415
+
+            session.expire_all()
+            quick_practice.reconcile_for_request(
+                session,
+                request_id=request_id,
+            )
             session.commit()
             return started
         except Exception:
@@ -688,6 +702,10 @@ async def run_scheduler(stop_event: asyncio.Event) -> None:
                 handler=recurrence_scheduler.process_auto_stops,
             ),
             ScheduledTask(
+                name="process_quick_practice_lifecycle",
+                handler=process_quick_practice_lifecycle_task,
+            ),
+            ScheduledTask(
                 name="process_resource_alerts",
                 handler=process_resource_alerts_task,
             ),
@@ -721,8 +739,15 @@ def process_expired_requests_task() -> int:
     return vm_request_expiry_service.process_expired_requests()
 
 
+def process_quick_practice_lifecycle_task() -> int:
+    """Finalize multi-machine topology and reclaim expired practice groups."""
+    from app.services import quick_practice  # noqa: PLC0415
+
+    return quick_practice.process_lifecycle()
+
+
 def process_resource_alerts_task() -> int:
-    """Scheduler tick：資源閾值告警評估（間隔由 GovernanceConfig 控制）。"""
+    """Scheduler tick：資源閾值警告評估（間隔由 GovernanceConfig 控制）。"""
     from app.services.monitoring import (
         alert_service,  # noqa: PLC0415 — 避免 import cycle
     )

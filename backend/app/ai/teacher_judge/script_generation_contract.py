@@ -9,7 +9,7 @@ SCRIPT_GENERATION_MAX_ATTEMPTS = 3
 SCRIPT_GENERATION_CONTRACT_PROMPT = f"""
 # 腳本品質契約
 - 你產生的是受管資料收集腳本，不是自由發揮的診斷腳本；可讀性、可移植性、證據品質與狀態語意都必須穩定。
-- 腳本目標是收集同學 VM/LXC 內的服務、port、process、localhost HTTP 等只讀資料，整理成單一 JSON。
+- 腳本目標是收集同學 VM/LXC 內的服務、port、process、localhost HTTP 等只讀資料；只有 rubric 與 catalog 明確引用受控程式入口時，才可在指定 cwd 以有限 timeout 執行並收集 exit code/stdout/stderr。所有結果整理成單一 JSON。
 - 腳本必須定義並使用這些 helper：`truncate_output`、`redact_sensitive_text`、`command_available`、`run_command`、`record_check`。
 - `truncate_output(text, limit={RAW_OUTPUT_CHAR_LIMIT})` 必須將 raw 輸出截斷到固定長度。
 - `redact_sensitive_text(text)` 必須遮罩 token、password、secret、api key、private key、bearer 等敏感字樣；不得使用裸 `key` 這種過度寬泛規則。建議使用下列結構：
