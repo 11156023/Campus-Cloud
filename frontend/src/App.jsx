@@ -9,11 +9,11 @@ import { AuthSessionStatus } from "./services/authSession";
 import styles from "./App.module.scss";
 
 // 個人
-const AdminDashboardPage = lazy(() => import("./pages/personal/dashboard/AdminDashboardPage"));
-const TeacherDashboardPage = lazy(() => import("./pages/personal/dashboard/TeacherDashboardPage"));
-const StudentHomePage = lazy(() => import("./pages/personal/dashboard/StudentHomePage"));
-const StudentCoursePage = lazy(() => import("./pages/personal/dashboard/StudentCoursePage"));
-const QuickTemplateFormPage = lazy(() => import("./pages/personal/dashboard/QuickTemplateFormPage"));
+const AdminDashboardPage = lazy(() => import("./pages/personal/dashboard/admin/AdminDashboardPage"));
+const TeacherDashboardPage = lazy(() => import("./pages/personal/dashboard/teacher/TeacherDashboardPage"));
+const StudentHomePage = lazy(() => import("./pages/personal/dashboard/student/StudentHomePage"));
+const StudentCoursePage = lazy(() => import("./pages/personal/dashboard/student/StudentCoursePage"));
+const QuickTemplateFormPage = lazy(() => import("./pages/personal/quick-practice/QuickTemplateFormPage"));
 const ResourcesPage = lazy(() => import("./pages/personal/resources/ResourcesPage"));
 const ResourceDetailPage = lazy(() => import("./pages/personal/resources/detail/ResourceDetailPage"));
 const RequestsPage = lazy(() => import("./pages/personal/requests/RequestsPage"));

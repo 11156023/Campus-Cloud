@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
-import MIcon from "../../../components/MIcon";
-import TerminalDialog from "../resources/TerminalDialog";
-import VncDialog from "../resources/VncDialog";
-import { CoursesService } from "../../../services/courses";
-import { ResourcesService } from "../../../services/resources";
-import { QuickPracticeService } from "../../../services/quickPractice";
+import MIcon from "../../../../components/MIcon";
+import TerminalDialog from "../../resources/TerminalDialog";
+import VncDialog from "../../resources/VncDialog";
+import { CoursesService } from "../../../../services/courses";
+import { ResourcesService } from "../../../../services/resources";
+import { QuickPracticeService } from "../../../../services/quickPractice";
 import styles from "./StudentHomePage.module.scss";
-import PageHeader from "../../../components/PageHeader/PageHeader";
+import PageHeader from "../../../../components/PageHeader/PageHeader";
 
 const STATUS_META = {
   running: { label: "環境已就緒", tone: "success", icon: "check_circle" },

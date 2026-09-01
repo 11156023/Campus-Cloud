@@ -1,5 +1,5 @@
-@use "../../../assets/styles/variables" as *;
-@use "../../../assets/styles/mixins" as *;
+@use "../../../../assets/styles/variables" as *;
+@use "../../../../assets/styles/mixins" as *;
 
 .page {
   // Chromium 會把 backdrop-filter（液態玻璃模式還包含 SVG 位移濾鏡）
