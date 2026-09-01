@@ -263,9 +263,6 @@ export default function BatchReviewPage() {
                     <tr key={b.id} className={styles.tr}>
                       <td className={styles.td}>
                         <div className={styles.nameCell}>
-                          <div className={styles.nameIcon}>
-                            <MIcon name="library_add" size={18} />
-                          </div>
                           <div>
                             <div className={styles.namePrimary}>{b.hostname_prefix}</div>
                             <div className={styles.nameSub}>{b.resource_type?.toUpperCase()}</div>

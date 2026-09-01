@@ -233,9 +233,6 @@ function RequestRow({ req, onUpdated }) {
       >
         <td className={styles.td}>
           <div className={styles.nameCell}>
-            <div className={styles.nameIcon}>
-              <MIcon name={type.icon} size={18} />
-            </div>
             <div className={styles.nameMeta}>
               <span className={styles.namePrimary}>{req.hostname}</span>
               <span className={styles.nameSub}>
@@ -341,7 +338,6 @@ function SkeletonRow() {
     <tr className={styles.tr} aria-hidden>
       <td className={styles.td}>
         <div className={styles.nameCell}>
-          <div className={`${styles.nameIcon} ${styles.skeleton}`} />
           <div className={styles.nameMeta}>
             <div className={`${styles.skeleton} ${styles.skRow}`} style={{ width: 110, height: 13 }} />
             <div className={`${styles.skeleton} ${styles.skRow}`} style={{ width: 70, height: 10 }} />
