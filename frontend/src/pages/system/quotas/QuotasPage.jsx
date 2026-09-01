@@ -192,7 +192,6 @@ function QuotaDialog({ mode, quota, candidates, loadingUsers, defaults, closing 
         toast.success("配額已更新");
       } else {
         await QuotasService.create({
-          scope: "user",
           user_id: userId,
           ...normNumbers(form, baseline),
         });

@@ -429,6 +429,13 @@
 .inspectorTitle small { overflow: hidden; color: var(--color-text-muted); font-size: $font-size-10; text-overflow: ellipsis; white-space: nowrap; }
 .inspectorSplit { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .inspectorHint { margin: 0; color: var(--color-text-muted); font-size: $font-size-10; line-height: 1.5; }
+.rowActions { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
+.rowActions button { white-space: nowrap; }
+.audienceClassList { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
+.audienceClassItem { display: flex; align-items: flex-start; gap: 8px; padding: 9px 11px; border: 1px solid var(--color-border); border-radius: $radius-8; background: var(--color-surface); font-weight: $font-weight-400; cursor: pointer; }
+.audienceClassItem input { width: auto; margin-top: 2px; }
+.audienceClassItem span { display: flex; min-width: 0; flex-direction: column; gap: 2px; font-size: $font-size-14; }
+.audienceClassItem small { color: var(--color-text-muted); font-size: $font-size-10; }
 .inspectorDanger { display: inline-flex; min-height: 34px; align-items: center; justify-content: center; gap: 5px; margin-top: auto; padding: 0 10px; border: 1px solid color-mix(in srgb, var(--color-danger) 35%, var(--color-border)); border-radius: $radius-8; color: var(--color-danger); background: var(--color-surface); cursor: pointer; }
 .table { min-width: 720px; }
 

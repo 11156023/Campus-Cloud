@@ -3,24 +3,15 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, Field, model_validator
-
-from app.models import QuotaScope
+from pydantic import BaseModel, Field
 
 
 class ResourceQuotaCreate(BaseModel):
-    scope: QuotaScope = QuotaScope.user
     user_id: uuid.UUID
     max_cpu_cores: int = Field(default=8, ge=0, le=256)
     max_memory_mb: int = Field(default=16384, ge=0, le=1048576)
     max_disk_gb: int = Field(default=100, ge=0, le=65536)
     max_instances: int = Field(default=5, ge=0, le=100)
-
-    @model_validator(mode="after")
-    def _validate_target(self) -> "ResourceQuotaCreate":
-        if self.scope != QuotaScope.user:
-            raise ValueError("only user quota scope is supported")
-        return self
 
 
 class ResourceQuotaUpdate(BaseModel):
@@ -32,7 +23,6 @@ class ResourceQuotaUpdate(BaseModel):
 
 class ResourceQuotaPublic(BaseModel):
     id: uuid.UUID
-    scope: QuotaScope
     user_id: uuid.UUID
     user_email: str | None = None
     max_cpu_cores: int

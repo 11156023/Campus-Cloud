@@ -13,6 +13,11 @@ class ResourceNetwork(SQLModel, table=True):
     """IP/MAC/bridge metadata linked to a managed VM/LXC resource."""
 
     __tablename__ = "resource_networks"
+    __table_args__ = (
+        sa.UniqueConstraint(
+            "resource_vmid", name="uq_resource_networks_resource_vmid"
+        ),
+    )
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     resource_vmid: int = Field(

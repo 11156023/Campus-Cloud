@@ -1,4 +1,4 @@
-﻿"""防火牆相關 API schemas"""
+"""防火牆相關 API schemas"""
 
 import uuid
 from datetime import datetime
@@ -67,6 +67,25 @@ class ConnectionDelete(BaseModel):
 
 
 # ─── 防火牆規則 CRUD ───────────────────────────────────────────────────────────
+# ─── 佈局管理 ──────────────────────────────────────────────────────────────────
+
+
+class LayoutNodeUpdate(BaseModel):
+    """更新節點位置"""
+
+    vmid: int | None = Field(default=None, description="VM ID；None 代表 gateway")
+    node_type: Literal["vm", "gateway"] = Field(description="節點類型")
+    position_x: float = Field(description="X 座標")
+    position_y: float = Field(description="Y 座標")
+
+
+class LayoutUpdate(BaseModel):
+    """批次更新圖形佈局"""
+
+    nodes: list[LayoutNodeUpdate]
+
+
+# ─── 回應 schemas ──────────────────────────────────────────────────────────────
 
 
 class FirewallRuleCreate(BaseModel):
@@ -94,27 +113,6 @@ class FirewallRuleUpdate(BaseModel):
     sport: str | None = None
     enable: int | None = None
     comment: str | None = None
-
-
-# ─── 佈局管理 ──────────────────────────────────────────────────────────────────
-
-
-class LayoutNodeUpdate(BaseModel):
-    """更新節點位置"""
-
-    vmid: int | None = Field(default=None, description="VM ID；None 代表 gateway")
-    node_type: Literal["vm", "gateway"] = Field(description="節點類型")
-    position_x: float = Field(description="X 座標")
-    position_y: float = Field(description="Y 座標")
-
-
-class LayoutUpdate(BaseModel):
-    """批次更新圖形佈局"""
-
-    nodes: list[LayoutNodeUpdate]
-
-
-# ─── 回應 schemas ──────────────────────────────────────────────────────────────
 
 
 class FirewallRulePublic(BaseModel):
@@ -175,8 +173,6 @@ class TopologyResponse(BaseModel):
 
 
 # ─── NAT 規則 ──────────────────────────────────────────────────────────────────
-
-
 class NATRulePublic(BaseModel):
     """NAT 端口轉發規則（回應）"""
 
@@ -208,10 +204,10 @@ __all__ = [
     "PortSpec",
     "ConnectionCreate",
     "ConnectionDelete",
-    "FirewallRuleCreate",
-    "FirewallRuleUpdate",
     "LayoutNodeUpdate",
     "LayoutUpdate",
+    "FirewallRuleCreate",
+    "FirewallRuleUpdate",
     "FirewallRulePublic",
     "FirewallOptionsPublic",
     "TopologyNode",

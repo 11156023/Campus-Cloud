@@ -49,6 +49,9 @@ export const QuickPracticeService = {
   async launch(environmentId) {
     return normalizeSession(await apiPost(`/api/v1/quick-practice/templates/${environmentId}/launch`, {}));
   },
+  async endSession(sessionId) {
+    return normalizeSession(await apiPost(`/api/v1/quick-practice/sessions/${sessionId}/end`, {}));
+  },
   async listMySessions(options) {
     return (await apiGet("/api/v1/quick-practice/sessions/my", options)).map(normalizeSession);
   },

@@ -8,7 +8,6 @@ API schemas 已移至 app.schemas 模組。
 from sqlmodel import SQLModel
 
 from .ai_api_credential import AIAPICredential
-from .ai_api_rate_limit import AIAPIRateLimit
 from .ai_api_request import AIAPIRequest, AIAPIRequestStatus
 from .ai_api_usage import AIAPIUsage
 from .ai_pve_template import AIPVETemplate
@@ -37,6 +36,7 @@ from .course import (
 from .course_environment import (
     ClassCapacityReservation,
     CourseEnvironment,
+    CourseEnvironmentAudience,
     CourseEnvironmentEdge,
     CourseEnvironmentNode,
     CourseEnvironmentVersion,
@@ -63,7 +63,7 @@ from .quick_practice import QuickPracticeSession, QuickPracticeSessionMachine
 from .quota_config import QuotaConfig
 from .resource import Resource
 from .resource_network import ResourceNetwork
-from .resource_quota import QuotaScope, ResourceQuota
+from .resource_quota import ResourceQuota
 from .reverse_proxy_rule import ReverseProxyRule
 from .spec_change_request import (
     SpecChangeRequest,
@@ -131,7 +131,6 @@ __all__ = [
     "AIAPIRequest",
     "AIAPIRequestStatus",
     "AIAPIUsage",
-    "AIAPIRateLimit",
     "AIPVETemplate",
     "AITemplateCallLog",
     # Resource
@@ -139,7 +138,6 @@ __all__ = [
     "ResourceNetwork",
     "ResourceQuota",
     "QuotaConfig",
-    "QuotaScope",
     # VM Request
     "VMProvisioningStatus",
     "VMRequest",
@@ -182,6 +180,7 @@ __all__ = [
     # Cloudflare Config
     "CloudflareConfig",
     "CourseEnvironment",
+    "CourseEnvironmentAudience",
     "CourseEnvironmentEdge",
     "CourseEnvironmentVersion",
     "CourseEnvironmentVersionStatus",

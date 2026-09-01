@@ -156,6 +156,9 @@ def build_fast_ai_plan_prompt(
 ) -> str:
     """Compact planner prompt for latency-sensitive form prefill."""
     compact_resources = {
+        "application_templates": list(
+            resource_options.get("application_templates") or []
+        )[:20],
         "lxc_os_images": list(resource_options.get("lxc_os_images") or [])[:20],
         "vm_operating_systems": list(resource_options.get("vm_operating_systems") or [])[:20],
         "gpu_options": list(resource_options.get("gpu_options") or [])[:10],
@@ -166,8 +169,12 @@ Rules:
 - All human-readable text must be concise Traditional Chinese.
 - Latest user message overrides earlier messages. Assistant suggestions are not user requirements.
 - Preserve valid non-empty form values unless the user explicitly asks to change them.
+- Two kinds of source exist. `application_templates` are environments a teacher or the platform already installed; each entry's `description` says what is inside, and `resource_type` decides whether the machine is a container or a VM. `lxc_os_images` and `vm_operating_systems` are bare operating systems the user would have to install everything on.
+- If an application template already provides what the user asked for (match the service name against its name and description), pick it: set resource_type from its `resource_type` ("qemu" means vm), put its template_id in `vm_template_id` for a VM or in `lxc_template_id` for a container, leave the other source fields empty, and say in the summary that the software is preinstalled.
+- Otherwise pick a bare OS image and say in the summary which software the user still has to install. Never claim a bare image comes with the software.
+- Treat an application template's cores/memory_mb/disk_gb as the suggested spec: keep them unless the user asked for something bigger, and never propose a disk smaller than the template's own.
 - Prefer LXC for ordinary Linux services; use VM for Windows, GUI, GPU, driver isolation, or full OS control.
-- Use only listed OS images, VM template IDs, GPU mapping IDs, and schedule options.
+- Use only listed application templates, OS images, VM template IDs, GPU mapping IDs, and schedule options.
 - Never select a GPU with available_count=0. If GPU is required but unavailable, return an empty gpu_mapping_id.
 - Preserve an existing schedule. Otherwise choose exactly one listed schedule option; never invent a time.
 - Recommend the minimum reasonable CPU, memory, and disk. VM disk >=20 GB; LXC disk >=8 GB.
