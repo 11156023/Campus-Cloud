@@ -78,6 +78,7 @@
    .table     { @include table-base; }   可加 min-width 撐出卷動
    .th        { @include table-th; }
    .tr        { @include table-tr; }     整列可點時再疊 table-tr-clickable
+                                         列數會變的表格要 table-layout: fixed（見 STYLE_GUIDE 規則二）
    .td        { @include table-td; }
    欄寬、對齊、特殊儲存格等頁面差異寫在 @include 之後。 */
 @mixin table-wrap {

@@ -356,13 +356,50 @@ import MIcon from "../components/MIcon";
 .tableWrap { @include table-wrap; }        // 玻璃容器 + 圓角 + 橫向卷動
 .table     { @include table-base; min-width: 720px; }  // min-width 依內容自定，撐出卷動
 .th        { @include table-th; }
-.tr        { @include table-tr; }          // 一般列不亮 hover 時傳 $hover: false
+.tr        { @include table-tr; }          // 基底不含 hover，見下方規則
 .td        { @include table-td; }
 ```
 
 - 欄寬、對齊、特殊儲存格（`.thRight`、`.tdNowrap`…）等頁面差異寫在 `@include` 之後
 - RWD 行為統一為 **容器橫向卷動**（`table-wrap` 內建 `overflow-x: auto`），不做表格轉卡片
 - 表格嵌在既有卡片內時可只用 `table-base` / `table-th` / `table-tr` / `table-td`，省略外層 `table-wrap`
+
+#### 規則一：整列 hover 變色 = 這一列可以點
+
+整列 hover 變色是**互動訊號，不是裝飾**。列本身不可點（互動都在儲存格內的按鈕上）時，
+不要讓整列變色，否則是假的可點暗示。
+
+```scss
+.tr          { @include table-tr; }            // 不可點：只有分隔線，無 hover
+.trClickable { @include table-tr-clickable; }  // 可點：游標 + hover 一起給
+```
+
+- 判斷標準只有一個：**`<tr>` 自己有沒有 `onClick`**（或 `role` / `tabIndex`）
+- 同一張表可以混用（監控頁：節點列可點、VM 列不可點），所以用兩支 mixin 疊加，不用布林參數
+- 不要自己寫 `cursor: pointer` 或 `&:hover { background: … }`——游標與 hover 會各自漂移
+- 需要不同的 hover 色時（例如群組列本身已有底色），可在 `@include` 之後覆寫 `background`
+
+#### 規則二：列數會變的表格要固定欄寬
+
+`table-layout` 預設的 `auto` 依**全部列的內容**計算欄寬。只要展開／收合會增減
+**完整欄位的列**，每一欄的內容都變了，整張表就會跳動。
+
+```scss
+.table { @include table-base; table-layout: fixed; min-width: 1080px; }
+
+.colStatus { width: 100px; }   // 欄寬集中宣告，搭配 JSX 的 <colgroup>
+```
+
+- 只有在展開列是 **`<td colSpan={N}>` 的整寬詳情面板**時才不需要——
+  colspan 儲存格不參與個別欄寬計算，不會造成跳動
+- 改用 `fixed` 後，要移除儲存格內為了「跟 auto layout 搶寬度」而設的 `min-width`，
+  它們只會讓內容溢出欄位
+- 不指定寬度的那一欄會吸收剩餘空間（通常留給名稱欄）
+
+#### 規則三：儲存格圖示要帶文字沒有的資訊
+
+`MIcon` 一律 `aria-hidden`，螢幕閱讀器讀不到。若圖示編碼的資訊
+就寫在緊鄰的文字裡（型別、分類），它只是版面慣性，拿掉讓文字說話即可。
 
 ### Dropdown 選單
 
