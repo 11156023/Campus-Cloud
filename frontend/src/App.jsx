@@ -139,6 +139,7 @@ function App() {
                   : <StudentHomePage />
             }
           />
+          {/* 單一課程總覽：課堂環境、課堂機器與截至今天的 AI 任務 */}
           <Route path="/dashboard/course/:pathId" element={<StudentCoursePage />} />
           <Route path="/quick-template/:id"   element={<QuickTemplateFormPage />} />
           <Route path="/my-resources"         element={<ResourcesPage />} />

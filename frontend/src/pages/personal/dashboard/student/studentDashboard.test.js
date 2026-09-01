@@ -1,13 +1,11 @@
-import { describe, expect, it, vi } from "vitest";
-
-vi.mock("../../resources/TerminalDialog", () => ({ default: () => null }));
-vi.mock("../../resources/VncDialog", () => ({ default: () => null }));
-
+import { describe, expect, it } from "vitest";
 import {
   assignmentsUntilToday,
   buildPracticeMachines,
   practiceMachineActionLabel,
-} from "./StudentHomePage";
+  pickInProgress,
+  toPercent,
+} from "./studentDashboard";
 
 describe("assignmentsUntilToday", () => {
   it("保留今天以前的所有任務、排除未來任務並依日期排列", () => {
@@ -64,5 +62,42 @@ describe("practiceMachineActionLabel", () => {
     expect(practiceMachineActionLabel({ vmid: 218, status: "running" })).toBe("進入機器");
     expect(practiceMachineActionLabel({ vmid: 218, status: "stopped" })).toBe("啟動並進入");
     expect(practiceMachineActionLabel({ vmid: null, status: "pending" })).toBe("環境配置中");
+  });
+});
+
+describe("toPercent", () => {
+  it("把進度收斂到 0–100 的整數，非數值視為 0", () => {
+    expect(toPercent(42.4)).toBe(42);
+    expect(toPercent(-5)).toBe(0);
+    expect(toPercent(180)).toBe(100);
+    expect(toPercent(null)).toBe(0);
+    expect(toPercent("abc")).toBe(0);
+  });
+});
+
+describe("pickInProgress", () => {
+  it("優先挑進行中的項目", () => {
+    const picked = pickInProgress([
+      { id: "done", progress_percent: 100 },
+      { id: "doing", progress_percent: 40 },
+      { id: "fresh", progress_percent: 0 },
+    ]);
+
+    expect(picked.id).toBe("doing");
+  });
+
+  it("沒有進行中的項目時退回第一個尚未完成的", () => {
+    const picked = pickInProgress([
+      { id: "done", progress_percent: 100 },
+      { id: "fresh", progress_percent: 0 },
+    ]);
+
+    expect(picked.id).toBe("fresh");
+  });
+
+  it("全部完成時退回第一筆，空清單回 null", () => {
+    expect(pickInProgress([{ id: "a", progress_percent: 100 }]).id).toBe("a");
+    expect(pickInProgress([])).toBeNull();
+    expect(pickInProgress(undefined)).toBeNull();
   });
 });
