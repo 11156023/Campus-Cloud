@@ -16,7 +16,7 @@ from typing import Any
 from sqlmodel import Session, select
 
 from app.exceptions import AppError, ConflictError
-from app.models import QuotaConfig, QuotaScope, Resource, ResourceQuota
+from app.models import QuotaConfig, Resource, ResourceQuota
 from app.models.base import get_datetime_utc
 from app.services.proxmox import proxmox_service
 from app.services.resource.quota_policy import (
@@ -74,10 +74,7 @@ def update_global_quota(session: Session, data: dict[str, Any]) -> QuotaConfig:
 
 def _quota_for_user(session: Session, user_id: uuid.UUID) -> ResourceQuota | None:
     return session.exec(
-        select(ResourceQuota).where(
-            ResourceQuota.scope == QuotaScope.user,
-            ResourceQuota.user_id == user_id,
-        )
+        select(ResourceQuota).where(ResourceQuota.user_id == user_id)
     ).first()
 
 

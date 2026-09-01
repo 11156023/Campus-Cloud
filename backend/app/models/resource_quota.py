@@ -2,16 +2,11 @@
 
 import uuid
 from datetime import datetime
-from enum import Enum
 
 import sqlalchemy as sa
 from sqlmodel import Column, DateTime, Field, SQLModel
 
 from .base import get_datetime_utc
-
-
-class QuotaScope(str, Enum):
-    user = "user"
 
 
 class ResourceQuota(SQLModel, table=True):
@@ -23,7 +18,6 @@ class ResourceQuota(SQLModel, table=True):
     )
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    scope: QuotaScope = Field(default=QuotaScope.user)
     user_id: uuid.UUID = Field(foreign_key="user.id")
     max_cpu_cores: int = Field(default=8, ge=0, le=256)
     max_memory_mb: int = Field(default=16384, ge=0, le=1048576)
@@ -35,4 +29,4 @@ class ResourceQuota(SQLModel, table=True):
     )
 
 
-__all__ = ["QuotaScope", "ResourceQuota"]
+__all__ = ["ResourceQuota"]

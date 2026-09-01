@@ -1,8 +1,7 @@
-from typing import Annotated, Any
+from typing import Annotated
 
 import jwt
 from fastapi import APIRouter, Depends
-from fastapi.responses import HTMLResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
 
@@ -10,13 +9,12 @@ from app.api.deps import (
     CurrentUser,
     SessionDep,
     TokenDep,
-    get_current_active_superuser,
     rate_limit_by_ip,
 )
 from app.core import security
 from app.core.config import settings
 from app.infrastructure.redis import get_redis, revoke_jti
-from app.schemas import Message, NewPassword, Token, TokenPayload, UserPublic
+from app.schemas import Message, NewPassword, Token, TokenPayload
 from app.schemas.ldap import LdapLoginRequest, LoginMethodsPublic
 from app.services.user import auth_service, ldap_auth_service
 
@@ -76,11 +74,6 @@ async def refresh_token(session: SessionDep, body: RefreshTokenRequest) -> Token
     )
 
 
-@router.post("/login/test-token", response_model=UserPublic)
-def test_token(current_user: CurrentUser) -> Any:
-    return current_user
-
-
 @router.post("/login/logout")
 async def logout(
     token: TokenDep,
@@ -135,17 +128,3 @@ def reset_password(session: SessionDep, body: NewPassword) -> Message:
         session=session, token=body.token, new_password=body.new_password
     )
     return Message(message="Password updated successfully")
-
-
-@router.post(
-    "/password-recovery-html-content/{email}",
-    dependencies=[Depends(get_current_active_superuser)],
-    response_class=HTMLResponse,
-)
-def recover_password_html_content(email: str, session: SessionDep) -> Any:
-    html_content, subject = auth_service.get_password_recovery_html(
-        session=session, email=email
-    )
-    return HTMLResponse(
-        content=html_content, headers={"subject:": subject}
-    )

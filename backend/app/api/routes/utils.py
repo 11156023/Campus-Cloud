@@ -4,42 +4,18 @@ import asyncio
 import logging
 from typing import Literal
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Response
 from pydantic import BaseModel
-from pydantic.networks import EmailStr
 from sqlalchemy import text
 
-from app.api.deps import get_current_active_superuser
 from app.core.db import engine
 from app.infrastructure.redis.client import get_redis
-from app.schemas import Message
-from app.utils import generate_test_email, send_email
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/utils", tags=["utils"])
 
 _HEALTH_CHECK_TIMEOUT_SECONDS = 3.0
-
-
-@router.post(
-    "/test-email/",
-    dependencies=[Depends(get_current_active_superuser)],
-    status_code=201,
-)
-def test_email(email_to: EmailStr) -> Message:
-    """
-    Test emails.
-    """
-    email_data = generate_test_email(email_to=email_to)
-    send_email(
-        email_to=email_to,
-        subject=email_data.subject,
-        html_content=email_data.html_content,
-    )
-    return Message(message="Test email sent")
-
-
 # ─── Health / Readiness ──────────────────────────────────────────────────────
 
 
