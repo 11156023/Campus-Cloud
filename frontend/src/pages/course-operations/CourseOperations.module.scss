@@ -10,6 +10,8 @@
 .btnSecondary { border: 1px solid var(--color-border); color: var(--color-text); background: var(--color-surface); }
 .btnSecondary:hover:not(:disabled) { background: var(--color-hover); }
 .btnSecondary:disabled { opacity: 0.5; cursor: not-allowed; }
+/* 頁首返回鍵：與「申請虛擬機 / 容器」頁的 .backBtn 一致 */
+.backBtn { box-shadow: var(--shadow-sm); white-space: nowrap; }
 .backLink { align-self: flex-start; padding: 5px 4px; color: var(--color-text-secondary); background: transparent; }
 .backLink:hover { color: var(--color-primary); }
 .iconBtn { width: 32px; height: 32px; padding: 0; color: var(--color-text-secondary); background: transparent; }
@@ -79,7 +81,6 @@
 .templateChoices p { margin: 4px 0; color: var(--color-text-secondary); font-size: $font-size-12; line-height: 1.4; }
 .templateChoices small { color: var(--color-text-muted); font-size: $font-size-10; }
 
-.headerState { display: flex; align-items: center; gap: 7px; }
 
 .lockBadge { color: var(--color-pending); background: color-mix(in srgb, var(--color-pending) 12%, transparent); }
 .workspaceTabs { padding-bottom: 8px; border-bottom: 1px solid var(--color-border); }
@@ -434,8 +435,6 @@
 .audienceClassItem small { color: var(--color-text-muted); font-size: $font-size-10; }
 .inspectorDanger { display: inline-flex; min-height: 34px; align-items: center; justify-content: center; gap: 5px; margin-top: auto; padding: 0 10px; border: 1px solid color-mix(in srgb, var(--color-danger) 35%, var(--color-border)); border-radius: $radius-8; color: var(--color-danger); background: var(--color-surface); cursor: pointer; }
 .table { min-width: 720px; }
-
-.headerState { flex-wrap: wrap; justify-content: flex-end; }
 
 .jobGrid span { color: var(--color-text-muted); font-size: $font-size-10; }
 .jobGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; padding: 16px 28px; border-bottom: 1px solid var(--color-border); background: color-mix(in srgb, var(--color-hover) 34%, var(--color-surface)); }

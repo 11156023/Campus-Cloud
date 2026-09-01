@@ -10,7 +10,6 @@
 
   @media (min-width: $breakpoint-sidebar) { padding: 0; }
 }
-.saveState { display: inline-flex; align-items: center; gap: 6px; padding: 7px 10px; border-radius: $radius-pill; color: var(--color-success); background: color-mix(in srgb, var(--color-success) 10%, transparent); font-size: $font-size-10; font-weight: $font-weight-700; white-space: nowrap; }
 .stepper { display: grid; grid-template-columns: repeat(5, 1fr); overflow: hidden; @include glass-surface($shadow: var(--shadow-sm)); border-radius: $radius-12; }
 .stepper button { display: grid; min-width: 0; grid-template-columns: 28px minmax(0, 1fr); align-items: center; gap: 8px; min-height: 62px; padding: 9px 12px; border: 0; border-right: 1px solid var(--color-divider); color: var(--color-text-muted); background: transparent; text-align: left; cursor: pointer; }
 .stepper button:last-child { border-right: 0; }
@@ -107,10 +106,13 @@
 .btnSecondary { border: 1px solid var(--color-border); color: var(--color-text-secondary); background: var(--color-surface); }
 .btnSecondary:hover:not(:disabled) { background: var(--color-hover); }
 .btnPrimary:disabled, .btnSecondary:disabled { cursor: not-allowed; opacity: 0.5; }
+/* 頁首返回鍵：與「申請虛擬機 / 容器」頁的 .backBtn 一致 */
+.backBtn { display: inline-flex; align-items: center; gap: 6px; padding: 8px $spacing-16; border-radius: $radius-8; font-size: $font-size-14; font-weight: $font-weight-500; cursor: pointer; white-space: nowrap; background: var(--color-surface); color: var(--color-text); border: 1px solid var(--color-border); box-shadow: var(--shadow-sm); transition: background $transition-base; }
+.backBtn:hover { background: var(--color-hover); }
 
 @include respond-below(lg) { .stepper { grid-template-columns: repeat(5, minmax(135px, 1fr)); overflow-x: auto; } .studentLayout, .reviewLayout { grid-template-columns: 1fr; } }
 @include respond-below(md) {
-  .saveState { align-self: stretch; justify-content: center; }
+  .backBtn { align-self: stretch; }
   .formGrid, .environmentGrid { grid-template-columns: 1fr; padding: $spacing-16; }
   .full { grid-column: auto; }
   .advancedGrid { grid-template-columns: 1fr; }

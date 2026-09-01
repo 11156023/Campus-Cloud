@@ -224,7 +224,7 @@ export default function ClassSetupPage() {
 
   return <div className={styles.page}>
     <PageHeader title={item?.name || "建立完整課程班級"} subtitle="依序完成課表、學生、環境與每週任務；每一步都會保存到正式班級。">
-      <span className={styles.saveState}><MIcon name="cloud_done" size={16} />{classId ? "班級草稿已建立" : "第一步後開始自動保存"}</span>
+      <button type="button" className={styles.backBtn} onClick={() => navigate("/class-management")}><MIcon name="arrow_back" size={18} />返回班級管理</button>
     </PageHeader>
 
     <nav className={styles.stepper} aria-label="建立班級流程">{STEPS.map(([key, label, hint], index) => {
