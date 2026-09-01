@@ -92,16 +92,6 @@ class VMSchema(BaseModel):
     maxdisk: int | None = None
 
 
-class VNCInfoSchema(BaseModel):
-    """VNC 連線資訊"""
-
-    vmid: int
-    ws_url: str
-    ticket: str | None = None
-    port: str | None = None
-    message: str
-
-
 class TerminalInfoSchema(BaseModel):
     """LXC Terminal 連線資訊"""
 
@@ -111,6 +101,14 @@ class TerminalInfoSchema(BaseModel):
     message: str
 
 
+class VNCInfoSchema(BaseModel):
+    """VNC 連線資訊"""
+
+    vmid: int
+    ws_url: str
+    ticket: str | None = None
+    port: str | None = None
+    message: str
 class TemplateSchema(BaseModel):
     """LXC OS template 資訊"""
 

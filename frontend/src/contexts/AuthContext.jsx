@@ -51,6 +51,17 @@ export function AuthProvider({ children }) {
     cancelSessionCheck();
     clearExpiryTimer();
     toast.dismiss(REFRESH_WARNING_ID);
+
+    // 先請伺服器把 access/refresh token 的 JTI 加入黑名單，否則登出後
+    // token 在到期前仍然有效。必須在 clearTokens() 之前呼叫：apiPost 是同步
+    // wrapper，request() 會在第一個 await 之前就取好 token snapshot。
+    // 撤銷失敗（離線、後端不可用）不應阻擋本機登出，因此僅記錄不中斷。
+    const { refreshToken } = AuthStorage.getSnapshot();
+    apiPost(
+      "/api/v1/login/logout",
+      refreshToken ? { refresh_token: refreshToken } : {},
+    ).catch(() => {});
+
     AuthStorage.clearTokens();
     setSession({
       status: AuthSessionStatus.ANONYMOUS,

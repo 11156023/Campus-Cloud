@@ -10,15 +10,17 @@ from app.ai.pve_log import ssh_exec as ssh_exec_module
 def test_resolve_vm_info_uses_cached_ip_when_present(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    resource = SimpleNamespace(
-        ip_address="10.10.0.6",
-        ssh_private_key_encrypted="encrypted-key",
-    )
+    resource = SimpleNamespace(ssh_private_key_encrypted="encrypted-key")
 
     monkeypatch.setattr(
         ssh_exec_module.resource_repo,
         "get_resource_by_vmid",
         lambda **_kwargs: resource,
+    )
+    monkeypatch.setattr(
+        ssh_exec_module.resource_repo,
+        "get_cached_ip_address",
+        lambda **_kwargs: "10.10.0.6",
     )
     monkeypatch.setattr(ssh_exec_module, "decrypt_value", lambda _v: "PRIVATE_KEY")
 
@@ -30,16 +32,18 @@ def test_resolve_vm_info_uses_cached_ip_when_present(
 def test_resolve_vm_info_falls_back_to_proxmox_ip_and_updates_cache(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    resource = SimpleNamespace(
-        ip_address=None,
-        ssh_private_key_encrypted="encrypted-key",
-    )
+    resource = SimpleNamespace(ssh_private_key_encrypted="encrypted-key")
     cache_updates: dict[str, object] = {}
 
     monkeypatch.setattr(
         ssh_exec_module.resource_repo,
         "get_resource_by_vmid",
         lambda **_kwargs: resource,
+    )
+    monkeypatch.setattr(
+        ssh_exec_module.resource_repo,
+        "get_cached_ip_address",
+        lambda **_kwargs: None,
     )
     monkeypatch.setattr(
         ssh_exec_module.proxmox_service,
@@ -68,15 +72,17 @@ def test_resolve_vm_info_falls_back_to_proxmox_ip_and_updates_cache(
 def test_resolve_vm_info_raises_when_no_cached_or_live_ip(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    resource = SimpleNamespace(
-        ip_address=None,
-        ssh_private_key_encrypted="encrypted-key",
-    )
+    resource = SimpleNamespace(ssh_private_key_encrypted="encrypted-key")
 
     monkeypatch.setattr(
         ssh_exec_module.resource_repo,
         "get_resource_by_vmid",
         lambda **_kwargs: resource,
+    )
+    monkeypatch.setattr(
+        ssh_exec_module.resource_repo,
+        "get_cached_ip_address",
+        lambda **_kwargs: None,
     )
     monkeypatch.setattr(
         ssh_exec_module.proxmox_service,

@@ -146,13 +146,6 @@ class TaskRecordPublic(BaseModel):
             started_at=record.started_at,
             finished_at=record.finished_at,
         )
-
-
-class TaskRecordsPublic(BaseModel):
-    data: list[TaskRecordPublic]
-    count: int
-
-
 class VMTemplateTaskResponse(BaseModel):
     """回傳範本本體 + 觸發的背景任務（前端拿 task.id 輪詢進度）"""
 
