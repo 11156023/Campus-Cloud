@@ -1,6 +1,6 @@
 """Tell the PostgreSQL AI template to use the postgres OS identity for DB access.
 
-Revision ID: aipve02_postgresql_prompt_identity
+Revision ID: aipve02_pg_prompt_identity
 Revises: tjmerge03_all_heads
 Create Date: 2026-08-31
 """
@@ -10,7 +10,7 @@ from __future__ import annotations
 import sqlalchemy as sa
 from alembic import op
 
-revision = "aipve02_postgresql_prompt_identity"
+revision = "aipve02_pg_prompt_identity"
 down_revision = "tjmerge03_all_heads"
 branch_labels = None
 depends_on = None
