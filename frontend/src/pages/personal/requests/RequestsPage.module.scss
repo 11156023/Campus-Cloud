@@ -60,8 +60,9 @@
   @include table-tr;
 }
 
+/* 有詳細資訊的列整列可展開。 */
 .trClickable {
-  cursor: pointer;
+  @include table-tr-clickable;
 }
 
 .trExpanded {
