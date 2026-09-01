@@ -72,8 +72,9 @@ src/pages/personal/resources/
 | 變數 | 用途 |
 |------|------|
 | `--color-primary` | 主色（藍紫） |
-| `--color-primary-dark` | 深色主色 |
+| `--color-primary-dark` | 深色主色（**僅作底色**，如 primary 按鈕 hover；深色模式仍為深色，當文字會不可讀）|
 | `--color-primary-light` | 淺色主色 |
+| `--color-primary-on-surface` | 品牌色**文字／邊框**用；亮暗兩色都達 AA。勿與 `--color-text-primary` 混淆（語序相反、兩者皆為藍色）|
 
 #### 文字
 | 變數 | 用途 |
