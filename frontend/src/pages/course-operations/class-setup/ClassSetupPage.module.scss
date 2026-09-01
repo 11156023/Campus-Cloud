@@ -10,8 +10,6 @@
 
   @media (min-width: $breakpoint-sidebar) { padding: 0; }
 }
-.backLink { display: inline-flex; width: fit-content; align-items: center; gap: $spacing-8; padding: 4px 0; border: 0; color: var(--color-text-secondary); background: transparent; font-size: $font-size-12; cursor: pointer; }
-.backLink:hover { color: var(--color-primary); }
 .saveState { display: inline-flex; align-items: center; gap: 6px; padding: 7px 10px; border-radius: $radius-pill; color: var(--color-success); background: color-mix(in srgb, var(--color-success) 10%, transparent); font-size: $font-size-10; font-weight: $font-weight-700; white-space: nowrap; }
 .stepper { display: grid; grid-template-columns: repeat(5, 1fr); overflow: hidden; @include glass-surface($shadow: var(--shadow-sm)); border-radius: $radius-12; }
 .stepper button { display: grid; min-width: 0; grid-template-columns: 28px minmax(0, 1fr); align-items: center; gap: 8px; min-height: 62px; padding: 9px 12px; border: 0; border-right: 1px solid var(--color-divider); color: var(--color-text-muted); background: transparent; text-align: left; cursor: pointer; }

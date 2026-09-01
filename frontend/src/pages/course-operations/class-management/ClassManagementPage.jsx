@@ -146,7 +146,6 @@ export default function ClassManagementPage() {
       icon="school"
       title={classes.length ? "沒有符合搜尋或篩選條件的班級。" : "還沒有任何班級。"}
       description={classes.length ? undefined : "建立班級後，SkyLab 會替每位學生準備好上課機器。"}
-      action={classes.length ? undefined : <button type="button" className={styles.btnSecondary} onClick={() => navigate("/class-setup")}><MIcon name="add" size={17} />一鍵建立班級</button>}
     />}
   </div>;
 }
