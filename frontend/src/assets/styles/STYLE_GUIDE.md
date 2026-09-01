@@ -113,7 +113,7 @@ src/pages/personal/resources/
 | `--color-pending` | `#d97706` | `#f59e0b` | 🟠 待審核 | 待審核、草稿、排程中、等待處理 |
 | `--color-danger` | `#dc3545` | 同左 | 🔴 危險 | 錯誤、失敗、危險操作 |
 | `--color-warning` | `#dc3545` | 同左 | 🔴 同 danger | （等同 danger，已統一為紅色） |
-| —（灰色） | `--color-hover` / `--color-text-muted` | — | ⚫ 未啟用 | 已停止、已暫停、disabled |
+| `--color-status-neutral` | `#6b7280` | `#9ca3af` | — | ⚫ 未啟用 | 已停止、已暫停、disabled |
 
 危險操作的 hover 加深色用 `--color-danger-dark`（`#b91c1c`）。
 
@@ -128,7 +128,7 @@ src/pages/personal/resources/
 .badge_info    { background: color-mix(in srgb, var(--color-info)    12%, transparent); color: var(--color-info); }
 .badge_pending { background: color-mix(in srgb, var(--color-pending) 12%, transparent); color: var(--color-pending); }
 .badge_danger  { background: color-mix(in srgb, var(--color-danger)  12%, transparent); color: var(--color-danger); }
-.badge_muted   { background: var(--color-hover); color: var(--color-text-muted); }
+.badge_muted   { background: var(--color-hover); color: var(--color-status-neutral); }
 ```
 
 > 一律用 `var(--color-*)`，不要把狀態色寫死成 HEX——深色模式的 info / pending 亮色值才吃得到。
