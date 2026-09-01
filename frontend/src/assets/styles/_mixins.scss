@@ -77,7 +77,7 @@
    .tableWrap { @include table-wrap; }   外層玻璃容器＋橫向卷動
    .table     { @include table-base; }   可加 min-width 撐出卷動
    .th        { @include table-th; }
-   .tr        { @include table-tr; }     不要整列 hover 時傳 $hover: false
+   .tr        { @include table-tr; }     整列可點時再疊 table-tr-clickable
    .td        { @include table-td; }
    欄寬、對齊、特殊儲存格等頁面差異寫在 @include 之後。 */
 @mixin table-wrap {
@@ -103,17 +103,22 @@
   white-space: nowrap;
 }
 
-@mixin table-tr($hover: true) {
+@mixin table-tr {
   transition: background $transition-base;
 
   &:not(:last-child) {
     border-bottom: 1px solid var(--color-divider);
   }
+}
 
-  @if $hover {
-    &:hover {
-      background: var(--color-row-hover);
-    }
+/* 整列 hover 變色是「這一列可以點」的訊號，不是裝飾。
+   全站列表的互動幾乎都在儲存格內的按鈕上，整列本身不可點，所以基底不給 hover；
+   只有 <tr> 自己有 onClick 時才疊這支，游標與 hover 一起給，兩者不會各自漂移。 */
+@mixin table-tr-clickable {
+  cursor: pointer;
+
+  &:hover {
+    background: var(--color-row-hover);
   }
 }
 
