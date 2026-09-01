@@ -201,62 +201,62 @@ export default function StudentHomePage() {
             </button>
           </article>
         </div>
+      </section>
 
-        <section
-          className={styles.quickTemplateSection}
-          aria-labelledby="quick-template-title"
-          data-guide="home-quick-templates"
-        >
-          <div className={styles.sectionHeading}>
-            <div>
-              <h2 id="quick-template-title">快速練習環境</h2>
-            </div>
-            <span>選擇固定配置的多機環境，整組啟動並受練習時限管理</span>
+      <section
+        className={styles.quickTemplateSection}
+        aria-labelledby="quick-template-title"
+        data-guide="home-quick-templates"
+      >
+        <div className={styles.sectionHeading}>
+          <div>
+            <h2 id="quick-template-title">快速練習環境</h2>
           </div>
+          <span>選擇固定配置的多機環境，整組啟動並受練習時限管理</span>
+        </div>
 
-          {templatesLoading ? (
-            <div className={styles.quickTemplateGrid} aria-label="正在載入快速模板">
-              {Array.from({ length: QUICK_TEMPLATE_LIMIT }, (_, index) => (
-                <div key={index} className={styles.quickTemplateSkeleton} />
-              ))}
-            </div>
-          ) : quickTemplates.length > 0 ? (
-            <div className={styles.quickTemplateGrid}>
-              {quickTemplates.map((template) => (
-                <button
-                  type="button"
-                  key={template.id}
-                  className={styles.templateCard}
-                  onClick={() => navigate(`/quick-template/${template.id}`, { state: { from: "/dashboard" } })}
-                >
-                  <div className={styles.templateHeader}>
-                    <span className={styles.templateLogo}><MIcon name="layers" size={22} /></span>
-                    <span className={styles.templateCategoryChip}>免人工審核</span>
-                  </div>
-                  <div className={styles.templateBody}>
-                    <h4 className={styles.templateName}>{template.name}</h4>
-                    <p className={styles.templateDesc}>
-                      {template.description
-                        || `包含 ${template.nodes.length} 台機器，適合臨時練習與課後操作。`}
-                    </p>
-                  </div>
-                  <div className={styles.templateFooter}>
-                    <span className={styles.templateAction}>
-                      立即建立
-                      <MIcon name="arrow_forward" size={14} />
-                    </span>
-                  </div>
-                </button>
-              ))}
-            </div>
-          ) : (
-            <EmptyState
-              icon="inventory_2"
-              title="目前沒有可快速建立的模板"
-              description="老師發布可供快速練習的多機環境後，就會顯示在這裡。"
-            />
-          )}
-        </section>
+        {templatesLoading ? (
+          <div className={styles.quickTemplateGrid} aria-label="正在載入快速模板">
+            {Array.from({ length: QUICK_TEMPLATE_LIMIT }, (_, index) => (
+              <div key={index} className={styles.quickTemplateSkeleton} />
+            ))}
+          </div>
+        ) : quickTemplates.length > 0 ? (
+          <div className={styles.quickTemplateGrid}>
+            {quickTemplates.map((template) => (
+              <button
+                type="button"
+                key={template.id}
+                className={styles.templateCard}
+                onClick={() => navigate(`/quick-template/${template.id}`, { state: { from: "/dashboard" } })}
+              >
+                <div className={styles.templateHeader}>
+                  <span className={styles.templateLogo}><MIcon name="layers" size={22} /></span>
+                  <span className={styles.templateCategoryChip}>免人工審核</span>
+                </div>
+                <div className={styles.templateBody}>
+                  <h4 className={styles.templateName}>{template.name}</h4>
+                  <p className={styles.templateDesc}>
+                    {template.description
+                      || `包含 ${template.nodes.length} 台機器，適合臨時練習與課後操作。`}
+                  </p>
+                </div>
+                <div className={styles.templateFooter}>
+                  <span className={styles.templateAction}>
+                    立即建立
+                    <MIcon name="arrow_forward" size={14} />
+                  </span>
+                </div>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <EmptyState
+            icon="inventory_2"
+            title="目前沒有可快速建立的模板"
+            description="老師發布可供快速練習的多機環境後，就會顯示在這裡。"
+          />
+        )}
       </section>
     </div>
   );
