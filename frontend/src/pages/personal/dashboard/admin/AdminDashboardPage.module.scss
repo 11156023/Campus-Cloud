@@ -36,10 +36,33 @@
   gap: $spacing-24;
   padding: $spacing-24;
 }
+/* 對話開始後這一列縮成「標題 + 重新問一題」，版面讓給對話本身 */
 .assistantSectionExpanded .assistantHero {
-  grid-template-columns: 1fr;
-  padding-bottom: $spacing-16;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: $spacing-16;
+  padding: $spacing-16 $spacing-24;
   border-bottom: 1px solid var(--color-divider);
+}
+
+.assistantReset {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: $radius-pill;
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: $font-size-14;
+  cursor: pointer;
+
+  &:hover {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+  }
 }
 .assistantIntro {
   display: flex;

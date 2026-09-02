@@ -77,6 +77,11 @@ export default function AdminDashboardPage() {
   const issues = useMemo(() => buildAdminIssues(checks), [checks]);
   const name = user?.full_name?.trim() || user?.email?.split("@")[0] || "管理員";
 
+  function resetAssistant() {
+    setConversationPrompt("");
+    setAssistantPrompt("");
+  }
+
   function openAssistant(event) {
     event.preventDefault();
     const prompt = normalizeAssistantPrompt(assistantPrompt);
@@ -96,8 +101,19 @@ export default function AdminDashboardPage() {
       <div className={styles.assistantHero}>
         <div className={styles.assistantIntro}>
           <span className={styles.assistantIcon}><MIcon name="support_agent" size={28} /></span>
-          <div><span className={styles.assistantLabel}>AI PVE 維運助手</span><h2 id="admin-assistant-title">直接描述你遇到的問題</h2><p>可查詢節點、VM／LXC、資源用量與儲存狀態；需要執行指令時仍會要求你確認。</p></div>
+          <div>
+            <span className={styles.assistantLabel}>AI PVE 維運助手</span>
+            <h2 id="admin-assistant-title">直接描述你遇到的問題</h2>
+            {/* 對話開始後這段說明就沒有作用了，版面留給對話 */}
+            {!conversationPrompt && <p>可查詢節點、VM／LXC、資源用量與儲存狀態；需要執行指令時仍會要求你確認。</p>}
+          </div>
         </div>
+        {conversationPrompt && (
+          <button type="button" className={styles.assistantReset} onClick={resetAssistant}>
+            <MIcon name="refresh" size={16} />
+            重新問一題
+          </button>
+        )}
         {!conversationPrompt && <form className={styles.assistantForm} onSubmit={openAssistant}>
           <div className={styles.assistantInput}>
             <MIcon name="terminal" size={21} />

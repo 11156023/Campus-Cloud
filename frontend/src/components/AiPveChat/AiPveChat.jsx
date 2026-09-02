@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import rehypeSanitize from "rehype-sanitize";
 import MIcon from "../MIcon";
 import { useToast } from "../../hooks/useToast";
 import { AiPveLogService } from "../../services/aiPveLog";
@@ -172,7 +174,13 @@ export default function AiPveChat({ initialPrompt = "", compact = false }) {
               <MIcon name={message.role === "assistant" ? "smart_toy" : "person"} size={16} />
               <span>{message.role === "assistant" ? "AI-PVE" : "你"}</span>
             </div>
-            <p className={styles.msgContent}>{sanitizeAiPveContent(message.content)}</p>
+            {/* 維運回覆常是節點清單、用量表格與指令片段，直接印純文字會看到
+                一堆星號與管線符號 */}
+            <div className={styles.msgContent}>
+              <ReactMarkdown rehypePlugins={[rehypeSanitize]}>
+                {sanitizeAiPveContent(message.content)}
+              </ReactMarkdown>
+            </div>
             {message.tools?.length > 0 && (
               <div className={styles.toolRow}>
                 <span className={styles.toolLabel}>
