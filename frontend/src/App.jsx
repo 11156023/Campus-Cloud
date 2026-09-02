@@ -11,7 +11,7 @@ import styles from "./App.module.scss";
 // 個人
 const AdminDashboardPage = lazy(() => import("./pages/personal/dashboard/admin/AdminDashboardPage"));
 const TeacherDashboardPage = lazy(() => import("./pages/personal/dashboard/teacher/TeacherDashboardPage"));
-const StudentHomePage = lazy(() => import("./pages/personal/dashboard/student/StudentHomePage"));
+const StudentHomePage = lazy(() => import("./pages/personal/dashboard/StudentHomePage"));
 const StudentCoursePage = lazy(() => import("./pages/personal/dashboard/student/StudentCoursePage"));
 const QuickTemplateFormPage = lazy(() => import("./pages/personal/quick-practice/QuickTemplateFormPage"));
 const ResourcesPage = lazy(() => import("./pages/personal/resources/ResourcesPage"));

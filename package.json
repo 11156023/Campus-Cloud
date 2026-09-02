@@ -1,5 +1,5 @@
 {
-  "name": "fastapi-full-stack-template",
+  "name": "skylab",
   "private": true,
   "workspaces": [
     "frontend"

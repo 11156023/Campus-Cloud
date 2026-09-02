@@ -1,6 +1,6 @@
-import { useContext, useEffect, useMemo, useState } from "react";
+import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import styles from "./RequestFormPage.module.scss";
-import { LayoutContext } from "../../../layout/DashboardLayout";
+import { LayoutContext } from "../../../layout/layoutContext";
 import { useAuth } from "../../../contexts/AuthContext";
 import { useToast } from "../../../hooks/useToast";
 import { VmRequestsService } from "../../../services/vmRequests";
@@ -8,7 +8,6 @@ import { VmRequestAvailabilityService } from "../../../services/vmRequestAvailab
 import { GpuService } from "../../../services/gpu";
 import { TemplatesService } from "../../../services/templates";
 import { apiGet } from "../../../services/api";
-import AiSidePanel from "./AiSidePanel";
 import AvailabilityPanel from "../../../components/AvailabilityPanel/AvailabilityPanel";
 import MIcon from "../../../components/MIcon";
 import PageHeader from "../../../components/PageHeader/PageHeader";
@@ -136,6 +135,7 @@ const gpuLabel = (gpu) => {
   return `${gpu.description || gpu.mapping_id}${vram} [${gpu.available_count}/${capacity} 可用]${gpu.available_count <= 0 ? " — 已滿" : ""}`;
 };
 
+
 function buildAiScheduleOptions(availability) {
   const days = (availability?.days || [])
     .filter((day) => (day.slots || []).some(
@@ -206,16 +206,14 @@ const MSG = {
   scheduleOutOfRange: "租借時段需在未來三個月內",
 };
 
-export default function RequestFormPage({ onBack, className }) {
+export default function RequestFormPage({ onBack, className, initialPrefill = null }) {
   const { user }  = useAuth();
   const toast     = useToast();
   const isPrivileged = user?.is_superuser || user?.role === "admin" || user?.role === "teacher";
-  const { setCompactFooter } = useContext(LayoutContext);
+  const { setCompactFooter, registerRequestForm } = useContext(LayoutContext);
   useEffect(() => { setCompactFooter(true); return () => setCompactFooter(false); }, [setCompactFooter]);
 
   const [closing, setClosing]   = useState(false);
-  const [aiOpen, setAiOpen]     = useState(false);
-  const [rightTab, setRightTab] = useState("ai");
 
   /* 範本系統 2.0：LXC 可選範本，選了走克隆路徑（免映像檔） */
   const [sysTemplates, setSysTemplates]   = useState([]);
@@ -269,6 +267,8 @@ export default function RequestFormPage({ onBack, className }) {
   const [vmTemplates, setVmTemplates]   = useState([]);
   const [vmLoading, setVmLoading]       = useState(false);
   const [gpuOptions, setGpuOptions]     = useState([]);
+  /* AI 建議的 GPU：等可用清單就緒才敢寫進表單（見下方 effect） */
+  const [pendingGpu, setPendingGpu]     = useState(null);
   const [gpuLoading, setGpuLoading]     = useState(false);
   const [gpuOptionsKey, setGpuOptionsKey] = useState("");
 
@@ -533,6 +533,7 @@ export default function RequestFormPage({ onBack, className }) {
     if (errors[key]) setErrors((prev) => ({ ...prev, [key]: "" }));
   }
 
+
   const recommendationContext = useMemo(() => ({
     resource_type: resourceType,
     mode,
@@ -567,6 +568,11 @@ export default function RequestFormPage({ onBack, className }) {
     if (!prefill) return;
     const nextResourceType = prefill.resource_type === "vm" ? "vm" : "lxc";
     setResourceType(nextResourceType);
+    setPendingGpu(
+      nextResourceType === "vm" && prefill.gpu_mapping_id
+        ? String(prefill.gpu_mapping_id)
+        : null,
+    );
     /* AI 選了容器應用範本時給的是 PVE VMID，要換回目錄項目的 id */
     const lxcCatalogPick = nextResourceType === "lxc" && prefill.lxc_template_id
       ? catalogChoices.find((item) => (
@@ -609,9 +615,9 @@ export default function RequestFormPage({ onBack, className }) {
         disk_size: nextResourceType === "vm" && disk
           ? Math.max(20, disk)
           : prev.disk_size,
-        gpu_mapping_id: nextResourceType === "vm" && prefill.gpu_mapping_id
-          ? prefill.gpu_mapping_id
-          : "",
+        /* GPU 由 pendingGpu 那支 effect 在可用清單就緒後才寫入；這裡先留空，
+           免得寫進去又被清單檢查清掉，使用者以為填好了其實沒有。 */
+        gpu_mapping_id: "",
         start_at: prefill.start_at
           ? fromDateInputValue(toDateInputValue(prefill.start_at))
           : prev.start_at,
@@ -631,6 +637,62 @@ export default function RequestFormPage({ onBack, className }) {
         : "已匯入 AI 推薦配置；LXC Root 密碼不會由 AI 填入，請自行輸入。",
     );
   }
+
+  /* GPU 不能跟其他欄位一起寫進去：可用清單要等「作業系統確定是 GPU 版」加上
+     「時段選好」之後才非同步載入，先寫會被清單載入後的檢查清掉。所以先記著，
+     等清單就緒再套；真的套不上就講出來，不要安靜地把它丟掉。 */
+  useEffect(() => {
+    if (!pendingGpu) return;
+    if (resourceType !== "vm") { setPendingGpu(null); return; }
+    if (!selectedOsNeedsGpu) {
+      setPendingGpu(null);
+      toast.error("AI 建議搭配 GPU，但所選作業系統不是 GPU 版本，請改選標示「需 GPU」的作業系統。");
+      return;
+    }
+    if (mode === "scheduled" && !gpuWindowReady) return;   // 等使用者把時段選完
+    if (gpuLoading) return;
+    if (gpuOptionsKey !== gpuOptionsRequestKey) return;    // 等這個時段的清單回來
+
+    const match = gpuOptions.find((gpu) => gpu.mapping_id === pendingGpu);
+    if (match && match.available_count > 0) {
+      setForm((prev) => ({ ...prev, gpu_mapping_id: pendingGpu }));
+    } else {
+      toast.error("AI 建議的 GPU 在這個時段沒有可用的，請改選其他 GPU 或調整時段。");
+    }
+    setPendingGpu(null);
+  }, [
+    pendingGpu, resourceType, selectedOsNeedsGpu, mode, gpuWindowReady,
+    gpuLoading, gpuOptions, gpuOptionsKey, gpuOptionsRequestKey, toast,
+  ]);
+
+  /* AI 助手在別的頁面談完需求後，會帶著推薦配置導到這裡。等候選清單載入完再套用，
+     否則 LXC 應用範本會對不到目錄項目而退回成映像檔。 */
+  const [aiPrefilled, setAiPrefilled] = useState(false);
+  const appliedPrefillRef = useRef(null);
+  useEffect(() => {
+    if (!initialPrefill || sysTplLoading) return;
+    // 比對物件本身而不是布林旗標：助手再規劃一次帶新的配置過來時要能重新套用
+    if (appliedPrefillRef.current === initialPrefill) return;
+    appliedPrefillRef.current = initialPrefill;
+    applyAiPrefill(initialPrefill);
+    setAiPrefilled(true);
+  }, [initialPrefill, sysTplLoading]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* 把自己交給 AI 助手：它就地把欄位填好，並且拿得到這張表單當下的真實候選
+     （這個時段的 GPU、可用時段、作業系統清單）。用 ref 轉一手，
+     註冊一次就好，不必每次 render 重註冊，也不會抓到過期的閉包。 */
+  const applyPrefillRef = useRef(applyAiPrefill);
+  const contextRef = useRef(recommendationContext);
+  applyPrefillRef.current = applyAiPrefill;
+  contextRef.current = recommendationContext;
+  useEffect(() => {
+    if (!registerRequestForm) return undefined;
+    registerRequestForm({
+      applyPrefill: (prefill) => applyPrefillRef.current(prefill),
+      getContext: () => contextRef.current,
+    });
+    return () => registerRequestForm(null);
+  }, [registerRequestForm]);
 
   function handleBack() {
     setClosing(true);
@@ -848,6 +910,14 @@ export default function RequestFormPage({ onBack, className }) {
           返回
         </button>
       </PageHeader>
+
+      {/* AI 代填一定要說出來：使用者要知道哪些值不是自己填的 */}
+      {aiPrefilled && (
+        <p className={styles.adviceBox}>
+          <MIcon name="auto_awesome" size={15} />
+          {" "}以下欄位由 AI 依你的描述預填，送出前請逐項確認；帳號與密碼一律由你自己輸入。
+        </p>
+      )}
 
       {/* ── 主體：表單 + AI 側欄 ── */}
       <div className={styles.formPageBody}>
@@ -1281,35 +1351,9 @@ export default function RequestFormPage({ onBack, className }) {
           </div>
         </div>
 
-        {/* Mobile AI 側欄 */}
-        {aiOpen && (
-          <AiSidePanel
-            className={styles.aiPanelMobile}
-            recommendationContext={recommendationContext}
-            onImportPlan={applyAiPrefill}
-          />
-        )}
-
         {/* Desktop 右側面板（摘要 + AI）*/}
         <div className={styles.rightPanel}>
-          <div className={styles.rightPanelTabs}>
-            {[
-              { key: "summary", label: "摘要",   icon: "receipt_long" },
-              { key: "ai",      label: "AI 助手", icon: "smart_toy"    },
-            ].map((t) => (
-              <button
-                key={t.key}
-                type="button"
-                className={`${styles.rightPanelTab} ${rightTab === t.key ? styles.rightPanelTabActive : ""}`}
-                onClick={() => setRightTab(t.key)}
-              >
-                <MIcon name={t.icon} size={14} />
-                {t.label}
-              </button>
-            ))}
-          </div>
-
-          <div className={`${styles.summaryBody} ${rightTab !== "summary" ? styles.rightPanelPaneHidden : ""}`}>
+          <div className={styles.summaryBody}>
               {/* Type / mode chips */}
               <div className={styles.summaryChips}>
                 <span className={`${styles.summaryChip} ${resourceType === "lxc" ? styles.summaryChipLxc : styles.summaryChipVm}`}>
@@ -1424,25 +1468,9 @@ export default function RequestFormPage({ onBack, className }) {
                 </div>
               )}
           </div>
-
-          <AiSidePanel
-            className={`${styles.aiPanelFill} ${rightTab !== "ai" ? styles.rightPanelPaneHidden : ""}`}
-            recommendationContext={recommendationContext}
-            onImportPlan={applyAiPrefill}
-          />
         </div>
       </div>
 
-      {/* 浮動 AI Tab（僅手機）*/}
-      <button
-        type="button"
-        className={`${styles.aiFloatingTab} ${styles.aiFloatingTabMobileOnly} ${aiOpen ? styles.aiFloatingTabOpen : ""}`}
-        onClick={() => setAiOpen((v) => !v)}
-      >
-        <MIcon name="smart_toy" size={16} />
-        <span>{aiOpen ? "關閉 AI" : "AI 助手"}</span>
-        <MIcon name={aiOpen ? "keyboard_arrow_down" : "keyboard_arrow_up"} size={16} />
-      </button>
 
     </div>
   );
