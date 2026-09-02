@@ -158,10 +158,8 @@ function App() {
               <Route path="/batch-review"   element={<BatchReviewPage />} />
             </>
           )}
-          <Route
-            path="/templates"
-            element={canTeach ? <TemplatesPage /> : <Navigate to="/dashboard" replace />}
-          />
+          {/* 機器範本頁只給老師／管理員；學生導向「我的申請 › 範本開通」 */}
+          <Route path="/templates"      element={canTeach ? <TemplatesPage /> : <Navigate to="/my-requests?tab=templates" replace />} />
 
           {/* AI */}
           <Route path="/ai-api"         element={<AiApiPage />} />

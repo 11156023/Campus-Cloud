@@ -219,7 +219,7 @@ export default function RequestFormPage({ onBack, className }) {
 
   /* 範本系統 2.0：LXC 可選範本，選了走克隆路徑（免映像檔） */
   const [sysTemplates, setSysTemplates]   = useState([]);
-  /* 學生看到的是「開放申請」的應用範本目錄，不是完整母範本清單 */
+  /* 學生看到的是「全部可見」的應用範本目錄，不是完整母範本清單 */
   const [catalog, setCatalog]             = useState([]);
   const [sysTplLoading, setSysTplLoading] = useState(false);
   const [selectedTplId, setSelectedTplId] = useState("");
@@ -304,7 +304,7 @@ export default function RequestFormPage({ onBack, className }) {
   }, [isPrivileged]);
 
   useEffect(() => {
-    // 學生／一般使用者：只拿教師標記「開放學生自行申請」的應用範本。
+    // 學生／一般使用者：只拿教師設為「全部可見」且已就緒的範本。
     // 規格由範本決定，送出後仍走一般審核流程。
     if (isPrivileged) return;
     setSysTplLoading(true);

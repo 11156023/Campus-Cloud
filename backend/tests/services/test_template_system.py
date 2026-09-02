@@ -301,7 +301,7 @@ def test_global_template_is_visible_to_other_users() -> None:
 
 
 # ---------------------------------------------------------------------------
-# request_clone：學生禁止直接克隆，教師可批量
+# request_clone：學生配額與批量權限
 # ---------------------------------------------------------------------------
 
 
@@ -317,18 +317,41 @@ def visible_template(monkeypatch: pytest.MonkeyPatch) -> VMTemplate:
     return template
 
 
-@pytest.mark.parametrize("count", [1, 2])
-async def test_request_clone_student_denied(
-    visible_template: VMTemplate, count: int
+async def test_request_clone_student_batch_denied(
+    visible_template: VMTemplate,
 ) -> None:
     from app.schemas.template import TemplateCloneRequest
 
-    with pytest.raises(PermissionDeniedError, match="teachers and admins"):
+    with pytest.raises(PermissionDeniedError, match="batch"):
         await clone_service.request_clone(
             session=None,  # type: ignore[arg-type]
             user=make_user("student"),
             template_id=visible_template.id,
-            data=TemplateCloneRequest(count=count),
+            data=TemplateCloneRequest(count=2),
+        )
+
+
+async def test_request_clone_student_quota_exceeded(
+    visible_template: VMTemplate, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.core.config import settings
+    from app.schemas.template import TemplateCloneRequest
+
+    monkeypatch.setattr(
+        clone_service.resource_repo,
+        "get_resources_by_user",
+        lambda *, session, user_id: [
+            SimpleNamespace(vmid=i)
+            for i in range(settings.TEMPLATE_CLONE_STUDENT_MAX_INSTANCES)
+        ],
+    )
+
+    with pytest.raises(ConflictError, match="quota"):
+        await clone_service.request_clone(
+            session=None,  # type: ignore[arg-type]
+            user=make_user("student"),
+            template_id=visible_template.id,
+            data=TemplateCloneRequest(count=1),
         )
 
 

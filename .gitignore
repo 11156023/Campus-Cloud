@@ -46,3 +46,4 @@ vllm-API/models.json
 vllm-service/models.json
 vllm-API/
 vllm-inference/
+data/template_files/

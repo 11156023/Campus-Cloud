@@ -205,61 +205,6 @@
   background: var(--color-divider);
 }
 
-/* ── 學生型錄 ── */
-.catalogGrid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: $spacing-16;
-
-  @include respond-to(sm) {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
-  @include respond-to(lg) {
-    grid-template-columns: repeat(3, 1fr);
-  }
-}
-
-.catalogCard {
-  @include flex-column;
-  gap: $spacing-8;
-  padding: $spacing-16;
-  @include glass-surface($shadow: var(--shadow-sm));
-  border-radius: $radius-16;
-}
-
-.catalogHead {
-  display: flex;
-  align-items: center;
-  gap: $spacing-8;
-  color: var(--color-primary);
-}
-
-.catalogName {
-  font-size: $font-size-16;
-  font-weight: $font-weight-700;
-  color: var(--color-text-primary);
-  @include text-truncate;
-}
-
-.catalogDesc {
-  font-size: $font-size-14;
-  color: var(--color-text-secondary);
-  @include text-clamp(2);
-}
-
-.catalogChips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: $spacing-4;
-  margin-top: auto;
-}
-
-.catalogBtn {
-  width: 100%;
-  justify-content: center;
-}
-
 /* ── 按鈕 ── */
 %btn-base {
   display: inline-flex;
@@ -554,25 +499,6 @@
   font-size: 13px;
 }
 
-/* ── 範本 icon ── */
-.iconThumb {
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
-  object-fit: cover;
-  flex-shrink: 0;
-  background: var(--color-hover);
-}
-
-.iconThumbSmall {
-  width: 22px;
-  height: 22px;
-  border-radius: 6px;
-  object-fit: cover;
-  flex-shrink: 0;
-  background: var(--color-hover);
-}
-
 /* ── 附件（使用手冊） ── */
 .attachList {
   display: flex;
@@ -634,14 +560,6 @@
   color: var(--color-text-muted);
   font-size: 13px;
   line-height: 1.5;
-}
-
-.catalogActions {
-  display: flex;
-  gap: 8px;
-  margin-top: auto;
-
-  > * { flex: 1; }
 }
 
 /* ── 未填欄位：紅框 ── */

@@ -1,8 +1,8 @@
 """範本系統 2.0 API 路由。
 
 權限規則（詳見 core/authorizers.py 與 template_service）：
-- 列表/單筆查詢：teacher/admin（依可見範圍過濾）
-- 建立/更新/刪除/克隆/更新循環：TEMPLATE_MANAGE（teacher/admin），且僅擁有者或 admin
+- 列表/單筆查詢：全部角色（依可見範圍過濾）
+- 建立/更新/刪除/更新循環：TEMPLATE_MANAGE（teacher/admin），且僅擁有者或 admin
 - 任務查詢：本人或 admin
 """
 
@@ -11,8 +11,7 @@ import uuid
 from fastapi import APIRouter, File, UploadFile
 from fastapi.responses import FileResponse
 
-from app.api.deps import CurrentUser, InstructorUser, SessionDep
-from app.exceptions import NotFoundError
+from app.api.deps import CurrentUser, SessionDep
 from app.schemas.template import (
     TaskRecordPublic,
     TemplateAttachmentPublic,
@@ -26,7 +25,7 @@ from app.schemas.template import (
     VMTemplateTaskResponse,
     VMTemplateUpdate,
 )
-from app.services.template import clone_service, template_files, template_service
+from app.services.template import clone_service, template_service
 
 router = APIRouter(prefix="/templates", tags=["templates"])
 
@@ -48,9 +47,9 @@ def list_template_catalog(
 
 @router.get("/", response_model=VMTemplatesPublic)
 def list_templates(
-    session: SessionDep, current_user: InstructorUser
+    session: SessionDep, current_user: CurrentUser
 ) -> VMTemplatesPublic:
-    """列出教師可用的單機母範本（admin 全部；teacher 自有+可見）。"""
+    """列出可見範本（admin 全部；teacher 自有+可見；student 僅 ready 且可見）。"""
     data = template_service.list_templates(session=session, user=current_user)
     return VMTemplatesPublic(data=data, count=len(data))
 
@@ -70,7 +69,7 @@ async def create_template(
 
 @router.get("/{template_id}", response_model=VMTemplatePublic)
 def get_template(
-    session: SessionDep, current_user: InstructorUser, template_id: uuid.UUID
+    session: SessionDep, current_user: CurrentUser, template_id: uuid.UUID
 ) -> VMTemplatePublic:
     return template_service.get_template_for_user(
         session=session, user=current_user, template_id=template_id
@@ -122,11 +121,11 @@ async def delete_template(
 @router.post("/{template_id}/clone", response_model=TemplateCloneResponse)
 async def clone_template(
     session: SessionDep,
-    current_user: InstructorUser,
+    current_user: CurrentUser,
     template_id: uuid.UUID,
     body: TemplateCloneRequest,
 ) -> TemplateCloneResponse:
-    """從單機母範本克隆開通；只允許教師與管理員。"""
+    """從範本克隆開通（student 單台套配額；teacher/admin 可批量）。"""
     records = await clone_service.request_clone(
         session=session, user=current_user, template_id=template_id, data=body
     )
@@ -135,61 +134,14 @@ async def clone_template(
     )
 
 
-# --- icon 與附件（使用手冊） ---
-
-
-@router.post("/{template_id}/icon", response_model=VMTemplatePublic)
-async def upload_template_icon(
-    session: SessionDep,
-    current_user: CurrentUser,
-    template_id: uuid.UUID,
-    file: UploadFile = File(...),
-) -> VMTemplatePublic:
-    """上傳範本 icon（擁有者或 admin；PNG/JPEG/WebP/SVG/GIF，2MB 內）。"""
-    data = await file.read()
-    return template_service.upload_icon(
-        session=session,
-        user=current_user,
-        template_id=template_id,
-        content_type=file.content_type,
-        data=data,
-    )
-
-
-@router.get("/{template_id}/icon")
-def get_template_icon(template_id: uuid.UUID) -> FileResponse:
-    """icon 圖檔。<img> 標籤無法帶 Authorization header，因此不做驗證；
-    template_id 由路由強制為 UUID，不會有路徑穿越問題。
-
-    CSP sandbox：icon 可為 SVG，直接開啟 URL 時禁止內嵌 script 執行，
-    避免 stored XSS。"""
-    path = template_files.find_icon(template_id)
-    if path is None:
-        raise NotFoundError("Icon not found")
-    return FileResponse(
-        path,
-        headers={
-            "Content-Security-Policy": "default-src 'none'; sandbox",
-            "X-Content-Type-Options": "nosniff",
-        },
-    )
-
-
-@router.delete("/{template_id}/icon", response_model=VMTemplatePublic)
-def delete_template_icon(
-    session: SessionDep, current_user: CurrentUser, template_id: uuid.UUID
-) -> VMTemplatePublic:
-    """移除範本 icon（擁有者或 admin）。"""
-    return template_service.remove_icon(
-        session=session, user=current_user, template_id=template_id
-    )
+# --- 附件（使用手冊） ---
 
 
 @router.get(
     "/{template_id}/attachments", response_model=TemplateAttachmentsPublic
 )
 def list_template_attachments(
-    session: SessionDep, current_user: InstructorUser, template_id: uuid.UUID
+    session: SessionDep, current_user: CurrentUser, template_id: uuid.UUID
 ) -> TemplateAttachmentsPublic:
     """列出範本附件（可見範本的使用者皆可）。"""
     attachments = template_service.list_attachments(
@@ -224,7 +176,7 @@ async def upload_template_attachment(
 @router.get("/{template_id}/attachments/{attachment_id}/download")
 def download_template_attachment(
     session: SessionDep,
-    current_user: InstructorUser,
+    current_user: CurrentUser,
     template_id: uuid.UUID,
     attachment_id: uuid.UUID,
 ) -> FileResponse:

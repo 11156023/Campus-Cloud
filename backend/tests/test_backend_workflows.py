@@ -326,7 +326,6 @@ def _seed_lxc_template(
     *,
     pve_vmid: int = 9100,
     status: VMTemplateStatus = VMTemplateStatus.ready,
-    student_requestable: bool = True,
 ) -> VMTemplate:
     template = VMTemplate(
         pve_vmid=pve_vmid,
@@ -335,7 +334,6 @@ def _seed_lxc_template(
         resource_type="lxc",
         status=status,
         visibility=VMTemplateVisibility.global_,
-        student_requestable=student_requestable,
     )
     session.add(template)
     session.commit()

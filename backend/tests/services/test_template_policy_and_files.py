@@ -1,9 +1,10 @@
-"""範本政策（密碼/GPU/磁碟鎖定）與 icon/附件檔案的單元測試。
+"""範本政策（密碼/GPU/磁碟鎖定）與附件檔案的單元測試。
 
 mock PVE operations 與 repo，無 DB / Redis：
-- request_clone：密碼政策、GPU 節點相容、payload 加密
+- request_clone：密碼政策、requires_gpu 強制、GPU 節點相容、payload 加密
 - _reconfigure_qemu：login_password=None 時不得帶 cipassword
-- template_files：icon 與附件的實體檔案生命週期
+- create/update template：LXC 不可設 requires_gpu
+- template_files：附件的實體檔案生命週期
 - add_attachment：副檔名 / 大小 / 數量上限
 """
 
@@ -21,8 +22,12 @@ import pytest
 
 from app.core.security import decrypt_value
 from app.exceptions import BadRequestError, ConflictError
-from app.models import VMTemplate, VMTemplateStatus
-from app.schemas.template import TemplateCloneRequest
+from app.models import VMTemplate, VMTemplateStatus, VMTemplateVisibility
+from app.schemas.template import (
+    TemplateCloneRequest,
+    VMTemplateCreate,
+    VMTemplateUpdate,
+)
 from app.services.proxmox import provisioning_service
 from app.services.template import clone_service, template_files, template_service
 
@@ -76,6 +81,20 @@ async def test_request_clone_rejects_custom_password_when_locked(
         )
 
 
+async def test_request_clone_requires_gpu_selection(
+    clone_target: VMTemplate,
+) -> None:
+    clone_target.requires_gpu = True
+
+    with pytest.raises(BadRequestError, match="需要 GPU"):
+        await clone_service.request_clone(
+            session=None,  # type: ignore[arg-type]
+            user=make_user("teacher"),
+            template_id=clone_target.id,
+            data=TemplateCloneRequest(count=1),
+        )
+
+
 async def test_request_clone_rejects_gpu_on_lxc_template(
     clone_target: VMTemplate,
 ) -> None:
@@ -93,6 +112,7 @@ async def test_request_clone_rejects_gpu_on_lxc_template(
 async def test_request_clone_rejects_gpu_not_on_template_node(
     clone_target: VMTemplate, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    clone_target.requires_gpu = True
     monkeypatch.setattr(
         provisioning_service, "_gpu_mapping_nodes", lambda mapping_id: {"pve2"}
     )
@@ -109,6 +129,7 @@ async def test_request_clone_rejects_gpu_not_on_template_node(
 async def test_request_clone_payload_encrypts_password_and_locks_disk(
     clone_target: VMTemplate, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    clone_target.requires_gpu = True
     monkeypatch.setattr(
         provisioning_service, "_gpu_mapping_nodes", lambda mapping_id: {"pve1"}
     )
@@ -216,51 +237,82 @@ def test_reconfigure_qemu_sets_custom_password(
 
 
 # ---------------------------------------------------------------------------
+# create / update template：LXC 不可設 requires_gpu
+# ---------------------------------------------------------------------------
+
+
+async def test_create_template_rejects_requires_gpu_for_lxc(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import app.core.authorizers as authorizers
+
+    monkeypatch.setattr(authorizers, "require_template_manage", lambda user: None)
+    monkeypatch.setattr(
+        template_service.template_repo,
+        "get_template_by_pve_vmid",
+        lambda **kw: None,
+    )
+    monkeypatch.setattr(
+        template_service.proxmox_ops,
+        "find_resource",
+        lambda vmid: {"vmid": vmid, "type": "lxc", "node": "pve1"},
+    )
+
+    with pytest.raises(BadRequestError, match="LXC"):
+        await template_service.create_template(
+            session=None,  # type: ignore[arg-type]
+            user=make_user("teacher"),
+            data=VMTemplateCreate(
+                source_vmid=321, name="ct-tpl", requires_gpu=True
+            ),
+        )
+
+
+def test_update_template_rejects_requires_gpu_for_lxc(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    template = make_template(resource_type="lxc")
+    monkeypatch.setattr(
+        template_service, "_get_or_404", lambda session, template_id: template
+    )
+    monkeypatch.setattr(
+        template_service, "_require_owner", lambda user, template: None
+    )
+
+    with pytest.raises(BadRequestError, match="LXC"):
+        template_service.update_template(
+            session=None,  # type: ignore[arg-type]
+            user=make_user("teacher"),
+            template_id=template.id,
+            data=VMTemplateUpdate(requires_gpu=True),
+        )
+
+
+# ---------------------------------------------------------------------------
 # template_files：實體檔案生命週期
 # ---------------------------------------------------------------------------
 
 
 @pytest.fixture
-def file_dirs(
-    monkeypatch: pytest.MonkeyPatch,
-) -> Iterator[tuple[Path, Path]]:
+def attach_dir(monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
     # 不用 tmp_path：部分環境的 pytest basetemp 目錄有 ACL 問題
     base = Path(tempfile.mkdtemp(prefix="tpl-files-"))
-    icon_dir = base / "icons"
-    attach_dir = base / "files"
-    monkeypatch.setattr(template_files, "ICON_DIR", icon_dir)
-    monkeypatch.setattr(template_files, "ATTACHMENT_DIR", attach_dir)
-    yield icon_dir, attach_dir
+    directory = base / "files"
+    monkeypatch.setattr(template_files, "ATTACHMENT_DIR", directory)
+    yield directory
     shutil.rmtree(base, ignore_errors=True)
 
 
-def test_icon_save_replaces_old_extension(
-    file_dirs: tuple[Path, Path],
-) -> None:
-    template_id = uuid.uuid4()
-    template_files.save_icon(template_id, ".png", b"png-bytes")
-    template_files.save_icon(template_id, ".webp", b"webp-bytes")
-
-    found = template_files.find_icon(template_id)
-    assert found is not None and found.suffix == ".webp"
-    icon_dir = file_dirs[0]
-    assert not (icon_dir / f"{template_id}.png").exists()
-
-
-def test_attachment_lifecycle_and_bulk_cleanup(
-    file_dirs: tuple[Path, Path],
-) -> None:
+def test_attachment_lifecycle_and_bulk_cleanup(attach_dir: Path) -> None:
     template_id = uuid.uuid4()
     attachment_id = uuid.uuid4()
-    template_files.save_icon(template_id, ".png", b"icon")
     template_files.save_attachment(template_id, attachment_id, b"manual")
 
     assert template_files.attachment_path(template_id, attachment_id) is not None
 
     template_files.delete_all_for_template(template_id)
-    assert template_files.find_icon(template_id) is None
     assert template_files.attachment_path(template_id, attachment_id) is None
-    assert not (file_dirs[1] / str(template_id)).exists()
+    assert not (attach_dir / str(template_id)).exists()
 
 
 # ---------------------------------------------------------------------------
@@ -423,7 +475,7 @@ def test_manual_download_validates_attachment_id(
 
 
 # ---------------------------------------------------------------------------
-# 學生可申請的應用範本目錄
+# 學生申請表單的應用範本目錄（全部可見 + ready）
 # ---------------------------------------------------------------------------
 
 
@@ -433,18 +485,18 @@ def _catalog_rows() -> list[VMTemplate]:
             pve_vmid=9001,
             name="n8n",
             resource_type="lxc",
-            student_requestable=True,
+            visibility=VMTemplateVisibility.global_,
         ),
         make_template(
             pve_vmid=9002,
             name="jupyter",
             resource_type="qemu",
-            student_requestable=True,
+            visibility=VMTemplateVisibility.global_,
             default_cores=4,
             default_memory=8192,
             default_disk=60,
         ),
-        make_template(pve_vmid=9003, name="gone", student_requestable=True),
+        make_template(pve_vmid=9003, name="gone", visibility=VMTemplateVisibility.global_),
     ]
 
 

@@ -32,7 +32,6 @@ def make_template(**overrides: Any) -> VMTemplate:
         resource_type="qemu",
         status=VMTemplateStatus.ready,
         visibility=VMTemplateVisibility.private,
-        student_requestable=False,
     )
     defaults.update(overrides)
     return VMTemplate(**defaults)
@@ -74,24 +73,25 @@ def test_unregistered_source_is_rejected_for_lxc(registered) -> None:
         _validate(make_user("student"), resource_type="lxc")
 
 
-def test_student_cannot_request_a_template_that_is_not_opened(registered) -> None:
+def test_student_cannot_request_a_private_template(registered) -> None:
     registered(make_template())
 
-    with pytest.raises(BadRequestError, match="not open for self-service"):
+    with pytest.raises(BadRequestError, match="not open to students"):
         _validate(make_user("student"))
 
 
-def test_student_can_request_an_opened_template(registered) -> None:
-    template = make_template(student_requestable=True)
+def test_student_can_request_a_globally_visible_template(registered) -> None:
+    template = make_template(visibility=VMTemplateVisibility.global_)
     registered(template)
 
     assert _validate(make_user("student")) is template
 
 
-def test_opened_template_still_has_to_be_ready(registered) -> None:
+def test_visible_template_still_has_to_be_ready(registered) -> None:
     registered(
         make_template(
-            student_requestable=True, status=VMTemplateStatus.creating
+            visibility=VMTemplateVisibility.global_,
+            status=VMTemplateStatus.creating,
         )
     )
 
@@ -100,7 +100,9 @@ def test_opened_template_still_has_to_be_ready(registered) -> None:
 
 
 def test_template_type_must_match_the_request(registered) -> None:
-    registered(make_template(student_requestable=True, resource_type="lxc"))
+    registered(
+        make_template(visibility=VMTemplateVisibility.global_, resource_type="lxc")
+    )
 
     with pytest.raises(BadRequestError, match="does not match"):
         _validate(make_user("student"))
@@ -120,7 +122,7 @@ def test_teacher_cannot_use_another_teachers_private_template(
         _validate(make_user("teacher"))
 
 
-def test_teacher_does_not_need_the_student_flag(
+def test_teacher_uses_visibility_rules_instead(
     registered, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     template = make_template()
@@ -152,7 +154,7 @@ def _catalog_request(**overrides: Any) -> VMRequestCreate:
 
 def test_a_template_request_keeps_the_requested_cpu_and_memory() -> None:
     template = make_template(
-        student_requestable=True,
+        visibility=VMTemplateVisibility.global_,
         default_cores=4,
         default_memory=8192,
         default_disk=40,
@@ -169,7 +171,7 @@ def test_a_template_request_keeps_the_requested_cpu_and_memory() -> None:
 
 
 def test_disk_cannot_be_smaller_than_the_template() -> None:
-    template = make_template(student_requestable=True, default_disk=40)
+    template = make_template(visibility=VMTemplateVisibility.global_, default_disk=40)
     request_in = _catalog_request(disk_size=20)
 
     vm_request_service._apply_template_floor(request_in, template)
@@ -179,7 +181,7 @@ def test_disk_cannot_be_smaller_than_the_template() -> None:
 
 def test_lxc_rootfs_is_raised_to_the_template_floor() -> None:
     template = make_template(
-        student_requestable=True, resource_type="lxc", default_disk=16
+        visibility=VMTemplateVisibility.global_, resource_type="lxc", default_disk=16
     )
     request_in = _catalog_request(
         resource_type="lxc", disk_size=None, rootfs_size=8, username=None

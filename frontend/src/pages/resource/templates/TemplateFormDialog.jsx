@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import styles from "./TemplatesPage.module.scss";
 import MIcon from "../../../components/MIcon";
 import { useAuth } from "../../../contexts/AuthContext";
@@ -13,11 +13,32 @@ const CORE_MAX = 8;
 const MEMORY_MIN = 512;
 const MEMORY_MAX = 32768;
 
+// 與後端 template_files.py 的限制一致（前端先擋，後端仍會驗證）
+const ATTACHMENT_MAX_BYTES = 50 * 1024 * 1024;
+const ATTACHMENT_MAX_COUNT = 10;
+const ATTACHMENT_EXTS = new Set([
+  ".pdf", ".md", ".txt", ".doc", ".docx", ".ppt", ".pptx",
+  ".xls", ".xlsx", ".odt", ".odp", ".zip",
+  ".png", ".jpg", ".jpeg", ".webp", ".gif", ".mp4",
+]);
+
+const fileExt = (name) => {
+  const idx = String(name || "").lastIndexOf(".");
+  return idx >= 0 ? String(name).slice(idx).toLowerCase() : "";
+};
+
+const formatBytes = (bytes) => {
+  if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  if (bytes >= 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${bytes} B`;
+};
+
 /**
  * 建立（從 VM 轉換）或編輯範本的 dialog。
  * template 有值 = 編輯模式。
+ * 附件：編輯模式即時上傳；建立模式先暫存，create 成功後補上傳。
  */
-export default function TemplateFormDialog({ template, closing = false, onClose, onSaved }) {
+export default function TemplateFormDialog({ template, onClose, onSaved }) {
   const toast = useToast();
   const confirm = useConfirm();
   const { user } = useAuth();
@@ -36,22 +57,117 @@ export default function TemplateFormDialog({ template, closing = false, onClose,
   );
   const [defaultCores, setDefaultCores] = useState(template?.default_cores || 2);
   const [defaultMemory, setDefaultMemory] = useState(template?.default_memory || 2048);
-  const [studentRequestable, setStudentRequestable] = useState(Boolean(template?.student_requestable));
+  const [allowPasswordChange, setAllowPasswordChange] = useState(
+    template ? template.allow_password_change !== false : true,
+  );
+  const [requiresGpu, setRequiresGpu] = useState(Boolean(template?.requires_gpu));
   const [resources, setResources] = useState([]);
   const [resourcesLoading, setResourcesLoading] = useState(!isEdit);
   const [busy, setBusy] = useState(false);
 
+  // 編輯模式：既有附件（即時操作）
+  const [attachments, setAttachments] = useState([]);
+  const [attachBusy, setAttachBusy] = useState(false);
+  // 建立模式：暫存檔案，create 成功後補上傳
+  const [pendingAttachments, setPendingAttachments] = useState([]);
+  const attachInputRef = useRef(null);
+
   useEffect(() => {
-    if (isEdit) return undefined;
     let cancelled = false;
-    (isAdmin ? ResourcesService.listAll() : ResourcesService.list())
-      .then((res) => !cancelled && setResources(res ?? []))
-      .catch(() => {})
-      .finally(() => !cancelled && setResourcesLoading(false));
+    if (!isEdit) {
+      (isAdmin ? ResourcesService.listAll() : ResourcesService.list())
+        .then((res) => !cancelled && setResources(res ?? []))
+        .catch(() => {})
+        .finally(() => !cancelled && setResourcesLoading(false));
+    } else {
+      TemplatesService.listAttachments(template.id)
+        .then((res) => !cancelled && setAttachments(res?.data ?? []))
+        .catch(() => {});
+    }
     return () => {
       cancelled = true;
     };
-  }, [isEdit, isAdmin]);
+  }, [isEdit, isAdmin, template?.id]);
+
+  // 來源機類型決定可否設定 GPU（hostpci 僅 qemu 支援）
+  const selectedResource = resources.find((r) => String(r.vmid) === sourceVmid);
+  const resourceType = isEdit ? template.resource_type : selectedResource?.type;
+  const gpuSelectable = resourceType !== "lxc";
+
+  useEffect(() => {
+    if (!gpuSelectable && requiresGpu) setRequiresGpu(false);
+  }, [gpuSelectable, requiresGpu]);
+
+  const validateAttachment = (file, currentCount) => {
+    const ext = fileExt(file.name);
+    if (!ATTACHMENT_EXTS.has(ext)) {
+      toast.error(`不支援的檔案類型 ${ext || "(無副檔名)"}`);
+      return false;
+    }
+    if (file.size > ATTACHMENT_MAX_BYTES) {
+      toast.error("檔案大小不可超過 50MB");
+      return false;
+    }
+    if (currentCount >= ATTACHMENT_MAX_COUNT) {
+      toast.error(`附件數量已達上限 ${ATTACHMENT_MAX_COUNT} 個`);
+      return false;
+    }
+    return true;
+  };
+
+  const handleAttachmentSelect = async (file) => {
+    const currentCount = isEdit ? attachments.length : pendingAttachments.length;
+    if (!file || !validateAttachment(file, currentCount)) {
+      if (attachInputRef.current) attachInputRef.current.value = "";
+      return;
+    }
+    if (!isEdit) {
+      setPendingAttachments((prev) => [...prev, file]);
+      if (attachInputRef.current) attachInputRef.current.value = "";
+      return;
+    }
+    setAttachBusy(true);
+    try {
+      await TemplatesService.uploadAttachment(template.id, file);
+      const res = await TemplatesService.listAttachments(template.id);
+      setAttachments(res?.data ?? []);
+      toast.success("附件已上傳");
+    } catch (e) {
+      toast.error(e?.message ?? "附件上傳失敗");
+    } finally {
+      setAttachBusy(false);
+      if (attachInputRef.current) attachInputRef.current.value = "";
+    }
+  };
+
+  const handleAttachmentRemove = async (attachmentId) => {
+    setAttachBusy(true);
+    try {
+      await TemplatesService.removeAttachment(template.id, attachmentId);
+      setAttachments((prev) => prev.filter((a) => a.id !== attachmentId));
+    } catch (e) {
+      toast.error(e?.message ?? "附件刪除失敗");
+    } finally {
+      setAttachBusy(false);
+    }
+  };
+
+  /** create 成功後補上傳暫存檔（best-effort，失敗可稍後在編輯補） */
+  const uploadPendingFiles = async (templateId) => {
+    const failed = [];
+    for (const file of pendingAttachments) {
+      try {
+        await TemplatesService.uploadAttachment(templateId, file);
+      } catch {
+        failed.push(file.name);
+      }
+    }
+    if (failed.length > 0) {
+      toast.error(
+        `部分檔案上傳失敗：${failed.join("、")}。可稍後在「編輯」重新上傳`,
+      );
+    }
+  };
 
   const handleSubmit = async () => {
     if (!isEdit && !sourceVmid) {
@@ -71,7 +187,8 @@ export default function TemplateFormDialog({ template, closing = false, onClose,
       visibility,
       default_cores: useCustomSpec ? Number(defaultCores) : null,
       default_memory: useCustomSpec ? Number(defaultMemory) : null,
-      student_requestable: studentRequestable,
+      allow_password_change: allowPasswordChange,
+      requires_gpu: requiresGpu,
     };
 
     if (!isEdit) {
@@ -91,7 +208,14 @@ export default function TemplateFormDialog({ template, closing = false, onClose,
         await TemplatesService.update(template.id, common);
         toast.success("範本已更新");
       } else {
-        await TemplatesService.create({ ...common, source_vmid: Number(sourceVmid) });
+        const res = await TemplatesService.create({
+          ...common,
+          source_vmid: Number(sourceVmid),
+        });
+        const newTemplateId = res?.template?.id;
+        if (newTemplateId) {
+          await uploadPendingFiles(newTemplateId);
+        }
         toast.success("已開始轉換範本，來源 VM 會先關機、移除所有快照，再轉為唯讀範本");
       }
       onSaved();
@@ -103,11 +227,17 @@ export default function TemplateFormDialog({ template, closing = false, onClose,
     }
   };
 
+  const shownAttachments = isEdit
+    ? attachments
+    : pendingAttachments.map((file, idx) => ({
+        id: `pending-${idx}`,
+        filename: file.name,
+        size_bytes: file.size,
+        pendingIndex: idx,
+      }));
+
   return (
-    <div
-      className={`${styles.modalOverlay} ${closing ? styles.modalOverlayOut : ""}`}
-      onClick={onClose}
-    >
+    <div className={styles.modalOverlay} onClick={onClose}>
       <div className={`${styles.modal} ${styles.modalWide}`} onClick={(e) => e.stopPropagation()}>
         <span className={styles.modalTitle}>
           <MIcon name="library_books" size={20} />
@@ -115,7 +245,7 @@ export default function TemplateFormDialog({ template, closing = false, onClose,
         </span>
         <p className={styles.modalDesc}>
           {isEdit
-            ? "更新範本的名稱、說明、可見範圍與預設規格。"
+            ? "更新範本的名稱、說明、可見範圍、克隆政策與預設規格。"
             : "選擇一台已裝好環境的母機。轉換會先關機並移除該機的所有快照，完成後原 VM 變成唯讀範本，無法再直接開機。"}
         </p>
 
@@ -196,7 +326,7 @@ export default function TemplateFormDialog({ template, closing = false, onClose,
               />
               <span>
                 <strong>全部可見</strong>
-                <small>所有教師都可以看到，並用於組多機環境</small>
+                <small>所有使用者都可以看到及克隆</small>
               </span>
             </label>
           </div>
@@ -205,10 +335,20 @@ export default function TemplateFormDialog({ template, closing = false, onClose,
         <label className={styles.checkLine}>
           <input
             type="checkbox"
-            checked={studentRequestable}
-            onChange={(e) => setStudentRequestable(e.target.checked)}
+            checked={allowPasswordChange}
+            onChange={(e) => setAllowPasswordChange(e.target.checked)}
           />
-          開放學生自行申請（學生可在申請機器時直接選用這個範本，仍需審核；規格固定為下方預設值）
+          允許使用者在克隆時自訂/重設登入密碼（取消勾選＝克隆機沿用範本內建帳密）
+        </label>
+
+        <label className={styles.checkLine} title={gpuSelectable ? undefined : "LXC 範本不支援 GPU 直通"}>
+          <input
+            type="checkbox"
+            checked={requiresGpu}
+            disabled={!gpuSelectable}
+            onChange={(e) => setRequiresGpu(e.target.checked)}
+          />
+          使用此範本需要 GPU（克隆時強制選擇並配置 GPU；僅 VM 範本可設）
         </label>
 
         <label className={styles.checkLine}>
@@ -217,7 +357,7 @@ export default function TemplateFormDialog({ template, closing = false, onClose,
             checked={useCustomSpec}
             onChange={(e) => setUseCustomSpec(e.target.checked)}
           />
-          自訂預設規格（未勾選＝沿用範本機器本身的 CPU / 記憶體設定）
+          自訂克隆預設規格（未勾選＝沿用範本機器本身的 CPU / 記憶體設定）
         </label>
 
         {useCustomSpec && (
@@ -271,6 +411,67 @@ export default function TemplateFormDialog({ template, closing = false, onClose,
             </div>
           </>
         )}
+
+        <div className={styles.field}>
+          <label>預設磁碟</label>
+          <div className={styles.diskFixed}>
+            <MIcon name="lock" size={15} />
+            {isEdit && template.default_disk
+              ? `${template.default_disk} GB（跟母機一致，轉換時自動偵測，不可調整）`
+              : "跟母機一致，轉換完成後自動偵測，不可調整"}
+          </div>
+        </div>
+
+        <div className={styles.field}>
+          <label>使用手冊 / 附件（選填，最多 10 個）</label>
+          {shownAttachments.length > 0 && (
+            <div className={styles.attachList}>
+              {shownAttachments.map((a) => (
+                <div key={a.id} className={styles.attachItem}>
+                  <MIcon name="description" size={15} />
+                  <span className={styles.attachName}>{a.filename}</span>
+                  <span className={styles.attachSize}>{formatBytes(a.size_bytes)}</span>
+                  <button
+                    type="button"
+                    className={`${styles.attachBtn} ${styles.attachBtnDanger}`}
+                    disabled={attachBusy}
+                    onClick={() =>
+                      isEdit
+                        ? handleAttachmentRemove(a.id)
+                        : setPendingAttachments((prev) =>
+                            prev.filter((_, idx) => idx !== a.pendingIndex),
+                          )
+                    }
+                    title="刪除附件"
+                  >
+                    <MIcon name="delete_outline" size={15} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          <input
+            ref={attachInputRef}
+            type="file"
+            style={{ display: "none" }}
+            onChange={(e) => handleAttachmentSelect(e.target.files?.[0])}
+          />
+          <div>
+            <button
+              type="button"
+              className={styles.btnSecondary}
+              disabled={attachBusy || shownAttachments.length >= ATTACHMENT_MAX_COUNT}
+              onClick={() => attachInputRef.current?.click()}
+            >
+              <MIcon name="upload_file" size={14} />
+              {attachBusy ? "處理中…" : "上傳附件"}
+            </button>
+          </div>
+          <span className={styles.fieldHint}>
+            支援 PDF、Office 文件、圖片、壓縮檔等，單檔 50MB 內；學生在克隆視窗可下載
+            {!isEdit && "；會在轉換開始後自動上傳"}
+          </span>
+        </div>
 
         <div className={styles.modalActions}>
           <button type="button" className={styles.btnSecondary} onClick={onClose}>

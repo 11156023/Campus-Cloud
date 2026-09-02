@@ -132,7 +132,7 @@ def list_templates(*, session: Session, user: User) -> list[VMTemplatePublic]:
 def list_student_catalog(*, session: Session) -> list[TemplateCatalogItem]:
     """The application catalogue any signed-in user may request a machine from.
 
-    Only ready, explicitly opened templates appear, and each row is enriched
+    Only ready, globally visible templates appear, and each row is enriched
     with the PVE facts the request form needs (OS family and the source
     machine's own spec, which is the clone's floor).
     """
@@ -286,6 +286,9 @@ async def create_template(
     resource_type = "lxc" if pve_resource.get("type") == "lxc" else "qemu"
     node = str(pve_resource["node"])
 
+    if data.requires_gpu and resource_type == "lxc":
+        raise BadRequestError("LXC 範本不支援 GPU 直通，無法設定需要 GPU")
+
     # 母機若是平台管理的資源，僅擁有者或 admin 能轉換（轉換後原 VM 消失）
     owned = session.get(Resource, data.source_vmid)
     if owned is not None and owned.user_id != user.id and not is_admin(user):
@@ -306,7 +309,7 @@ async def create_template(
             default_cores=data.default_cores,
             default_memory=data.default_memory,
             allow_password_change=data.allow_password_change,
-            student_requestable=data.student_requestable,
+            requires_gpu=data.requires_gpu,
             source_vmid=data.source_vmid,
         )
     else:
@@ -322,7 +325,7 @@ async def create_template(
             default_cores=data.default_cores,
             default_memory=data.default_memory,
             allow_password_change=data.allow_password_change,
-            student_requestable=data.student_requestable,
+            requires_gpu=data.requires_gpu,
             source_vmid=data.source_vmid,
         )
     try:
@@ -434,48 +437,15 @@ def update_template(
     updates: dict[str, Any] = data.model_dump(exclude_unset=True)
     for field, value in updates.items():
         setattr(template, field, value)
+    if template.requires_gpu and template.resource_type == "lxc":
+        raise BadRequestError("LXC 範本不支援 GPU 直通，無法設定需要 GPU")
     template_repo.touch(session=session, template=template)
     return _to_public(template)
 
 
 # ---------------------------------------------------------------------------
-# icon 與附件（使用手冊）
+# 附件（使用手冊）
 # ---------------------------------------------------------------------------
-
-def upload_icon(
-    *,
-    session: Session,
-    user: User,
-    template_id: uuid.UUID,
-    content_type: str | None,
-    data: bytes,
-) -> VMTemplatePublic:
-    template = _get_or_404(session, template_id)
-    _require_owner(user, template)
-    ext = template_files.ICON_CONTENT_TYPES.get((content_type or "").lower())
-    if ext is None:
-        raise BadRequestError("僅支援 PNG / JPEG / WebP / SVG / GIF 圖片")
-    if len(data) > template_files.ICON_MAX_BYTES:
-        raise BadRequestError("圖片大小不可超過 2MB")
-    template_files.save_icon(template.id, ext, data)
-    # v= 時間戳讓 <img> 換圖時不吃瀏覽器快取
-    template.icon_url = (
-        f"/api/v1/templates/{template.id}/icon?v={int(time.time())}"
-    )
-    template_repo.touch(session=session, template=template)
-    return _to_public(template)
-
-
-def remove_icon(
-    *, session: Session, user: User, template_id: uuid.UUID
-) -> VMTemplatePublic:
-    template = _get_or_404(session, template_id)
-    _require_owner(user, template)
-    template_files.delete_icon(template.id)
-    template.icon_url = None
-    template_repo.touch(session=session, template=template)
-    return _to_public(template)
-
 
 def _template_attachments(
     session: Session, template_id: uuid.UUID
@@ -1109,7 +1079,6 @@ def run_delete_task(task_id: uuid.UUID, payload: dict[str, Any]) -> dict[str, An
         if template is not None:
             template.status = VMTemplateStatus.deleted
             template.error_message = None
-            template.icon_url = None
             template_repo.touch(session=session, template=template, commit=False)
         for attachment in session.exec(
             select(TemplateAttachment).where(

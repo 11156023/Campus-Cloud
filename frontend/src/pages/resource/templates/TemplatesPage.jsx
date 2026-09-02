@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
 import styles from "./TemplatesPage.module.scss";
 import MIcon from "../../../components/MIcon";
 import EmptyState from "../../../components/EmptyState/EmptyState";
-import { useAuth } from "../../../contexts/AuthContext";
-import { TemplatesService, safeTemplateIconUrl } from "../../../services/templates";
+import { TemplatesService } from "../../../services/templates";
 import { downloadBlob } from "../../../services/api";
 import { useToast } from "../../../hooks/useToast";
 import useDialogPresence from "../../../hooks/useDialogPresence";
@@ -211,13 +209,6 @@ function ManagementRow({ template, cycleBusy, onClone, onEdit, onManual, onRetry
     <tr className={styles.tr}>
       <td className={styles.td}>
         <div className={styles.nameCell}>
-          {safeTemplateIconUrl(template.icon_url) && (
-            <img
-              className={styles.iconThumbSmall}
-              src={safeTemplateIconUrl(template.icon_url)}
-              alt=""
-            />
-          )}
           <span className={styles.namePrimary}>{template.name}</span>
           {template.pve_exists === false && template.status === "ready" && (
             <span className={styles.pveMissing} title="PVE 端找不到這個範本，可能已被手動刪除">
@@ -242,9 +233,6 @@ function ManagementRow({ template, cycleBusy, onClone, onEdit, onManual, onRetry
       </td>
       <td className={`${styles.td} ${styles.mutedCell}`}>
         {visibilityLabel(template)}
-        {template.student_requestable && (
-          <span className={styles.typeChip}>學生可申請</span>
-        )}
       </td>
       <td className={`${styles.td} ${styles.mutedCell}`}>v{template.version}</td>
       <td className={`${styles.td} ${styles.tdMenu}`}>
@@ -279,88 +267,9 @@ function ManagementRow({ template, cycleBusy, onClone, onEdit, onManual, onRetry
   );
 }
 
-function StudentCatalog({ templates, onClone, onManual }) {
-  if (templates.length === 0) {
-    return (
-      <div className={styles.card}>
-        <EmptyState icon="widgets" title="目前沒有可用的範本" />
-      </div>
-    );
-  }
-
-  return (
-    <div className={styles.catalogGrid}>
-      {templates.map((template) => (
-        <div key={template.id} className={styles.catalogCard}>
-          <div className={styles.catalogHead}>
-            {safeTemplateIconUrl(template.icon_url) ? (
-              <img
-                className={styles.iconThumb}
-                src={safeTemplateIconUrl(template.icon_url)}
-                alt=""
-              />
-            ) : (
-              <MIcon name="library_books" size={18} />
-            )}
-            <span className={styles.catalogName}>{template.name}</span>
-          </div>
-          {template.description && (
-            <p className={styles.catalogDesc}>{template.description}</p>
-          )}
-          <div className={styles.catalogChips}>
-            <span className={styles.typeChip}>{template.resource_type}</span>
-            {template.default_cores && (
-              <span className={styles.typeChip}>{template.default_cores} 核</span>
-            )}
-            {template.default_memory && (
-              <span className={styles.typeChip}>
-                {Math.round(template.default_memory / 1024)} GB RAM
-              </span>
-            )}
-            {template.default_disk && (
-              <span className={styles.typeChip}>{template.default_disk} GB 磁碟</span>
-            )}
-            <span className={styles.typeChip}>v{template.version}</span>
-            {template.allow_password_change === false && (
-              <span className={styles.typeChip}>固定帳密</span>
-            )}
-            {template.student_requestable && (
-              <span className={styles.typeChip}>學生可申請</span>
-            )}
-          </div>
-          <div className={styles.catalogActions}>
-            <button
-              type="button"
-              className={`${styles.btnPrimary} ${styles.catalogBtn}`}
-              onClick={() => onClone(template)}
-            >
-              <MIcon name="content_copy" size={14} />
-              一鍵克隆
-            </button>
-            {template.attachment_count > 0 && (
-              <button
-                type="button"
-                className={`${styles.btnSecondary} ${styles.catalogBtn}`}
-                onClick={() => onManual(template)}
-              >
-                <MIcon name="description" size={14} />
-                使用手冊（{template.attachment_count}）
-              </button>
-            )}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 export default function TemplatesPage() {
   const toast = useToast();
   const confirm = useConfirm();
-  const { user } = useAuth();
-  const canManage =
-    user?.role === "admin" || user?.role === "teacher" || user?.is_superuser === true;
-
   const [templates, setTemplates] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
@@ -376,18 +285,6 @@ export default function TemplatesPage() {
   const [cycleBusy, setCycleBusy] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const timerRef = useRef(null);
-  const [searchParams, setSearchParams] = useSearchParams();
-
-  // 儀表板「快速入門」深連結：?clone=<templateId> 直接打開克隆視窗
-  useEffect(() => {
-    const cloneId = searchParams.get("clone");
-    if (!cloneId || templates === null) return;
-    const target = templates.find(
-      (t) => t.id === cloneId && t.status === "ready",
-    );
-    if (target) setCloneTarget(target);
-    setSearchParams({}, { replace: true });
-  }, [templates, searchParams, setSearchParams]);
 
   const load = useCallback(async () => {
     try {
@@ -493,11 +390,10 @@ export default function TemplatesPage() {
   };
 
   const list = templates ?? [];
-  const readyTemplates = list.filter((t) => t.status === "ready");
 
   return (
     <div className={styles.page}>
-      <PageHeader title="機器母範本" subtitle="管理教師組裝多機環境時使用的單機來源；學生不會直接看到或複製母範本。">
+      <PageHeader title="機器範本" subtitle="把設定好的母機轉為範本，學生即可在「我的申請 › 範本開通」一鍵克隆出自己的環境">
         <div className={styles.pageActions}>
           <button
             type="button"
@@ -508,67 +404,57 @@ export default function TemplatesPage() {
             <MIcon name="sync" size={16} />
             {refreshing ? "載入中…" : "重新整理"}
           </button>
-          {canManage && (
-            <button
-              type="button"
-              className={styles.btnPrimary}
-              onClick={() => setCreateOpen(true)}
-            >
-              <MIcon name="add" size={16} />
-              從 VM 建立範本
-            </button>
-          )}
+          <button
+            type="button"
+            className={styles.btnPrimary}
+            onClick={() => setCreateOpen(true)}
+          >
+            <MIcon name="add" size={16} />
+            從 VM 建立範本
+          </button>
         </div>
       </PageHeader>
 
       {templates === null ? (
         <LoadingState fullPage text="載入範本中…" />
-      ) : canManage ? (
-        list.length === 0 ? (
-          <div className={styles.card}>
-            <EmptyState
-              icon="widgets"
-              title="還沒有任何範本"
-            />
-          </div>
-        ) : (
-          <div className={styles.card}>
-            <table className={styles.table}>
-              <thead>
-                <tr>
-                  <th className={styles.th}>名稱</th>
-                  <th className={styles.th}>VMID</th>
-                  <th className={styles.th}>類型</th>
-                  <th className={styles.th}>狀態</th>
-                  <th className={styles.th}>可見範圍</th>
-                  <th className={styles.th}>版本</th>
-                  <th className={styles.th} />
-                </tr>
-              </thead>
-              <tbody>
-                {list.map((template) => (
-                  <ManagementRow
-                    key={template.id}
-                    template={template}
-                    cycleBusy={cycleBusy}
-                    onClone={setCloneTarget}
-                    onEdit={setEditTarget}
-                    onManual={setManualTarget}
-                    onRetry={handleRetry}
-                    onCycle={handleCycle}
-                    onDelete={setDeleteTarget}
-                  />
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )
+      ) : list.length === 0 ? (
+        <div className={styles.card}>
+          <EmptyState
+            icon="widgets"
+            title="還沒有任何範本"
+          />
+        </div>
       ) : (
-        <StudentCatalog
-          templates={readyTemplates}
-          onClone={setCloneTarget}
-          onManual={setManualTarget}
-        />
+        <div className={styles.card}>
+          <table className={styles.table}>
+            <thead>
+              <tr>
+                <th className={styles.th}>名稱</th>
+                <th className={styles.th}>VMID</th>
+                <th className={styles.th}>類型</th>
+                <th className={styles.th}>狀態</th>
+                <th className={styles.th}>可見範圍</th>
+                <th className={styles.th}>版本</th>
+                <th className={styles.th} />
+              </tr>
+            </thead>
+            <tbody>
+              {list.map((template) => (
+                <ManagementRow
+                  key={template.id}
+                  template={template}
+                  cycleBusy={cycleBusy}
+                  onClone={setCloneTarget}
+                  onEdit={setEditTarget}
+                  onManual={setManualTarget}
+                  onRetry={handleRetry}
+                  onCycle={handleCycle}
+                  onDelete={setDeleteTarget}
+                />
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
       {createDialog.open && (
@@ -596,7 +482,7 @@ export default function TemplatesPage() {
       {cloneDialog.open && (
         <TemplateCloneDialog
           template={cloneDialog.item}
-          canBatch={canManage}
+          canBatch
           closing={cloneDialog.closing}
           onClose={() => setCloneTarget(null)}
         />

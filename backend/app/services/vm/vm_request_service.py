@@ -26,6 +26,7 @@ from app.models import (
     VMRequestStatus,
     VMTemplate,
     VMTemplateStatus,
+    VMTemplateVisibility,
 )
 from app.repositories import governance as governance_repo
 from app.repositories import vm_request as vm_request_repo
@@ -256,7 +257,7 @@ def _validate_template_source(
 
     母範本同時也是 PVE template，所以不能只靠前端清單擋：任何帶
     template_id 的申請都要在建立當下確認範本存在、ready，且申請者確實有
-    權限使用它。教師依可見範圍，其他角色則必須是已開放學生申請的範本。
+    權限使用它。教師依可見範圍，其他角色則必須是「全部可見」的範本。
     provision 時仍會再查一次範本節點，這裡是為了不讓審核通過後才失敗。
     """
     template = vm_template_repo.get_template_by_pve_vmid(
@@ -281,8 +282,8 @@ def _validate_template_source(
         ):
             raise BadRequestError("Selected template is not accessible")
         return template
-    if not template.student_requestable:
-        raise BadRequestError("Selected template is not open for self-service")
+    if template.visibility != VMTemplateVisibility.global_:
+        raise BadRequestError("Selected template is not open to students")
     return template
 
 

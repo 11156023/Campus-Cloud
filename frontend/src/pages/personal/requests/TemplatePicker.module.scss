@@ -1,0 +1,137 @@
+@use "../../../assets/styles/variables" as *;
+@use "../../../assets/styles/mixins" as *;
+
+/* ── 「我的申請 › 範本開通」 ── */
+.wrap {
+  @include flex-column;
+  gap: $spacing-16;
+}
+
+.toolbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: $spacing-16;
+  flex-wrap: wrap;
+}
+
+.hint {
+  margin: 0;
+  font-size: $font-size-14;
+  line-height: 1.6;
+  color: var(--color-text-secondary);
+}
+
+.card {
+  @include flex-column;
+  @include glass-surface($shadow: var(--shadow-sm));
+  border-radius: $radius-16;
+  overflow: visible;
+}
+
+/* ── 範本卡片 ── */
+.grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: $spacing-16;
+
+  @include respond-to(sm) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  @include respond-to(lg) {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.tplCard {
+  @include flex-column;
+  gap: $spacing-8;
+  padding: $spacing-16;
+  @include glass-surface($shadow: var(--shadow-sm));
+  border-radius: $radius-16;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: $spacing-8;
+  color: var(--color-primary);
+}
+
+.name {
+  font-size: $font-size-16;
+  font-weight: $font-weight-700;
+  color: var(--color-text-primary);
+  @include text-truncate;
+}
+
+.desc {
+  margin: 0;
+  font-size: $font-size-14;
+  color: var(--color-text-secondary);
+  @include text-clamp(2);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $spacing-4;
+  margin-top: auto;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px $spacing-8;
+  border: 1px solid var(--color-border);
+  border-radius: $radius-pill;
+  font-size: $font-size-12;
+  color: var(--color-text-secondary);
+}
+
+/* ── 按鈕 ── */
+%btn-base {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px $spacing-16;
+  border-radius: $radius-8;
+  font-size: $font-size-14;
+  font-weight: $font-weight-500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background $transition-base;
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+}
+
+.btnPrimary {
+  @extend %btn-base;
+  background: var(--color-primary);
+  color: var(--color-text-on-primary);
+
+  &:hover:not(:disabled) {
+    background: var(--color-primary-dark);
+  }
+}
+
+.btnSecondary {
+  @extend %btn-base;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  box-shadow: var(--shadow-sm);
+
+  &:hover:not(:disabled) {
+    background: var(--color-hover);
+  }
+}
+
+.cloneBtn {
+  width: 100%;
+  justify-content: center;
+}
