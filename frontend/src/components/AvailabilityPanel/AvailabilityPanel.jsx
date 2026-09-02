@@ -7,12 +7,20 @@
  *   onHintChange  (hint: string|null) => void  — contextual UX hint for the parent to display
  */
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { VmRequestAvailabilityService } from "../../services/vmRequestAvailability";
 import styles from "./AvailabilityPanel.module.scss";
 import MIcon from "../MIcon";
 
-const MONTH_NAMES = ["一月","二月","三月","四月","五月","六月","七月","八月","九月","十月","十一月","十二月"];
-const DAY_HEADERS = ["日","一","二","三","四","五","六"];
+const MONTH_KEYS = [
+  "AvailabilityPanel.month1", "AvailabilityPanel.month2", "AvailabilityPanel.month3", "AvailabilityPanel.month4",
+  "AvailabilityPanel.month5", "AvailabilityPanel.month6", "AvailabilityPanel.month7", "AvailabilityPanel.month8",
+  "AvailabilityPanel.month9", "AvailabilityPanel.month10", "AvailabilityPanel.month11", "AvailabilityPanel.month12",
+];
+const DAY_HEADER_KEYS = [
+  "AvailabilityPanel.daySun", "AvailabilityPanel.dayMon", "AvailabilityPanel.dayTue", "AvailabilityPanel.dayWed",
+  "AvailabilityPanel.dayThu", "AvailabilityPanel.dayFri", "AvailabilityPanel.daySat",
+];
 
 /* picking state: "extend" = waiting for user to pick end date; "idle" = can start fresh */
 const PICK_EXTEND = "extend";
@@ -51,6 +59,7 @@ function cacheAvailability(key, data) {
 }
 
 export default function AvailabilityPanel({ draft, startAt, endAt, onChange, onHintChange, onDataChange }) {
+  const { t } = useTranslation("components");
   const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState(false);
@@ -248,17 +257,17 @@ export default function AvailabilityPanel({ draft, startAt, endAt, onChange, onH
 
   useEffect(() => {
     let hint = null;
-    if (!startDate) hint = "點選日期即可選取單日，或繼續點選其他日期延伸範圍";
-    else if (picking === PICK_EXTEND && startDate === endDate) hint = `已選單日 ${startDate}，審核通過後會依日期啟用`;
+    if (!startDate) hint = t("AvailabilityPanel.hintPickStart");
+    else if (picking === PICK_EXTEND && startDate === endDate) hint = t("AvailabilityPanel.hintSingleDaySelected", { date: startDate });
     else if (picking === PICK_IDLE && endDate)
-      hint = "日期已選定，點選日期即可重新選擇";
+      hint = t("AvailabilityPanel.hintRangeSelected");
     onHintChangeRef.current?.(hint);
-  }, [startDate, endDate, picking]);
+  }, [startDate, endDate, picking]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ── Early returns ── */
   if (!draftReady) return (
     <div className={styles.root}>
-      <p className={styles.hint}>先填完基本規格後，再選日期與連續時段。</p>
+      <p className={styles.hint}>{t("AvailabilityPanel.hintFillSpecFirst")}</p>
     </div>
   );
   if (loading) return (
@@ -270,7 +279,7 @@ export default function AvailabilityPanel({ draft, startAt, endAt, onChange, onH
   );
   if (error || !data) return (
     <div className={styles.root}>
-      <p className={`${styles.hint} ${styles.hintError}`}>目前無法取得時段資料，請稍後再試。</p>
+      <p className={`${styles.hint} ${styles.hintError}`}>{t("AvailabilityPanel.hintLoadFailed")}</p>
     </div>
   );
 
@@ -283,7 +292,7 @@ export default function AvailabilityPanel({ draft, startAt, endAt, onChange, onH
     <div className={styles.root} aria-busy={refreshing || undefined}>
 
       {refreshing && (
-        <p className={styles.refreshingHint} aria-live="polite">正在依新規格更新可用時段…</p>
+        <p className={styles.refreshingHint} aria-live="polite">{t("AvailabilityPanel.refreshingHint")}</p>
       )}
 
       {/* ── Calendar ── */}
@@ -292,14 +301,14 @@ export default function AvailabilityPanel({ draft, startAt, endAt, onChange, onH
           <button type="button" className={styles.calendarNavBtn} onClick={prevMonth} disabled={!canGoPrevious}>
             <MIcon name="chevron_left" size={18} />
           </button>
-          <span className={styles.calendarTitle}>{MONTH_NAMES[viewMonth]} {viewYear}</span>
+          <span className={styles.calendarTitle}>{t(MONTH_KEYS[viewMonth])} {viewYear}</span>
           <button type="button" className={styles.calendarNavBtn} onClick={nextMonth} disabled={!canGoNext}>
             <MIcon name="chevron_right" size={18} />
           </button>
         </div>
         <div className={styles.calendarGrid}>
-          {DAY_HEADERS.map((h) => (
-            <div key={h} className={styles.calendarDayHeader}>{h}</div>
+          {DAY_HEADER_KEYS.map((key) => (
+            <div key={key} className={styles.calendarDayHeader}>{t(key)}</div>
           ))}
           {calendarDays.map((d, i) => {
             if (!d) return <div key={`pad-${i}`} />;
@@ -348,13 +357,13 @@ export default function AvailabilityPanel({ draft, startAt, endAt, onChange, onH
       {/* ── Legend ── */}
       <div className={styles.legend}>
         {[
-          { cls: styles.calendarDayGood,    label: "可申請" },
-          { cls: styles.calendarDayLimited, label: "名額有限" },
-          { cls: styles.calendarDayNone,    label: "已滿" },
-        ].map(({ cls, label }) => (
-          <div key={label} className={styles.legendItem}>
+          { cls: styles.calendarDayGood,    labelKey: "AvailabilityPanel.legendAvailable" },
+          { cls: styles.calendarDayLimited, labelKey: "AvailabilityPanel.legendLimited" },
+          { cls: styles.calendarDayNone,    labelKey: "AvailabilityPanel.legendFull" },
+        ].map(({ cls, labelKey }) => (
+          <div key={labelKey} className={styles.legendItem}>
             <span className={`${styles.legendDot} ${cls}`} />
-            <span>{label}</span>
+            <span>{t(labelKey)}</span>
           </div>
         ))}
       </div>

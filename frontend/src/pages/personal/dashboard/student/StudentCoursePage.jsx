@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
+import { useTranslation } from "react-i18next";
 import MIcon from "../../../../components/MIcon";
 import EmptyState from "../../../../components/EmptyState/EmptyState";
 import LoadingState from "../../../../components/LoadingState/LoadingState";
@@ -22,30 +23,31 @@ import styles from "./StudentCoursePage.module.scss";
 
 /** AI 任務的每個檢查項目可被自動判定的程度。 */
 const AI_DETECTABLE_META = {
-  auto: { label: "可自動檢查", icon: "smart_toy", tone: "auto" },
-  partial: { label: "部分自動檢查", icon: "rule", tone: "partial" },
-  manual: { label: "老師人工確認", icon: "person_check", tone: "manual" },
+  auto: { labelKey: "StudentCoursePage.detectableAuto", icon: "smart_toy", tone: "auto" },
+  partial: { labelKey: "StudentCoursePage.detectablePartial", icon: "rule", tone: "partial" },
+  manual: { labelKey: "StudentCoursePage.detectableManual", icon: "person_check", tone: "manual" },
 };
 
 /** 一次 AI Check 送出後的執行狀態。 */
 const AI_CHECK_STATUS_META = {
-  pending: { label: "等待 AI Check", icon: "hourglass_top", tone: "pending" },
-  running: { label: "AI 檢查中", icon: "sync", tone: "running" },
-  completed: { label: "已收到 AI 回覆", icon: "task_alt", tone: "completed" },
-  failed: { label: "檢查失敗", icon: "error_outline", tone: "failed" },
-  cancelled: { label: "已取消", icon: "block", tone: "cancelled" },
+  pending: { labelKey: "StudentCoursePage.checkStatusPending", icon: "hourglass_top", tone: "pending" },
+  running: { labelKey: "StudentCoursePage.checkStatusRunning", icon: "sync", tone: "running" },
+  completed: { labelKey: "StudentCoursePage.checkStatusCompleted", icon: "task_alt", tone: "completed" },
+  failed: { labelKey: "StudentCoursePage.checkStatusFailed", icon: "error_outline", tone: "failed" },
+  cancelled: { labelKey: "StudentCoursePage.checkStatusCancelled", icon: "block", tone: "cancelled" },
 };
 
-const NO_COURSE_STATUS = { label: "目前沒有課程", tone: "muted", icon: "event_busy" };
+const NO_COURSE_STATUS = { labelKey: "StudentCoursePage.noCourseStatus", tone: "muted", icon: "event_busy" };
 
 /** AI Check 送出後、尚未有結論前的輪詢間隔。 */
 const AI_CHECK_POLL_MS = 2500;
 
 function StatusBadge({ meta }) {
+  const { t } = useTranslation("personal");
   return (
     <span className={`${styles.statusBadge} ${styles[meta.tone]}`}>
       <MIcon name={meta.icon} size={16} />
-      {meta.label}
+      {t(meta.labelKey)}
     </span>
   );
 }
@@ -55,6 +57,7 @@ function StatusBadge({ meta }) {
  * 內容分三塊：課堂卡片（進度與環境）、課堂機器、截至今天的 AI 任務。
  */
 export default function StudentCoursePage() {
+  const { t } = useTranslation("personal");
   const navigate = useNavigate();
   const location = useLocation();
   const { pathId } = useParams();
@@ -216,13 +219,13 @@ export default function StudentCoursePage() {
   const currentSchedule = view.activePath?.schedule;
   const heroStatusMeta = view.activePath
     ? currentSchedule?.state === "now"
-      ? { label: "正在上課", tone: "success", icon: "sensors" }
-      : { label: "可以開始", tone: "success", icon: "play_circle" }
+      ? { labelKey: "StudentCoursePage.statusInClass", tone: "success", icon: "sensors" }
+      : { labelKey: "StudentCoursePage.statusReadyToStart", tone: "success", icon: "play_circle" }
     : NO_COURSE_STATUS;
 
   async function openPracticeMachine(machine) {
     if (!machine?.vmid) {
-      toast.error("這台課堂機器尚未建立完成");
+      toast.error(t("StudentCoursePage.machineNotReady"));
       return;
     }
     const toastId = `start-class-machine-${machine.vmid}`;
@@ -230,18 +233,18 @@ export default function StudentCoursePage() {
     try {
       let resource = await ResourcesService.get(machine.vmid);
       if (resource.status !== "running") {
-        toast.info("正在啟動課堂機器，通常需要一點時間…", { id: toastId });
+        toast.info(t("StudentCoursePage.startingMachine"), { id: toastId });
         await ResourcesService.start(resource.vmid);
         resource = await waitForPracticeMachine(resource.vmid);
         if (resource?.status !== "running") {
-          toast.info("機器仍在啟動中，請稍後再試。", { id: toastId });
+          toast.info(t("StudentCoursePage.machineStillStarting"), { id: toastId });
           return;
         }
-        toast.success("課堂機器已啟動", { id: toastId });
+        toast.success(t("StudentCoursePage.machineStarted"), { id: toastId });
       }
       setActivePracticeResource({ ...machine, ...resource });
     } catch (error) {
-      toast.error(error?.message ?? "無法開啟課堂機器");
+      toast.error(error?.message ?? t("StudentCoursePage.openMachineFailed"));
     } finally {
       setOpeningMachineId(null);
     }
@@ -249,7 +252,7 @@ export default function StudentCoursePage() {
 
   function openMachineInformation(machine) {
     if (!machine?.vmid) {
-      toast.info("這台課堂機器尚未建立完成。");
+      toast.info(t("StudentCoursePage.machineNotReadyInfo"));
       return;
     }
     navigate(`/my-resources/${machine.vmid}`);
@@ -267,10 +270,10 @@ export default function StudentCoursePage() {
       const check = await CoursesService.startAiCheck(view.activePath.id, assignment.id);
       setAssignmentChecks((current) => ({ ...current, [assignment.id]: check }));
       toast.success(check.status === "completed"
-        ? "AI Check 已完成"
-        : "已送出，AI 正在檢查你的課堂環境");
+        ? t("StudentCoursePage.aiCheckCompleted")
+        : t("StudentCoursePage.aiCheckSubmitted"));
     } catch (error) {
-      toast.error(error?.message ?? "目前無法送出 AI Check");
+      toast.error(error?.message ?? t("StudentCoursePage.aiCheckSubmitFailed"));
     } finally {
       setCheckingAssignmentId(null);
     }
@@ -279,7 +282,7 @@ export default function StudentCoursePage() {
   if (view.loading) {
     return (
       <div className={styles.page}>
-        <LoadingState text="正在整理你的課堂資訊" fullPage />
+        <LoadingState text={t("StudentCoursePage.loadingText")} fullPage />
       </div>
     );
   }
@@ -293,12 +296,12 @@ export default function StudentCoursePage() {
           onClick={() => navigate(location.state?.from ?? "/dashboard")}
         >
           <MIcon name="arrow_back" size={18} />
-          返回今日課表
+          {t("StudentCoursePage.backToToday")}
         </button>
         <div className={styles.coursePageTitle}>
-          <p className={styles.eyebrow}>課程總覽</p>
-          <h1>{view.activePath?.title ?? "課程"}</h1>
-          <p>{view.activePath?.description ?? "查看今天的環境與任務。"}</p>
+          <p className={styles.eyebrow}>{t("StudentCoursePage.eyebrowCourseOverview")}</p>
+          <h1>{view.activePath?.title ?? t("StudentCoursePage.defaultCourseTitle")}</h1>
+          <p>{view.activePath?.description ?? t("StudentCoursePage.defaultCourseDesc")}</p>
         </div>
       </header>
 
@@ -306,8 +309,8 @@ export default function StudentCoursePage() {
         <div className={styles.notice} role="status">
           <MIcon name="cloud_off" size={20} />
           <div>
-            <strong>暫時無法取得最新資訊</strong>
-            <span>你仍可直接前往課程或我的資源查看。</span>
+            <strong>{t("StudentCoursePage.noticeTitle")}</strong>
+            <span>{t("StudentCoursePage.noticeDesc")}</span>
           </div>
         </div>
       )}
@@ -321,16 +324,16 @@ export default function StudentCoursePage() {
           <div className={styles.classCardTop}>
             <div>
               <p className={styles.eyebrow}>
-                {currentSchedule?.state === "now" ? "現在正在進行" : "接下來可以練習"}
+                {currentSchedule?.state === "now" ? t("StudentCoursePage.eyebrowNow") : t("StudentCoursePage.eyebrowUpcoming")}
               </p>
               <h2 id="today-class-title">
-                {view.activePath?.title ?? "目前沒有可開始的課程"}
+                {view.activePath?.title ?? t("StudentCoursePage.noCourseAvailable")}
               </h2>
               <p className={styles.classDescription}>
                 {nextRoom
-                  ? `這堂課要做：${nextRoom.title}`
+                  ? t("StudentCoursePage.classTaskDesc", { title: nextRoom.title })
                   : view.activePath?.description
-                    ?? "老師發布內容後，這裡會直接告訴你現在要做什麼。"}
+                    ?? t("StudentCoursePage.classNoContentYet")}
               </p>
             </div>
             <StatusBadge meta={heroStatusMeta} />
@@ -346,13 +349,13 @@ export default function StudentCoursePage() {
                     <span><MIcon name="location_on" size={18} />{currentSchedule.place}</span>
                   </>
                 ) : (
-                  <span><MIcon name="task_alt" size={18} />任務進度 {roomProgress}%</span>
+                  <span><MIcon name="task_alt" size={18} />{t("StudentCoursePage.taskProgress", { percent: roomProgress })}</span>
                 )}
               </div>
 
               <div
                 className={styles.progressTrack}
-                aria-label={`章節進度 ${roomProgress}%`}
+                aria-label={t("StudentCoursePage.chapterProgressAria", { percent: roomProgress })}
                 data-guide="home-progress"
               >
                 <span style={{ width: `${roomProgress}%` }} />
@@ -362,16 +365,16 @@ export default function StudentCoursePage() {
                 <MIcon name="check_circle" size={18} />
                 <span>
                   {deployment?.status === "running" || !nextRoom?.has_lab
-                    ? "練習內容已可使用，直接開始即可。"
-                    : "開始後系統會自動準備需要的內容。"}
+                    ? t("StudentCoursePage.hintReady")
+                    : t("StudentCoursePage.hintWillPrepare")}
                 </span>
               </div>
             </>
           ) : (
             <EmptyState
               icon="event_available"
-              title="目前沒有待完成的課程"
-              description="可以先查看所有課程，或等待老師發布今天的內容。"
+              title={t("StudentCoursePage.emptyNoCourseTitle")}
+              description={t("StudentCoursePage.emptyNoCourseDesc")}
             />
           )}
 
@@ -382,16 +385,16 @@ export default function StudentCoursePage() {
                 className={styles.primaryButton}
                 onClick={() => navigate(nextRoom ? `/courses/rooms/${nextRoom.id}` : "/courses")}
               >
-                {nextRoom ? "開始練習" : "查看可用課程"}
+                {nextRoom ? t("StudentCoursePage.startPractice") : t("StudentCoursePage.viewAvailableCourses")}
                 <MIcon name="arrow_forward" size={18} />
               </button>
             </div>
           ) : (
-            <section className={styles.machinePicker} aria-label="課堂機器" data-guide="home-start">
+            <section className={styles.machinePicker} aria-label={t("StudentCoursePage.classMachinesAriaLabel")} data-guide="home-start">
               <header>
                 <div>
-                  <strong>你的課堂機器</strong>
-                  <span>直接點擊機器即可進入；右側資訊按鈕可查看完整設定。</span>
+                  <strong>{t("StudentCoursePage.yourClassMachines")}</strong>
+                  <span>{t("StudentCoursePage.machineHint")}</span>
                 </div>
               </header>
               <div className={styles.machineGrid}>
@@ -409,7 +412,7 @@ export default function StudentCoursePage() {
                         className={styles.machineLaunchButton}
                         onClick={() => openPracticeMachine(machine)}
                         disabled={openingMachineId !== null || machine.vmid == null}
-                        aria-label={`${actionLabel}：${machineName}`}
+                        aria-label={t("StudentCoursePage.machineLaunchAria", { action: actionLabel, name: machineName })}
                       >
                         <span className={styles.machineIcon}>
                           <MIcon name={machine.type === "lxc" ? "terminal" : "desktop_windows"} size={22} />
@@ -417,8 +420,8 @@ export default function StudentCoursePage() {
                         <span className={styles.machineCopy}>
                           <strong>{machineName}</strong>
                           <small>
-                            {machine.classMachineRole ?? "課堂練習機"}
-                            {machine.vmid != null ? ` · VMID ${machine.vmid}` : " · 尚未配置"}
+                            {machine.classMachineRole ?? t("StudentCoursePage.defaultMachineRole")}
+                            {machine.vmid != null ? t("StudentCoursePage.vmidSuffix", { vmid: machine.vmid }) : t("StudentCoursePage.notConfiguredSuffix")}
                           </small>
                         </span>
                         <span className={`${styles.machineState} ${machine.status === "running" ? styles.machineStateReady : ""}`}>
@@ -431,8 +434,8 @@ export default function StudentCoursePage() {
                         className={styles.machineInfoButton}
                         onClick={() => openMachineInformation(machine)}
                         disabled={machine.vmid == null}
-                        aria-label={`查看 ${machineName} 的完整資源資訊`}
-                        title="前往我的資源查看完整設定"
+                        aria-label={t("StudentCoursePage.viewFullInfoAria", { name: machineName })}
+                        title={t("StudentCoursePage.viewFullSettingsTitle")}
                       >
                         <MIcon name="info" size={20} />
                       </button>
@@ -448,10 +451,10 @@ export default function StudentCoursePage() {
       <section className={styles.taskSection} aria-labelledby="task-title" data-guide="home-tasks">
         <div className={styles.sectionHeading}>
           <div>
-            <h2 id="task-title">截至今天的所有任務</h2>
+            <h2 id="task-title">{t("StudentCoursePage.tasksTitle")}</h2>
           </div>
           {aiRequirementCount > 0 && (
-            <span>{aiAssignments.length} 個任務 · {aiRequirementCount} 個檢查項目</span>
+            <span>{t("StudentCoursePage.tasksSummary", { tasks: aiAssignments.length, items: aiRequirementCount })}</span>
           )}
         </div>
 
@@ -480,16 +483,16 @@ export default function StudentCoursePage() {
                       <small>
                         {formatAssignmentDate(assignment.approved_at)}
                         {" · "}{assignment.teaching_class_name}
-                        {" · "}{assignment.items?.length ?? 0} 個檢查項目
+                        {" · "}{t("StudentCoursePage.itemsCount", { count: assignment.items?.length ?? 0 })}
                       </small>
                     </span>
                     {checkMeta ? (
                       <span className={`${styles.assignmentStatus} ${styles[`assignmentStatus_${checkMeta.tone}`]}`}>
-                        <MIcon name={checkMeta.icon} size={16} />{checkMeta.label}
+                        <MIcon name={checkMeta.icon} size={16} />{t(checkMeta.labelKey)}
                       </span>
                     ) : (
                       <span className={`${styles.assignmentStatus} ${styles.assignmentStatus_ready}`}>
-                        <MIcon name="radio_button_unchecked" size={16} />尚未送檢
+                        <MIcon name="radio_button_unchecked" size={16} />{t("StudentCoursePage.notSubmittedYet")}
                       </span>
                     )}
                     <MIcon name={expanded ? "expand_less" : "expand_more"} size={21} />
@@ -500,8 +503,8 @@ export default function StudentCoursePage() {
                       <div className={styles.aiBrief}>
                         <span><MIcon name="auto_awesome" size={19} /></span>
                         <div>
-                          <strong>AI 整理的任務重點</strong>
-                          <p>{assignment.summary || "依照下面的項目完成操作，完成後再送出 AI Check。"}</p>
+                          <strong>{t("StudentCoursePage.aiSummaryTitle")}</strong>
+                          <p>{assignment.summary || t("StudentCoursePage.aiSummaryFallback")}</p>
                         </div>
                       </div>
 
@@ -518,7 +521,7 @@ export default function StudentCoursePage() {
                               </div>
                               <span className={`${styles.aiCheckBadge} ${styles[detectableMeta.tone]}`}>
                                 <MIcon name={detectableMeta.icon} size={15} />
-                                {detectableMeta.label}
+                                {t(detectableMeta.labelKey)}
                               </span>
                             </li>
                           );
@@ -528,7 +531,7 @@ export default function StudentCoursePage() {
                       {check && (
                         <section
                           className={`${styles.aiReply} ${styles[`aiReply_${check.status}`]}`}
-                          aria-label="AI Check 回覆"
+                          aria-label={t("StudentCoursePage.aiReplyAriaLabel")}
                         >
                           <header>
                             <span>
@@ -540,11 +543,11 @@ export default function StudentCoursePage() {
                               />
                             </span>
                             <div>
-                              <strong>{checkRunning ? "AI 正在檢查你的課堂環境" : "AI Check 回覆"}</strong>
+                              <strong>{checkRunning ? t("StudentCoursePage.aiCheckingEnv") : t("StudentCoursePage.aiCheckReplyTitle")}</strong>
                               <small>
                                 {typeof check.score === "number"
-                                  ? `評分 ${check.score}/${check.max_score ?? 5}`
-                                  : checkMeta?.label}
+                                  ? t("StudentCoursePage.scoreFormat", { score: check.score, max: check.max_score ?? 5 })
+                                  : checkMeta?.labelKey && t(checkMeta.labelKey)}
                               </small>
                             </div>
                           </header>
@@ -558,7 +561,7 @@ export default function StudentCoursePage() {
                                     size={17}
                                   />
                                   <span>
-                                    <strong>{item.title || "評分項目"}</strong>
+                                    <strong>{item.title || t("StudentCoursePage.defaultScoreItemTitle")}</strong>
                                     {item.comment && <small>{item.comment}</small>}
                                   </span>
                                   {typeof item.score === "number" && (
@@ -574,7 +577,7 @@ export default function StudentCoursePage() {
                       <footer className={styles.assignmentActions}>
                         <span>
                           <MIcon name="info" size={16} />
-                          送出前請先啟動課堂機器，AI 只會檢查你自己的環境。
+                          {t("StudentCoursePage.beforeSubmitHint")}
                         </span>
                         <button
                           type="button"
@@ -584,12 +587,12 @@ export default function StudentCoursePage() {
                         >
                           <MIcon name={checkRunning ? "sync" : "fact_check"} size={18} />
                           {checkRunning
-                            ? "AI 檢查中…"
+                            ? t("StudentCoursePage.aiChecking")
                             : checkingAssignmentId === assignment.id
-                              ? "正在送出…"
+                              ? t("StudentCoursePage.submitting")
                               : check?.status === "completed"
-                                ? "完成修正，再次 AI Check"
-                                : "我完成了，送出 AI Check"}
+                                ? t("StudentCoursePage.recheckAfterFix")
+                                : t("StudentCoursePage.submitAiCheck")}
                         </button>
                       </footer>
                     </div>
@@ -601,8 +604,8 @@ export default function StudentCoursePage() {
         ) : (
           <EmptyState
             icon="checklist"
-            title="截至今天沒有需要送檢的任務"
-            description="老師發布並核准 AI 任務後，會依發布日期完整列在這裡。"
+            title={t("StudentCoursePage.emptyNoTasksTitle")}
+            description={t("StudentCoursePage.emptyNoTasksDesc")}
           />
         )}
       </section>

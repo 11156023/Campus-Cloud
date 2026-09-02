@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "../../../contexts/AuthContext";
 import styles from "./RequestsPage.module.scss";
+import i18n from "../../../i18n";
 import { VmRequestsService } from "../../../services/vmRequests";
 import { isConsumedRequest } from "../../../services/pendingResources";
 import { useToast } from "../../../hooks/useToast";
@@ -12,17 +14,19 @@ import SharedEmptyState from "../../../components/EmptyState/EmptyState";
 import PageHeader from "../../../components/PageHeader/PageHeader";
 
 /* ── Constants ── */
+const defaultT = (key) => i18n.t(key, { ns: "personal" });
+
 const STATUS_MAP = {
-  pending:   { label: "審核中", color: "info"    },
-  approved:  { label: "已核准", color: "success" },
-  rejected:  { label: "已拒絕", color: "danger"  },
-  cancelled: { label: "已取消", color: "muted"   },
-  expired:   { label: "已過期", color: "muted"   },
+  pending:   { labelKey: "RequestsPage.statusPending",   color: "info"    },
+  approved:  { labelKey: "RequestsPage.statusApproved",  color: "success" },
+  rejected:  { labelKey: "RequestsPage.statusRejected",  color: "danger"  },
+  cancelled: { labelKey: "RequestsPage.statusCancelled", color: "muted"   },
+  expired:   { labelKey: "RequestsPage.statusExpired",   color: "muted"   },
 };
 
 const RESOURCE_TYPE_MAP = {
-  lxc: { label: "容器 (LXC)", icon: "terminal" },
-  vm:  { label: "虛擬機 (VM)", icon: "computer" },
+  lxc: { labelKey: "RequestsPage.typeLxc", icon: "terminal" },
+  vm:  { labelKey: "RequestsPage.typeVm", icon: "computer" },
 };
 
 /* 開通成功後 VMRequest.status 仍停留在 approved（後端只把 vmid 寫回），
@@ -63,24 +67,32 @@ function isWaitingForResources(req) {
 }
 
 /* approved 在 UI 上再依開通進度細分（vmid 為空時 provisioning_status 反映開通流程） */
-function getDisplayStatus(req) {
+function getDisplayStatus(req, t = defaultT) {
   if (req.status === "approved") {
     if (req.vmid != null) {
-      if (req.provisioning_status === "failed") return { label: "機器異常", color: "danger" };
-      if (isWaitingForResources(req)) return { label: "等待資源釋出", color: "warning" };
-      return { label: "已開通", color: "success" };
+      if (req.provisioning_status === "failed") return { label: t("RequestsPage.statusMachineError"), color: "danger" };
+      if (isWaitingForResources(req)) return { label: t("RequestsPage.statusWaitingResources"), color: "warning" };
+      return { label: t("RequestsPage.statusProvisioned"), color: "success" };
     }
-    if (req.provisioning_status === "failed") return { label: "開通失敗", color: "danger" };
-    if (req.provisioning_status === "running") return { label: "開通中", color: "info" };
-    return { label: "已核准", color: "success" };
+    if (req.provisioning_status === "failed") return { label: t("RequestsPage.statusProvisionFailed"), color: "danger" };
+    if (req.provisioning_status === "running") return { label: t("RequestsPage.statusProvisioning"), color: "info" };
+    return { label: t("RequestsPage.statusApproved"), color: "success" };
   }
-  return STATUS_MAP[req.status] ?? { label: req.status, color: "muted" };
+  const mapped = STATUS_MAP[req.status];
+  return mapped ? { label: t(mapped.labelKey), color: mapped.color } : { label: req.status, color: "muted" };
 }
 
 const VIEW_LIST   = "list";
 const VIEW_CREATE = "create";
 
-const LIST_COLUMNS = ["資源", "系統", "規格", "申請時間", "狀態", "操作"];
+const LIST_COLUMN_KEYS = [
+  "RequestsPage.colResource",
+  "RequestsPage.colOs",
+  "RequestsPage.colSpec",
+  "RequestsPage.colRequestedAt",
+  "RequestsPage.colStatus",
+  "RequestsPage.colActions",
+];
 
 /* ── Helpers ── */
 function formatDatetime(isoStr) {
@@ -107,9 +119,9 @@ function getOsDisplay(req) {
   return null;
 }
 
-function getFormInfoItems(req) {
+function getFormInfoItems(req, t = defaultT) {
   const items = [];
-  if (req.username)             items.push({ label: "帳號",   value: req.username });
+  if (req.username)             items.push({ label: t("RequestsPage.fieldAccount"),   value: req.username });
   if (req.gpu_mapping_id)       items.push({ label: "GPU",    value: req.gpu_mapping_id });
   return items;
 }
@@ -121,7 +133,8 @@ function getMemDisplay(memMB) {
 
 /* ── Primitive sub-components ── */
 function StatusBadge({ req }) {
-  const s = getDisplayStatus(req);
+  const { t } = useTranslation("personal");
+  const s = getDisplayStatus(req, t);
   return (
     <span className={`${styles.badge} ${styles[`badge_${s.color}`]}`}>
       {s.label}
@@ -142,12 +155,13 @@ function InfoRow({ icon, label, value }) {
   );
 }
 
-function getSpecDisplay(req) {
-  return `${req.cores} 核 / ${getMemDisplay(req.memory)} / ${req.storage}`;
+function getSpecDisplay(req, t = defaultT) {
+  return t("RequestsPage.specDisplay", { cores: req.cores, mem: getMemDisplay(req.memory), storage: req.storage });
 }
 
 /* ── Confirm Modal ── */
-function ConfirmModal({ title, desc, confirmLabel = "確定", danger = false, loading = false, onConfirm, onClose }) {
+function ConfirmModal({ title, desc, confirmLabel, danger = false, loading = false, onConfirm, onClose }) {
+  const { t } = useTranslation("personal");
   const [closing, setClosing] = useState(false);
 
   function close() {
@@ -170,7 +184,7 @@ function ConfirmModal({ title, desc, confirmLabel = "確定", danger = false, lo
         {desc && <p className={styles.modalDesc}>{desc}</p>}
         <div className={styles.modalActions}>
           <button type="button" className={styles.btnSecondary} onClick={close}>
-            取消
+            {t("ConfirmModal.cancel")}
           </button>
           <button
             type="button"
@@ -178,7 +192,7 @@ function ConfirmModal({ title, desc, confirmLabel = "確定", danger = false, lo
             disabled={loading}
             onClick={onConfirm}
           >
-            {loading ? "處理中…" : confirmLabel}
+            {loading ? t("ConfirmModal.processing") : (confirmLabel ?? t("ConfirmModal.confirm"))}
           </button>
         </div>
       </div>
@@ -188,6 +202,7 @@ function ConfirmModal({ title, desc, confirmLabel = "確定", danger = false, lo
 
 /* ── RequestRow ── */
 function RequestRow({ req, onUpdated }) {
+  const { t } = useTranslation("personal");
   const toast = useToast();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -200,7 +215,7 @@ function RequestRow({ req, onUpdated }) {
 
   const type      = RESOURCE_TYPE_MAP[req.resource_type] ?? { label: req.resource_type, icon: "computer" };
   const osDisplay = getOsDisplay(req);
-  const formItems = getFormInfoItems(req);
+  const formItems = getFormInfoItems(req, t);
   const startFmt  = formatDatetime(req.start_at);
   const endFmt    = formatDatetime(req.end_at);
 
@@ -218,9 +233,9 @@ function RequestRow({ req, onUpdated }) {
     try {
       const updated = await VmRequestsService.cancel(req.id);
       onUpdated(updated);
-      toast.success(`已撤銷申請「${req.hostname}」`);
+      toast.success(t("RequestRow.cancelSuccess", { hostname: req.hostname }));
     } catch (err) {
-      toast.error(err?.message ?? "撤銷失敗，請稍後再試。");
+      toast.error(err?.message ?? t("RequestRow.cancelFailed"));
     } finally {
       setCancelling(false);
       setCancelConfirm(false);
@@ -232,9 +247,9 @@ function RequestRow({ req, onUpdated }) {
     try {
       const updated = await VmRequestsService.retry(req.id);
       onUpdated(updated);
-      toast.success("已重新觸發開通，進度將自動更新");
+      toast.success(t("RequestRow.retrySuccess"));
     } catch (err) {
-      toast.error(err?.message ?? "重試失敗，請稍後再試。");
+      toast.error(err?.message ?? t("RequestRow.retryFailed"));
     } finally {
       setRetrying(false);
     }
@@ -257,7 +272,7 @@ function RequestRow({ req, onUpdated }) {
                 type="button"
                 className={styles.expandBtn}
                 aria-expanded={expanded}
-                aria-label={expanded ? "收合詳細資訊" : "展開詳細資訊"}
+                aria-label={expanded ? t("RequestRow.collapseDetails") : t("RequestRow.expandDetails")}
                 onClick={() => setExpanded((v) => !v)}
               >
                 <MIcon name={expanded ? "expand_more" : "chevron_right"} size={16} />
@@ -268,8 +283,8 @@ function RequestRow({ req, onUpdated }) {
             <div className={styles.nameMeta}>
               <span className={styles.namePrimary}>{req.hostname}</span>
               <span className={styles.nameSub}>
-                {type.label}
-                {showVmid && req.vmid != null && ` · 編號 ${req.vmid}`}
+                {t(type.labelKey ?? type.label)}
+                {showVmid && req.vmid != null && t("RequestRow.numberSuffix", { vmid: req.vmid })}
               </span>
             </div>
           </div>
@@ -278,7 +293,7 @@ function RequestRow({ req, onUpdated }) {
           <span className={styles.osCell}>{osDisplay ?? "—"}</span>
         </td>
         <td className={styles.td}>
-          <span className={styles.specCell}>{getSpecDisplay(req)}</span>
+          <span className={styles.specCell}>{getSpecDisplay(req, t)}</span>
         </td>
         <td className={styles.td}>{formatDate(req.created_at)}</td>
         <td className={styles.td}><StatusBadge req={req} /></td>
@@ -288,19 +303,19 @@ function RequestRow({ req, onUpdated }) {
             {canRetry(req) && (
               <button type="button" className={styles.retryBtn} disabled={retrying} onClick={handleRetry}>
                 <MIcon name="refresh" size={13} />
-                {retrying ? "…" : "重試"}
+                {retrying ? "…" : t("RequestRow.retry")}
               </button>
             )}
             {canCancel(req) && (
               <button type="button" className={styles.cancelBtn} onClick={() => setCancelConfirm(true)}>
                 <MIcon name="close" size={13} />
-                撤銷
+                {t("RequestRow.cancelRequest")}
               </button>
             )}
             {isProvisionedButFailed(req) && (
               <button type="button" className={styles.retryBtn} onClick={() => navigate("/my-resources")}>
                 <MIcon name="inventory_2" size={13} />
-                前往我的資源
+                {t("RequestRow.goToResources")}
               </button>
             )}
           </div>
@@ -309,15 +324,15 @@ function RequestRow({ req, onUpdated }) {
 
       {expanded && (
         <tr className={styles.detailTr}>
-          <td className={styles.detailTd} colSpan={LIST_COLUMNS.length}>
+          <td className={styles.detailTd} colSpan={LIST_COLUMN_KEYS.length}>
             <div className={styles.detailBody}>
               {formItems.map(({ label, value }) => (
                 <InfoRow key={label} icon="tune" label={label} value={value} />
               ))}
-              <InfoRow icon="chat_bubble_outline" label="申請原因" value={req.reason} />
+              <InfoRow icon="chat_bubble_outline" label={t("RequestRow.reasonLabel")} value={req.reason} />
               <InfoRow
                 icon="calendar_month"
-                label="預約期間"
+                label={t("RequestRow.periodLabel")}
                 value={startFmt ? `${startFmt}${endFmt ? ` ~ ${endFmt}` : ""}` : null}
               />
               {showRejection && (
@@ -332,7 +347,7 @@ function RequestRow({ req, onUpdated }) {
                   <span>
                     {req.provisioning_error}
                     {isProvisionedButFailed(req) &&
-                      "（機器已建立，此申請無法重試；請到「我的資源」開機或刪除這台機器。）"}
+                      t("RequestRow.machineFailNote")}
                   </span>
                 </div>
               )}
@@ -349,9 +364,9 @@ function RequestRow({ req, onUpdated }) {
 
       {cancelConfirm && (
         <ConfirmModal
-          title="確定撤銷申請？"
-          desc={`申請「${req.hostname}」撤銷後無法復原。`}
-          confirmLabel="撤銷申請"
+          title={t("RequestRow.confirmCancelTitle")}
+          desc={t("RequestRow.confirmCancelDesc", { hostname: req.hostname })}
+          confirmLabel={t("RequestRow.confirmCancelLabel")}
           danger
           loading={cancelling}
           onConfirm={handleCancel}
@@ -396,14 +411,15 @@ function SkeletonRow() {
 
 /* ── Empty / Error states ── */
 function EmptyState({ onCreateClick }) {
+  const { t } = useTranslation("personal");
   return (
     <SharedEmptyState
       icon="description"
-      title="尚無申請紀錄"
+      title={t("RequestsPage.emptyTitle")}
       action={
         <button type="button" className={styles.btnPrimary} onClick={onCreateClick}>
           <MIcon name="add" size={16} />
-          立即申請
+          {t("RequestsPage.createNow")}
         </button>
       }
     />
@@ -411,14 +427,15 @@ function EmptyState({ onCreateClick }) {
 }
 
 function ErrorState({ onRetry }) {
+  const { t } = useTranslation("personal");
   return (
     <EmptyState
       icon="error_outline"
-      title="載入失敗"
+      title={t("RequestsPage.errorTitle")}
       action={
         <button type="button" className={styles.btnSecondary} onClick={onRetry}>
           <MIcon name="refresh" size={16} />
-          重試
+          {t("RequestsPage.retry")}
         </button>
       }
     />
@@ -427,6 +444,7 @@ function ErrorState({ onRetry }) {
 
 /* ── Page ── */
 export default function RequestsPage() {
+  const { t } = useTranslation("personal");
   /* 其他頁（如快速建立的「完整設定」）可用 navigate("/my-requests", { state: { create: true } }) 直接開表單 */
   const location = useLocation();
   const [requests, setRequests] = useState([]);
@@ -490,10 +508,10 @@ export default function RequestsPage() {
       className={`${styles.page} ${returning ? styles.animSlideInLeft : ""}`}
       onAnimationEnd={returning ? () => setReturning(false) : undefined}
     >
-      <PageHeader title="我的申請" subtitle="管理你的虛擬機與容器申請">
+      <PageHeader title={t("RequestsPage.title")} subtitle={t("RequestsPage.subtitle")}>
         <button type="button" className={styles.btnPrimary} onClick={() => setView(VIEW_CREATE)} data-guide="request-create">
           <MIcon name="add" size={16} />
-          申請資源
+          {t("RequestsPage.requestResource")}
         </button>
       </PageHeader>
 
@@ -508,8 +526,8 @@ export default function RequestsPage() {
               <table className={styles.table}>
                 <thead>
                   <tr>
-                    {LIST_COLUMNS.map((column) => (
-                      <th key={column} className={styles.th}>{column}</th>
+                    {LIST_COLUMN_KEYS.map((columnKey) => (
+                      <th key={columnKey} className={styles.th}>{t(columnKey)}</th>
                     ))}
                   </tr>
                 </thead>

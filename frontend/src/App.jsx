@@ -1,5 +1,6 @@
 import { lazy } from "react";
 import { Navigate, Route, Routes, useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "./contexts/AuthContext";
 import DashboardLayout from "./layout/DashboardLayout";
 import LoginPage from "./pages/login/LoginPage";
@@ -59,6 +60,7 @@ const GatewayPage = lazy(() => import("./pages/system/gateway/GatewayPage"));
 const ReverseProxyPage = lazy(() => import("./pages/network/reverse-proxy/ReverseProxyPage"));
 
 function AuthBootstrapState({ unavailable = false, retrying = false, onRetry }) {
+  const { t } = useTranslation("common");
   return (
     <main className={styles.authStatePage}>
       <section className={styles.authStateCard} role={unavailable ? "alert" : "status"}>
@@ -70,12 +72,12 @@ function AuthBootstrapState({ unavailable = false, retrying = false, onRetry }) 
           <LoadingSpinner size={42} />
         )}
         <h1 className={styles.authStateTitle}>
-          {unavailable ? "暫時無法連線" : "正在驗證登入狀態"}
+          {unavailable ? t("App.connectionUnavailable") : t("App.verifyingLogin")}
         </h1>
         <p className={styles.authStateDescription}>
           {unavailable
-            ? "如果問題持續發生請聯繫系統管理員。"
-            : "請稍候，系統正在確認你的登入資訊。"}
+            ? t("App.connectionUnavailableDesc")
+            : t("App.verifyingLoginDesc")}
         </p>
         {unavailable && (
           <button
@@ -87,7 +89,7 @@ function AuthBootstrapState({ unavailable = false, retrying = false, onRetry }) 
             <span aria-hidden="true">
               <MIcon name="refresh" size={18} />
             </span>
-            {retrying ? "重試中…" : "重新連線"}
+            {retrying ? t("App.retrying") : t("App.retryConnect")}
           </button>
         )}
       </section>

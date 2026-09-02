@@ -17,6 +17,7 @@ from typing import Any
 from sqlmodel import Session, desc, select
 
 from app.ai.teacher_judge import file_service
+from app.core.i18n import t
 from app.models.teacher_judge_file import TeacherJudgeFile
 from app.models.teacher_judge_script_artifact import (
     TeacherJudgeScriptArtifact,
@@ -320,7 +321,7 @@ def get_student_ai_assignment(
         None,
     )
     if assignment is None:
-        raise HTTPException(status_code=404, detail="AI assignment not found")
+        raise HTTPException(status_code=404, detail=t("ai_assignment.not_found"))
     return assignment
 
 
@@ -355,7 +356,9 @@ def get_student_ai_assignment_source_document(
         is None
         or source_file is None
     ):
-        raise HTTPException(status_code=404, detail="這個任務沒有可供學生查看的 PDF。")
+        raise HTTPException(
+            status_code=404, detail=t("ai_assignment.source_pdf_not_found")
+        )
     return file_service.get_file_download(
         session=session,
         teaching_class_id=assignment.teaching_class_id,
@@ -388,7 +391,7 @@ def get_student_ai_check(
         or run.teaching_class_id != assignment.teaching_class_id
         or run.started_by != user_id
     ):
-        raise HTTPException(status_code=404, detail="AI check not found")
+        raise HTTPException(status_code=404, detail=t("ai_assignment.check_not_found"))
     return _check_to_student(run, item_id=_requested_item_id(run))
 
 

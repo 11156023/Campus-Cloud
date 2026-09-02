@@ -9,6 +9,7 @@ from sqlmodel import select
 from app.ai.teacher_judge.script_executor_service import execute_script_run
 from app.ai.teacher_judge.script_run_service import create_script_run
 from app.api.deps import CurrentUser, SessionDep
+from app.core.i18n import t
 from app.infrastructure.worker import submit
 from app.models.teacher_judge_script_run import TeacherJudgeScriptRunTargetScope
 from app.models.teaching_class import (
@@ -249,7 +250,7 @@ def start_ai_check(
     if requested_item_id and requested_item_id not in {
         item.id for item in assignment.items
     }:
-        raise HTTPException(status_code=404, detail="Checkpoint not found")
+        raise HTTPException(status_code=404, detail=t("course.checkpoint_not_found"))
     latest_check = (
         assignment.checkpoint_checks.get(requested_item_id)
         if requested_item_id
@@ -269,7 +270,9 @@ def start_ai_check(
         )
     ).first()
     if enrollment is None:
-        raise HTTPException(status_code=404, detail="Class enrollment not found")
+        raise HTTPException(
+            status_code=404, detail=t("course.enrollment_not_found")
+        )
 
     candidates = list(
         session.exec(
@@ -288,7 +291,7 @@ def start_ai_check(
     if not candidates:
         raise HTTPException(
             status_code=400,
-            detail="你的課堂機器尚未建立完成，請先確認環境已就緒。",
+            detail=t("course.machine_not_ready"),
         )
 
     template_key = assignment.template_key.strip().lower()

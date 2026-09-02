@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import rehypeSanitize from "rehype-sanitize";
 import { VncScreen } from "react-vnc";
+import { useTranslation } from "react-i18next";
 import LoadingState from "../../../components/LoadingState/LoadingState";
 import MIcon from "../../../components/MIcon";
 import { useToast } from "../../../hooks/useToast";
@@ -13,10 +14,11 @@ import styles from "./CourseRoomPage.module.scss";
 
 const POLL_INTERVAL_MS = 3000;
 
-const DIFFICULTY_LABEL = { easy: "簡單", medium: "中等", hard: "困難" };
+const DIFFICULTY_LABEL_KEYS = { easy: "CourseRoomPage.difficultyEasy", medium: "CourseRoomPage.difficultyMedium", hard: "CourseRoomPage.difficultyHard" };
 
 /* ── 剩餘時間倒數 ── */
 function Countdown({ expiresAt }) {
+  const { t } = useTranslation("teaching");
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
@@ -25,14 +27,15 @@ function Countdown({ expiresAt }) {
   }, []);
 
   const remainMs = new Date(expiresAt).getTime() - now;
-  if (remainMs <= 0) return <span>已到期</span>;
+  if (remainMs <= 0) return <span>{t("CourseRoomPage.expired")}</span>;
   const hours = Math.floor(remainMs / 3600000);
   const mins = Math.floor((remainMs % 3600000) / 60000);
-  return <span>剩餘 {hours > 0 ? `${hours} 小時 ` : ""}{mins} 分鐘</span>;
+  return <span>{t("CourseRoomPage.remainingLabel")} {hours > 0 ? t("CourseRoomPage.hoursUnit", { hours }) : ""}{t("CourseRoomPage.minsUnit", { mins })}</span>;
 }
 
 /* ── 內嵌 VNC 面板 ── */
 function VncPanel({ vmid }) {
+  const { t } = useTranslation("teaching");
   const vncRef = useRef(null);
   const [wsUrl, setWsUrl] = useState("");
   const [vncTicket, setVncTicket] = useState("");
@@ -50,7 +53,7 @@ function VncPanel({ vmid }) {
         if (cancelled) return;
         const ticket = data.ticket ?? "";
         if (!ticket) {
-          setError("無法建立遠端畫面連線，請稍後再試");
+          setError(t("CourseRoomPage.vncNoConnection"));
           return;
         }
         const apiUrl = new URL(
@@ -65,7 +68,7 @@ function VncPanel({ vmid }) {
         setWsUrl(url);
       })
       .catch((e) => {
-        if (!cancelled) setError(e.message ?? "無法取得控制台資訊");
+        if (!cancelled) setError(e.message ?? t("CourseRoomPage.vncInfoFailed"));
       });
 
     return () => {
@@ -85,7 +88,7 @@ function VncPanel({ vmid }) {
     return (
       <div className={styles.vncState}>
         <MIcon name="hourglass_empty" size={20} />
-        連線控制台中…
+        {t("CourseRoomPage.vncConnecting")}
       </div>
     );
   }
@@ -95,7 +98,7 @@ function VncPanel({ vmid }) {
         <span
           className={`${styles.statusDot} ${connected ? styles.dot_ok : styles.dot_wait}`}
         />
-        <span>{connected ? "已連接" : "連接中"}</span>
+        <span>{connected ? t("CourseRoomPage.vncConnected") : t("CourseRoomPage.vncConnectingShort")}</span>
         <button
           type="button"
           className={styles.vncBtn}
@@ -123,6 +126,7 @@ function VncPanel({ vmid }) {
 
 /* ── 單一題目列 ── */
 function QuestionRow({ question, onSubmit, submitting }) {
+  const { t } = useTranslation("teaching");
   const [answer, setAnswer] = useState("");
   const isFlag = question.question_type === "flag";
 
@@ -160,7 +164,7 @@ function QuestionRow({ question, onSubmit, submitting }) {
             className={styles.submitBtn}
             disabled={submitting || !answer.trim()}
           >
-            提交
+            {t("CourseRoomPage.submit")}
           </button>
         </form>
       ) : (
@@ -170,7 +174,7 @@ function QuestionRow({ question, onSubmit, submitting }) {
           disabled={submitting}
           onClick={() => onSubmit(question.id, null)}
         >
-          標記完成
+          {t("CourseRoomPage.markComplete")}
         </button>
       )}
     </div>
@@ -178,6 +182,7 @@ function QuestionRow({ question, onSubmit, submitting }) {
 }
 
 export default function CourseRoomPage() {
+  const { t } = useTranslation("teaching");
   const { roomId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -197,8 +202,8 @@ export default function CourseRoomPage() {
         setDeployment(data.my_deployment);
         setActiveTaskId((cur) => cur ?? data.tasks[0]?.id ?? null);
       })
-      .catch((e) => setError(e.message ?? "載入房間失敗"));
-  }, [roomId]);
+      .catch((e) => setError(e.message ?? t("CourseRoomPage.loadRoomFailed")));
+  }, [roomId, t]);
 
   useEffect(() => {
     loadRoom();
@@ -211,22 +216,22 @@ export default function CourseRoomPage() {
       CoursesService.getDeployment(deployment.id)
         .then((d) => {
           setDeployment(d);
-          if (d.status === "failed") toast.error(d.error ?? "實驗機部署失敗");
-          if (d.status === "running") toast.success("實驗機已就緒");
+          if (d.status === "failed") toast.error(d.error ?? t("CourseRoomPage.deployFailedToast"));
+          if (d.status === "running") toast.success(t("CourseRoomPage.readyToast"));
         })
         .catch(() => {});
     }, POLL_INTERVAL_MS);
     return () => clearInterval(id);
-  }, [deployment?.status, deployment?.id, toast]);
+  }, [deployment?.status, deployment?.id, toast, t]);
 
   async function handleDeploy() {
     setDeploying(true);
     try {
       const d = await CoursesService.deployRoom(roomId);
       setDeployment(d);
-      toast.info("部署已啟動，克隆實驗機中…");
+      toast.info(t("CourseRoomPage.deployStartedToast"));
     } catch (e) {
-      toast.error(e.message ?? "部署失敗");
+      toast.error(e.message ?? t("CourseRoomPage.deployFailed"));
     } finally {
       setDeploying(false);
     }
@@ -237,9 +242,9 @@ export default function CourseRoomPage() {
     try {
       const d = await CoursesService.terminateDeployment(deployment.id);
       setDeployment(d);
-      toast.info("實驗機已歸還，資源回收中");
+      toast.info(t("CourseRoomPage.terminatedToast"));
     } catch (e) {
-      toast.error(e.message ?? "歸還失敗");
+      toast.error(e.message ?? t("CourseRoomPage.terminateFailed"));
     }
   }
 
@@ -249,11 +254,11 @@ export default function CourseRoomPage() {
       try {
         const result = await CoursesService.submitAnswer(questionId, answer);
         if (!result.correct) {
-          toast.error("答案不正確，再試試！");
+          toast.error(t("CourseRoomPage.wrongAnswer"));
           return;
         }
         toast.success(
-          result.task_completed ? "任務完成！已解鎖下一任務 🎉" : "答對了！"
+          result.task_completed ? t("CourseRoomPage.taskCompleted") : t("CourseRoomPage.correctAnswer")
         );
         setRoom((cur) => {
           if (!cur) return cur;
@@ -277,12 +282,12 @@ export default function CourseRoomPage() {
           });
         }
       } catch (e) {
-        toast.error(e.message ?? "提交失敗");
+        toast.error(e.message ?? t("CourseRoomPage.submitFailed"));
       } finally {
         setSubmittingId(null);
       }
     },
-    [toast]
+    [toast, t]
   );
 
   const activeTask = useMemo(
@@ -314,7 +319,7 @@ export default function CourseRoomPage() {
         <div className={styles.topHeading}>
           <span className={styles.roomTitle}>{room.title}</span>
           <span className={styles.roomMeta}>
-            {DIFFICULTY_LABEL[room.difficulty] ?? room.difficulty}
+            {DIFFICULTY_LABEL_KEYS[room.difficulty] ? t(DIFFICULTY_LABEL_KEYS[room.difficulty]) : room.difficulty}
             {room.category ? ` · ${room.category}` : ""}
           </span>
         </div>
@@ -327,7 +332,7 @@ export default function CourseRoomPage() {
                   {deployment.status === "provisioning" && (
                     <>
                       <MIcon name="hourglass_top" size={16} />
-                      部署中…
+                      {t("CourseRoomPage.deployingStatus")}
                     </>
                   )}
                   {deployment.status === "running" && (
@@ -343,7 +348,7 @@ export default function CourseRoomPage() {
                   onClick={handleTerminate}
                 >
                   <MIcon name="power_settings_new" size={16} />
-                  歸還
+                  {t("CourseRoomPage.returnLab")}
                 </button>
               </>
             ) : (
@@ -354,7 +359,7 @@ export default function CourseRoomPage() {
                 disabled={deploying}
               >
                 <MIcon name="rocket_launch" size={16} />
-                {deploying ? "啟動中…" : "啟動實驗機"}
+                {deploying ? t("CourseRoomPage.startingBtn") : t("CourseRoomPage.startLabBtn")}
               </button>
             )}
           </div>
@@ -364,7 +369,7 @@ export default function CourseRoomPage() {
       {deployment?.status === "failed" && (
         <div className={styles.failedBanner}>
           <MIcon name="error_outline" size={16} />
-          部署失敗：{deployment.error ?? "未知錯誤"}，可重新啟動實驗機。
+          {t("CourseRoomPage.failedBanner", { error: deployment.error ?? t("CourseRoomPage.unknownError") })}
         </div>
       )}
 
@@ -394,7 +399,7 @@ export default function CourseRoomPage() {
             );
           })}
           {room.tasks.length === 0 && (
-            <div className={styles.stateText}>尚無任務</div>
+            <div className={styles.stateText}>{t("CourseRoomPage.noTasks")}</div>
           )}
         </aside>
 
@@ -420,7 +425,7 @@ export default function CourseRoomPage() {
               </div>
             </>
           ) : (
-            <div className={styles.stateText}>選擇左側任務開始</div>
+            <div className={styles.stateText}>{t("CourseRoomPage.selectTaskPrompt")}</div>
           )}
         </section>
 
@@ -433,8 +438,8 @@ export default function CourseRoomPage() {
               <div className={styles.vncState}>
                 <MIcon name="desktop_windows" size={28} />
                 {deployment?.status === "provisioning"
-                  ? "實驗機克隆中，就緒後自動連線…"
-                  : "啟動實驗機後，控制台會顯示在這裡"}
+                  ? t("CourseRoomPage.cloningAutoConnect")
+                  : t("CourseRoomPage.startLabToSeeConsole")}
               </div>
             )}
           </section>

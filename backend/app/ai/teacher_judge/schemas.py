@@ -13,6 +13,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field, field_validator
 
 from app.ai.teacher_judge.template_command_service import SUPPORTED_TEMPLATE_KEYS
+from app.core.i18n import t
 
 
 class TeacherJudgeRubricCheckStep(BaseModel):
@@ -152,7 +153,7 @@ class TeacherJudgeSessionCreateRequest(BaseModel):
     def validate_title(cls, value: str) -> str:
         title = value.strip()
         if not title:
-            raise ValueError("title must not be blank")
+            raise ValueError(t("schemas.title_blank"))
         return title
 
     @field_validator("rubric_name")
@@ -162,7 +163,7 @@ class TeacherJudgeSessionCreateRequest(BaseModel):
             return None
         name = value.strip()
         if not name:
-            raise ValueError("rubric_name must not be blank")
+            raise ValueError(t("schemas.rubric_name_blank"))
         return name
 
     @field_validator("environment_keys")
@@ -172,7 +173,7 @@ class TeacherJudgeSessionCreateRequest(BaseModel):
             return None
         normalized = list(dict.fromkeys(str(key).strip().lower() for key in value if str(key).strip()))
         if any(key not in SUPPORTED_TEMPLATE_KEYS for key in normalized):
-            raise ValueError("environment_keys contains an unsupported environment")
+            raise ValueError(t("schemas.environment_keys_unsupported"))
         return normalized
 
     def model_post_init(self, __context: Any) -> None:
@@ -180,16 +181,16 @@ class TeacherJudgeSessionCreateRequest(BaseModel):
         # callers may create a session with only title/selected_file_id.
         if self.creation_mode == "blank":
             if self.selected_file_id is not None:
-                raise ValueError("blank creation must not include selected_file_id")
+                raise ValueError(t("schemas.blank_creation_no_file"))
             if not self.rubric_name:
-                raise ValueError("blank creation requires rubric_name")
+                raise ValueError(t("schemas.blank_creation_requires_rubric_name"))
             if not self.environment_keys:
-                raise ValueError("blank creation requires environment_keys")
+                raise ValueError(t("schemas.blank_creation_requires_environment_keys"))
         elif self.creation_mode == "existing":
             if self.selected_file_id is None:
-                raise ValueError("existing creation requires selected_file_id")
+                raise ValueError(t("schemas.existing_creation_requires_file"))
             if self.rubric_name is not None or self.environment_keys is not None:
-                raise ValueError("existing creation must not include blank rubric fields")
+                raise ValueError(t("schemas.existing_creation_no_blank_fields"))
 
 
 class TeacherJudgeSessionUpdateRequest(BaseModel):
@@ -206,7 +207,7 @@ class TeacherJudgeSessionUpdateRequest(BaseModel):
             return None
         title = value.strip()
         if not title:
-            raise ValueError("title must not be blank")
+            raise ValueError(t("schemas.title_blank"))
         return title
 
 
@@ -271,7 +272,7 @@ class TeacherJudgeScriptCreateRequest(BaseModel):
     def validate_name(cls, value: str) -> str:
         name = value.strip()
         if not name:
-            raise ValueError("name must not be blank")
+            raise ValueError(t("schemas.name_blank"))
         return name
 
     @field_validator("template_key")
@@ -337,7 +338,7 @@ class TeacherJudgeFileCreateRequest(BaseModel):
     def normalize_create_display_name(cls, value: str) -> str:
         name = value.strip()
         if not name:
-            raise ValueError("display_name must not be blank")
+            raise ValueError(t("schemas.display_name_blank"))
         return name
 
     @field_validator("environment_keys")
@@ -345,7 +346,7 @@ class TeacherJudgeFileCreateRequest(BaseModel):
     def normalize_create_environment_keys(cls, value: list[str]) -> list[str]:
         normalized = list(dict.fromkeys(str(key).strip().lower() for key in value if str(key).strip()))
         if not normalized or any(key not in SUPPORTED_TEMPLATE_KEYS for key in normalized):
-            raise ValueError("environment_keys must contain supported environments")
+            raise ValueError(t("schemas.environment_keys_must_contain_supported"))
         return normalized
 
 
@@ -373,7 +374,7 @@ class TeacherJudgeFileMetadataUpdateRequest(BaseModel):
             return None
         name = value.strip()
         if not name:
-            raise ValueError("display_name must not be blank")
+            raise ValueError(t("schemas.display_name_blank"))
         return name
 
     @field_validator("environment_keys")
@@ -383,7 +384,7 @@ class TeacherJudgeFileMetadataUpdateRequest(BaseModel):
             return None
         normalized = list(dict.fromkeys(str(key).strip().lower() for key in value if str(key).strip()))
         if not normalized or any(key not in SUPPORTED_TEMPLATE_KEYS for key in normalized):
-            raise ValueError("environment_keys must contain supported environments")
+            raise ValueError(t("schemas.environment_keys_must_contain_supported"))
         return normalized
 
     @field_validator("template_key")
@@ -393,7 +394,7 @@ class TeacherJudgeFileMetadataUpdateRequest(BaseModel):
             return None
         key = value.strip().lower()
         if key not in SUPPORTED_TEMPLATE_KEYS:
-            raise ValueError("template_key contains an unsupported environment")
+            raise ValueError(t("schemas.template_key_unsupported"))
         return key
 
 
@@ -407,7 +408,7 @@ class TeacherJudgeSessionForkRequest(BaseModel):
             return None
         title = value.strip()
         if not title:
-            raise ValueError("title must not be blank")
+            raise ValueError(t("schemas.title_blank"))
         return title
 
 
@@ -422,7 +423,7 @@ class TeacherJudgeScriptRunCreateRequest(BaseModel):
     def validate_target_vmids(cls, value: list[int]) -> list[int]:
         unique_vmids = list(dict.fromkeys(value))
         if not unique_vmids:
-            raise ValueError("target_vmids must not be empty")
+            raise ValueError(t("schemas.target_vmids_empty"))
         return unique_vmids
 
 

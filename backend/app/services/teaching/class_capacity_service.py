@@ -7,6 +7,7 @@ from collections import defaultdict
 
 from sqlmodel import Session, select
 
+from app.core.i18n import t
 from app.domain.placement import advisor as placement_advisor
 from app.exceptions import BadRequestError
 from app.models import (
@@ -97,7 +98,7 @@ def reserve(
     ).first()
     if existing:
         if existing.course_version_id != course_version_id:
-            raise BadRequestError("班級已使用其他課程版本完成容量預留")
+            raise BadRequestError(t("class_capacity.version_mismatch"))
         if existing.status != "released":
             return existing
         session.delete(existing)
@@ -105,7 +106,7 @@ def reserve(
 
     totals = calculate(nodes=nodes, students=students)
     if not nodes or not students:
-        raise BadRequestError("學生名單與課程環境必須完成")
+        raise BadRequestError(t("class_capacity.missing_students_or_nodes"))
     placement_plan = _check_cluster_capacity(
         session,
         nodes=nodes,
@@ -177,7 +178,7 @@ def _evaluate_cluster_capacity(
         if node.source_type == "template":
             template = session.get(VMTemplate, node.source_template_id)
             if template is None:
-                return {}, [f"課程機器「{node.name}」的來源範本不存在"]
+                return {}, [t("class_capacity.template_not_found", name=node.name)]
             target_node = template.node
         else:
             try:
@@ -194,7 +195,7 @@ def _evaluate_cluster_capacity(
                     node.id,
                 )
                 return {}, [
-                    f"無法確認自訂機器「{node.name}」的建機節點，請稍後再試"
+                    t("class_capacity.node_resolution_failed", name=node.name)
                 ]
         target = demand[target_node]
         target["cpu_cores"] += node.cpu * student_count
@@ -216,7 +217,7 @@ def _evaluate_cluster_capacity(
         }
     except Exception:
         logger.exception("Failed to fetch Proxmox capacity for class reservation")
-        return {}, ["Unable to verify class capacity. Review capacity or retry later."]
+        return {}, [t("class_capacity.capacity_check_failed")]
 
     # Pending reviewed classes are not necessarily visible as PVE guests yet.
     for reservation in session.exec(
@@ -250,24 +251,34 @@ def _evaluate_cluster_capacity(
     for node_name, values in demand.items():
         capacity = capacities.get(node_name)
         if capacity is None or capacity.status != "online":
-            issues.append(f"PVE 節點 {node_name} 不存在或不在線")
+            issues.append(t("class_capacity.node_offline", node=node_name))
             continue
         if capacity.allocatable_cpu_cores < values["cpu_cores"]:
             issues.append(
-                f"{node_name} CPU 不足：需要 {values['cpu_cores']}，"
-                f"可用 {capacity.allocatable_cpu_cores:.1f}"
+                t(
+                    "class_capacity.cpu_insufficient",
+                    node=node_name,
+                    required=values["cpu_cores"],
+                    available=f"{capacity.allocatable_cpu_cores:.1f}",
+                )
             )
         if capacity.allocatable_memory_bytes < values["memory_bytes"]:
             issues.append(
-                f"{node_name} RAM 不足：需要 "
-                f"{values['memory_bytes'] // GIB} GB，可用 "
-                f"{capacity.allocatable_memory_bytes // GIB} GB"
+                t(
+                    "class_capacity.ram_insufficient",
+                    node=node_name,
+                    required=values["memory_bytes"] // GIB,
+                    available=capacity.allocatable_memory_bytes // GIB,
+                )
             )
         if capacity.allocatable_disk_bytes < values["disk_bytes"]:
             issues.append(
-                f"{node_name} Disk 不足：需要 "
-                f"{values['disk_bytes'] // GIB} GB，可用 "
-                f"{capacity.allocatable_disk_bytes // GIB} GB"
+                t(
+                    "class_capacity.disk_insufficient",
+                    node=node_name,
+                    required=values["disk_bytes"] // GIB,
+                    available=capacity.allocatable_disk_bytes // GIB,
+                )
             )
     return dict(demand), issues
 

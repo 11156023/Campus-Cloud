@@ -48,6 +48,7 @@ from app.ai.teacher_judge.session_service import (
 from app.ai.teacher_judge.template_command_service import get_enabled_template_commands
 from app.api.deps import InstructorUser, SessionDep
 from app.core.authorizers import require_teaching_access
+from app.core.i18n import t
 from app.infrastructure.worker import submit
 from app.models import TeachingClass, TeachingClassWeek
 from app.models.teacher_judge_script_artifact import TeacherJudgeScriptArtifact
@@ -81,7 +82,7 @@ def _selected_file_conflict() -> HTTPException:
         status_code=409,
         detail={
             "code": "teacher_judge_file_in_use",
-            "message": "這份評分表已被其他檢查使用；請使用「重構」建立獨立副本，或上傳新的評分表。",
+            "message": t("teacherJudgeSessions.selectedFileInUse"),
         },
     )
 
@@ -89,7 +90,9 @@ def _selected_file_conflict() -> HTTPException:
 def _access(db: SessionDep, class_id: uuid.UUID, user: InstructorUser) -> None:
     teaching_class = db.get(TeachingClass, class_id)
     if not teaching_class:
-        raise HTTPException(status_code=404, detail="找不到班級。")
+        raise HTTPException(
+            status_code=404, detail=t("teacherJudgeSessions.classNotFound")
+        )
     require_teaching_access(user, teaching_class.owner_id)
 
 
@@ -100,7 +103,9 @@ def _validate_week(
         return
     week = db.get(TeachingClassWeek, week_id)
     if week is None or week.class_id != class_id:
-        raise HTTPException(status_code=400, detail="選擇的週次不屬於這個班級。")
+        raise HTTPException(
+            status_code=400, detail=t("teacherJudgeSessions.weekNotInClass")
+        )
 
 
 @router.get("/", response_model=list[TeacherJudgeSessionPublic])
@@ -218,7 +223,9 @@ def update_session(
     item = get_session(session, teaching_class_id, session_id)
     changes = payload.model_fields_set
     if item.status == TeacherJudgeSessionStatus.archived and changes - {"status"}:
-        raise HTTPException(status_code=409, detail="已封存的檢查為唯讀。")
+        raise HTTPException(
+            status_code=409, detail=t("teacherJudgeSessions.archivedReadOnly")
+        )
     if "title" in changes and payload.title is not None:
         item.title = payload.title.strip()
     if "teaching_class_week_id" in changes:
@@ -241,7 +248,9 @@ def update_session(
             item.pinned_at = None
     if payload.is_pinned is not None:
         if item.status == TeacherJudgeSessionStatus.archived and payload.is_pinned:
-            raise HTTPException(status_code=409, detail="已封存的檢查不能釘選。")
+            raise HTTPException(
+                status_code=409, detail=t("teacherJudgeSessions.archivedCannotPin")
+            )
         item.pinned_at = get_datetime_utc() if payload.is_pinned else None
 
     item.updated_at = get_datetime_utc()
@@ -305,7 +314,9 @@ def list_messages(
     if before:
         cursor = session.get(TeacherJudgeSessionMessage, before)
         if not cursor or cursor.session_id != session_id:
-            raise HTTPException(status_code=400, detail="訊息游標無效。")
+            raise HTTPException(
+                status_code=400, detail=t("teacherJudgeSessions.invalidMessageCursor")
+            )
         query = query.where(
             (TeacherJudgeSessionMessage.created_at < cursor.created_at)
             | (
@@ -363,7 +374,7 @@ async def create_message(
             status_code=409,
             detail={
                 "code": "teacher_judge_analysis_revision_conflict",
-                "message": "評分表已被其他變更更新，請重新載入後再請 AI 提案。",
+                "message": t("teacherJudgeSessions.analysisRevisionConflict"),
                 "analysis_revision": file.analysis_revision,
             },
         )
@@ -525,7 +536,9 @@ def get_session_run(
         )
     ).first()
     if not run:
-        raise HTTPException(status_code=404, detail="找不到這項檢查的執行結果。")
+        raise HTTPException(
+            status_code=404, detail=t("teacherJudgeSessions.runResultNotFound")
+        )
     return _run_to_public(run)
 
 
@@ -550,7 +563,9 @@ def create_session_run(
         or artifact.teaching_class_id != teaching_class_id
         or artifact.session_id != session_id
     ):
-        raise HTTPException(status_code=404, detail="找不到這項檢查的腳本。")
+        raise HTTPException(
+            status_code=404, detail=t("teacherJudgeSessions.scriptNotFound")
+        )
     run = create_script_run(
         session=session,
         teaching_class_id=teaching_class_id,

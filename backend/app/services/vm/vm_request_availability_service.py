@@ -10,6 +10,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from sqlmodel import Session, select
 
 from app.core.authorizers import require_vm_request_access
+from app.core.i18n import t
 from app.domain.placement import advisor as placement_advisor
 from app.domain.placement.schemas import NodeCapacity, PlacementRequest, ResourceType
 from app.domain.placement.storage import (
@@ -89,7 +90,7 @@ def assess_existing_request(
         request_id=request_id,
     )
     if not db_request:
-        raise NotFoundError("Request not found")
+        raise NotFoundError(t("availability.request_not_found"))
 
     require_vm_request_access(current_user, db_request.user_id)
 
@@ -127,9 +128,9 @@ def validate_request_window(
     start_at = _normalize_datetime(getattr(request_in, "start_at", None))
     end_at = _normalize_datetime(getattr(request_in, "end_at", None))
     if not start_at or not end_at:
-        raise BadRequestError("A scheduled request window is required.")
+        raise BadRequestError(t("availability.window_required"))
     if end_at <= start_at:
-        raise BadRequestError("end_at must be later than start_at")
+        raise BadRequestError(t("availability.end_before_start"))
 
     ostemplate, template_vmid = _template_constraints(
         resource_type=cast(str, request_in.resource_type),
@@ -163,7 +164,7 @@ def validate_request_window(
     if not selection.node or not selection.plan.feasible:
         raise BadRequestError(
             selection.plan.summary
-            or "No node is available for the requested time window."
+            or t("availability.no_node_for_window")
         )
 
 
@@ -176,9 +177,9 @@ def assess_request_window(
     start_at = _normalize_datetime(request_in.start_at)
     end_at = _normalize_datetime(request_in.end_at)
     if not start_at or not end_at:
-        raise BadRequestError("A request window is required.")
+        raise BadRequestError(t("availability.window_required_short"))
     if end_at <= start_at:
-        raise BadRequestError("end_at must be later than start_at")
+        raise BadRequestError(t("availability.end_before_start"))
 
     duration_seconds = max((end_at - start_at).total_seconds(), 0)
     duration_hours = int(duration_seconds // 3600)
@@ -880,7 +881,7 @@ def _resolve_timezone(value: str) -> ZoneInfo:
     try:
         return ZoneInfo(value or "Asia/Taipei")
     except ZoneInfoNotFoundError as exc:
-        raise BadRequestError("Invalid timezone") from exc
+        raise BadRequestError(t("availability.invalid_timezone")) from exc
 
 
 def _template_constraints(
