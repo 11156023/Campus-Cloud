@@ -93,7 +93,7 @@
   border: 1px solid color-mix(in srgb, var(--color-primary) 30%, var(--color-border));
   border-radius: $radius-16;
   background: var(--color-surface);
-  box-shadow: var(--shadow-xl);
+  box-shadow: var(--shadow-lg);
   pointer-events: auto;
   animation: guideIn 180ms ease both;
 
