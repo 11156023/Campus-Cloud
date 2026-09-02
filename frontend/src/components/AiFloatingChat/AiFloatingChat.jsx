@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import rehypeSanitize from "rehype-sanitize";
 import { useAuth } from "../../contexts/AuthContext";
+import { LayoutContext } from "../../layout/layoutContext";
 import { AiNavigationService } from "../../services/aiNavigation";
 import { AiTemplateRecommendationApi } from "../../services/aiTemplateRecommendation";
 import MIcon from "../MIcon";
@@ -251,6 +252,9 @@ export default function AiFloatingChat({ open = false, onOpenChange = () => {} }
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
+  /* 申請表單開著時會把自己註冊進來：規劃就地填進欄位，而且拿得到
+     這張表單當下的真實候選，推薦的 GPU 與時段才不會是憑空的。 */
+  const { requestForm } = useContext(LayoutContext);
   const [messages, setMessages] = useState([]);
   const [history, setHistory] = useState([]);
   const [input, setInput] = useState("");
@@ -341,7 +345,7 @@ export default function AiFloatingChat({ open = false, onOpenChange = () => {} }
         messages: nextHistory,
         top_k: 5,
         device_nodes: [],
-        form_context: null,
+        form_context: requestForm?.getContext() ?? null,
       });
     } catch {
       // 規劃是三個能力裡最重的一個，失敗就讓一般問答接手，不要整段對話中斷。
@@ -351,10 +355,9 @@ export default function AiFloatingChat({ open = false, onOpenChange = () => {} }
     const prefill = plan?.form_prefill;
     if (!prefill?.resource_type) return false;
 
-    const content = stripThinkTags(plan.summary) || "依你的需求，我建議這樣的配置：";
+    const summary = stripThinkTags(plan.summary);
 
-    /* 配置只是流程的一步，產生完要把剩下的步驟接回來，不能停在配置卡片。
-       規劃那一步標記為完成，下一步（填申請單）變成目前進度。 */
+    /* 配置只是流程的一步，產生完要把剩下的步驟接回來，不能停在這裡。 */
     const flow = flowRef.current;
     const recommendIndex = flow
       ? flow.steps.findIndex((step) => step.action === "recommend")
@@ -363,7 +366,21 @@ export default function AiFloatingChat({ open = false, onOpenChange = () => {} }
       ? { steps: flow.steps, stepsFloor: recommendIndex + 1 }
       : {};
 
-    const assistantMessage = { role: "assistant", content, plan: { prefill }, ...followUp };
+    /* 申請表單開著就直接填進去——填好的表單本身就是結果，
+       不需要再給一張長得像表單的卡片。表單沒開才給卡片＋一鍵帶過去。 */
+    const filled = Boolean(requestForm);
+    if (filled) requestForm.applyPrefill(prefill);
+    const filledNote = "我已經把這些填進申請單了，帳號與密碼請你自己輸入，確認後就能送出。";
+    const content = filled
+      ? (summary ? `${summary}\n\n${filledNote}` : filledNote)
+      : (summary || "依你的需求，我建議這樣的配置：");
+
+    const assistantMessage = {
+      role: "assistant",
+      content,
+      ...(filled ? {} : { plan: { prefill } }),
+      ...followUp,
+    };
     setMessages((previous) => [...previous, assistantMessage]);
     setHistory((previous) => [...previous, {
       role: "assistant",
@@ -398,7 +415,7 @@ export default function AiFloatingChat({ open = false, onOpenChange = () => {} }
         messages: nextHistory,
         top_k: 5,
         device_nodes: [],
-        form_context: null,
+        form_context: requestForm?.getContext() ?? null,
         focus_hint: state.question.text,
       });
       question = stripThinkTags(reply.reply) || question;

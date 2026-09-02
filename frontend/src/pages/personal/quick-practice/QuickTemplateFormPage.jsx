@@ -3,7 +3,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import MIcon from "../../../components/MIcon";
 import LoadingState from "../../../components/LoadingState/LoadingState";
 import { useToast } from "../../../hooks/useToast";
-import { LayoutContext } from "../../../layout/DashboardLayout";
+import { LayoutContext } from "../../../layout/layoutContext";
 import { QuickPracticeService } from "../../../services/quickPractice";
 import PageHeader from "../../../components/PageHeader/PageHeader";
 import styles from "./QuickTemplateFormPage.module.scss";

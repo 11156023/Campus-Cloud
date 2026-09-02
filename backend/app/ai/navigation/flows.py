@@ -58,15 +58,21 @@ _FLOWS: tuple[NavigationFlow, ...] = (
         ),
         steps=(
             NavigationStep(
-                title="讓 AI 依用途規劃配置",
+                title="打開申請單",
                 path="/my-requests",
-                detail="我會先問幾個問題（用途、要不要 GPU、要不要圖形桌面、用多久），再挑規格並把申請單填好；不需要的話可以跳過這步。",
+                detail="申請表單就是這次要填的東西，先打開它，後面的每一步都在這張表單上完成。",
+                state={"create": True},
+            ),
+            NavigationStep(
+                title="讓 AI 問清楚並幫你填",
+                path="/my-requests",
+                detail="我會問用途、要不要 GPU、要不要圖形桌面、用多久，然後直接把欄位填進表單；想自己填就跳過這步。",
                 action="recommend",
             ),
             NavigationStep(
-                title="確認並填寫申請單",
+                title="確認內容並送出",
                 path="/my-requests",
-                detail="選作業系統或老師提供的範本，調整規格；需要 GPU 就選標示 GPU 的項目並挑時段。",
+                detail="檢查規格與時段，帳號密碼一律由你自己輸入，確認後送出。",
                 state={"create": True},
             ),
             NavigationStep(
