@@ -1,8 +1,8 @@
 import { apiDelete, apiGet, apiGetBlob, apiPost, apiPut } from "./api";
 
 /**
- * 課程實驗室（Course Lab）：
- * - CoursesService：學生端 — 路徑瀏覽、房間內容、秒開部署、Flag 提交
+ * 課程服務：
+ * - CoursesService：學生端 — 正式課程總覽、每週任務、PDF 與 AI Check
  * - CourseAdminService：老師/管理員端 — 路徑/房間/任務/題目 CRUD、發布、進度監控
  * 欄位見後端 app/schemas/course.py。
  */
@@ -74,25 +74,6 @@ export const CoursesService = {
     return apiGet(`/api/v1/courses/rooms/${roomId}`);
   },
 
-  /** 秒開部署（202；之後以 getDeployment 輪詢） */
-  deployRoom(roomId) {
-    return apiPost(`/api/v1/courses/rooms/${roomId}/deploy`, {});
-  },
-
-  /** 部署狀態輪詢（provisioning / running / failed / expired） */
-  getDeployment(deploymentId) {
-    return apiGet(`/api/v1/courses/deployments/${deploymentId}`);
-  },
-
-  /** 提前歸還銷毀 */
-  terminateDeployment(deploymentId) {
-    return apiDelete(`/api/v1/courses/deployments/${deploymentId}`);
-  },
-
-  /** 提交答案（no_answer 題型 answer 可為 null） */
-  submitAnswer(questionId, answer) {
-    return apiPost(`/api/v1/courses/questions/${questionId}/submit`, { answer });
-  },
 };
 
 export const CourseAdminService = {

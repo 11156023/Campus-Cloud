@@ -176,24 +176,6 @@
   }
 }
 
-.primaryActions {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: $spacing-8;
-}
-
-.primaryButton {
-  @include student-action-button;
-  min-height: 42px;
-  padding: 9px 16px;
-  border-radius: $radius-8;
-  background: var(--color-primary);
-  color: var(--color-text-on-primary);
-
-  &:hover:not(:disabled) { background: var(--color-primary-dark); }
-}
-
 /* ── 課堂機器 ── */
 
 .machinePicker {

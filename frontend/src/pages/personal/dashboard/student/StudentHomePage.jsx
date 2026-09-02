@@ -75,10 +75,10 @@ export default function StudentHomePage() {
     return () => controller.abort();
   }, []);
 
-  /** 進入單一課程總覽；沒有課程時退回課程列表。 */
+  /** 進入單一正式課程總覽；沒有課程時留在首頁。 */
   function openCourseOverview(path = view.activePath) {
     if (!path) {
-      navigate("/courses");
+      navigate("/dashboard");
       return;
     }
     navigate(`/dashboard/course/${path.id}`, { state: { from: "/dashboard" } });

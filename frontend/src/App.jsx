@@ -11,7 +11,7 @@ import styles from "./App.module.scss";
 // 個人
 const AdminDashboardPage = lazy(() => import("./pages/personal/dashboard/admin/AdminDashboardPage"));
 const TeacherDashboardPage = lazy(() => import("./pages/personal/dashboard/teacher/TeacherDashboardPage"));
-const StudentHomePage = lazy(() => import("./pages/personal/dashboard/StudentHomePage"));
+const StudentHomePage = lazy(() => import("./pages/personal/dashboard/student/StudentHomePage"));
 const StudentCoursePage = lazy(() => import("./pages/personal/dashboard/student/StudentCoursePage"));
 const QuickTemplateFormPage = lazy(() => import("./pages/personal/quick-practice/QuickTemplateFormPage"));
 const ResourcesPage = lazy(() => import("./pages/personal/resources/ResourcesPage"));
@@ -34,8 +34,6 @@ const AiMonitoringPage = lazy(() => import("./pages/ai/ai-monitoring/AiMonitorin
 const AiPvePage = lazy(() => import("./pages/system/ai-pve/AiPvePage"));
 
 // 教學
-const CoursePathsPage = lazy(() => import("./pages/courses/paths/CoursePathsPage"));
-const CourseRoomPage = lazy(() => import("./pages/courses/room/CourseRoomPage"));
 const CourseCmsPage = lazy(() => import("./pages/teaching/course-cms/CourseCmsPage"));
 const CourseTemplateManagementPage = lazy(() => import("./pages/course-operations/course-templates/CourseTemplateManagementPage"));
 const CourseTemplateEditorPage = lazy(() => import("./pages/course-operations/course-templates/CourseTemplateEditorPage"));
@@ -188,8 +186,6 @@ function App() {
           />
 
           {/* 教學 */}
-          <Route path="/courses"               element={<CoursePathsPage />} />
-          <Route path="/courses/rooms/:roomId" element={<CourseRoomPage />} />
           <Route path="/course-cms"            element={<CourseCmsPage />} />
 
           {/* 課務管理 */}

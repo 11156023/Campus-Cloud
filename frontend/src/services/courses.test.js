@@ -58,23 +58,6 @@ describe("CoursesService", () => {
     expect(init.method).toBe("GET");
   });
 
-  test("deployRoom 以 POST 打 /rooms/{id}/deploy", async () => {
-    fetchMock.mockResolvedValueOnce(jsonRes(202, { id: "d1" }));
-    await CoursesService.deployRoom("room-1");
-    const [url, init] = fetchMock.mock.calls[0];
-    expect(url).toContain("/api/v1/courses/rooms/room-1/deploy");
-    expect(init.method).toBe("POST");
-  });
-
-  test("submitAnswer 以 POST 送 answer body", async () => {
-    fetchMock.mockResolvedValueOnce(jsonRes(200, { correct: true }));
-    await CoursesService.submitAnswer("q-1", "FLAG{x}");
-    const [url, init] = fetchMock.mock.calls[0];
-    expect(url).toContain("/api/v1/courses/questions/q-1/submit");
-    expect(init.method).toBe("POST");
-    expect(JSON.parse(init.body)).toEqual({ answer: "FLAG{x}" });
-  });
-
   test("學生 AI Check 使用課程與任務範圍的專用端點", async () => {
     fetchMock
       .mockResolvedValueOnce(jsonRes(200, { run_id: "run-1", status: "pending" }))
@@ -143,13 +126,6 @@ describe("CoursesService", () => {
     expect(init.method).toBe("GET");
   });
 
-  test("terminateDeployment 以 DELETE 打 /deployments/{id}", async () => {
-    fetchMock.mockResolvedValueOnce(jsonRes(200, { status: "expired" }));
-    await CoursesService.terminateDeployment("d-1");
-    const [url, init] = fetchMock.mock.calls[0];
-    expect(url).toContain("/api/v1/courses/deployments/d-1");
-    expect(init.method).toBe("DELETE");
-  });
 });
 
 describe("CourseAdminService", () => {

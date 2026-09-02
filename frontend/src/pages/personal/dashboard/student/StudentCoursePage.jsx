@@ -371,22 +371,11 @@ export default function StudentCoursePage() {
             <EmptyState
               icon="event_available"
               title="目前沒有待完成的課程"
-              description="可以先查看所有課程，或等待老師發布今天的內容。"
+              description="老師發布今天的內容後，就會顯示在這裡。"
             />
           )}
 
-          {practiceMachines.length === 0 ? (
-            <div className={styles.primaryActions}>
-              <button
-                type="button"
-                className={styles.primaryButton}
-                onClick={() => navigate(nextRoom ? `/courses/rooms/${nextRoom.id}` : "/courses")}
-              >
-                {nextRoom ? "開始練習" : "查看可用課程"}
-                <MIcon name="arrow_forward" size={18} />
-              </button>
-            </div>
-          ) : (
+          {practiceMachines.length > 0 && (
             <section className={styles.machinePicker} aria-label="課堂機器" data-guide="home-start">
               <header>
                 <div>
