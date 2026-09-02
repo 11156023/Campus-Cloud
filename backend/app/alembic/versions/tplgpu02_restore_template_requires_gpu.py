@@ -9,7 +9,7 @@ column (added by hand while their alembic head lived on another branch),
 so we only add it when it is really missing.
 
 Revision ID: tplgpu02_restore_requires_gpu
-Revises: dbc02_drop_dead
+Revises: wgpeer01
 Create Date: 2026-09-02
 """
 
@@ -19,7 +19,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision = "tplgpu02_restore_requires_gpu"
-down_revision = "dbc02_drop_dead"
+down_revision = "wgpeer01"
 branch_labels = None
 depends_on = None
 
