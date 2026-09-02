@@ -2,6 +2,7 @@ import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import rehypeSanitize from "rehype-sanitize";
+import remarkGfm from "remark-gfm";
 import { useAuth } from "../../contexts/AuthContext";
 import { LayoutContext } from "../../layout/layoutContext";
 import { AiNavigationService } from "../../services/aiNavigation";
@@ -206,7 +207,7 @@ function Message({ message, currentPath, onNavigate, onRecommend, onAnswer, onPl
           <div className={styles.messageText}>{message.content}</div>
         ) : (
           <div className={`${styles.messageText} ${styles.markdown}`}>
-            <ReactMarkdown rehypePlugins={[rehypeSanitize]}>{message.content}</ReactMarkdown>
+            <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>{message.content}</ReactMarkdown>
           </div>
         )}
         {/* 先給結果（配置），再給接下來要做的事（流程），最後才是選項 */}

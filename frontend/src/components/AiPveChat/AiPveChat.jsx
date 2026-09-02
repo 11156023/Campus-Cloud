@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import rehypeSanitize from "rehype-sanitize";
+import remarkGfm from "remark-gfm";
 import MIcon from "../MIcon";
 import { useToast } from "../../hooks/useToast";
 import { AiPveLogService } from "../../services/aiPveLog";
@@ -177,7 +178,7 @@ export default function AiPveChat({ initialPrompt = "", compact = false }) {
             {/* 維運回覆常是節點清單、用量表格與指令片段，直接印純文字會看到
                 一堆星號與管線符號 */}
             <div className={styles.msgContent}>
-              <ReactMarkdown rehypePlugins={[rehypeSanitize]}>
+              <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>
                 {sanitizeAiPveContent(message.content)}
               </ReactMarkdown>
             </div>

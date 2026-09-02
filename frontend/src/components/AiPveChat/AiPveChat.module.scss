@@ -50,13 +50,17 @@
 }
 
 .msg_user {
-  margin-left: $spacing-32;
+  /* 問題通常只有一句，讓它靠右且不要拉滿整列 */
+  max-width: min(72ch, 100%);
+  margin-left: auto;
   border: 1px solid color-mix(in srgb, var(--color-primary) 20%, transparent);
   background: color-mix(in srgb, var(--color-primary) 8%, transparent);
 }
 
 .msg_assistant {
   margin-right: $spacing-32;
+  /* 回覆可能含長表格，寬度給滿但內容各自處理溢出 */
+  min-width: 0;
   border: 1px solid var(--color-border);
   background: var(--color-surface);
   box-shadow: var(--shadow-sm);
@@ -117,28 +121,43 @@
     code { padding: 0; background: none; }
   }
 
-  /* 節點／VM 用量表格：欄多的時候在自己的框裡捲 */
+  /* 節點／VM 清單：欄多就橫向捲，列多就縱向捲，表頭釘住 */
   table {
     display: block;
     width: max-content;
     max-width: 100%;
-    margin: 0 0 $spacing-8;
-    overflow-x: auto;
-    border-collapse: collapse;
+    max-height: 420px;
+    margin: 0 0 $spacing-16;
+    overflow: auto;
+    border: 1px solid var(--color-border);
+    border-radius: $radius-8;
+    border-collapse: separate;
+    border-spacing: 0;
     font-size: $font-size-12;
     font-variant-numeric: tabular-nums;
 
     th, td {
-      padding: 6px 10px;
-      border: 1px solid var(--color-border);
+      padding: 7px 12px;
+      border-bottom: 1px solid var(--color-divider);
       text-align: left;
       white-space: nowrap;
     }
 
     th {
-      background: var(--color-hover);
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      border-bottom: 1px solid var(--color-border);
+      background: var(--color-surface);
+      color: var(--color-text-secondary);
       font-weight: $font-weight-700;
     }
+
+    tbody tr:nth-child(even) {
+      background: color-mix(in srgb, var(--color-hover) 55%, transparent);
+    }
+
+    tbody tr:last-child td { border-bottom: 0; }
   }
 
   blockquote {
@@ -170,12 +189,12 @@
 }
 
 .toolBadge {
-  padding: 2px 8px;
+  padding: 3px 10px;
   border-radius: $radius-pill;
   color: var(--color-text-secondary);
   background: var(--color-hover);
-  font-size: $font-size-10;
-  text-transform: uppercase;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: $font-size-12;
 }
 
 .pendingBox {
