@@ -8,7 +8,6 @@ import { VmRequestAvailabilityService } from "../../../services/vmRequestAvailab
 import { GpuService } from "../../../services/gpu";
 import { TemplatesService } from "../../../services/templates";
 import { apiGet } from "../../../services/api";
-import AiSidePanel from "./AiSidePanel";
 import AvailabilityPanel from "../../../components/AvailabilityPanel/AvailabilityPanel";
 import MIcon from "../../../components/MIcon";
 import PageHeader from "../../../components/PageHeader/PageHeader";
@@ -136,44 +135,6 @@ const gpuLabel = (gpu) => {
   return `${gpu.description || gpu.mapping_id}${vram} [${gpu.available_count}/${capacity} 可用]${gpu.available_count <= 0 ? " — 已滿" : ""}`;
 };
 
-function buildAiScheduleOptions(availability) {
-  const days = (availability?.days || [])
-    .filter((day) => (day.slots || []).some(
-      (slot) => slot.status === "available" || slot.status === "limited",
-    ))
-    .sort((a, b) => String(a.date).localeCompare(String(b.date)));
-  const runs = [];
-  for (const day of days) {
-    const previousRun = runs[runs.length - 1];
-    const previousDay = previousRun?.[previousRun.length - 1];
-    const expectedDate = previousDay
-      ? new Date(`${previousDay.date}T00:00:00`)
-      : null;
-    expectedDate?.setDate(expectedDate.getDate() + 1);
-    if (previousDay && toDateInputValue(expectedDate) === day.date) {
-      previousRun.push(day);
-    } else {
-      runs.push([day]);
-    }
-  }
-
-  const options = [];
-  for (const run of runs) {
-    for (const dayCount of [1, 3, 7, 14, 30]) {
-      if (run.length < dayCount) continue;
-      const selected = run.slice(0, dayCount);
-      const selectedSlots = selected.flatMap((day) => day.slots || []);
-      options.push({
-        start_at: fromDateInputValue(selected[0].date),
-        end_at: fromDateInputValue(selected[selected.length - 1].date, true),
-        status: selectedSlots.some((slot) => slot.status === "limited") ? "limited" : "available",
-        summary: `${dayCount} 天可用時段`,
-        recommended_nodes: selectedSlots.find((slot) => slot.recommended_nodes?.length)?.recommended_nodes || [],
-      });
-    }
-  }
-  return options.slice(0, 12);
-}
 
 /* 依畫面順序排列，送出時定位到第一個有問題的欄位 */
 const FIELD_ORDER = [
@@ -214,8 +175,6 @@ export default function RequestFormPage({ onBack, className, initialPrefill = nu
   useEffect(() => { setCompactFooter(true); return () => setCompactFooter(false); }, [setCompactFooter]);
 
   const [closing, setClosing]   = useState(false);
-  const [aiOpen, setAiOpen]     = useState(false);
-  const [rightTab, setRightTab] = useState("ai");
 
   /* 範本系統 2.0：LXC 可選範本，選了走克隆路徑（免映像檔） */
   const [sysTemplates, setSysTemplates]   = useState([]);
@@ -533,35 +492,6 @@ export default function RequestFormPage({ onBack, className, initialPrefill = nu
     if (errors[key]) setErrors((prev) => ({ ...prev, [key]: "" }));
   }
 
-  const recommendationContext = useMemo(() => ({
-    resource_type: resourceType,
-    mode,
-    hostname: form.hostname || null,
-    reason: form.reason || null,
-    lxc_os_image: resourceType === "lxc" ? form.ostemplate || null : null,
-    vm_template_id: resourceType === "vm" && form.template_id ? Number(form.template_id) : null,
-    cores: Number(form.cores) || null,
-    memory_mb: Number(form.memory) || null,
-    disk_gb: Number(resourceType === "vm" ? form.disk_size : form.rootfs_size) || null,
-    storage: "local-lvm",
-    start_at: form.start_at || null,
-    end_at: form.end_at || null,
-    immediate_no_end: Boolean(form.immediate_no_end),
-    selected_gpu_mapping_id: form.gpu_mapping_id || null,
-    gpu_options: gpuOptions,
-    schedule_options: buildAiScheduleOptions(availabilityData),
-    lxc_os_options: lxcTemplates.map((template) => ({
-      value: template.volid,
-      label: formatOstemplate(template.volid),
-    })),
-    vm_os_options: vmChoices.map((template) => ({
-      template_id: Number(template.vmid),
-      label: template.name || String(template.vmid),
-      node: template.node || "",
-    })),
-    /* 應用範本的候選由後端提供，前端不送，避免候選清單可被偽造 */
-    resource_options_from_client: true,
-  }), [resourceType, mode, form, gpuOptions, availabilityData, lxcTemplates, vmChoices]);
 
   function applyAiPrefill(prefill) {
     if (!prefill) return;
@@ -1298,35 +1228,9 @@ export default function RequestFormPage({ onBack, className, initialPrefill = nu
           </div>
         </div>
 
-        {/* Mobile AI 側欄 */}
-        {aiOpen && (
-          <AiSidePanel
-            className={styles.aiPanelMobile}
-            recommendationContext={recommendationContext}
-            onImportPlan={applyAiPrefill}
-          />
-        )}
-
         {/* Desktop 右側面板（摘要 + AI）*/}
         <div className={styles.rightPanel}>
-          <div className={styles.rightPanelTabs}>
-            {[
-              { key: "summary", label: "摘要",   icon: "receipt_long" },
-              { key: "ai",      label: "AI 助手", icon: "smart_toy"    },
-            ].map((t) => (
-              <button
-                key={t.key}
-                type="button"
-                className={`${styles.rightPanelTab} ${rightTab === t.key ? styles.rightPanelTabActive : ""}`}
-                onClick={() => setRightTab(t.key)}
-              >
-                <MIcon name={t.icon} size={14} />
-                {t.label}
-              </button>
-            ))}
-          </div>
-
-          <div className={`${styles.summaryBody} ${rightTab !== "summary" ? styles.rightPanelPaneHidden : ""}`}>
+          <div className={styles.summaryBody}>
               {/* Type / mode chips */}
               <div className={styles.summaryChips}>
                 <span className={`${styles.summaryChip} ${resourceType === "lxc" ? styles.summaryChipLxc : styles.summaryChipVm}`}>
@@ -1441,25 +1345,9 @@ export default function RequestFormPage({ onBack, className, initialPrefill = nu
                 </div>
               )}
           </div>
-
-          <AiSidePanel
-            className={`${styles.aiPanelFill} ${rightTab !== "ai" ? styles.rightPanelPaneHidden : ""}`}
-            recommendationContext={recommendationContext}
-            onImportPlan={applyAiPrefill}
-          />
         </div>
       </div>
 
-      {/* 浮動 AI Tab（僅手機）*/}
-      <button
-        type="button"
-        className={`${styles.aiFloatingTab} ${styles.aiFloatingTabMobileOnly} ${aiOpen ? styles.aiFloatingTabOpen : ""}`}
-        onClick={() => setAiOpen((v) => !v)}
-      >
-        <MIcon name="smart_toy" size={16} />
-        <span>{aiOpen ? "關閉 AI" : "AI 助手"}</span>
-        <MIcon name={aiOpen ? "keyboard_arrow_down" : "keyboard_arrow_up"} size={16} />
-      </button>
 
     </div>
   );

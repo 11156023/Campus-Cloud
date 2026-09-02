@@ -229,6 +229,78 @@
   line-height: 1.65;
 }
 
+/* 模型回的是 markdown，這裡把它排成正常的段落、清單與程式碼 */
+.markdown {
+  white-space: normal;
+
+  > :first-child { margin-top: 0; }
+  > :last-child { margin-bottom: 0; }
+
+  p { margin: 0 0 $spacing-8; }
+
+  ul, ol {
+    margin: 0 0 $spacing-8;
+    padding-left: 1.35em;
+  }
+
+  li { margin-bottom: 4px; }
+
+  h1, h2, h3, h4 {
+    margin: 14px 0 $spacing-8;
+    font-size: $font-size-14;
+    font-weight: $font-weight-700;
+    color: var(--color-text-primary);
+  }
+
+  strong { font-weight: $font-weight-700; }
+
+  code {
+    padding: 1px 5px;
+    border-radius: 4px;
+    background: var(--color-hover);
+    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: $font-size-12;
+  }
+
+  pre {
+    margin: 0 0 $spacing-8;
+    padding: 10px 12px;
+    overflow-x: auto;
+    border-radius: $radius-8;
+    background: var(--color-hover);
+
+    code {
+      padding: 0;
+      background: none;
+    }
+  }
+
+  a {
+    color: var(--color-primary);
+    text-decoration: underline;
+  }
+
+  table {
+    width: 100%;
+    margin-bottom: $spacing-8;
+    border-collapse: collapse;
+    font-size: $font-size-12;
+
+    th, td {
+      padding: 5px 8px;
+      border: 1px solid var(--color-border);
+      text-align: left;
+    }
+  }
+
+  blockquote {
+    margin: 0 0 $spacing-8;
+    padding-left: 10px;
+    border-left: 3px solid var(--color-border);
+    color: var(--color-text-secondary);
+  }
+}
+
 .actionList {
   display: flex;
   flex-direction: column;

@@ -5,7 +5,6 @@ import LoadingState from "../../../components/LoadingState/LoadingState";
 import { useToast } from "../../../hooks/useToast";
 import { LayoutContext } from "../../../layout/DashboardLayout";
 import { QuickPracticeService } from "../../../services/quickPractice";
-import AiSidePanel from "../requests/AiSidePanel";
 import PageHeader from "../../../components/PageHeader/PageHeader";
 import styles from "./QuickTemplateFormPage.module.scss";
 
@@ -115,7 +114,6 @@ export default function QuickTemplateFormPage() {
           <button type="button" className={styles.btnPrimary} disabled={submitting} onClick={launch}><MIcon name={submitting ? "hourglass_empty" : "bolt"} size={16} />{submitting ? "整組建立中…" : `啟動 ${template.nodes.length} 台機器`}</button>
         </div>
       </div>
-      <aside className={styles.aside}><AiSidePanel className={styles.aiPanel} /></aside>
     </div>
   </div>;
 }

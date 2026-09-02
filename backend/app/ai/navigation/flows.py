@@ -27,6 +27,9 @@ class NavigationStep:
     # 傳給 react-router 的 location state，讓落地頁直接進到正確的視圖，
     # 例如 {"create": True} 會讓 /my-requests 直接開啟申請表單。
     state: dict[str, Any] | None = None
+    # 這一步不是「去某一頁」，而是就地讓助手做一件事。
+    # "recommend" = 依對話規劃一份配置，產出可直接填進申請單的內容。
+    action: str | None = None
 
 
 @dataclass(frozen=True)
@@ -51,7 +54,13 @@ _FLOWS: tuple[NavigationFlow, ...] = (
         ),
         steps=(
             NavigationStep(
-                title="填寫申請單",
+                title="讓 AI 依用途規劃配置",
+                path="/my-requests",
+                detail="說明你要跑什麼，我會挑作業系統與規格，並把申請單填好；不需要的話可以跳過這步。",
+                action="recommend",
+            ),
+            NavigationStep(
+                title="確認並填寫申請單",
                 path="/my-requests",
                 detail="選作業系統或老師提供的範本，調整規格；需要 GPU 就選標示 GPU 的項目並挑時段。",
                 state={"create": True},

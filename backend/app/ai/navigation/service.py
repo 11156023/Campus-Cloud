@@ -118,6 +118,7 @@ def _flow_response(
                 "done" if index < active else "current" if index == active else "todo"
             ),
             state=step.state,
+            action=step.action,
         )
         for index, step in enumerate(flow.steps)
     ]

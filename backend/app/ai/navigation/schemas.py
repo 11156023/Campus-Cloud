@@ -47,6 +47,8 @@ class NavigationStepPublic(BaseModel):
     detail: str = ""
     status: StepStatus = "todo"
     state: dict[str, Any] | None = None
+    # "recommend" 代表這一步由助手就地完成（規劃配置），而不是導到某一頁
+    action: str | None = None
 
 
 class NavigationResolveResponse(BaseModel):

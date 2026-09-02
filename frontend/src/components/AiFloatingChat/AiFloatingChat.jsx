@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import ReactMarkdown from "react-markdown";
+import rehypeSanitize from "rehype-sanitize";
 import { useAuth } from "../../contexts/AuthContext";
 import { AiNavigationService } from "../../services/aiNavigation";
 import { AiTemplateRecommendationApi } from "../../services/aiTemplateRecommendation";
@@ -114,14 +116,25 @@ export function stepStatuses(steps, currentPath) {
   return steps.map((_, index) => (index < active ? "done" : index === active ? "current" : "todo"));
 }
 
-function StepList({ steps, currentPath, onNavigate }) {
+function StepList({ steps, currentPath, onNavigate, onRecommend }) {
   const statuses = stepStatuses(steps, currentPath);
   return (
     <ol className={styles.stepList}>
       {steps.map((step, index) => (
         <li key={`${step.path}-${index}`} className={styles[`step_${statuses[index]}`]}>
-          <button type="button" onClick={() => onNavigate(step.path, step.state)}>
-            <MIcon name={STEP_ICON[statuses[index]] ?? STEP_ICON.todo} size={17} />
+          {/* action 步驟由助手就地完成，不換頁 */}
+          <button
+            type="button"
+            onClick={() => (step.action === "recommend"
+              ? onRecommend()
+              : onNavigate(step.path, step.state))}
+          >
+            <MIcon
+              name={step.action === "recommend" && statuses[index] !== "done"
+                ? "auto_fix_high"
+                : (STEP_ICON[statuses[index]] ?? STEP_ICON.todo)}
+              size={17}
+            />
             <span>
               <strong>{index + 1}. {step.title}</strong>
               {step.detail && <small>{step.detail}</small>}
@@ -153,7 +166,7 @@ function PlanCard({ plan, onNavigate }) {
   );
 }
 
-function Message({ message, currentPath, onNavigate }) {
+function Message({ message, currentPath, onNavigate, onRecommend }) {
   const isUser = message.role === "user";
   return (
     <div className={`${styles.message} ${isUser ? styles.messageUser : styles.messageAssistant}`}>
@@ -163,9 +176,21 @@ function Message({ message, currentPath, onNavigate }) {
         </span>
       )}
       <div className={styles.messageContent}>
-        <div className={styles.messageText}>{message.content}</div>
+        {/* 模型回的是 markdown（清單、粗體、程式碼），直接印出來會看到一堆星號 */}
+        {isUser ? (
+          <div className={styles.messageText}>{message.content}</div>
+        ) : (
+          <div className={`${styles.messageText} ${styles.markdown}`}>
+            <ReactMarkdown rehypePlugins={[rehypeSanitize]}>{message.content}</ReactMarkdown>
+          </div>
+        )}
         {message.steps?.length > 0 && (
-          <StepList steps={message.steps} currentPath={currentPath} onNavigate={onNavigate} />
+          <StepList
+            steps={message.steps}
+            currentPath={currentPath}
+            onNavigate={onNavigate}
+            onRecommend={onRecommend}
+          />
         )}
         {message.plan && <PlanCard plan={message.plan} onNavigate={onNavigate} />}
         {message.targets?.length > 0 && (
@@ -292,6 +317,27 @@ export default function AiFloatingChat({ open = false, onOpenChange = () => {} }
     return true;
   }
 
+  /* 流程裡的「讓 AI 規劃配置」那一步：沿用前面談過的需求，就地產出配置，不換頁。 */
+  async function runRecommendation() {
+    if (loading) return;
+    const nextHistory = history.length
+      ? history
+      : [{ role: "user", content: "請依我的需求規劃一台機器的配置。" }];
+    setLoading(true);
+    try {
+      const planned = await sendRecommendation("", nextHistory);
+      if (!planned) {
+        setMessages((previous) => [...previous, {
+          role: "assistant",
+          content: "我還需要知道這台機器要做什麼，例如「跑深度學習訓練」或「架一個網站」。",
+        }]);
+      }
+    } finally {
+      setLoading(false);
+      inputRef.current?.focus();
+    }
+  }
+
   async function sendChat(text, nextHistory) {
     const contextualHistory = nextHistory.map((message, index) => {
       if (index !== nextHistory.length - 1 || message.role !== "user") return message;
@@ -415,6 +461,7 @@ export default function AiFloatingChat({ open = false, onOpenChange = () => {} }
                   message={message}
                   currentPath={location.pathname}
                   onNavigate={handleNavigate}
+                  onRecommend={runRecommendation}
                 />
               ))
             )}

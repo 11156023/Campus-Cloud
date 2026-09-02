@@ -97,11 +97,15 @@ async def test_whole_task_falls_back_to_a_step_by_step_flow(
 
     assert result.action == "guide"
     assert result.flow_id == "request_machine"
-    assert [step.status for step in result.steps] == ["current", "todo", "todo"]
-    assert result.primary is not None
-    # 第一步要直接開到申請表單，不是停在列表頁。
-    assert result.primary.path == "/my-requests"
-    assert result.primary.state == {"create": True}
+    assert [step.status for step in result.steps] == [
+        "current", "todo", "todo", "todo",
+    ]
+    # 第一步是「讓 AI 規劃配置」，就地完成而不是導到某一頁。
+    assert result.steps[0].action == "recommend"
+    # 下一步才是填表，而且要直接開到表單，不是停在列表頁。
+    assert result.steps[1].action is None
+    assert result.steps[1].path == "/my-requests"
+    assert result.steps[1].state == {"create": True}
 
 
 @pytest.mark.asyncio
