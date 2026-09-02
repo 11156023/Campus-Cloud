@@ -58,14 +58,15 @@ export default function TemplateCloneDialog({ template, canBatch, onClose, onClo
   useEffect(() => {
     if (!needsGpu) return undefined;
     let cancelled = false;
-    GpuService.listOptions()
+    /* GPU 不可跨 PVE 連線：只列出與範本同叢集的 GPU */
+    GpuService.listOptions(template?.node ? { node: template.node } : undefined)
       .then((res) => !cancelled && setGpuOptions(res ?? []))
       .catch(() => !cancelled && toast.error("GPU 清單載入失敗"))
       .finally(() => !cancelled && setGpuLoading(false));
     return () => {
       cancelled = true;
     };
-  }, [needsGpu, toast]);
+  }, [needsGpu, toast, template?.node]);
 
   useEffect(() => {
     let cancelled = false;

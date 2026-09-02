@@ -14,7 +14,11 @@ from sqlmodel import Session, select
 
 from app.core.db import engine
 from app.exceptions import NotFoundError, ProxmoxError
-from app.infrastructure.proxmox import get_proxmox_api_for_node
+from app.infrastructure.proxmox import (
+    get_connection_id_for_node,
+    get_nodes_for_connection,
+    get_proxmox_api_for_node,
+)
 from app.infrastructure.proxmox.operations import iter_connection_clients
 from app.models import Resource
 from app.schemas.gpu import (
@@ -656,20 +660,41 @@ def delete_gpu_mapping(mapping_id: str) -> None:
         raise ProxmoxError(f"Failed to delete GPU mapping: {last_error}")
 
 
-def list_gpu_options() -> list[GPUSummary]:
+def _cluster_nodes_for_node(node: str | None) -> set[str] | None:
+    """回傳指定節點所屬連線（叢集）的節點集合；無法判定時回 None（不過濾）。
+
+    clone 不可跨連線：範本在哪個連線，GPU 也必須掛在同連線的節點上。
+    節點未登錄在 proxmox_nodes（例如舊版單連線環境未同步）時保守地
+    不過濾，避免把所有 GPU 藏起來。
+    """
+    node = str(node or "").strip()
+    if not node:
+        return None
+    cluster_nodes = get_nodes_for_connection(get_connection_id_for_node(node))
+    # 節點不在自己連線的節點集合裡代表映射資料不可用/未登錄 → 不過濾
+    if node not in cluster_nodes:
+        return None
+    return cluster_nodes
+
+
+def list_gpu_options(node: str | None = None) -> list[GPUSummary]:
     """Return a simplified list of available GPUs for form selection.
 
     Cross-references mappings with current VM assignments to determine
-    availability.
+    availability.  ``node`` 指定範本所在節點時，只回傳同一個 PVE
+    連線（叢集）上的 GPU mapping。
     """
     mappings = list_gpu_mappings()
+    allowed_nodes = _cluster_nodes_for_node(node)
     options: list[GPUSummary] = []
 
     for mapping in mappings:
-        model, vram, _ = _extract_gpu_info(mapping.description, mapping.id)
-
         # Build node list from maps
         nodes = list({m.node for m in mapping.maps if m.node})
+        if allowed_nodes is not None and nodes and not (set(nodes) & allowed_nodes):
+            continue
+
+        model, vram, _ = _extract_gpu_info(mapping.description, mapping.id)
         node_str = ", ".join(sorted(nodes))
 
         options.append(

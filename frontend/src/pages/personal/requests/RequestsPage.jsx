@@ -51,11 +51,22 @@ function isProvisionedButFailed(req) {
     req.provisioning_status === "failed"
   );
 }
+/* 機器已建立但暫時開不了機（如 GPU 記憶體不足），排程器持續重試中 */
+function isWaitingForResources(req) {
+  return (
+    req.status === "approved" &&
+    req.vmid != null &&
+    req.provisioning_status !== "failed" &&
+    Boolean(req.resource_warning)
+  );
+}
+
 /* approved 在 UI 上再依開通進度細分（vmid 為空時 provisioning_status 反映開通流程） */
 function getDisplayStatus(req) {
   if (req.status === "approved") {
     if (req.vmid != null) {
       if (req.provisioning_status === "failed") return { label: "機器異常", color: "danger" };
+      if (isWaitingForResources(req)) return { label: "等待資源釋出", color: "warning" };
       return { label: "已開通", color: "success" };
     }
     if (req.provisioning_status === "failed") return { label: "開通失敗", color: "danger" };
@@ -195,8 +206,10 @@ function RequestRow({ req, onUpdated }) {
   const showRejection = req.status === "rejected" && req.review_comment;
   const showFailure =
     (canRetry(req) || isProvisionedButFailed(req)) && req.provisioning_error;
+  const showWaiting = isWaitingForResources(req);
   const hasDetail =
-    formItems.length > 0 || req.reason || startFmt || showRejection || showFailure;
+    formItems.length > 0 || req.reason || startFmt || showRejection ||
+    showFailure || showWaiting;
 
   async function handleCancel() {
     setCancelling(true);
@@ -313,6 +326,12 @@ function RequestRow({ req, onUpdated }) {
                     {isProvisionedButFailed(req) &&
                       "（機器已建立，此申請無法重試；請到「我的資源」開機或刪除這台機器。）"}
                   </span>
+                </div>
+              )}
+              {showWaiting && (
+                <div className={styles.reviewComment}>
+                  <MIcon name="hourglass_empty" size={13} />
+                  <span>{req.resource_warning}</span>
                 </div>
               )}
             </div>

@@ -314,6 +314,8 @@ export default function RequestFormPage({ onBack, className }) {
     return form.ostemplate ? parseLxcImage(form.ostemplate).needsGpu : false;
   }, [resourceType, vmTemplates, form.template_id, selectedTplId, lxcSysTemplates, form.ostemplate]);
   const canLoadGpu = resourceType === "vm" && selectedOsNeedsGpu;
+  /* 範本所在節點：GPU 不可跨 PVE 連線（叢集），只顯示與範本同叢集的 GPU */
+  const selectedTemplateNode = selectedVmTemplate?.node || "";
   const gpuWindowReady = Boolean(mode === "scheduled" && form.start_at && form.end_at);
   const selectedGpuProfiles = useMemo(() => {
     if (!form.gpu_mapping_id) return [];
@@ -328,7 +330,7 @@ export default function RequestFormPage({ onBack, className }) {
   }, [selectedGpuProfiles]);
 
   const gpuOptionsRequestKey = canLoadGpu
-    ? `${mode}|${gpuWindowReady ? form.start_at : ""}|${gpuWindowReady ? form.end_at : ""}`
+    ? `${mode}|${gpuWindowReady ? form.start_at : ""}|${gpuWindowReady ? form.end_at : ""}|${selectedTemplateNode}`
     : "";
 
   useEffect(() => {
@@ -346,9 +348,10 @@ export default function RequestFormPage({ onBack, className }) {
     }
     let cancelled = false;
     const requestKey = gpuOptionsRequestKey;
-    const params = gpuWindowReady
-      ? { startAt: form.start_at, endAt: form.end_at }
-      : undefined;
+    const params = {
+      ...(gpuWindowReady ? { startAt: form.start_at, endAt: form.end_at } : {}),
+      ...(selectedTemplateNode ? { node: selectedTemplateNode } : {}),
+    };
     const timeoutId = window.setTimeout(() => {
       if (cancelled) return;
       setGpuLoading(true);
@@ -372,7 +375,7 @@ export default function RequestFormPage({ onBack, className }) {
       cancelled = true;
       window.clearTimeout(timeoutId);
     };
-  }, [canLoadGpu, form.start_at, form.end_at, gpuOptionsRequestKey, gpuWindowReady, mode]);
+  }, [canLoadGpu, form.start_at, form.end_at, gpuOptionsRequestKey, gpuWindowReady, mode, selectedTemplateNode]);
 
   /* ── Helpers ── */
   useEffect(() => {
@@ -586,9 +589,12 @@ export default function RequestFormPage({ onBack, className }) {
       /* GPU re-availability check before submitting (mirrors old frontend logic) */
       const selectedGpuId = form.gpu_mapping_id?.trim();
       if (resourceType === "vm" && selectedGpuId) {
-        const params = mode === "scheduled"
-          ? { startAt: form.start_at || undefined, endAt: form.end_at || undefined }
-          : undefined;
+        const params = {
+          ...(mode === "scheduled"
+            ? { startAt: form.start_at || undefined, endAt: form.end_at || undefined }
+            : {}),
+          ...(selectedTemplateNode ? { node: selectedTemplateNode } : {}),
+        };
         const latestOptions = await GpuService.listOptions(params);
         const gpuStillAvailable = latestOptions.some(
           (g) => g.mapping_id === selectedGpuId && g.available_count > 0,
