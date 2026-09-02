@@ -386,6 +386,14 @@ export default function RequestFormPage({ onBack, className }) {
       : String(item.pve_vmid) === String(form.template_id)
   )) ?? null, [catalogChoices, selectedTplId, form.template_id]);
 
+  /* 範本政策 requires_gpu：學生看目錄項目、老師看完整範本清單（以 PVE VMID 對應） */
+  const selectedTemplateRequiresGpu = useMemo(() => {
+    if (resourceType !== "vm" || !form.template_id) return false;
+    if (selectedCatalogItem?.requires_gpu) return true;
+    const tpl = sysTemplates.find((t) => String(t.pve_vmid) === String(form.template_id));
+    return Boolean(tpl?.requires_gpu);
+  }, [resourceType, form.template_id, selectedCatalogItem, sysTemplates]);
+
   /* 是否已完成作業系統選擇（型別確定後，帳密欄位才顯示） */
   const osChosen = resourceType === "vm"
     ? Boolean(form.template_id)
@@ -403,7 +411,9 @@ export default function RequestFormPage({ onBack, className }) {
     }
     return form.ostemplate ? parseLxcImage(form.ostemplate).needsGpu : false;
   }, [resourceType, vmChoices, form.template_id, selectedTplId, lxcSysTemplates, form.ostemplate]);
-  const canLoadGpu = resourceType === "vm" && selectedOsNeedsGpu;
+  /* GPU 區塊只在需要時出現：作業系統名稱標 -GPU，或範本政策要求 GPU */
+  const gpuNeeded = selectedOsNeedsGpu || selectedTemplateRequiresGpu;
+  const canLoadGpu = resourceType === "vm" && gpuNeeded;
   /* 範本所在節點：GPU 不可跨 PVE 連線（叢集），只顯示與範本同叢集的 GPU */
   const selectedTemplateNode = selectedVmTemplate?.node || "";
   const gpuWindowReady = Boolean(mode === "scheduled" && form.start_at && form.end_at);
@@ -424,10 +434,10 @@ export default function RequestFormPage({ onBack, className }) {
     : "";
 
   useEffect(() => {
-    if ((resourceType !== "vm" || !selectedOsNeedsGpu) && form.gpu_mapping_id) {
+    if ((resourceType !== "vm" || !gpuNeeded) && form.gpu_mapping_id) {
       setForm((prev) => ({ ...prev, gpu_mapping_id: "", gpu_mdev_profile: "" }));
     }
-  }, [resourceType, selectedOsNeedsGpu, form.gpu_mapping_id]);
+  }, [resourceType, gpuNeeded, form.gpu_mapping_id]);
 
   useEffect(() => {
     if (!canLoadGpu) {
@@ -659,7 +669,7 @@ export default function RequestFormPage({ onBack, className }) {
     if (resourceType === "vm") {
       if (!form.template_id)            errs.template_id = MSG.osRequired;
       if (!isWindowsVm && !form.username.trim()) errs.username = MSG.usernameRequired;
-      if (selectedOsNeedsGpu && !form.gpu_mapping_id) errs.gpu_mapping_id = MSG.gpuRequired;
+      if (gpuNeeded && !form.gpu_mapping_id) errs.gpu_mapping_id = MSG.gpuRequired;
     }
 
     if (mode === "scheduled") {
@@ -930,7 +940,7 @@ export default function RequestFormPage({ onBack, className }) {
                     <optgroup label="老師／官方提供的環境範本">
                       {catalogChoices.map((t) => (
                         <option key={`cat-${t.id}`} value={t.choice}>
-                          {withGpuTag(stripGpuMarker(t.name), osNameNeedsGpu(t.name))}
+                          {withGpuTag(stripGpuMarker(t.name), osNameNeedsGpu(t.name) || Boolean(t.requires_gpu))}
                         </option>
                       ))}
                     </optgroup>
@@ -1097,10 +1107,13 @@ export default function RequestFormPage({ onBack, className }) {
               })()}
             </div>
 
-            {/* ── GPU（僅所選作業系統標記 -GPU 時顯示）── */}
-            {resourceType === "vm" && selectedOsNeedsGpu && (
+            {/* ── GPU（作業系統標記 -GPU、或範本政策要求 GPU 時才顯示）── */}
+            {resourceType === "vm" && gpuNeeded && (
               <div className={styles.formSection}>
                 <h2 className={styles.sectionTitle}>GPU 加速</h2>
+                {selectedTemplateRequiresGpu && (
+                  <p className={styles.fieldHint}>此範本需要 GPU，送出前必須選擇要配置的 GPU。</p>
+                )}
 
                 {!canLoadGpu && mode === "scheduled" && (
                   <p className={styles.fieldHint}>請先選擇租借時段，再載入該時段可用的 GPU。</p>

@@ -303,6 +303,18 @@ def _apply_template_floor(request_in: VMRequestCreate, template: VMTemplate) -> 
         request_in.disk_size = max(int(request_in.disk_size or 0), floor)
 
 
+def _require_template_gpu(request_in: VMRequestCreate, template: VMTemplate) -> None:
+    """範本政策 requires_gpu：用這個範本申請時必須配置 GPU。
+
+    前端在範本要求 GPU 時才顯示 GPU 區塊並強制選擇；這裡再守一次，
+    避免直接打 API 或舊表單繞過。
+    """
+    if not template.requires_gpu:
+        return
+    if not str(getattr(request_in, "gpu_mapping_id", "") or "").strip():
+        raise BadRequestError("此範本需要 GPU，請選擇要配置的 GPU")
+
+
 def create(
     *, session: Session, request_in: VMRequestCreate, user
 ) -> VMRequestPublic:
@@ -321,6 +333,7 @@ def create(
         )
         if source_template is not None:
             _apply_template_floor(request_in, source_template)
+            _require_template_gpu(request_in, source_template)
 
     # ---------- 配額執法（E7）：寫入前先擋 ----------
     quota_service.check_quota(

@@ -179,6 +179,32 @@ def test_disk_cannot_be_smaller_than_the_template() -> None:
     assert request_in.disk_size == 40
 
 
+def test_template_that_requires_gpu_rejects_request_without_gpu() -> None:
+    template = make_template(
+        visibility=VMTemplateVisibility.global_, requires_gpu=True
+    )
+
+    with pytest.raises(BadRequestError, match="需要 GPU"):
+        vm_request_service._require_template_gpu(_catalog_request(), template)
+
+
+def test_template_that_requires_gpu_accepts_request_with_gpu() -> None:
+    template = make_template(
+        visibility=VMTemplateVisibility.global_, requires_gpu=True
+    )
+    request_in = _catalog_request(gpu_mapping_id="gpu-a100")
+
+    vm_request_service._require_template_gpu(request_in, template)
+
+    assert request_in.gpu_mapping_id == "gpu-a100"
+
+
+def test_template_without_gpu_policy_ignores_gpu_field() -> None:
+    vm_request_service._require_template_gpu(
+        _catalog_request(), make_template(visibility=VMTemplateVisibility.global_)
+    )
+
+
 def test_lxc_rootfs_is_raised_to_the_template_floor() -> None:
     template = make_template(
         visibility=VMTemplateVisibility.global_, resource_type="lxc", default_disk=16

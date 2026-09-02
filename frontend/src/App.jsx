@@ -167,8 +167,8 @@ function App() {
               <Route path="/batch-review"   element={<BatchReviewPage />} />
             </>
           )}
-          {/* 機器範本頁只給老師／管理員；學生導向「我的申請 › 範本開通」 */}
-          <Route path="/templates"      element={canTeach ? <TemplatesPage /> : <Navigate to="/my-requests?tab=templates" replace />} />
+          {/* 機器範本頁只給老師／管理員；學生在申請表單的「資源設定」選用範本 */}
+          <Route path="/templates"      element={canTeach ? <TemplatesPage /> : <Navigate to="/my-requests" state={{ create: true }} replace />} />
 
           {/* AI */}
           <Route path="/ai-api"         element={<AiApiPage />} />

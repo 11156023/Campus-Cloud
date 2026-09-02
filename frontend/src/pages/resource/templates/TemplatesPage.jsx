@@ -393,7 +393,7 @@ export default function TemplatesPage() {
 
   return (
     <div className={styles.page}>
-      <PageHeader title="機器範本" subtitle="把設定好的母機轉為範本，學生即可在「我的申請 › 範本開通」一鍵克隆出自己的環境">
+      <PageHeader title="機器範本" subtitle="把設定好的母機轉為範本；設為「全部可見」後，學生就能在申請表單的資源設定選用">
         <div className={styles.pageActions}>
           <button
             type="button"

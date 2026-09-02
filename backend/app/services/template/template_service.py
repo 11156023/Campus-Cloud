@@ -168,6 +168,7 @@ def list_student_catalog(*, session: Session) -> list[TemplateCatalogItem]:
                 # ostype 只有 VM 讀得到，而且每次查詢都會打 PVE，
                 # 所以只對目錄裡的 VM 逐筆確認
                 is_windows=(not is_lxc) and is_windows_template(template.pve_vmid),
+                requires_gpu=bool(template.requires_gpu),
                 cores=template.default_cores or (raw.get("maxcpu") or None),
                 memory_mb=template.default_memory
                 or (int(max_memory) // (1024 * 1024) if max_memory else None),

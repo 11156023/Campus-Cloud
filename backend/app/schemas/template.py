@@ -91,6 +91,7 @@ class TemplateCatalogItem(BaseModel):
     node: str
     version: int
     is_windows: bool = False
+    requires_gpu: bool = False
     cores: int | None = None
     memory_mb: int | None = None
     disk_gb: int | None = None

@@ -492,6 +492,7 @@ def _catalog_rows() -> list[VMTemplate]:
             name="jupyter",
             resource_type="qemu",
             visibility=VMTemplateVisibility.global_,
+            requires_gpu=True,
             default_cores=4,
             default_memory=8192,
             default_disk=60,
@@ -539,6 +540,8 @@ def test_student_catalog_uses_pve_facts_and_skips_missing_templates(
         8192,
         60,
     )
+    # 範本的 GPU 政策要跟著目錄走，表單才知道要顯示並強制選 GPU
+    assert (by_vmid[9001].requires_gpu, by_vmid[9002].requires_gpu) == (False, True)
 
 
 def test_lxc_templates_are_not_offered_as_vm_sources(

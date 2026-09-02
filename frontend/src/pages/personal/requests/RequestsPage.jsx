@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../../contexts/AuthContext";
 import styles from "./RequestsPage.module.scss";
 import { VmRequestsService } from "../../../services/vmRequests";
@@ -7,7 +7,6 @@ import { isConsumedRequest } from "../../../services/pendingResources";
 import { useToast } from "../../../hooks/useToast";
 import useAutoRefresh from "../../../hooks/useAutoRefresh";
 import RequestFormPage from "./RequestFormPage";
-import TemplatePicker from "./TemplatePicker";
 import MIcon from "../../../components/MIcon";
 import SharedEmptyState from "../../../components/EmptyState/EmptyState";
 import PageHeader from "../../../components/PageHeader/PageHeader";
@@ -80,14 +79,6 @@ function getDisplayStatus(req) {
 
 const VIEW_LIST   = "list";
 const VIEW_CREATE = "create";
-
-/* 頁籤：申請紀錄（走審核）／範本開通（老師公開的範本，一鍵克隆） */
-const TAB_REQUESTS  = "requests";
-const TAB_TEMPLATES = "templates";
-const TABS = [
-  { key: TAB_REQUESTS,  label: "申請紀錄", icon: "assignment" },
-  { key: TAB_TEMPLATES, label: "範本開通", icon: "library_books" },
-];
 
 const LIST_COLUMNS = ["資源", "系統", "規格", "申請時間", "狀態", "操作"];
 
@@ -443,15 +434,6 @@ export default function RequestsPage() {
   const [error, setError]       = useState(false);
   const [view, setView]         = useState(location.state?.create ? VIEW_CREATE : VIEW_LIST);
   const [returning, setReturning] = useState(false);
-  /* 頁籤記在 ?tab=，讓「/my-requests?tab=templates&clone=<id>」可以直接深連結到克隆視窗 */
-  const [searchParams, setSearchParams] = useSearchParams();
-  const tab = searchParams.get("tab") === TAB_TEMPLATES ? TAB_TEMPLATES : TAB_REQUESTS;
-  const setTab = (key) => {
-    const next = new URLSearchParams(searchParams);
-    if (key === TAB_TEMPLATES) next.set("tab", key);
-    else next.delete("tab");
-    setSearchParams(next, { replace: true });
-  };
 
   /** silent = true 時不觸發 loading / error state，供背景自動刷新使用 */
   const fetchRequests = useCallback(async (silent = false) => {
@@ -470,14 +452,12 @@ export default function RequestsPage() {
     }
   }, []);
 
-  const showRequests = view === VIEW_LIST && tab === TAB_REQUESTS;
-
   useEffect(() => {
-    if (showRequests) fetchRequests();
-  }, [showRequests, fetchRequests]);
+    if (view === "list") fetchRequests();
+  }, [view, fetchRequests]);
 
   useAutoRefresh(() => {
-    if (showRequests) fetchRequests(true);
+    if (view === "list") fetchRequests(true);
   });
 
   function handleUpdated(updated) {
@@ -499,32 +479,13 @@ export default function RequestsPage() {
       className={`${styles.page} ${returning ? styles.animSlideInLeft : ""}`}
       onAnimationEnd={returning ? () => setReturning(false) : undefined}
     >
-      <PageHeader title="我的申請" subtitle="管理你的虛擬機與容器申請，或從老師公開的範本一鍵開通">
+      <PageHeader title="我的申請" subtitle="管理你的虛擬機與容器申請">
         <button type="button" className={styles.btnPrimary} onClick={() => setView(VIEW_CREATE)} data-guide="request-create">
           <MIcon name="add" size={16} />
           申請資源
         </button>
       </PageHeader>
 
-      <div className={styles.tabs} role="tablist">
-        {TABS.map((t) => (
-          <button
-            key={t.key}
-            type="button"
-            role="tab"
-            aria-selected={tab === t.key}
-            className={tab === t.key ? styles.tabActive : styles.tab}
-            onClick={() => setTab(t.key)}
-          >
-            <MIcon name={t.icon} size={16} />
-            {t.label}
-          </button>
-        ))}
-      </div>
-
-      {tab === TAB_TEMPLATES ? (
-        <TemplatePicker />
-      ) : (
       <div className={styles.content} data-guide="request-list">
         {error ? (
           <ErrorState onRetry={fetchRequests} />
@@ -553,7 +514,6 @@ export default function RequestsPage() {
           </>
         )}
       </div>
-      )}
     </div>
   );
 }
