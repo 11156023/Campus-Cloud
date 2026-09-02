@@ -45,6 +45,9 @@ const GATEWAY_X     = VM_COL_X + 520;
 const NODE_TYPES = { gateway: GatewayNode, vm: VMNode };
 const EDGE_TYPES = { connection: ConnectionEdge };
 
+/** ReactFlow 節點 id → ConnectionDialog 的選項 key（網關節點對應 "internet"） */
+const toDialogKey = (nodeId) => (nodeId === GATEWAY_KEY ? "internet" : String(nodeId));
+
 /* ─── 主頁面 ─────────────────────────────────────────────── */
 export default function FirewallPage() {
   const { theme } = useTheme();
@@ -55,6 +58,7 @@ export default function FirewallPage() {
   const [error,        setError]        = useState("");
   const [selectedNode, setSelectedNode] = useState(null);
   const [showDialog,   setShowDialog]   = useState(false);
+  const [dialogPreset, setDialogPreset] = useState(null); // 拉線帶入的來源/目標
   const [deleteEdge,   setDeleteEdge]   = useState(null);
   const [showLabels,   setShowLabels]   = useState(false);
   const [showMiniMap,  setShowMiniMap]  = useState(true);
@@ -168,6 +172,19 @@ export default function FirewallPage() {
   /* ── 點擊空白處：取消選取 ── */
   const onPaneClick = useCallback(() => setSelectedNode(null), []);
 
+  /* ── 拉線前驗證：禁止自連（網關只有一個，自連即網關對網關） ── */
+  const isValidConnection = useCallback(
+    (conn) => Boolean(conn?.source && conn?.target && conn.source !== conn.target),
+    []
+  );
+
+  /* ── 拉線完成：帶入來源/目標，開啟新增連線對話框 ── */
+  const onConnect = useCallback((conn) => {
+    if (!conn?.source || !conn?.target || conn.source === conn.target) return;
+    setDialogPreset({ source: toDialogKey(conn.source), target: toDialogKey(conn.target) });
+    setShowDialog(true);
+  }, []);
+
   /* ── VM 節點列表（供 ConnectionDialog 使用） ── */
   const vmNodes = (topology?.nodes ?? [])
     .filter((n) => n.node_type !== "gateway")
@@ -204,7 +221,7 @@ export default function FirewallPage() {
           <button
             type="button"
             className={styles.btnPrimary}
-            onClick={() => setShowDialog(true)}
+            onClick={() => { setDialogPreset(null); setShowDialog(true); }}
             data-guide="firewall-create"
           >
             <MIcon name="add" size={16} />
@@ -246,6 +263,9 @@ export default function FirewallPage() {
               onNodeDragStop={onNodeDragStop}
               onNodeClick={onNodeClick}
               onPaneClick={onPaneClick}
+              onConnect={onConnect}
+              isValidConnection={isValidConnection}
+              connectionRadius={36}
               onInit={(instance) => { rfInstance.current = instance; }}
               nodeTypes={NODE_TYPES}
               edgeTypes={EDGE_TYPES}
@@ -318,7 +338,10 @@ export default function FirewallPage() {
       {/* ── 新增連線 Dialog ── */}
       {connDialog.open && (
         <ConnectionDialog
+          key={dialogPreset ? `${dialogPreset.source}->${dialogPreset.target}` : "manual"}
           nodes={vmNodes}
+          initialSource={dialogPreset?.source}
+          initialTarget={dialogPreset?.target}
           onConfirm={handleCreateConnection}
           onClose={() => setShowDialog(false)}
           closing={connDialog.closing}

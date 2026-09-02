@@ -123,10 +123,31 @@ function PortForwardForm({ rows, setRows, invalid }) {
 }
 
 /* ── 主元件 ── */
-export default function ConnectionDialog({ nodes, onConfirm, onClose, closing = false }) {
-  // 節點選擇
-  const [sourceKey, setSourceKey] = useState("internet");
-  const [targetKey, setTargetKey] = useState(nodes[0]?.key ?? "");
+export default function ConnectionDialog({
+  nodes, onConfirm, onClose, closing = false, initialSource, initialTarget,
+}) {
+  // 節點選擇（拉線開啟時由 initialSource / initialTarget 帶入；手動開啟預設 網際網路 → 第一台 VM）
+  const isKnownKey = (key) => key === "internet" || nodes.some((n) => n.key === key);
+  const defaultSource = isKnownKey(initialSource) ? initialSource : "internet";
+  const defaultTarget = isKnownKey(initialTarget) && initialTarget !== defaultSource
+    ? initialTarget
+    : (defaultSource === "internet" ? (nodes[0]?.key ?? "") : "internet");
+  const [sourceKey, setSourceKey] = useState(defaultSource);
+  const [targetKey, setTargetKey] = useState(defaultTarget);
+
+  /* 選到另一側正在使用的節點時自動交換，讓「VM → 網際網路」一步就能選到 */
+  const pickSource = (key) => {
+    if (key === targetKey) setTargetKey(sourceKey);
+    setSourceKey(key);
+  };
+  const pickTarget = (key) => {
+    if (key === sourceKey) setSourceKey(targetKey);
+    setTargetKey(key);
+  };
+  const swapEnds = () => {
+    setSourceKey(targetKey);
+    setTargetKey(sourceKey);
+  };
 
   // 方向（VM→VM 用）
   const [direction, setDirection] = useState("one_way");
@@ -236,29 +257,31 @@ export default function ConnectionDialog({ nodes, onConfirm, onClose, closing = 
               <label className={styles.nodeLabel}>來源</label>
               <select
                 value={sourceKey}
-                onChange={(e) => setSourceKey(e.target.value)}
+                onChange={(e) => pickSource(e.target.value)}
                 className={styles.select}
               >
-                {nodeOptions
-                  .filter((n) => n.key !== targetKey)
-                  .map((n) => <option key={n.key} value={n.key}>{n.label}</option>)}
+                {nodeOptions.map((n) => <option key={n.key} value={n.key}>{n.label}</option>)}
               </select>
             </div>
 
-            <div className={styles.arrowIcon}>
-              <MIcon name="arrow_forward" size={20} />
-            </div>
+            <button
+              type="button"
+              className={styles.swapBtn}
+              onClick={swapEnds}
+              title="交換來源與目標"
+              aria-label="交換來源與目標"
+            >
+              <MIcon name="swap_horiz" size={20} />
+            </button>
 
             <div className={styles.nodeSelect}>
               <label className={styles.nodeLabel}>目標</label>
               <select
                 value={targetKey}
-                onChange={(e) => setTargetKey(e.target.value)}
+                onChange={(e) => pickTarget(e.target.value)}
                 className={styles.select}
               >
-                {nodeOptions
-                  .filter((n) => n.key !== sourceKey)
-                  .map((n) => <option key={n.key} value={n.key}>{n.label}</option>)}
+                {nodeOptions.map((n) => <option key={n.key} value={n.key}>{n.label}</option>)}
               </select>
             </div>
           </div>
