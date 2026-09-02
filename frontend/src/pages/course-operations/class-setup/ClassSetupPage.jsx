@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import MIcon from "../../components/MIcon";
-import PageHeader from "../../components/PageHeader/PageHeader";
-import EmptyState from "../../components/EmptyState/EmptyState";
-import LoadingState from "../../components/LoadingState/LoadingState";
-import { CourseEnvironmentsService } from "../../services/courseEnvironments";
-import { TeachingClassesService } from "../../services/teachingClasses";
+import MIcon from "../../../components/MIcon";
+import PageHeader from "../../../components/PageHeader/PageHeader";
+import EmptyState from "../../../components/EmptyState/EmptyState";
+import LoadingState from "../../../components/LoadingState/LoadingState";
+import { CourseEnvironmentsService } from "../../../services/courseEnvironments";
+import { TeachingClassesService } from "../../../services/teachingClasses";
+import { focusInvalidField } from "../../../utils/focusField";
 import styles from "./ClassSetupPage.module.scss";
 
 const STEPS = [
@@ -90,6 +91,16 @@ export default function ClassSetupPage() {
   const [loading, setLoading] = useState(Boolean(classId));
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [invalidField, setInvalidField] = useState("");
+  const nameRef = useRef(null);
+  const emailsRef = useRef(null);
+
+  function markInvalid(key, ref) {
+    setInvalidField(key);
+    focusInvalidField(ref.current);
+  }
+
+  function clearInvalid(key) { setInvalidField((current) => (current === key ? "" : current)); }
 
   const selectedTemplate = templates.find((template) => String(template.versionId) === String(templateId));
   const completed = [Boolean(item), Boolean(item?.students.length), Boolean(item?.course_environment && item?.nodes.length), weeks.some((week) => String(week.title ?? "").trim())];
@@ -144,7 +155,7 @@ export default function ClassSetupPage() {
     return () => { active = false; };
   }, [step, classId, item?.students.length, item?.nodes.length]);
 
-  function updateForm(key, value) { setForm((current) => ({ ...current, [key]: value })); }
+  function updateForm(key, value) { setForm((current) => ({ ...current, [key]: value })); clearInvalid(key); }
   function go(nextStep) { setParams(classId ? { classId, step: String(nextStep) } : { step: String(nextStep) }); window.scrollTo({ top: 0, behavior: "smooth" }); }
   function createTemplate() { navigate(templateBuilderPath(classId)); }
   function pauseSetup() {
@@ -154,7 +165,7 @@ export default function ClassSetupPage() {
   }
 
   async function saveBasic() {
-    if (!form.name.trim()) { setMessage("請輸入班級名稱。"); return false; }
+    if (!form.name.trim()) { markInvalid("name", nameRef); return false; }
     const payload = {
       name: form.name.trim(), code: form.code.trim() || `CLASS-${Date.now().toString().slice(-8)}`, term: form.term.trim() || "未指定", location: form.location.trim() || null,
       start_date: form.startDate, end_date: form.endDate, weekday: Number(form.weekday), start_time: form.startTime,
@@ -168,7 +179,7 @@ export default function ClassSetupPage() {
 
   async function saveStudents() {
     const parsed = parseStudentEmails(emails);
-    if (!item?.students.length && !parsed.length) { setMessage("請至少加入一位學生。"); return false; }
+    if (!item?.students.length && !parsed.length) { markInvalid("emails", emailsRef); return false; }
     if (parsed.length) {
       const result = await TeachingClassesService.addStudents(classId, parsed);
       applyClass(result.class);
@@ -190,7 +201,7 @@ export default function ClassSetupPage() {
   }
 
   async function next() {
-    setBusy(true); setMessage("");
+    setBusy(true); setMessage(""); setInvalidField("");
     try {
       const saved = step === 1 ? await saveBasic() : step === 2 ? await saveStudents() : step === 3 ? await saveEnvironment() : await saveTasks();
       if (saved && step < 5 && !(step === 1 && !classId)) go(step + 1);
@@ -212,8 +223,7 @@ export default function ClassSetupPage() {
   if (loading) return <LoadingState fullPage text="正在恢復班級設定…" />;
 
   return <div className={styles.page}>
-    <button type="button" className={styles.backLink} onClick={() => navigate("/class-management")}><MIcon name="arrow_back" size={18} />返回班級</button>
-    <PageHeader eyebrow="一鍵建立班級" title={item?.name || "建立完整課程班級"} subtitle="依序完成課表、學生、環境與每週任務；每一步都會保存到正式班級。">
+    <PageHeader title={item?.name || "建立完整課程班級"} subtitle="依序完成課表、學生、環境與每週任務；每一步都會保存到正式班級。">
       <span className={styles.saveState}><MIcon name="cloud_done" size={16} />{classId ? "班級草稿已建立" : "第一步後開始自動保存"}</span>
     </PageHeader>
 
@@ -227,7 +237,7 @@ export default function ClassSetupPage() {
 
     <main className={styles.content}>
       {step === 1 && <section className={styles.card}><div className={styles.sectionHeader}><span>1</span><div><h2>班級與固定課表</h2><p>先填老師每天會用到的資訊；代碼、時區與提前開機可維持預設。</p></div></div><div className={styles.formGrid}>
-        <label className={styles.full}><span>班級名稱</span><input value={form.name} onChange={(event) => updateForm("name", event.target.value)} placeholder="例如：Linux Web 實務｜115-1" autoFocus /></label>
+        <label className={styles.full}><span>班級名稱</span><input ref={nameRef} className={invalidField === "name" ? styles.invalid : undefined} aria-invalid={invalidField === "name"} value={form.name} onChange={(event) => updateForm("name", event.target.value)} placeholder="例如：Linux Web 實務｜115-1" autoFocus /></label>
         <label className={styles.full}><span>上課地點</span><input value={form.location} onChange={(event) => updateForm("location", event.target.value)} placeholder="例如：電腦教室 A（會顯示在學生今日課表）" /></label>
         <label><span>開始日期</span><input type="date" value={form.startDate} onChange={(event) => updateForm("startDate", event.target.value)} /></label>
         <label><span>結束日期</span><input type="date" value={form.endDate} onChange={(event) => updateForm("endDate", event.target.value)} /></label>
@@ -236,7 +246,7 @@ export default function ClassSetupPage() {
         <details className={styles.advanced}><summary>進階設定</summary><div className={styles.advancedGrid}><label><span>學期</span><input value={form.term} onChange={(event) => updateForm("term", event.target.value)} /></label><label><span>提前開機</span><select value={form.bootLeadMinutes} onChange={(event) => updateForm("bootLeadMinutes", Number(event.target.value))}><option value={0}>準時</option><option value={5}>5 分鐘</option><option value={10}>10 分鐘</option><option value={15}>15 分鐘</option><option value={30}>30 分鐘</option></select></label></div></details>
       </div></section>}
 
-      {step === 2 && <section className={styles.card}><div className={styles.sectionHeader}><span>2</span><div><h2>加入學生名單</h2><p>貼上 Email；可以使用換行、逗號或分號分隔。找不到的帳號會單獨回報。</p></div></div><div className={styles.studentLayout}><label><span>學生 Email</span><textarea rows={10} value={emails} onChange={(event) => setEmails(event.target.value)} placeholder={"student01@example.edu\nstudent02@example.edu"} autoFocus /><small>準備加入 {parseStudentEmails(emails).length} 個 Email</small></label><aside><strong>目前班級學生</strong><span>{item?.students.length ?? 0}<small>位</small></span><p>{item?.students.length ? "可以繼續加入學生，重複帳號會自動略過。" : "下一步前至少需要一位已存在的學生帳號。"}</p>{item?.students.slice(0, 5).map((student) => <em key={student.id}>{student.full_name || student.email}</em>)}</aside></div></section>}
+      {step === 2 && <section className={styles.card}><div className={styles.sectionHeader}><span>2</span><div><h2>加入學生名單</h2><p>貼上 Email；可以使用換行、逗號或分號分隔。找不到的帳號會單獨回報。</p></div></div><div className={styles.studentLayout}><label><span>學生 Email</span><textarea ref={emailsRef} className={invalidField === "emails" ? styles.invalid : undefined} aria-invalid={invalidField === "emails"} rows={10} value={emails} onChange={(event) => { setEmails(event.target.value); clearInvalid("emails"); }} placeholder={"student01@example.edu\nstudent02@example.edu"} autoFocus /><small>準備加入 {parseStudentEmails(emails).length} 個 Email</small></label><aside><strong>目前班級學生</strong><span>{item?.students.length ?? 0}<small>位</small></span><p>{item?.students.length ? "可以繼續加入學生，重複帳號會自動略過。" : "下一步前至少需要一位已存在的學生帳號。"}</p>{item?.students.slice(0, 5).map((student) => <em key={student.id}>{student.full_name || student.email}</em>)}</aside></div></section>}
 
       {step === 3 && (
         <section className={styles.card}>

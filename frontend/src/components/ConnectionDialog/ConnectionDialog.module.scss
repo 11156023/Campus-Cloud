@@ -293,3 +293,13 @@
 }
 
 $spacing-16: 12px;
+
+/* ── 未填欄位：紅框 ── */
+.portInputInvalid {
+  border-color: var(--color-danger);
+
+  &:focus {
+    border-color: var(--color-danger);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-danger) 18%, transparent);
+  }
+}

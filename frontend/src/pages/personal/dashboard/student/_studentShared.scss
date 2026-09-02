@@ -1,0 +1,78 @@
+@use "../../../../assets/styles/variables" as *;
+@use "../../../../assets/styles/mixins" as *;
+
+/* 學生首頁與課程總覽共用的版面外殼；兩個 module 都 @use 這支。 */
+
+.page {
+  // Chromium 會把 backdrop-filter（液態玻璃模式還包含 SVG 位移濾鏡）
+  // 分塊合成，跨過圖塊邊界的寬卡片會出現固定位置的垂直色差。
+  // 學生頁面以穩定易讀為優先，保留玻璃色與陰影，只停用背景取樣濾鏡。
+  --glass-backdrop-filter: none;
+
+  @include flex-column;
+  gap: $spacing-24;
+  padding: $spacing-8 $spacing-16 $spacing-32;
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+
+  @media (min-width: $breakpoint-sidebar) {
+    padding: 0 0 $spacing-32;
+  }
+}
+
+/* 後端暫時取不到資料時的橫幅提示。 */
+.notice {
+  @include glass-surface($shadow: none);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: $spacing-16;
+  border-radius: $radius-12;
+  color: var(--color-warning);
+
+  div {
+    @include flex-column;
+    gap: 2px;
+  }
+
+  span {
+    color: var(--color-text-secondary);
+    font-size: $font-size-12;
+  }
+}
+
+.sectionHeading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: $spacing-16;
+
+  h2 {
+    margin-top: 3px;
+    color: var(--color-text-primary);
+    font-size: $font-size-18;
+  }
+
+  > span {
+    color: var(--color-text-muted);
+    font-size: $font-size-12;
+  }
+}
+
+/* 兩個頁面的行動按鈕共用的基底樣式（外觀由各自的 .primaryButton / .secondaryButton 決定）。 */
+@mixin student-action-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: none;
+  font: inherit;
+  font-size: $font-size-14;
+  font-weight: $font-weight-700;
+  cursor: pointer;
+  transition: transform $transition-base, background $transition-base, color $transition-base;
+
+  &:hover:not(:disabled) { transform: translateY(-1px); }
+  &:disabled { cursor: not-allowed; opacity: .4; }
+}

@@ -9,11 +9,11 @@ import { AuthSessionStatus } from "./services/authSession";
 import styles from "./App.module.scss";
 
 // 個人
-const AdminDashboardPage = lazy(() => import("./pages/personal/dashboard/AdminDashboardPage"));
-const TeacherDashboardPage = lazy(() => import("./pages/personal/dashboard/TeacherDashboardPage"));
-const StudentHomePage = lazy(() => import("./pages/personal/dashboard/StudentHomePage"));
-const StudentCoursePage = lazy(() => import("./pages/personal/dashboard/StudentCoursePage"));
-const QuickTemplateFormPage = lazy(() => import("./pages/personal/dashboard/QuickTemplateFormPage"));
+const AdminDashboardPage = lazy(() => import("./pages/personal/dashboard/admin/AdminDashboardPage"));
+const TeacherDashboardPage = lazy(() => import("./pages/personal/dashboard/teacher/TeacherDashboardPage"));
+const StudentHomePage = lazy(() => import("./pages/personal/dashboard/student/StudentHomePage"));
+const StudentCoursePage = lazy(() => import("./pages/personal/dashboard/student/StudentCoursePage"));
+const QuickTemplateFormPage = lazy(() => import("./pages/personal/quick-practice/QuickTemplateFormPage"));
 const ResourcesPage = lazy(() => import("./pages/personal/resources/ResourcesPage"));
 const ResourceDetailPage = lazy(() => import("./pages/personal/resources/detail/ResourceDetailPage"));
 const RequestsPage = lazy(() => import("./pages/personal/requests/RequestsPage"));
@@ -36,11 +36,11 @@ const AiMonitoringPage = lazy(() => import("./pages/ai/ai-monitoring/AiMonitorin
 const CoursePathsPage = lazy(() => import("./pages/courses/paths/CoursePathsPage"));
 const CourseRoomPage = lazy(() => import("./pages/courses/room/CourseRoomPage"));
 const CourseCmsPage = lazy(() => import("./pages/teaching/course-cms/CourseCmsPage"));
-const CourseTemplateManagementPage = lazy(() => import("./pages/course-operations/CourseTemplateManagementPage"));
-const CourseTemplateEditorPage = lazy(() => import("./pages/course-operations/CourseTemplateEditorPage"));
-const ClassManagementPage = lazy(() => import("./pages/course-operations/ClassManagementPage"));
-const ClassWorkspacePage = lazy(() => import("./pages/course-operations/ClassWorkspacePage"));
-const ClassSetupPage = lazy(() => import("./pages/course-operations/ClassSetupPage"));
+const CourseTemplateManagementPage = lazy(() => import("./pages/course-operations/course-templates/CourseTemplateManagementPage"));
+const CourseTemplateEditorPage = lazy(() => import("./pages/course-operations/course-templates/CourseTemplateEditorPage"));
+const ClassManagementPage = lazy(() => import("./pages/course-operations/class-management/ClassManagementPage"));
+const ClassWorkspacePage = lazy(() => import("./pages/course-operations/class-workspace/ClassWorkspacePage"));
+const ClassSetupPage = lazy(() => import("./pages/course-operations/class-setup/ClassSetupPage"));
 
 // 系統管理
 const AdminPage = lazy(() => import("./pages/system/admin/AdminPage"));
@@ -139,6 +139,7 @@ function App() {
                   : <StudentHomePage />
             }
           />
+          {/* 單一課程總覽：課堂環境、課堂機器與截至今天的 AI 任務 */}
           <Route path="/dashboard/course/:pathId" element={<StudentCoursePage />} />
           <Route path="/quick-template/:id"   element={<QuickTemplateFormPage />} />
           <Route path="/my-resources"         element={<ResourcesPage />} />

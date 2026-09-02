@@ -58,7 +58,7 @@ class MonitoringOverview(BaseModel):
 
 
 class AlertEventPublic(BaseModel):
-    """告警事件（open = resolved_at 為 None）。"""
+    """警告事件（open = resolved_at 為 None）。"""
 
     id: uuid.UUID
     scope: AlertScope

@@ -20,7 +20,7 @@
   gap: 0;
   padding: 0;
 
-  @include respond-to(md) {
+  @media (min-width: $breakpoint-sidebar) {
     gap: 40px;
     padding: var(--layout-py) var(--layout-px);
   }
@@ -35,7 +35,7 @@
   animation: fadeIn 0.15s ease;
   transition: opacity 0.15s ease;
 
-  @include respond-to(md) {
+  @media (min-width: $breakpoint-sidebar) {
     display: none;
   }
 }
@@ -59,7 +59,7 @@
   position: relative;
   padding: 0 $spacing-8;
 
-  @include respond-to(md) {
+  @media (min-width: $breakpoint-sidebar) {
     padding: 0;
   }
 }
@@ -77,7 +77,7 @@
   flex: 1;
   @include flex-column;
 
-  @include respond-to(md) {
+  @media (min-width: $breakpoint-sidebar) {
     min-height: calc(100dvh - 60px);
   }
 }
@@ -92,7 +92,7 @@
   top: 0;
   z-index: 50;
 
-  @include respond-to(md) {
+  @media (min-width: $breakpoint-sidebar) {
     display: none;
   }
 }
@@ -117,7 +117,7 @@
   margin-top: auto;
   padding: $spacing-16 0 $spacing-8;
 
-  @include respond-to(md) {
+  @media (min-width: $breakpoint-sidebar) {
     padding: $spacing-16 0 0;
   }
 }

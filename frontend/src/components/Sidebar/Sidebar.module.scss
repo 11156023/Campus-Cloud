@@ -29,7 +29,7 @@
     transform: translateX(0);
   }
 
-  @include respond-to(md) {
+  @media (min-width: $breakpoint-sidebar) {
     position: sticky;
     top: var(--layout-py);
     left: auto;

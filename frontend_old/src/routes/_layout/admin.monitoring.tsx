@@ -438,10 +438,10 @@ function AlertsPanel() {
           <div>
             <CardTitle className="text-base flex items-center gap-2">
               <Bell className="h-4 w-4" />
-              活動告警
+              活動警告
             </CardTitle>
             <CardDescription>
-              超過閾值的資源使用告警（每 30 秒更新）
+              超過閾值的資源使用警告（每 30 秒更新）
             </CardDescription>
           </div>
           {alerts && alerts.length > 0 && (
@@ -457,7 +457,7 @@ function AlertsPanel() {
         ) : !alerts || alerts.length === 0 ? (
           <div className="flex flex-col items-center gap-2 py-6 text-muted-foreground">
             <BellOff className="h-6 w-6" />
-            <p className="text-sm">目前沒有活動告警</p>
+            <p className="text-sm">目前沒有活動警告</p>
           </div>
         ) : (
           <div className="space-y-2">
@@ -562,7 +562,7 @@ function MonitoringPage() {
             資源監控
           </h1>
           <p className="text-sm text-muted-foreground">
-            叢集資源使用、節點趨勢與閾值告警
+            叢集資源使用、節點趨勢與閾值警告
           </p>
         </div>
         <Select value={timeframe} onValueChange={setTimeframe}>

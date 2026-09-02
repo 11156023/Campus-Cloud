@@ -12,6 +12,7 @@ import AiSidePanel from "./AiSidePanel";
 import AvailabilityPanel from "../../../components/AvailabilityPanel/AvailabilityPanel";
 import MIcon from "../../../components/MIcon";
 import PageHeader from "../../../components/PageHeader/PageHeader";
+import { focusInvalidField } from "../../../utils/focusField";
 
 /* Hostname normalization — preserves alphanumeric, replaces others with hyphen */
 function normalizeHostname(value) {
@@ -24,9 +25,9 @@ function normalizeHostname(value) {
 }
 
 /* ── Form field primitives ── */
-function FieldGroup({ label, hint, required, error, children, labelRight }) {
+function FieldGroup({ label, hint, required, error, children, labelRight, name }) {
   return (
-    <div className={styles.formGroup}>
+    <div className={`${styles.formGroup} ${error ? styles.formGroupInvalid : ""}`} data-field={name}>
       <label className={styles.label}>
         <span>
           {label}
@@ -172,6 +173,19 @@ function buildAiScheduleOptions(availability) {
     }
   }
   return options.slice(0, 12);
+}
+
+/* 依畫面順序排列，送出時定位到第一個有問題的欄位 */
+const FIELD_ORDER = [
+  "hostname", "ostemplate", "template_id", "username", "password",
+  "gpu_mapping_id", "start_at", "end_at", "reason",
+];
+
+function focusFirstError(formEl, errs) {
+  const key = FIELD_ORDER.find((field) => errs[field]);
+  if (!key || !formEl) return;
+  const group = formEl.querySelector(`[data-field~="${key}"]`);
+  focusInvalidField(group?.querySelector("input, select, textarea"));
 }
 
 /* ── Validation messages（對齊舊版 zh-TW locales）── */
@@ -665,8 +679,9 @@ export default function RequestFormPage({ onBack, className }) {
   /* ── Submit ── */
   async function handleSubmit(e) {
     e.preventDefault();
+    const formEl = e.currentTarget;
     const errs = validate();
-    if (Object.keys(errs).length > 0) { setErrors(errs); return; }
+    if (Object.keys(errs).length > 0) { setErrors(errs); focusFirstError(formEl, errs); return; }
 
     setSubmitting(true);
     try {
@@ -884,7 +899,7 @@ export default function RequestFormPage({ onBack, className }) {
                 </p>
               )}
 
-              <FieldGroup label="資源名稱" required error={errors.hostname}>
+              <FieldGroup label="資源名稱" required error={errors.hostname} name="hostname">
                 <input
                   className={styles.input}
                   placeholder="project-alpha-web"
@@ -894,7 +909,7 @@ export default function RequestFormPage({ onBack, className }) {
                 />
               </FieldGroup>
 
-              <FieldGroup label="作業系統" required
+              <FieldGroup label="作業系統" required name="ostemplate template_id"
                 error={errors.template_id || errors.ostemplate}
                 hint={osChosen
                   ? `一次申請一台，將建立為「${resourceType === "vm" ? "虛擬機" : "LXC 容器"}」`
@@ -962,7 +977,7 @@ export default function RequestFormPage({ onBack, className }) {
               {osChosen && resourceType === "vm" && (
                 <div className={styles.formGrid}>
                   {!isWindowsVm && (
-                    <FieldGroup label="使用者名稱" required error={errors.username}>
+                    <FieldGroup label="使用者名稱" required error={errors.username} name="username">
                       <input
                         className={styles.input}
                         placeholder="admin"
@@ -975,6 +990,7 @@ export default function RequestFormPage({ onBack, className }) {
                     label="密碼"
                     required
                     error={errors.password}
+                    name="password"
                     hint={isWindowsVm
                       ? "Windows 範本登入帳號固定為 Admin，僅需設定密碼"
                       : undefined}
@@ -990,7 +1006,7 @@ export default function RequestFormPage({ onBack, className }) {
                 </div>
               )}
               {osChosen && resourceType === "lxc" && (
-                <FieldGroup label="密碼" required error={errors.password}
+                <FieldGroup label="密碼" required error={errors.password} name="password"
                   hint={selectedTpl
                     ? "克隆建立的容器沿用範本內建帳密，此密碼僅作平台紀錄"
                     : "LXC 容器登入帳號固定為 root，僅需設定密碼"}>
@@ -1091,6 +1107,7 @@ export default function RequestFormPage({ onBack, className }) {
                   label="選擇 GPU"
                   required
                   error={errors.gpu_mapping_id}
+                  name="gpu_mapping_id"
                   hint="GPU 會依所選時段重新計算可用性，送出前仍會再做一次即時檢查"
                 >
                   <SelectField
@@ -1160,7 +1177,7 @@ export default function RequestFormPage({ onBack, className }) {
                     無限期 (No end date)
                   </label>
                   {!form.immediate_no_end && (
-                    <FieldGroup label="結束時間" error={errors.end_at}>
+                    <FieldGroup label="結束時間" error={errors.end_at} name="end_at">
                       <input
                       type="datetime-local"
                       className={styles.input}
@@ -1175,7 +1192,7 @@ export default function RequestFormPage({ onBack, className }) {
               ) : (
                 <>
                   <div className={styles.scheduleInputGrid}>
-                    <FieldGroup label="開始日期" required error={errors.start_at}>
+                    <FieldGroup label="開始日期" required error={errors.start_at} name="start_at">
                       <input
                         type="date"
                         className={styles.input}
@@ -1185,7 +1202,7 @@ export default function RequestFormPage({ onBack, className }) {
                         onChange={(e) => set("start_at", fromDateInputValue(e.target.value))}
                       />
                     </FieldGroup>
-                    <FieldGroup label="結束日期" required error={errors.end_at}>
+                    <FieldGroup label="結束日期" required error={errors.end_at} name="end_at">
                       <input
                         type="date"
                         className={styles.input}
@@ -1232,7 +1249,7 @@ export default function RequestFormPage({ onBack, className }) {
             {/* ── 申請原因 ── */}
             <div className={styles.formSection}>
               <h2 className={styles.sectionTitle}>申請原因<span className={styles.required}> *</span></h2>
-              <FieldGroup error={errors.reason}>
+              <FieldGroup error={errors.reason} name="reason">
                 <textarea
                   className={styles.textarea}
                   placeholder="請描述您的申請用途..."

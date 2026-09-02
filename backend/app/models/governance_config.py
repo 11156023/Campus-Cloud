@@ -1,4 +1,4 @@
-"""治理設定模型（告警閾值、TTL/閒置政策、Auto 判斷開關）。"""
+"""治理設定模型（警告閾值、TTL/閒置政策、Auto 判斷開關）。"""
 
 from datetime import datetime
 
@@ -14,7 +14,7 @@ class GovernanceConfig(SQLModel, table=True):
 
     id: int = Field(default=1, primary_key=True)
 
-    # ── 資源告警 ──────────────────────────────────────────────────────────
+    # ── 資源警告 ──────────────────────────────────────────────────────────
     alerts_enabled: bool = Field(default=True)
     alert_cpu_threshold: float = Field(default=90.0, ge=50, le=100)
     alert_memory_threshold: float = Field(default=90.0, ge=50, le=100)

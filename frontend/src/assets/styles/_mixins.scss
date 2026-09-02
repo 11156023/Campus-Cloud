@@ -112,7 +112,7 @@
 
   @if $hover {
     &:hover {
-      background: var(--color-hover);
+      background: var(--color-row-hover);
     }
   }
 }

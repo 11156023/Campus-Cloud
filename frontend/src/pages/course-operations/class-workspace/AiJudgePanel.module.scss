@@ -1,5 +1,5 @@
-@use "../../assets/styles/variables" as *;
-@use "../../assets/styles/mixins" as *;
+@use "../../../assets/styles/variables" as *;
+@use "../../../assets/styles/mixins" as *;
 
 /* ── 主面板 ── */
 .panel {
@@ -1041,7 +1041,7 @@
   }
 
   tbody tr:hover {
-    background: var(--color-hover);
+    background: var(--color-row-hover);
   }
 }
 

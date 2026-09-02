@@ -2,25 +2,25 @@ import { memo, startTransition, useCallback, useEffect, useMemo, useRef, useStat
 import { Background, MarkerType, ReactFlow } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import LoadingState from "../../components/LoadingState/LoadingState";
-import MIcon from "../../components/MIcon";
-import PageHeader from "../../components/PageHeader/PageHeader";
-import EmptyState from "../../components/EmptyState/EmptyState";
-import ClassroomWatchDialog from "../../components/Classroom/ClassroomWatchDialog";
-import { useConfirm } from "../../components/ConfirmDialog/ConfirmProvider";
-import { ClassroomService } from "../../services/classroom";
-import { courseNodeHasUsableSource, CourseEnvironmentsService } from "../../services/courseEnvironments";
-import { TeachingClassesService } from "../../services/teachingClasses";
+import LoadingState from "../../../components/LoadingState/LoadingState";
+import MIcon from "../../../components/MIcon";
+import PageHeader from "../../../components/PageHeader/PageHeader";
+import EmptyState from "../../../components/EmptyState/EmptyState";
+import ClassroomWatchDialog from "../../../components/Classroom/ClassroomWatchDialog";
+import { useConfirm } from "../../../components/ConfirmDialog/ConfirmProvider";
+import { ClassroomService } from "../../../services/classroom";
+import { courseNodeHasUsableSource, CourseEnvironmentsService } from "../../../services/courseEnvironments";
+import { TeachingClassesService } from "../../../services/teachingClasses";
 import AiJudgePanel from "./AiJudgePanel";
 import ClassCreateDialog from "./ClassCreateDialog";
-import useDialogPresence from "../../hooks/useDialogPresence";
+import useDialogPresence from "../../../hooks/useDialogPresence";
 import {
   machineRuntimeState,
   mergeResourceUsageByVmid,
   RESOURCE_METRICS,
   usageForMetric,
 } from "./classHeatmapUsage";
-import styles from "./CourseOperations.module.scss";
+import styles from "../CourseOperations.module.scss";
 
 const TABS = [
   ["overview", "dashboard", "班級總覽", "確認開課條件"],

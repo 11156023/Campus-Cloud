@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import MIcon from "../../../components/MIcon";
-import { useAuth } from "../../../contexts/AuthContext";
-import { CourseAdminService } from "../../../services/courses";
-import { TeachingClassesService } from "../../../services/teachingClasses";
+import MIcon from "../../../../components/MIcon";
+import { useAuth } from "../../../../contexts/AuthContext";
+import { CourseAdminService } from "../../../../services/courses";
+import { TeachingClassesService } from "../../../../services/teachingClasses";
 import styles from "./TeacherDashboardPage.module.scss";
-import PageHeader from "../../../components/PageHeader/PageHeader";
-import EmptyState from "../../../components/EmptyState/EmptyState";
-import LoadingState from "../../../components/LoadingState/LoadingState";
+import PageHeader from "../../../../components/PageHeader/PageHeader";
+import EmptyState from "../../../../components/EmptyState/EmptyState";
+import LoadingState from "../../../../components/LoadingState/LoadingState";
 
 const CLASS_STATUS = {
   planning: "準備中",

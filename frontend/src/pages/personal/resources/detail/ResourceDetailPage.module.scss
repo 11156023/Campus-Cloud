@@ -4,7 +4,7 @@
   padding: $spacing-8 $spacing-16;
   flex: 1;
 
-  @include respond-to(md) {
+  @media (min-width: $breakpoint-sidebar) {
     padding: 0;
   }
 }
@@ -864,5 +864,18 @@
   &:hover {
     background: color-mix(in srgb, var(--color-danger) 12%, transparent);
     color: var(--color-danger);
+  }
+}
+
+/* ── 未填欄位：紅框 ── */
+.fieldInvalid {
+  input,
+  textarea {
+    border-color: var(--color-danger);
+
+    &:focus {
+      border-color: var(--color-danger);
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-danger) 18%, transparent);
+    }
   }
 }

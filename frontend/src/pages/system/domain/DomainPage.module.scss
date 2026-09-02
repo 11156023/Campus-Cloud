@@ -7,8 +7,16 @@
   padding: $spacing-8 $spacing-16;
   flex: 1;
 
-  @include respond-to(md) {
+  @media (min-width: $breakpoint-sidebar) {
     padding: 0;
+  }
+
+  /* 桌面版鎖定視口高度，改由 zoneList / list 內部滾動；
+     flex: none 讓 height 不被外層 column flex 演算法蓋掉 */
+  @include respond-to(lg) {
+    flex: none;
+    height: calc(100dvh - var(--layout-py) * 2 - var(--footer-h) - #{$spacing-16});
+    overflow: hidden;
   }
 }
 
@@ -48,6 +56,15 @@
 .list {
   @include flex-column;
   gap: $spacing-8;
+
+  @include respond-to(lg) {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    /* row hover 陰影會貼邊被裁，留一點內距 */
+    padding: 2px;
+    margin: -2px;
+  }
 }
 
 .row {
@@ -214,7 +231,8 @@
 
   @include respond-to(lg) {
     grid-template-columns: 280px minmax(0, 1fr);
-    align-items: start;
+    grid-template-rows: minmax(0, 1fr);
+    min-height: 0;
   }
 }
 
@@ -225,6 +243,10 @@
   padding: $spacing-16;
   @include glass-surface($shadow: var(--shadow-sm));
   border-radius: $radius-12;
+
+  @include respond-to(lg) {
+    min-height: 0;
+  }
 }
 
 .panelTitle {
@@ -243,6 +265,12 @@
 .zoneList {
   @include flex-column;
   gap: $spacing-4;
+
+  @include respond-to(lg) {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+  }
 }
 
 .zoneItem,

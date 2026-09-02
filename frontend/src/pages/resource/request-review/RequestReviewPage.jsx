@@ -19,8 +19,6 @@ const TABS = [
   { key: "all", label: "全部", icon: "view_list" },
 ];
 
-const REVIEW_COLUMNS = ["申請類型", "申請內容", "申請人", "時間", "規格 / 摘要", "狀態"];
-
 const STATUS_META = {
   pending: { label: "待審核", tone: "info" },
   approved: { label: "已通過", tone: "success" },
@@ -371,6 +369,12 @@ export default function RequestReviewPage() {
   }
 
   const isPending = selected?.reviewStatus === "pending";
+  /* 系統寫入的刪除標記（CONSUMED_REQUEST_MARKERS）不是審核人留的備註，不顯示 */
+  const rawReviewComment = selected?.raw?.review_comment;
+  const reviewNote =
+    rawReviewComment && !CONSUMED_REQUEST_MARKERS.includes(rawReviewComment)
+      ? rawReviewComment
+      : null;
   const stats = useMemo(() => {
     const source = allRequests.length ? allRequests : requests;
     const pending = source.filter((request) => request.reviewStatus === "pending").length;
@@ -484,42 +488,29 @@ export default function RequestReviewPage() {
             ) : visibleRequests.length === 0 ? (
               <EmptyState tab={activeTab} />
             ) : (
-              <div className={styles.tableWrap}>
-                <table className={styles.table}>
-                  <thead>
-                    <tr>
-                      {REVIEW_COLUMNS.map((column) => (
-                        <th key={column} className={styles.th}>{column}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {visibleRequests.map((request) => (
-                      <tr
-                        key={request.id}
-                        className={`${styles.tr} ${selected?.id === request.id ? styles.trActive : ""}`}
-                        onClick={() => { setSelectedId(request.id); setComment(""); }}
-                      >
-                        <td className={styles.td}>{sourceLabel(request.source)}</td>
-                        <td className={styles.td}>
-                          <div className={styles.nameCell}>
-                            <div className={styles.nameIcon}>
-                              <MIcon name={sourceIcon(request)} size={18} />
-                            </div>
-                            <div>
-                              <div className={styles.namePrimary}>{request.title}</div>
-                              <div className={styles.nameSub}>{request.paramText}</div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className={styles.td}>{request.user}</td>
-                        <td className={styles.td}>{request.timeText}</td>
-                        <td className={styles.td}>{request.specText}</td>
-                        <td className={styles.td}><StatusBadge status={request.status} /></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className={styles.list}>
+                {visibleRequests.map((request) => (
+                  <button
+                    key={request.id}
+                    type="button"
+                    className={`${styles.row} ${selected?.id === request.id ? styles.rowActive : ""}`}
+                    onClick={() => { setSelectedId(request.id); setComment(""); }}
+                  >
+                    <div className={styles.rowIcon}>
+                      <MIcon name={sourceIcon(request)} size={20} />
+                    </div>
+                    <div className={styles.rowMain}>
+                      <span className={styles.rowName}>{request.title}</span>
+                      <span className={styles.rowMeta}>
+                        {sourceLabel(request.source)}・{request.user}
+                      </span>
+                    </div>
+                    <div className={styles.rowSide}>
+                      <StatusBadge status={request.status} />
+                      <span className={styles.rowTime}>{request.timeText}</span>
+                    </div>
+                  </button>
+                ))}
               </div>
             )}
           </section>
@@ -530,11 +521,8 @@ export default function RequestReviewPage() {
             ) : (
               <>
                 <div className={styles.detailHeader}>
-                  <div>
-                    <h2>{selected.title}</h2>
-                    <p>{selected.user}</p>
-                  </div>
-                  <StatusBadge status={selected.status} />
+                  <h2>{selected.title}</h2>
+                  <p>{selected.user}</p>
                 </div>
 
                 <div className={styles.infoGrid}>
@@ -574,19 +562,18 @@ export default function RequestReviewPage() {
                   </div>
                 )}
 
-                <label className={styles.commentField}>
-                  <span>審核備註</span>
-                  <textarea
-                    value={comment}
-                    onChange={(event) => setComment(event.target.value)}
-                    disabled={!isPending || reviewing || selected.source === "deletion"}
-                    placeholder="可填寫核准原因或退回說明"
-                  />
-                </label>
-
-                <div className={styles.rowActions}>
-                  {isPending && selected.source !== "deletion" ? (
-                    <>
+                {isPending && selected.source !== "deletion" ? (
+                  <>
+                    <label className={styles.commentField}>
+                      <span>審核備註</span>
+                      <textarea
+                        value={comment}
+                        onChange={(event) => setComment(event.target.value)}
+                        disabled={reviewing}
+                        placeholder="可填寫核准原因或退回說明"
+                      />
+                    </label>
+                    <div className={styles.rowActions}>
                       <button
                         type="button"
                         className={styles.btnApprove}
@@ -603,13 +590,23 @@ export default function RequestReviewPage() {
                       >
                         拒絕
                       </button>
-                    </>
-                  ) : selected.source === "deletion" ? (
+                    </div>
+                  </>
+                ) : selected.source === "deletion" ? (
+                  <div className={styles.rowActions}>
                     <span className={styles.doneText}>刪除請求只作為申請紀錄，不計入審核通過數量。</span>
-                  ) : (
-                    <span className={styles.doneText}>這筆申請已完成審核。</span>
-                  )}
-                </div>
+                  </div>
+                ) : (
+                  (reviewNote || selected.reviewedAt) && (
+                    <div className={styles.reasonBox}>
+                      <span>
+                        審核備註
+                        {selected.reviewedAt ? `（${formatDateTime(selected.reviewedAt)} 審核）` : ""}
+                      </span>
+                      <p>{reviewNote || "未填寫備註"}</p>
+                    </div>
+                  )
+                )}
               </>
             )}
           </section>
