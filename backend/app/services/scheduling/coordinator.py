@@ -453,6 +453,19 @@ def _ensure_request_running(
     request = vm_request_repo.get_vm_request_by_id(
         session=session, request_id=request.id, for_update=True,
     ) or request
+    # 鎖定後再確認一次：本 tick 撈單之後，使用者刪機流程可能已把申請單標成
+    # 已消耗（provisioning_status=failed）。這時不能再把它寫回 completed，
+    # 否則下個 tick 會把它當成活單、發現機器不見而重新 clone 出來。
+    if (
+        request.status != VMRequestStatus.approved
+        or request.provisioning_status == VMProvisioningStatus.failed
+    ):
+        logger.info(
+            "Skipping auto-start for request %s: consumed or deactivated "
+            "after this tick began",
+            request.id,
+        )
+        return False
 
     pve_status = proxmox_service.get_status(actual_node, request.vmid, resource_type)
     is_running = str(pve_status.get("status") or "").lower() == "running"
@@ -685,6 +698,10 @@ def process_due_request_stops() -> int:
             session.exec(
                 select(VMRequest).where(
                     VMRequest.status == VMRequestStatus.approved,
+                    # failed = 已消耗（使用者刪機／轉範本）或機器異常，排程器
+                    # 不再接管。不排除的話，刪機後這裡會把 vmid 清掉，申請單
+                    # 在前端就變回「建立中／開通失敗」的 placeholder。
+                    VMRequest.provisioning_status != VMProvisioningStatus.failed,
                     VMRequest.vmid.is_not(None),
                     VMRequest.end_at.is_not(None),
                     VMRequest.end_at <= now,
@@ -727,12 +744,20 @@ def process_due_request_stops() -> int:
                     vmid,
                 )
             except NotFoundError:
-                logger.debug(
-                    "Scheduled shutdown skipped: resource %s not found for request %s, clearing vmid",
+                # 機器已不在 Proxmox（例如在 PVE 端被直接刪掉）。保留 vmid 供
+                # 稽核，標 failed 讓下個 tick 不再撈到；不要清 vmid——approved
+                # 且 vmid 為空在前端會被當成「建立中」placeholder。
+                logger.warning(
+                    "Scheduled shutdown skipped: resource %s not found for "
+                    "request %s; marking request failed",
                     vmid,
                     request.id,
                 )
-                request.vmid = None
+                request.provisioning_status = VMProvisioningStatus.failed
+                request.provisioning_error = (
+                    f"Resource {vmid} no longer exists on Proxmox; "
+                    "scheduled shutdown skipped"
+                )
                 session.add(request)
                 session.commit()
             except Exception:

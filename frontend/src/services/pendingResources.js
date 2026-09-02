@@ -4,11 +4,34 @@ import { VmRequestsService } from "./vmRequests";
 export const PENDING_POLL_INTERVAL = 5000;
 
 /**
+ * 後端在使用者刪機／孤兒清理／轉範本時寫進 review_comment、resource_warning、
+ * provisioning_error 的系統標記（對應 backend resource_service._RESOURCE_DELETED_MARKERS）。
+ * 帶標記的 approved 申請單只保留做稽核，任何列表都不該再把它當成活單。
+ */
+export const CONSUMED_REQUEST_MARKERS = Object.freeze([
+  "Resource deleted by user",
+  "Resource deleted (orphan DB cleanup)",
+  "Resource converted to template",
+]);
+
+/** 申請單對應的機器已被使用者刪除／清理／轉為範本 */
+export function isConsumedRequest(req) {
+  if (!req) return false;
+  return (
+    CONSUMED_REQUEST_MARKERS.includes(req.review_comment) ||
+    CONSUMED_REQUEST_MARKERS.includes(req.resource_warning) ||
+    CONSUMED_REQUEST_MARKERS.includes(req.provisioning_error)
+  );
+}
+
+/**
  * 是否為「建立中」、應在資源列表預先顯示為 placeholder 的申請。
  * 開通成功後 VMRequest.status 仍停留在 approved（後端只把 vmid 寫回），
  * 所以 approved 必須同時看 vmid：vmid 已存在代表機器已開出來，不再是 placeholder。
+ * 已消耗的申請單（機器被刪掉）即使 vmid 為空也不是建立中，不能再顯示成 placeholder。
  */
 export function isCreatingRequest(req) {
+  if (isConsumedRequest(req)) return false;
   if (req.status === "pending") return true;
   return req.status === "approved" && req.vmid == null;
 }

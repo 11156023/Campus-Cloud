@@ -9,6 +9,10 @@ import { AiApiService } from "../../../services/aiApi";
 import { DeletionRequestsService } from "../../../services/deletionRequests";
 import { SpecChangeRequestsService } from "../../../services/specChangeRequests";
 import { VmRequestsService } from "../../../services/vmRequests";
+import {
+  CONSUMED_REQUEST_MARKERS,
+  isConsumedRequest,
+} from "../../../services/pendingResources";
 import PageHeader from "../../../components/PageHeader/PageHeader";
 
 const TABS = [
@@ -49,18 +53,8 @@ function formatRange(startAt, endAt) {
   return `${formatDateTime(startAt)} - ${formatDateTime(endAt)}`;
 }
 
-const CONSUMED_REQUEST_MARKERS = [
-  "Resource deleted by user",
-  "Resource deleted (orphan DB cleanup)",
-  "Resource converted to template",
-];
-
-function isDeletedApprovedVm(request) {
-  return (
-    CONSUMED_REQUEST_MARKERS.includes(request?.review_comment) ||
-    CONSUMED_REQUEST_MARKERS.includes(request?.resource_warning)
-  );
-}
+/* 系統刪除標記與判斷統一放在 services/pendingResources，與資源頁共用 */
+const isDeletedApprovedVm = isConsumedRequest;
 
 function vmSpecLabel(request) {
   if (!request) return "-";

@@ -3,7 +3,7 @@ import math
 import time
 import uuid
 from datetime import UTC, datetime, timedelta
-from typing import Literal
+from typing import Any, Literal
 
 from sqlmodel import Session
 
@@ -253,23 +253,66 @@ _RESOURCE_DELETED_MARKERS = frozenset(
 
 
 def mark_linked_request_consumed(
-    *, session: Session, vmid: int, marker: str
-) -> None:
+    *, session: Session, vmid: int, marker: str, commit: bool = False
+) -> dict[str, Any] | None:
     """把連結到 vmid 的 approved 申請單標為已消耗（機器已刪除或轉為範本）。
 
     provisioning_status=failed 讓排程器不再接管該申請單；marker 寫入
     resource_warning / review_comment 讓資源頁與審核頁不再顯示它。
+
+    回傳標記前的欄位快照（供 ``restore_linked_request`` 在 Proxmox 端刪除
+    失敗時還原）；沒有連結的申請單時回傳 None。
     """
     linked_request = vm_request_repo.get_latest_approved_vm_request_by_vmid(
         session=session, vmid=vmid,
     )
     if linked_request is None:
-        return
+        return None
+    snapshot: dict[str, Any] = {
+        "request": linked_request,
+        "provisioning_status": linked_request.provisioning_status,
+        "provisioning_error": linked_request.provisioning_error,
+        "resource_warning": linked_request.resource_warning,
+        "review_comment": linked_request.review_comment,
+    }
     linked_request.provisioning_status = VMProvisioningStatus.failed
     linked_request.provisioning_error = marker
     linked_request.resource_warning = marker
     linked_request.review_comment = marker
     session.add(linked_request)
+    if commit:
+        session.commit()
+    return snapshot
+
+
+def restore_linked_request(
+    *, session: Session, snapshot: dict[str, Any] | None
+) -> None:
+    """還原 ``mark_linked_request_consumed`` 寫入的標記（刪除在 Proxmox 端失敗時用）。"""
+    if not snapshot:
+        return
+    request = snapshot["request"]
+    request.provisioning_status = snapshot["provisioning_status"]
+    request.provisioning_error = snapshot["provisioning_error"]
+    request.resource_warning = snapshot["resource_warning"]
+    request.review_comment = snapshot["review_comment"]
+    session.add(request)
+    session.commit()
+
+
+def _restore_after_failed_delete(
+    *, session: Session, snapshot: dict[str, Any] | None, vmid: int
+) -> None:
+    if snapshot is None:
+        return
+    try:
+        session.rollback()
+        restore_linked_request(session=session, snapshot=snapshot)
+    except Exception as exc:
+        logger.warning(
+            "Failed to restore linked request after aborted delete of %s: %s",
+            vmid, exc,
+        )
 
 
 def list_by_user(
@@ -615,32 +658,54 @@ def delete(
         node = resource_info["node"]
         resource_type = resource_info["type"]
 
-        # Re-check live status: deletion runs from a queue, so the snapshot in
-        # resource_info may be stale by the time we execute.
+        # 先把連結的申請單標成已消耗並 commit，再碰 Proxmox。排程器每個 tick
+        # 都以「approved 且未 failed」撈單；若機器先在 Proxmox 消失而標記還沒
+        # 落地，stale-VMID 回復路徑會把同名機器重新 clone 出來（會復活）。
+        # 標記先落地，任何找不到機器的 tick 重讀 DB 都會看到 failed 而放手；
+        # 同時也避免關機等待期間被排程器自動開機。Proxmox 端失敗時再還原。
+        consumed = mark_linked_request_consumed(
+            session=session,
+            vmid=vmid,
+            marker=RESOURCE_DELETED_BY_USER_MARKER,
+            commit=True,
+        )
+
         try:
-            current_status = proxmox_service.get_status(
-                node, vmid, resource_type
-            ).get("status", "")
-        except Exception as exc:
-            logger.warning(
-                "Failed to fetch live status for resource %s before delete: %s",
-                vmid, exc,
+            # Re-check live status: deletion runs from a queue, so the snapshot
+            # in resource_info may be stale by the time we execute.
+            try:
+                current_status = proxmox_service.get_status(
+                    node, vmid, resource_type
+                ).get("status", "")
+            except Exception as exc:
+                logger.warning(
+                    "Failed to fetch live status for resource %s before delete: %s",
+                    vmid, exc,
+                )
+                current_status = resource_info.get("status", "")
+
+            if current_status == "running":
+                _ensure_stopped_before_delete(
+                    node, vmid, resource_type, force=force
+                )
+
+            # Delete the resource
+            delete_params = {}
+            if purge:
+                delete_params["purge"] = 1
+                if resource_type == "qemu":
+                    delete_params["destroy-unreferenced-disks"] = 1
+
+            proxmox_service.delete_resource(
+                node, vmid, resource_type, **delete_params
             )
-            current_status = resource_info.get("status", "")
-
-        if current_status == "running":
-            _ensure_stopped_before_delete(
-                node, vmid, resource_type, force=force
+        except Exception:
+            # 機器還在：把申請單還原成可排程狀態，否則使用者會看到機器活著
+            # 但申請單已被隱藏、也不再自動關機。
+            _restore_after_failed_delete(
+                session=session, snapshot=consumed, vmid=vmid
             )
-
-        # Delete the resource
-        delete_params = {}
-        if purge:
-            delete_params["purge"] = 1
-            if resource_type == "qemu":
-                delete_params["destroy-unreferenced-disks"] = 1
-
-        proxmox_service.delete_resource(node, vmid, resource_type, **delete_params)
+            raise
 
         # Clean up reverse proxy rules and Cloudflare DNS records for this VM
         try:
@@ -688,13 +753,9 @@ def delete(
             session=session, teaching_class_id=teaching_class_id
         )
 
-        # Keep the original approval result for audit/review reporting.
-        # Mark it as no longer schedulable so the scheduler will not
-        # re-provision a resource that the user intentionally deleted.
-        mark_linked_request_consumed(
-            session=session, vmid=vmid, marker=RESOURCE_DELETED_BY_USER_MARKER,
-        )
-
+        # The linked approval record was already marked consumed (and
+        # committed) before touching Proxmox; it stays on disk for
+        # audit/review reporting but is no longer schedulable.
         audit_service.log_action(
             session=session,
             user_id=user_id,
