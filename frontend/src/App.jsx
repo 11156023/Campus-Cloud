@@ -40,6 +40,7 @@ const CourseTemplateManagementPage = lazy(() => import("./pages/course-operation
 const CourseTemplateEditorPage = lazy(() => import("./pages/course-operations/course-templates/CourseTemplateEditorPage"));
 const ClassManagementPage = lazy(() => import("./pages/course-operations/class-management/ClassManagementPage"));
 const ClassWorkspacePage = lazy(() => import("./pages/course-operations/class-workspace/ClassWorkspacePage"));
+const AiJudgePage = lazy(() => import("./pages/course-operations/ai-judge/AiJudgePage"));
 const ClassSetupPage = lazy(() => import("./pages/course-operations/class-setup/ClassSetupPage"));
 
 // 系統管理
@@ -197,6 +198,7 @@ function App() {
           <Route path="/class-management" element={canTeach ? <ClassManagementPage /> : <Navigate to="/dashboard" replace />} />
           <Route path="/class-management/new" element={<Navigate to={canTeach ? "/class-setup" : "/dashboard"} replace />} />
           <Route path="/class-setup" element={canTeach ? <ClassSetupPage /> : <Navigate to="/dashboard" replace />} />
+          <Route path="/class-management/:classId/ai" element={canTeach ? <AiJudgePage /> : <Navigate to="/dashboard" replace />} />
           {/* 舊評分表連結保留導回主工作頁，避免書籤落到不存在的獨立 editor。 */}
           <Route
             path="/class-management/:classId/ai/checks/:sessionId/edit"
