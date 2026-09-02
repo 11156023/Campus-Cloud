@@ -1273,7 +1273,7 @@ export default function RequestFormPage({ onBack, className }) {
               disabled={submitting}
             >
               {submitting
-                ? <><MIcon name="hourglass_empty" size={16} />送出中…</>
+                ? <><span className={styles.spin}><MIcon name="hourglass_empty" size={16} /></span>送出中…</>
                 : <><MIcon name="send" size={16} />送出申請</>
               }
             </button>

@@ -175,8 +175,8 @@
   border-radius: $radius-pill;
   font-size: $font-size-12;
   font-weight: $font-weight-500;
-  background: color-mix(in srgb, var(--color-primary-dark) 12%, transparent);
-  color: var(--color-primary-dark);
+  background: color-mix(in srgb, var(--color-primary-on-surface) 12%, transparent);
+  color: var(--color-primary-on-surface);
   white-space: nowrap;
 }
 

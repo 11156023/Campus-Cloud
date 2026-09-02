@@ -72,8 +72,9 @@ src/pages/personal/resources/
 | 變數 | 用途 |
 |------|------|
 | `--color-primary` | 主色（藍紫） |
-| `--color-primary-dark` | 深色主色 |
+| `--color-primary-dark` | 深色主色（**僅作底色**，如 primary 按鈕 hover；深色模式仍為深色，當文字會不可讀）|
 | `--color-primary-light` | 淺色主色 |
+| `--color-primary-on-surface` | 品牌色**文字／邊框**用；亮暗兩色都達 AA。勿與 `--color-text-primary` 混淆（語序相反、兩者皆為藍色）|
 
 #### 文字
 | 變數 | 用途 |
@@ -112,7 +113,7 @@ src/pages/personal/resources/
 | `--color-pending` | `#d97706` | `#f59e0b` | 🟠 待審核 | 待審核、草稿、排程中、等待處理 |
 | `--color-danger` | `#dc3545` | 同左 | 🔴 危險 | 錯誤、失敗、危險操作 |
 | `--color-warning` | `#dc3545` | 同左 | 🔴 同 danger | （等同 danger，已統一為紅色） |
-| —（灰色） | `--color-hover` / `--color-text-muted` | — | ⚫ 未啟用 | 已停止、已暫停、disabled |
+| `--color-status-neutral` | `#6b7280` | `#9ca3af` | — | ⚫ 未啟用 | 已停止、已暫停、disabled |
 
 危險操作的 hover 加深色用 `--color-danger-dark`（`#b91c1c`）。
 
@@ -127,7 +128,7 @@ src/pages/personal/resources/
 .badge_info    { background: color-mix(in srgb, var(--color-info)    12%, transparent); color: var(--color-info); }
 .badge_pending { background: color-mix(in srgb, var(--color-pending) 12%, transparent); color: var(--color-pending); }
 .badge_danger  { background: color-mix(in srgb, var(--color-danger)  12%, transparent); color: var(--color-danger); }
-.badge_muted   { background: var(--color-hover); color: var(--color-text-muted); }
+.badge_muted   { background: var(--color-hover); color: var(--color-status-neutral); }
 ```
 
 > 一律用 `var(--color-*)`，不要把狀態色寫死成 HEX——深色模式的 info / pending 亮色值才吃得到。
@@ -355,13 +356,68 @@ import MIcon from "../components/MIcon";
 .tableWrap { @include table-wrap; }        // 玻璃容器 + 圓角 + 橫向卷動
 .table     { @include table-base; min-width: 720px; }  // min-width 依內容自定，撐出卷動
 .th        { @include table-th; }
-.tr        { @include table-tr; }          // 一般列不亮 hover 時傳 $hover: false
+.tr        { @include table-tr; }          // 基底不含 hover，見下方規則
 .td        { @include table-td; }
 ```
 
 - 欄寬、對齊、特殊儲存格（`.thRight`、`.tdNowrap`…）等頁面差異寫在 `@include` 之後
 - RWD 行為統一為 **容器橫向卷動**（`table-wrap` 內建 `overflow-x: auto`），不做表格轉卡片
 - 表格嵌在既有卡片內時可只用 `table-base` / `table-th` / `table-tr` / `table-td`，省略外層 `table-wrap`
+
+#### 規則一：整列 hover 變色 = 這一列可以點
+
+整列 hover 變色是**互動訊號，不是裝飾**。列本身不可點（互動都在儲存格內的按鈕上）時，
+不要讓整列變色，否則是假的可點暗示。
+
+```scss
+.tr          { @include table-tr; }            // 不可點：只有分隔線，無 hover
+.trClickable { @include table-tr-clickable; }  // 可點：游標 + hover 一起給
+```
+
+- 判斷標準只有一個：**`<tr>` 自己有沒有 `onClick`**（或 `role` / `tabIndex`）
+- 同一張表可以混用（監控頁：節點列可點、VM 列不可點），所以用兩支 mixin 疊加，不用布林參數
+- 不要自己寫 `cursor: pointer` 或 `&:hover { background: … }`——游標與 hover 會各自漂移
+- 需要不同的 hover 色時（例如群組列本身已有底色），可在 `@include` 之後覆寫 `background`
+
+#### 規則二：列數會變的表格要固定欄寬
+
+`table-layout` 預設的 `auto` 依**全部列的內容**計算欄寬。只要展開／收合會增減
+**完整欄位的列**，每一欄的內容都變了，整張表就會跳動。
+
+```scss
+.table { @include table-base; table-layout: fixed; min-width: 1080px; }
+
+.colStatus { width: 100px; }   // 欄寬集中宣告，搭配 JSX 的 <colgroup>
+```
+
+- 只有在展開列是 **`<td colSpan={N}>` 的整寬詳情面板**時才不需要——
+  colspan 儲存格不參與個別欄寬計算，不會造成跳動
+- 改用 `fixed` 後，要移除儲存格內為了「跟 auto layout 搶寬度」而設的 `min-width`，
+  它們只會讓內容溢出欄位
+- 不指定寬度的那一欄會吸收剩餘空間（通常留給名稱欄）
+
+#### 規則三：列表表格的名稱欄不放圖示
+
+`MIcon` 一律 `aria-hidden`，螢幕閱讀器讀不到，所以名稱欄的圖示至多只能是給
+視覺使用者的輔助。實際盤點全站後，這些圖示分成兩種，**兩種都不該留**：
+
+| 型態 | 例子 | 問題 |
+|------|------|------|
+| 隨資料變化 | `terminal` / `computer` 對應 LXC / VM | 型別文字（「容器 (LXC)」）就寫在名稱正下方，圖示只是重複一次 |
+| 每列都相同 | `task`、`memory`、`device_hub`、`library_add` | 不編碼任何列資訊，純粹是版面慣性 |
+
+拿掉後名稱欄整欄對齊，掃視更快。**這條只管列表表格的名稱／資料儲存格**——
+狀態徽章、按鈕、頁首、空狀態插圖的圖示不受影響，它們本來就承擔語意。
+
+名稱欄的版面一併統一：
+
+```scss
+.nameCell { display: flex; align-items: center; gap: $spacing-16; }
+
+/* 巢狀列（群組 → 機器）的階層靠 └ 表達，不靠縮排圖示。
+   顏色要用文字系的 muted，--color-border 是邊框用色，淡到看不見。 */
+.machineBranch { color: var(--color-text-muted); }
+```
 
 ### Dropdown 選單
 

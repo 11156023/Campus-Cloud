@@ -224,11 +224,11 @@
   padding: $spacing-8 $spacing-16;
   border-radius: $radius-8;
   font-size: $font-size-12;
-  border: 1px solid color-mix(in srgb, var(--color-primary-dark) 30%, transparent);
-  background: color-mix(in srgb, var(--color-primary-dark) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-primary-on-surface) 30%, transparent);
+  background: color-mix(in srgb, var(--color-primary-on-surface) 8%, transparent);
   color: var(--color-text-secondary);
 
   p { margin: 0; }
 
-  strong { color: var(--color-primary-dark); }
+  strong { color: var(--color-primary-on-surface); }
 }

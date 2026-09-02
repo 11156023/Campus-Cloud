@@ -168,17 +168,7 @@
 .nameCell {
   display: flex;
   align-items: center;
-  gap: $spacing-8;
-}
-
-.nameIcon {
-  width: 34px;
-  height: 34px;
-  border-radius: $radius-8;
-  background: var(--color-hover);
-  color: var(--color-primary);
-  @include flex-center;
-  flex-shrink: 0;
+  gap: $spacing-16;
 }
 
 .namePrimary {
@@ -281,12 +271,12 @@
   font-size: $font-size-12;
   border: none;
   border-radius: $radius-pill;
-  background: color-mix(in srgb, var(--color-primary-dark) 12%, transparent);
-  color: var(--color-primary-dark);
+  background: color-mix(in srgb, var(--color-primary-on-surface) 12%, transparent);
+  color: var(--color-primary-on-surface);
   cursor: pointer;
   transition: background $transition-base;
 
-  &:hover { background: color-mix(in srgb, var(--color-primary-dark) 20%, transparent); }
+  &:hover { background: color-mix(in srgb, var(--color-primary-on-surface) 20%, transparent); }
 }
 
 .recurWindows {

@@ -73,23 +73,11 @@
   gap: $spacing-16;
 }
 
-.sectionHead {
-  @include flex-between;
+.tabToolbar {
+  display: flex;
+  justify-content: flex-end;
   flex-wrap: wrap;
-  gap: $spacing-16;
-  align-items: flex-start;
-}
-
-.sectionTitle {
-  font-size: $font-size-16;
-  font-weight: $font-weight-700;
-  color: var(--color-text-primary);
-}
-
-.sectionDesc {
-  margin-top: $spacing-4;
-  font-size: $font-size-14;
-  color: var(--color-text-secondary);
+  gap: $spacing-8;
 }
 
 .sectionActions {
@@ -239,12 +227,12 @@
   padding: $spacing-8 $spacing-16;
   border-radius: $radius-8;
   font-size: $font-size-12;
-  border: 1px solid color-mix(in srgb, var(--color-primary-dark) 30%, transparent);
-  background: color-mix(in srgb, var(--color-primary-dark) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-info) 30%, transparent);
+  background: color-mix(in srgb, var(--color-info) 8%, transparent);
   color: var(--color-text-secondary);
 
   p { margin: 0; }
-  strong { color: var(--color-primary-dark); }
+  strong { color: var(--color-info); }
 }
 
 /* ── 已保存評分表列表 ── */
@@ -515,72 +503,75 @@
 }
 
 .assessmentStatus_stale {
-  background: color-mix(in srgb, var(--color-primary-dark) 12%, transparent);
-  color: var(--color-primary-dark);
+  background: color-mix(in srgb, var(--color-info) 12%, transparent);
+  color: var(--color-info);
 }
 
-.statsGrid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: $spacing-8;
+.statsBar {
+  display: flex;
+  gap: 2px;
+  overflow: hidden;
+  height: 10px;
+  border-radius: $radius-pill;
+  background: var(--color-hover);
 
-  @include respond-to(sm) {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+  span {
+    min-width: 6px;
   }
 }
 
-.statBox {
-  @include flex-column;
-  align-items: center;
-  gap: 4px;
-  padding: $spacing-16 $spacing-8;
-  border-radius: $radius-12;
-  background: var(--color-hover);
-  text-align: center;
-}
+.statsSeg_auto { background: var(--color-success); }
+.statsSeg_partial { background: var(--color-info); }
+.statsSeg_manual { background: var(--color-danger); }
 
-.statValue {
+.statsLegend {
   display: flex;
   align-items: center;
-  gap: 4px;
-  font-size: $font-size-24;
-  font-weight: $font-weight-700;
-  color: var(--color-text-primary);
+  flex-wrap: wrap;
+  gap: $spacing-8 $spacing-16;
+  font-size: $font-size-12;
+  color: var(--color-text-secondary);
 }
 
-.statLabel {
-  font-size: $font-size-12;
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+
+  i {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+  }
+}
+
+.legendDot_auto { background: var(--color-success); }
+.legendDot_partial { background: var(--color-info); }
+.legendDot_manual { background: var(--color-danger); }
+
+.legendTotal {
+  margin-left: auto;
   color: var(--color-text-muted);
 }
 
-.statBox_success {
-  background: color-mix(in srgb, var(--color-success) 10%, transparent);
-
-  .statValue { color: var(--color-success); }
-  .statLabel { color: var(--color-success); }
-}
-
-.statBox_info {
-  background: color-mix(in srgb, var(--color-primary-dark) 10%, transparent);
-
-  .statValue { color: var(--color-primary-dark); }
-  .statLabel { color: var(--color-primary-dark); }
-}
-
-.statBox_danger {
-  background: color-mix(in srgb, var(--color-danger) 10%, transparent);
-
-  .statValue { color: var(--color-danger); }
-  .statLabel { color: var(--color-danger); }
-}
-
-.summaryBox {
-  padding: $spacing-16;
+.summaryDetails {
   border-radius: $radius-8;
   background: var(--color-hover);
   font-size: $font-size-14;
   color: var(--color-text-secondary);
-  line-height: $line-height-base;
+
+  summary {
+    padding: $spacing-8 $spacing-16;
+    font-weight: $font-weight-500;
+    color: var(--color-text-primary);
+    cursor: pointer;
+  }
+
+  p {
+    margin: 0;
+    padding: 0 $spacing-16 $spacing-16;
+    line-height: $line-height-base;
+  }
 }
 
 /* ── 評分項目卡片 ── */
@@ -604,7 +595,7 @@
 }
 
 .rubricCard_auto { border-top-color: var(--color-success); }
-.rubricCard_partial { border-top-color: var(--color-primary-dark); }
+.rubricCard_partial { border-top-color: var(--color-info); }
 .rubricCard_manual { border-top-color: var(--color-danger); }
 
 .rubricCardHead {
@@ -631,7 +622,7 @@
 }
 
 .detBadge_auto { background: color-mix(in srgb, var(--color-success) 12%, transparent); color: var(--color-success); }
-.detBadge_partial { background: color-mix(in srgb, var(--color-primary-dark) 12%, transparent); color: var(--color-primary-dark); }
+.detBadge_partial { background: color-mix(in srgb, var(--color-info) 12%, transparent); color: var(--color-info); }
 .detBadge_manual { background: color-mix(in srgb, var(--color-danger) 12%, transparent); color: var(--color-danger); }
 
 .rubricField {
@@ -738,7 +729,7 @@
 /* ── AI 對話 ── */
 .chatCard {
   padding: $spacing-16 $spacing-24;
-  height: 640px;
+  max-height: 640px;
   min-width: 0;
 
   @include respond-to(xl) {
@@ -755,6 +746,7 @@
 
 .chatMessages {
   flex: 1;
+  min-height: 150px;
   overflow-y: auto;
   @include flex-column;
   gap: $spacing-16;
@@ -1118,22 +1110,18 @@
 
 /* ── Badge ── */
 .badge {
-  display: inline-flex;
-  align-items: center;
+  @include badge-base;
   justify-content: center;
   gap: 4px;
   min-height: 24px;
   padding: 2px 10px;
-  border-radius: $radius-pill;
-  font-size: $font-size-12;
-  font-weight: $font-weight-500;
   white-space: nowrap;
 }
 
 .badge_success { background: color-mix(in srgb, var(--color-success) 12%, transparent); color: var(--color-success); }
-.badge_info { background: color-mix(in srgb, var(--color-primary-dark) 12%, transparent); color: var(--color-primary-dark); }
+.badge_info { background: color-mix(in srgb, var(--color-info) 12%, transparent); color: var(--color-info); }
 .badge_danger { background: color-mix(in srgb, var(--color-danger) 12%, transparent); color: var(--color-danger); }
-.badge_muted { background: var(--color-hover); color: var(--color-text-muted); }
+.badge_muted { background: var(--color-hover); color: var(--color-status-neutral); }
 
 /* ── Modal ── */
 .modalOverlay {
@@ -1405,7 +1393,7 @@
 .sidebarEmpty, .mainEmpty { display: flex; flex-direction: column; align-items: center; gap: $spacing-8; padding: $spacing-16 $spacing-8; color: var(--color-text-muted); text-align: center; }
 .sidebarEmpty p, .mainEmpty p { margin: 0; font-size: $font-size-12; line-height: 1.45; }
 .mainEmpty { min-height: 240px; }.mainEmpty > .material-icons-outlined { color: var(--color-primary); }
-.archivedNotice { display: inline-flex; align-items: center; gap: 5px; padding: 5px 8px; border-radius: 999px; color: var(--color-pending); background: color-mix(in srgb, var(--color-pending) 10%, transparent); font-size: $font-size-12; white-space: nowrap; }
+.archivedNotice { @include badge-base; gap: 5px; padding: 5px 8px; color: var(--color-pending); background: color-mix(in srgb, var(--color-pending) 10%, transparent); white-space: nowrap; }
 .renameDialog { width: min(420px, calc(100vw - 28px)); }
 
 .sourceRail {
@@ -1443,7 +1431,7 @@
 .sourceText { display: flex; min-width: 0; flex-direction: column; gap: 3px; }
 .sourceText b { overflow: hidden; font-size: $font-size-14; text-overflow: ellipsis; white-space: nowrap; }
 .sourceText small { color: var(--color-text-muted); font-size: $font-size-12; line-height: 1.35; }
-.sourceText em { width: max-content; padding: 2px 6px; border-radius: 999px; color: var(--color-primary-dark); background: color-mix(in srgb, var(--color-primary) 12%, transparent); font-size: $font-size-10; font-style: normal; }
+.sourceText em { width: max-content; padding: 2px 6px; border-radius: $radius-pill; color: var(--color-primary-on-surface); background: color-mix(in srgb, var(--color-primary) 12%, transparent); font-size: $font-size-10; font-style: normal; }
 .sourceActions { position: relative; }
 .sourceActions .iconBtn,
 .sourceRailActions .iconBtn { width: 36px; height: 36px; }
@@ -1514,13 +1502,13 @@
 .createChoiceCopy { display: flex; flex: 1; flex-direction: column; gap: $spacing-8; }
 .createChoiceCopy strong { font-size: $font-size-18; line-height: 1.3; }
 .createChoiceCopy small { max-width: 36ch; color: var(--color-text-secondary); font-size: $font-size-14; line-height: 1.6; }
-.createChoiceAction { display: inline-flex; align-items: center; gap: 6px; color: var(--color-primary-dark); font-size: $font-size-14; font-weight: $font-weight-700; }
+.createChoiceAction { display: inline-flex; align-items: center; gap: 6px; color: var(--color-primary-on-surface); font-size: $font-size-14; font-weight: $font-weight-700; }
 .dialogField { display: flex; flex-direction: column; gap: 6px; color: var(--color-text-secondary); font-size: $font-size-12; font-weight: $font-weight-500; }
 .dialogField input { min-height: 38px; padding: 8px 10px; border: 1px solid var(--color-border); border-radius: $radius-8; color: var(--color-text-primary); background: var(--color-surface); font: inherit; font-size: $font-size-14; outline: none; }
 .dialogField input:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 12%, transparent); }
 .modeFieldset { margin: 0; padding: 0; border: 0; }.modeFieldset legend { margin-bottom: 8px; color: var(--color-text-secondary); font-size: $font-size-12; font-weight: $font-weight-500; }
 .modeChoices { display: grid; gap: $spacing-8; }.modeChoice, .modeChoiceActive { display: flex; gap: 9px; padding: 11px; border: 1px solid var(--color-border); border-radius: $radius-8; cursor: pointer; }.modeChoiceActive { border-color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 7%, transparent); }.modeChoice input, .modeChoiceActive input { margin-top: 3px; accent-color: var(--color-primary); }.modeChoice span, .modeChoiceActive span { display: flex; min-width: 0; flex-direction: column; gap: 3px; }.modeChoice b, .modeChoiceActive b { font-size: $font-size-14; }.modeChoice small, .modeChoiceActive small { color: var(--color-text-muted); font-size: $font-size-12; line-height: 1.4; }
-.modeFields { display: flex; flex-direction: column; gap: $spacing-16; }.dialogChips { display: flex; flex-wrap: wrap; gap: 7px; }.dialogChip, .dialogChipActive { display: inline-flex; align-items: center; gap: 5px; padding: 6px 9px; border: 1px solid var(--color-border); border-radius: 999px; color: var(--color-text-secondary); background: var(--color-surface); font-size: $font-size-12; cursor: pointer; }.dialogChipActive { border-color: var(--color-primary); color: var(--color-primary-dark); background: color-mix(in srgb, var(--color-primary) 9%, transparent); }.dialogChip input { accent-color: var(--color-primary); }
+.modeFields { display: flex; flex-direction: column; gap: $spacing-16; }.dialogChips { display: flex; flex-wrap: wrap; gap: 7px; }.dialogChip, .dialogChipActive { display: inline-flex; align-items: center; gap: 5px; padding: 6px 9px; border: 1px solid var(--color-border); border-radius: $radius-pill; color: var(--color-text-secondary); background: var(--color-surface); font-size: $font-size-12; cursor: pointer; }.dialogChipActive { border-color: var(--color-primary); color: var(--color-primary-on-surface); background: color-mix(in srgb, var(--color-primary) 9%, transparent); }.dialogChip input { accent-color: var(--color-primary); }
 .existingPicker { display: flex; flex-direction: column; gap: $spacing-8; }.existingPickerHead { display: flex; align-items: center; justify-content: space-between; gap: $spacing-8; color: var(--color-text-secondary); font-size: $font-size-12; font-weight: $font-weight-500; }.existingList { display: flex; max-height: 200px; flex-direction: column; gap: 5px; overflow-y: auto; }.existingRow, .existingRowActive { display: flex; gap: 8px; padding: 8px; border: 1px solid var(--color-border); border-radius: $radius-8; cursor: pointer; }.existingRowActive { border-color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 7%, transparent); }.existingRow input, .existingRowActive input { accent-color: var(--color-primary); }.existingRow span, .existingRowActive span { display: flex; min-width: 0; flex-direction: column; gap: 2px; }.existingRow b, .existingRowActive b { overflow: hidden; font-size: $font-size-12; text-overflow: ellipsis; white-space: nowrap; }.existingRow small, .existingRowActive small { color: var(--color-text-muted); font-size: $font-size-12; }.dialogError { margin: 0; color: var(--color-danger); font-size: $font-size-12; }
 .uploadSourceBlock,
 .savedRubricBlock { display: flex; flex-direction: column; gap: $spacing-8; }
@@ -1594,6 +1582,8 @@
 .proposalList {
   display: grid;
   gap: $spacing-8;
+  max-height: 280px;
+  overflow-y: auto;
 }
 
 .proposalRow {
@@ -1619,7 +1609,7 @@
 
   b { font-size: $font-size-14; }
   small { color: var(--color-text-secondary); font-size: $font-size-12; line-height: 1.45; }
-  em { margin-right: 6px; color: var(--color-primary-dark); font-style: normal; font-weight: $font-weight-700; }
+  em { margin-right: 6px; color: var(--color-primary-on-surface); font-style: normal; font-weight: $font-weight-700; }
 }
 
 .proposalActions {
@@ -1630,7 +1620,8 @@
 
 .metadataGrid {
   display: grid;
-  grid-template-columns: minmax(220px, 1fr) minmax(260px, 1.4fr);
+  // 兩欄合計最小 496px；容器窄於此值時改單欄，避免評分環境 chips 被裁切
+  grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
   gap: $spacing-16;
   align-items: end;
 }

@@ -60,6 +60,18 @@
     0 0 30px color-mix(in srgb, var(--color-primary) 25%, transparent);
   pointer-events: none;
   animation: spotlightPulse 1.8s ease-in-out infinite;
+
+  /* 聚焦區以外壓暗：用超大 spread 的陰影蓋住畫面其餘部分，由 .layer 的
+     overflow: hidden 裁到視窗大小。不寫在 .spotlight 自己的 box-shadow 上，
+     是因為 spotlightPulse 會整個覆寫 box-shadow，動畫一跑遮罩就會消失。 */
+  &::before {
+    content: "";
+    position: absolute;
+    inset: -2px;
+    border-radius: inherit;
+    box-shadow: 0 0 0 9999px var(--color-overlay);
+    pointer-events: none;
+  }
 }
 
 .targetShield {
@@ -173,7 +185,7 @@
   padding: $spacing-16 $spacing-16 12px;
 
   h2 {
-    margin: $spacing-8 0 $spacing-8;
+    margin: 0 0 $spacing-8;
     color: var(--color-text-primary);
     font-size: $font-size-18;
     line-height: 1.4;
@@ -185,15 +197,6 @@
     font-size: $font-size-14;
     line-height: 1.7;
   }
-}
-
-.focusLabel {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  color: var(--color-primary);
-  font-size: 11px;
-  font-weight: $font-weight-700;
 }
 
 .progress {

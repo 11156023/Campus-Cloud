@@ -304,17 +304,13 @@
   text-align: right;
 }
 
-/* 一般列不做 hover——只有可點擊列（.trClickable）才亮 */
 .tr {
-  @include table-tr($hover: false);
+  @include table-tr;
 }
 
+/* 節點列整列可點（展開／收合）。 */
 .trClickable {
-  cursor: pointer;
-
-  &:hover {
-    background: var(--color-hover);
-  }
+  @include table-tr-clickable;
 }
 
 .td {
@@ -328,7 +324,7 @@
 
 .tdExpand {
   padding: $spacing-16;
-  background: var(--color-hover);
+  background: var(--color-surface);
 }
 
 .nodeCell {
@@ -406,7 +402,7 @@
 
 .badge_muted {
   background: var(--color-hover);
-  color: var(--color-text-muted);
+  color: var(--color-status-neutral);
 }
 
 .btnPrimary {

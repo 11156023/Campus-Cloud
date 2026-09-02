@@ -102,7 +102,7 @@ export default function ClassManagementPage() {
   }, [classes]);
 
   return <div className={`${styles.page} ${styles.listPage}`}>
-    <PageHeader title="我的班級" subtitle="從尚未完成的班級繼續準備，或進入已就緒的班級開始上課。">
+    <PageHeader title="班級管理" subtitle="從尚未完成的班級繼續準備，或進入已就緒的班級開始上課。">
       <button type="button" className={styles.btnPrimary} onClick={() => navigate("/class-setup")}>
         <MIcon name="add" size={17} />一鍵建立班級
       </button>
