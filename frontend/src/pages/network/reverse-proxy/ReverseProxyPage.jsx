@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import styles from "./ReverseProxyPage.module.scss";
+import useDialogPresence from "../../../hooks/useDialogPresence";
 import MIcon from "../../../components/MIcon";
 import LoadingState from "../../../components/LoadingState/LoadingState";
 import EmptyState from "../../../components/EmptyState/EmptyState";
@@ -210,6 +211,7 @@ export default function ReverseProxyPage() {
   const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [modal, setModal] = useState(null); // { kind: "rule", rule? } | { kind: "delete", rule }
+  const modalPresence = useDialogPresence(modal);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -322,7 +324,6 @@ export default function ReverseProxyPage() {
           <EmptyState
             icon="swap_horiz"
             title="還沒有任何網址"
-            description="幫 VM 裡的網站或服務取一個好記的網址，別人不用記一長串數字，直接輸入網址就能打開。"
           />
         ) : (
           <>
@@ -380,25 +381,29 @@ export default function ReverseProxyPage() {
       {/* Admin: Traefik */}
       {isAdmin && <TraefikPanel />}
 
-      {modal?.kind === "rule" && (
+      {modalPresence.item?.kind === "rule" && (
         <ReverseProxyRuleModal
-          rule={modal.rule}
+          rule={modalPresence.item.rule}
           setupContext={setupContext}
           isAdmin={isAdmin}
           loading={saving}
           onClose={() => setModal(null)}
           onSubmit={handleSubmitRule}
+          closing={modalPresence.closing}
         />
       )}
-      {modal?.kind === "delete" && (
-        <div className={styles.modalOverlay} onMouseDown={() => setModal(null)}>
+      {modalPresence.item?.kind === "delete" && (
+        <div
+          className={`${styles.modalOverlay} ${modalPresence.closing ? styles.modalOverlayOut : ""}`}
+          onMouseDown={() => setModal(null)}
+        >
           <div className={styles.confirm} onMouseDown={(e) => e.stopPropagation()}>
             <div className={styles.confirmIcon}>
               <MIcon name="warning" size={24} />
             </div>
             <h2>刪除網址</h2>
             <p>
-              確定要刪除 <strong>{modal.rule.domain}</strong> 嗎？刪除後這個網址會立刻失效，
+              確定要刪除 <strong>{modalPresence.item.rule.domain}</strong> 嗎？刪除後這個網址會立刻失效，
               相關設定也會一併清除。
             </p>
             <div className={styles.modalActions}>

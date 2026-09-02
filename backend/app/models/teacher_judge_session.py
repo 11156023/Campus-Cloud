@@ -43,6 +43,16 @@ class TeacherJudgeSession(SQLModel, table=True):
             "pinned_at",
             "last_activity_at",
         ),
+        # A rubric source is session-owned.  Keep NULL available for legacy
+        # chat-first sessions, but never allow two sessions to point at the
+        # same active source.
+        sa.Index(
+            "uq_teacher_judge_sessions_selected_file",
+            "selected_file_id",
+            unique=True,
+            postgresql_where=sa.text("selected_file_id IS NOT NULL"),
+            sqlite_where=sa.text("selected_file_id IS NOT NULL"),
+        ),
     )
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
@@ -53,6 +63,19 @@ class TeacherJudgeSession(SQLModel, table=True):
             nullable=False,
             index=True,
         )
+    )
+    teaching_class_week_id: uuid.UUID | None = Field(
+        default=None,
+        sa_column=Column(
+            sa.Uuid,
+            sa.ForeignKey(
+                "teaching_class_weeks.id",
+                name="fk_teacher_judge_sessions_week_id",
+                ondelete="SET NULL",
+            ),
+            nullable=True,
+            index=True,
+        ),
     )
     title: str = Field(max_length=255)
     status: TeacherJudgeSessionStatus = Field(

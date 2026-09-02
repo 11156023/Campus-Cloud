@@ -1107,7 +1107,7 @@ export class MonitoringService {
     /**
      * List Alerts
      *
-     * 告警事件列表（active=true 只列未解除的）。
+     * 警告事件列表（active=true 只列未解除的）。
      */
     public static monitoringListAlerts<ThrowOnError extends boolean = false>(options?: Options<MonitoringListAlertsData, ThrowOnError>): RequestResult<MonitoringListAlertsResponses, MonitoringListAlertsErrors, ThrowOnError> {
         return (options?.client ?? client).get<MonitoringListAlertsResponses, MonitoringListAlertsErrors, ThrowOnError>({
@@ -1121,7 +1121,7 @@ export class MonitoringService {
     /**
      * Acknowledge Alert
      *
-     * 確認（ack）一筆告警。
+     * 確認（ack）一筆警告。
      */
     public static monitoringAcknowledgeAlert<ThrowOnError extends boolean = false>(options: Options<MonitoringAcknowledgeAlertData, ThrowOnError>): RequestResult<MonitoringAcknowledgeAlertResponses, MonitoringAcknowledgeAlertErrors, ThrowOnError> {
         return (options.client ?? client).post<MonitoringAcknowledgeAlertResponses, MonitoringAcknowledgeAlertErrors, ThrowOnError>({

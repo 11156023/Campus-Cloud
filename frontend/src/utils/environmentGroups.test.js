@@ -5,7 +5,7 @@ describe("environment group builders", () => {
   it("merges quick session machines with live resources", () => {
     const groups = buildEnvironmentGroups(
       [{ vmid: 501, request_id: "request-1", name: "generated-name", status: "running", type: "lxc", node: "pve", ip_address: "10.0.0.5" }],
-      [{ id: "session-1", kindLabel: "快速模板", title: "資料庫練習", expiresAt: "2026-08-27T15:00:00Z", status: "running", machines: [{ id: "machine-1", requestId: "request-1", name: "MySQL", role: "資料庫", type: "lxc", status: "provisioning" }] }],
+      [{ id: "session-1", kindLabel: "快速練習", title: "資料庫練習", expiresAt: "2026-08-27T15:00:00Z", status: "running", machines: [{ id: "machine-1", requestId: "request-1", name: "MySQL", role: "資料庫", type: "lxc", status: "provisioning" }] }],
     );
     expect(groups).toHaveLength(1);
     expect(groups[0].machines[0]).toMatchObject({ name: "MySQL", status: "running", vmid: 501 });

@@ -52,7 +52,7 @@ function quickPracticeGroups(resources, sessions) {
     return {
       id: session.id,
       kind: "quick_practice",
-      kindLabel: session.kindLabel ?? "快速模板",
+      kindLabel: session.kindLabel ?? "快速練習",
       title: session.title,
       status: session.status,
       timingLabel: `${formatDateTime(session.expiresAt)} 到期`,

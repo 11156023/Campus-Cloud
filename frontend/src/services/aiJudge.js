@@ -14,10 +14,19 @@ const SCRIPT_GENERATION_TIMEOUT_MS = 7 * 60 * 1000;
 
 /** 評分環境模板選項 */
 export const TEMPLATE_OPTIONS = [
-  { key: "linux", label: "一般 Linux/LXC" },
-  { key: "python", label: "Python" },
   { key: "n8n", label: "n8n" },
+  { key: "python", label: "Python" },
+  { key: "postgresql", label: "PostgreSQL" },
+  { key: "linux", label: "一般 Linux/LXC" },
 ];
+
+/** 正式工作區與獨立編輯頁共用的整表潤飾動作。 */
+export const RUBRIC_POLISH_PROMPT =
+  "請在不改變原始評分目標的前提下潤飾目前評分表：讓每個項目的成功條件與證據清楚到下一層檢查 AI 能理解。將目前評分環境視為主要情境而非硬性範圍，逐項查找平台所有已啟用的受控檢查能力；若缺少工作目錄、執行命令或成功條件，請明確向我詢問，不要改成較容易但不同的檢查目標，也不要只因單一項目跨環境就要求切換整份評分表環境";
+
+/** 評分項目異動後，重新判斷目前環境能自動檢查到什麼程度。 */
+export const RUBRIC_REASSESS_PROMPT =
+  "請在不改變原始評分目標的前提下重新評估各項目的可自動偵測程度，更新偵測分類、偵測方式、替代建議與評分計劃書。將目前評分環境視為主要情境，個別項目可使用平台其他已啟用的受控能力；若缺少工作目錄、執行命令或成功條件，請明確向我詢問，不要改成不同的檢查目標，也不要只因單一項目跨環境就要求切換整份評分表環境";
 
 export function getTemplateLabel(templateKey) {
   return (
@@ -34,6 +43,14 @@ export function rubricToContext(analysis) {
     checked_count: analysis.checked_count,
     summary: analysis.summary,
   });
+}
+
+/** refine action 的內部指令仍保留在 session 歷史，但不在教師聊天室呈現。 */
+export function shouldDisplayChatMessage(message) {
+  const isKnownInternalPrompt = [RUBRIC_POLISH_PROMPT, RUBRIC_REASSESS_PROMPT].includes(
+    message?.content,
+  );
+  return !message?.hidden && !message?.metadata_json?.ui_hidden && !isKnownInternalPrompt;
 }
 
 export const AiJudgeService = {
@@ -60,6 +77,20 @@ export const AiJudgeService = {
     if (rubricName !== undefined) payload.rubric_name = rubricName;
     if (environmentKeys !== undefined) payload.environment_keys = environmentKeys;
     return apiPost(`/api/v1/teaching-classes/${classId}/judge/sessions/`, payload);
+  },
+
+  createBlankSession(classId, {
+    title = "未命名檢查",
+    rubricName = "空白評分表",
+    environmentKeys = ["n8n"],
+  } = {}) {
+    return this.createSession(classId, {
+      title,
+      selectedFileId: null,
+      creationMode: "blank",
+      rubricName,
+      environmentKeys,
+    });
   },
 
   getSession(classId, sessionId) {
@@ -100,11 +131,24 @@ export const AiJudgeService = {
     );
   },
 
-  sendSessionMessage(classId, sessionId, content, analysisRevision = null) {
+  clearSessionMessages(classId, sessionId) {
+    return apiDelete(
+      `/api/v1/teaching-classes/${classId}/judge/sessions/${sessionId}/messages`,
+    );
+  },
+
+  sendSessionMessage(
+    classId,
+    sessionId,
+    content,
+    analysisRevision = null,
+    { isRefine = false } = {},
+  ) {
     const payload = { content };
     if (analysisRevision !== null && analysisRevision !== undefined) {
       payload.analysis_revision = analysisRevision;
     }
+    if (isRefine) payload.is_refine = true;
     return apiPost(
       `/api/v1/teaching-classes/${classId}/judge/sessions/${sessionId}/messages`,
       payload,
@@ -146,13 +190,17 @@ export const AiJudgeService = {
   },
 
   /**
-   * 上傳評分表文件並觸發 AI 分析。
+   * 上傳評分表文件並觸發 AI 分析；environmentKeys 的第一項為主要情境。
    * 同名檔案已存在時後端回 409，可帶 conflictStrategy（"overwrite" | "copy"）重送。
    */
-  uploadFile(classId, file, templateKey, conflictStrategy) {
+  uploadFile(classId, file, templateKey, conflictStrategy, environmentKeys = null) {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("template_key", templateKey);
+    const selectedEnvironments = Array.isArray(environmentKeys) && environmentKeys.length
+      ? environmentKeys
+      : [templateKey];
+    selectedEnvironments.forEach((key) => formData.append("environment_keys", key));
     if (conflictStrategy) formData.append("conflict_strategy", conflictStrategy);
     return apiPostMultipart(`/api/v1/teaching-classes/${classId}/judge/files/`, formData);
   },

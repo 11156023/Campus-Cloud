@@ -7,8 +7,16 @@
   padding: $spacing-8 $spacing-16;
   flex: 1;
 
-  @include respond-to(md) {
+  @media (min-width: $breakpoint-sidebar) {
     padding: 0;
+  }
+
+  /* 桌面版鎖定視口高度，改由 zoneList / list 內部滾動；
+     flex: none 讓 height 不被外層 column flex 演算法蓋掉 */
+  @include respond-to(lg) {
+    flex: none;
+    height: calc(100dvh - var(--layout-py) * 2 - var(--footer-h) - #{$spacing-16});
+    overflow: hidden;
   }
 }
 
@@ -44,43 +52,19 @@
   @include flex-column;
 }
 
-/* ── Empty state ── */
-.empty {
-  flex: 1;
-  @include flex-column;
-  align-items: center;
-  justify-content: center;
-  gap: $spacing-16;
-  padding: $spacing-48 $spacing-16;
-  text-align: center;
-}
-
-.emptyIcon {
-  width: 72px;
-  height: 72px;
-  border-radius: $radius-16;
-  background: var(--color-surface);
-  color: var(--color-text-secondary);
-  @include flex-center;
-}
-
-.emptyTitle {
-  font-size: $font-size-18;
-  font-weight: $font-weight-700;
-  color: var(--color-text-primary);
-}
-
-.emptyDesc {
-  font-size: $font-size-14;
-  color: var(--color-text-primary);
-  max-width: 320px;
-  line-height: $line-height-base;
-}
-
 /* ── List ── */
 .list {
   @include flex-column;
   gap: $spacing-8;
+
+  @include respond-to(lg) {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    /* row hover 陰影會貼邊被裁，留一點內距 */
+    padding: 2px;
+    margin: -2px;
+  }
 }
 
 .row {
@@ -196,7 +180,7 @@
 
 .btnDanger {
   background: var(--color-danger);
-  color: #fff;
+  color: var(--color-text-on-primary);
 
   &:hover:not(:disabled) {
     box-shadow: var(--shadow-sm);
@@ -233,9 +217,9 @@
   flex-shrink: 0;
 }
 
-.badge_success { background: color-mix(in srgb, #28a745 12%, transparent); color: #28a745; }
+.badge_success { background: color-mix(in srgb, var(--color-success) 12%, transparent); color: var(--color-success); }
 .badge_info    { background: color-mix(in srgb, var(--color-primary-dark) 12%, transparent); color: var(--color-primary-dark); }
-.badge_danger  { background: color-mix(in srgb, #dc3545 12%, transparent); color: #dc3545; }
+.badge_danger  { background: color-mix(in srgb, var(--color-danger) 12%, transparent); color: var(--color-danger); }
 .badge_muted   { background: var(--color-hover); color: var(--color-text-muted); }
 
 /* ── 工作台雙欄 ── */
@@ -247,7 +231,8 @@
 
   @include respond-to(lg) {
     grid-template-columns: 280px minmax(0, 1fr);
-    align-items: start;
+    grid-template-rows: minmax(0, 1fr);
+    min-height: 0;
   }
 }
 
@@ -258,6 +243,10 @@
   padding: $spacing-16;
   @include glass-surface($shadow: var(--shadow-sm));
   border-radius: $radius-12;
+
+  @include respond-to(lg) {
+    min-height: 0;
+  }
 }
 
 .panelTitle {
@@ -276,6 +265,12 @@
 .zoneList {
   @include flex-column;
   gap: $spacing-4;
+
+  @include respond-to(lg) {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+  }
 }
 
 .zoneItem,
@@ -346,10 +341,29 @@
   padding: $spacing-16;
   background: var(--color-overlay);
   backdrop-filter: blur(4px);
+  animation: fadeIn 0.15s ease;
+  transition: opacity 0.15s ease;
+}
+
+.modalOverlayOut {
+  animation: none;
+  opacity: 0;
+  pointer-events: none;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 .modal,
 .confirm {
+  animation: slideUp 0.18s cubic-bezier(0.25, 0.8, 0.25, 1);
   width: min(560px, 100%);
   max-height: 88vh;
   overflow-y: auto;

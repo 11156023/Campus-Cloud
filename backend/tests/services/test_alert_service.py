@@ -1,4 +1,4 @@
-"""告警評估純函式測試（不依賴 PVE/DB/SMTP）。"""
+"""警告評估純函式測試（不依賴 PVE/DB/SMTP）。"""
 
 from datetime import datetime, timedelta, timezone
 

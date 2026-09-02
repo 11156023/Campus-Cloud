@@ -5,6 +5,7 @@ import MIcon from "../../../components/MIcon";
 import Avatar from "../../../components/Avatar/Avatar";
 import { useAuth } from "../../../contexts/AuthContext";
 import { useToast } from "../../../hooks/useToast";
+import useDialogPresence from "../../../hooks/useDialogPresence";
 import { AccountService } from "../../../services/account";
 import { downscaleImage } from "../../../utils/image/downscaleImage";
 import AppearanceTab from "./AppearanceTab";
@@ -274,6 +275,7 @@ function DangerZoneTab() {
   const { logout } = useAuth();
   const toast = useToast();
   const [showConfirm, setShowConfirm] = useState(false);
+  const confirmDialog = useDialogPresence(showConfirm);
   const [confirmText, setConfirmText] = useState("");
   const [deleting, setDeleting] = useState(false);
 
@@ -304,11 +306,14 @@ function DangerZoneTab() {
         </div>
       </div>
 
-      {showConfirm && createPortal(
+      {confirmDialog.open && createPortal(
         /* 用 portal 掛到 document.body：避免 Modal 巢狀在有 backdrop-filter 的 .dangerCard
            底下 —— backdrop-filter 會讓後代的 position:fixed 失去「相對整個視窗定位」的能力，
            變成只覆蓋卡片自己的範圍（CSS containing block 陷阱）。 */
-        <div className={styles.modalOverlay} onMouseDown={() => !deleting && setShowConfirm(false)}>
+        <div
+          className={`${styles.modalOverlay} ${confirmDialog.closing ? styles.modalOverlayOut : ""}`}
+          onMouseDown={() => !deleting && setShowConfirm(false)}
+        >
           <div className={styles.confirm} onMouseDown={(e) => e.stopPropagation()}>
             <div className={styles.confirmIcon}>
               <MIcon name="warning" size={24} />

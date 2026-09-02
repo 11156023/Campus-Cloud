@@ -21,22 +21,50 @@ class AIPVETemplateRead(BaseModel):
     updated_at: datetime
 
 
-class AIPVETemplateChatRequest(BaseModel):
+class AIPVETemplateTarget(BaseModel):
+    """One VMID and the AI role template selected for the test run."""
+
+    vmid: int = Field(ge=1)
     template_key: str = Field(min_length=1, max_length=50)
-    vmid: int = Field(default=102, ge=1)
+
+
+class AIPVETemplateTargetRead(AIPVETemplateTarget):
+    display_name: str
+
+
+class AIPVETemplateChatRequest(BaseModel):
+    targets: list[AIPVETemplateTarget] = Field(min_length=1, max_length=3)
     message: str | None = Field(default=None, min_length=1, max_length=2000)
     messages: list[dict[str, Any]] | None = Field(default=None, max_length=40)
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_legacy_single_target(cls, value: Any) -> Any:
+        """Accept the old harness payload while clients migrate to targets."""
+        if not isinstance(value, dict) or value.get("targets"):
+            return value
+        template_key = value.get("template_key")
+        if template_key:
+            return {
+                **value,
+                "targets": [
+                    {"vmid": value.get("vmid", 102), "template_key": template_key}
+                ],
+            }
+        return value
 
     @model_validator(mode="after")
     def require_message_or_history(self) -> AIPVETemplateChatRequest:
         if not self.message and not self.messages:
             raise ValueError("message 或 messages 至少需要一項")
+        vmids = [target.vmid for target in self.targets]
+        if len(vmids) != len(set(vmids)):
+            raise ValueError("targets 內的 VMID 不得重複")
         return self
 
 
 class AIPVETemplateChatResponse(BaseModel):
-    template_key: str
-    vmid: int
+    targets: list[AIPVETemplateTargetRead] = Field(default_factory=list)
     reply: str = ""
     tools_called: list[ToolCallRecord] = Field(default_factory=list)
     needs_confirmation: bool = False

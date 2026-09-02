@@ -4,6 +4,7 @@ import { AuthStorage } from "../../../services/auth";
 import { ResourcesService } from "../../../services/resources";
 import MIcon from "../../../components/MIcon";
 import { useClassroomTakeover } from "../../../components/Classroom/ClassroomStudentLayer";
+import useDialogPresence from "../../../hooks/useDialogPresence";
 import TakeoverOverlay from "../../../components/Classroom/TakeoverOverlay";
 import styles from "./ConsoleDialog.module.scss";
 
@@ -20,6 +21,8 @@ export default function VncDialog({ resource, onClose }) {
   const [error, setError]               = useState("");
   const [isFullscreen, setIsFullscreen] = useState(false);
   const underTakeover = useClassroomTakeover(resource?.vmid);
+  // 接管覆蓋層的進出場
+  const takeover = useDialogPresence(underTakeover);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -80,8 +83,13 @@ export default function VncDialog({ resource, onClose }) {
     };
   }, [resource?.vmid]);
 
+  const [closing, setClosing] = useState(false);
+
   function handleClose() {
-    onClose();
+    // 先播放離場動畫，再通知父層卸載
+    if (closing) return;
+    setClosing(true);
+    setTimeout(onClose, 150);
   }
 
   async function handleClipboard() {
@@ -97,7 +105,7 @@ export default function VncDialog({ resource, onClose }) {
   }
 
   return (
-    <div className={styles.overlay} onClick={handleClose}>
+    <div className={`${styles.overlay} ${closing ? styles.overlayOut : ""}`} onClick={handleClose}>
       <div className={`${styles.dialog} ${styles.dialogWide}`} onClick={(e) => e.stopPropagation()} ref={dialogRef}>
         <div className={styles.header}>
           <span className={styles.headerIcon}><MIcon name="desktop_windows" size={18} /></span>
@@ -139,7 +147,7 @@ export default function VncDialog({ resource, onClose }) {
 
         {wsUrl && (
           <div className={styles.vncWrap}>
-            {underTakeover && <TakeoverOverlay />}
+            {takeover.open && <TakeoverOverlay closing={takeover.closing} />}
             <VncScreen
               ref={vncRef}
               url={wsUrl}

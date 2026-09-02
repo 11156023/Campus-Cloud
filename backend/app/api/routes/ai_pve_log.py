@@ -1,129 +1,22 @@
 from __future__ import annotations
 
-import asyncio
 import logging
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException
 
 from app.ai.pve_log.chat import chat as pve_chat
-from app.ai.pve_log.collector import collect_snapshot
 from app.ai.pve_log.schemas import (
     ChatRequest,
     ChatResponse,
-    NetworkInterface,
-    NodeInfo,
-    ResourceConfig,
-    ResourceStatus,
-    ResourceSummary,
     SSHConfirmRequest,
     SSHExecRequest,
     SSHExecResult,
-    StorageInfo,
-    SystemSnapshot,
 )
 from app.api.deps import AdminUser, SessionDep
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/ai/pve-log", tags=["ai-pve-log"])
-
-
-async def _snapshot_or_500() -> SystemSnapshot:
-    try:
-        return await asyncio.to_thread(collect_snapshot)
-    except Exception:
-        logger.exception("收集 PVE 系統快照失敗")
-        raise HTTPException(status_code=500, detail="收集 PVE 資料失敗，請稍後再試")
-
-
-@router.get("/system-snapshot", response_model=SystemSnapshot)
-async def get_system_snapshot(
-    _current_user: AdminUser,
-) -> SystemSnapshot:
-    return await _snapshot_or_500()
-
-
-@router.get("/nodes", response_model=list[NodeInfo])
-async def get_nodes(
-    _current_user: AdminUser,
-) -> list[NodeInfo]:
-    snapshot = await _snapshot_or_500()
-    return snapshot.nodes
-
-
-@router.get("/storages", response_model=list[StorageInfo])
-async def get_storages(
-    _current_user: AdminUser,
-    node: str | None = Query(default=None),
-) -> list[StorageInfo]:
-    snapshot = await _snapshot_or_500()
-    if node:
-        return [s for s in snapshot.storages if s.node == node]
-    return snapshot.storages
-
-
-@router.get("/resources", response_model=list[ResourceSummary])
-async def get_resources(
-    _current_user: AdminUser,
-    node: str | None = Query(default=None),
-    resource_type: str | None = Query(default=None, pattern="^(qemu|lxc)$"),
-    status: str | None = Query(default=None, pattern="^(running|stopped)$"),
-) -> list[ResourceSummary]:
-    snapshot = await _snapshot_or_500()
-    result = snapshot.resources
-    if node:
-        result = [r for r in result if r.node == node]
-    if resource_type:
-        result = [r for r in result if r.resource_type == resource_type]
-    if status:
-        result = [r for r in result if r.status == status]
-    return result
-
-
-@router.get("/resource-statuses", response_model=list[ResourceStatus])
-async def get_resource_statuses(
-    _current_user: AdminUser,
-    node: str | None = Query(default=None),
-    vmid: int | None = Query(default=None),
-) -> list[ResourceStatus]:
-    snapshot = await _snapshot_or_500()
-    result = snapshot.resource_statuses
-    if node:
-        result = [s for s in result if s.node == node]
-    if vmid is not None:
-        result = [s for s in result if s.vmid == vmid]
-    return result
-
-
-@router.get(
-    "/resource-configs",
-    response_model=list[ResourceConfig],
-    response_model_exclude={"__all__": {"raw"}},
-)
-async def get_resource_configs(
-    _current_user: AdminUser,
-    node: str | None = Query(default=None),
-    vmid: int | None = Query(default=None),
-) -> list[ResourceConfig]:
-    snapshot = await _snapshot_or_500()
-    result = snapshot.resource_configs
-    if node:
-        result = [c for c in result if c.node == node]
-    if vmid is not None:
-        result = [c for c in result if c.vmid == vmid]
-    return result
-
-
-@router.get("/network-interfaces", response_model=list[NetworkInterface])
-async def get_network_interfaces(
-    _current_user: AdminUser,
-    vmid: int | None = Query(default=None),
-) -> list[NetworkInterface]:
-    snapshot = await _snapshot_or_500()
-    result = snapshot.network_interfaces
-    if vmid is not None:
-        result = [i for i in result if i.vmid == vmid]
-    return result
 
 
 @router.post("/chat", response_model=ChatResponse)

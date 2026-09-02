@@ -3,32 +3,16 @@
 
 .page {
   @include flex-column;
-  gap: $spacing-16;
+  gap: $spacing-24;
   width: 100%;
   padding: $spacing-8 $spacing-16 $spacing-32;
 
-  @include respond-to(md) { padding: 0 0 $spacing-32; }
+  @media (min-width: $breakpoint-sidebar) { padding: 0 0 $spacing-32; }
 }
 
 .stateText,
-.empty {
-  padding: $spacing-32 $spacing-16;
-  border: 1px dashed var(--color-border);
-  border-radius: $radius-16;
-  color: var(--color-text-muted);
-  text-align: center;
-}
 
 .stateText { font-size: $font-size-14; }
-
-.empty {
-  @include flex-column;
-  align-items: center;
-  gap: $spacing-8;
-
-  strong { color: var(--color-text-primary); font-size: $font-size-14; }
-  span { font-size: $font-size-12; }
-}
 
 .courseList { display: grid; gap: 12px; }
 

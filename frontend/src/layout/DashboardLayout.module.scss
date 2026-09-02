@@ -20,7 +20,7 @@
   gap: 0;
   padding: 0;
 
-  @include respond-to(md) {
+  @media (min-width: $breakpoint-sidebar) {
     gap: 40px;
     padding: var(--layout-py) var(--layout-px);
   }
@@ -32,10 +32,23 @@
   inset: 0;
   background: var(--color-overlay);
   z-index: 99;
+  animation: fadeIn 0.15s ease;
+  transition: opacity 0.15s ease;
 
-  @include respond-to(md) {
+  @media (min-width: $breakpoint-sidebar) {
     display: none;
   }
+}
+
+.overlayOut {
+  animation: none;
+  opacity: 0;
+  pointer-events: none;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 /* Main content area */
@@ -46,7 +59,7 @@
   position: relative;
   padding: 0 $spacing-8;
 
-  @include respond-to(md) {
+  @media (min-width: $breakpoint-sidebar) {
     padding: 0;
   }
 }
@@ -64,7 +77,7 @@
   flex: 1;
   @include flex-column;
 
-  @include respond-to(md) {
+  @media (min-width: $breakpoint-sidebar) {
     min-height: calc(100dvh - 60px);
   }
 }
@@ -79,7 +92,7 @@
   top: 0;
   z-index: 50;
 
-  @include respond-to(md) {
+  @media (min-width: $breakpoint-sidebar) {
     display: none;
   }
 }
@@ -88,8 +101,8 @@
   @include flex-center;
   padding: $spacing-8;
   background: var(--color-sidebar-glass);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: var(--sidebar-backdrop-filter);
+  -webkit-backdrop-filter: var(--sidebar-backdrop-filter);
   border: 1px solid var(--color-sidebar-glass-border);
   border-radius: $radius-8;
   box-shadow: var(--shadow-sm);
@@ -104,7 +117,7 @@
   margin-top: auto;
   padding: $spacing-16 0 $spacing-8;
 
-  @include respond-to(md) {
+  @media (min-width: $breakpoint-sidebar) {
     padding: $spacing-16 0 0;
   }
 }

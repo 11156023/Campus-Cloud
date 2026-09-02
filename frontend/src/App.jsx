@@ -1,5 +1,5 @@
 import { lazy } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useParams } from "react-router-dom";
 import { useAuth } from "./contexts/AuthContext";
 import DashboardLayout from "./layout/DashboardLayout";
 import LoginPage from "./pages/login/LoginPage";
@@ -9,11 +9,11 @@ import { AuthSessionStatus } from "./services/authSession";
 import styles from "./App.module.scss";
 
 // 個人
-const AdminDashboardPage = lazy(() => import("./pages/personal/dashboard/AdminDashboardPage"));
-const TeacherDashboardPage = lazy(() => import("./pages/personal/dashboard/TeacherDashboardPage"));
-const StudentHomePage = lazy(() => import("./pages/personal/dashboard/StudentHomePage"));
-const StudentCoursePage = lazy(() => import("./pages/personal/dashboard/StudentCoursePage"));
-const QuickTemplateFormPage = lazy(() => import("./pages/personal/dashboard/QuickTemplateFormPage"));
+const AdminDashboardPage = lazy(() => import("./pages/personal/dashboard/admin/AdminDashboardPage"));
+const TeacherDashboardPage = lazy(() => import("./pages/personal/dashboard/teacher/TeacherDashboardPage"));
+const StudentHomePage = lazy(() => import("./pages/personal/dashboard/student/StudentHomePage"));
+const StudentCoursePage = lazy(() => import("./pages/personal/dashboard/student/StudentCoursePage"));
+const QuickTemplateFormPage = lazy(() => import("./pages/personal/quick-practice/QuickTemplateFormPage"));
 const ResourcesPage = lazy(() => import("./pages/personal/resources/ResourcesPage"));
 const ResourceDetailPage = lazy(() => import("./pages/personal/resources/detail/ResourceDetailPage"));
 const RequestsPage = lazy(() => import("./pages/personal/requests/RequestsPage"));
@@ -37,12 +37,11 @@ const AiPvePage = lazy(() => import("./pages/system/ai-pve/AiPvePage"));
 const CoursePathsPage = lazy(() => import("./pages/courses/paths/CoursePathsPage"));
 const CourseRoomPage = lazy(() => import("./pages/courses/room/CourseRoomPage"));
 const CourseCmsPage = lazy(() => import("./pages/teaching/course-cms/CourseCmsPage"));
-const CourseTemplateManagementPage = lazy(() => import("./pages/course-operations/CourseTemplateManagementPage"));
-const CourseTemplateEditorPage = lazy(() => import("./pages/course-operations/CourseTemplateEditorPage"));
-const ClassManagementPage = lazy(() => import("./pages/course-operations/ClassManagementPage"));
-const ClassWorkspacePage = lazy(() => import("./pages/course-operations/ClassWorkspacePage"));
-const AiJudgeRubricEditorPage = lazy(() => import("./pages/course-operations/AiJudgeRubricEditorPage"));
-const ClassSetupPage = lazy(() => import("./pages/course-operations/ClassSetupPage"));
+const CourseTemplateManagementPage = lazy(() => import("./pages/course-operations/course-templates/CourseTemplateManagementPage"));
+const CourseTemplateEditorPage = lazy(() => import("./pages/course-operations/course-templates/CourseTemplateEditorPage"));
+const ClassManagementPage = lazy(() => import("./pages/course-operations/class-management/ClassManagementPage"));
+const ClassWorkspacePage = lazy(() => import("./pages/course-operations/class-workspace/ClassWorkspacePage"));
+const ClassSetupPage = lazy(() => import("./pages/course-operations/class-setup/ClassSetupPage"));
 
 // 系統管理
 const AdminPage = lazy(() => import("./pages/system/admin/AdminPage"));
@@ -96,9 +95,16 @@ function AuthBootstrapState({ unavailable = false, retrying = false, onRetry }) 
   );
 }
 
+function LegacyAiJudgeEditorRedirect() {
+  const { classId, sessionId } = useParams();
+  const query = sessionId ? `?check=${encodeURIComponent(sessionId)}` : "";
+  return <Navigate to={`/class-management/${classId}/ai${query}`} replace />;
+}
+
 function App() {
   const { user, loading, authStatus, retrySession } = useAuth();
   const isAdmin = Boolean(user?.is_superuser || user?.role === "admin");
+  const canTeach = isAdmin || user?.role === "teacher";
 
   if (authStatus === AuthSessionStatus.UNAVAILABLE && !user) {
     return (
@@ -134,8 +140,8 @@ function App() {
                   : <StudentHomePage />
             }
           />
-          <Route path="/dashboard-new"        element={<StudentHomePage />} />
-          <Route path="/dashboard-new/course/:pathId" element={<StudentCoursePage />} />
+          {/* 單一課程總覽：課堂環境、課堂機器與截至今天的 AI 任務 */}
+          <Route path="/dashboard/course/:pathId" element={<StudentCoursePage />} />
           <Route path="/quick-template/:id"   element={<QuickTemplateFormPage />} />
           <Route path="/my-resources"         element={<ResourcesPage />} />
           <Route path="/my-resources/:vmid"   element={<ResourceDetailPage backTo="/my-resources" />} />
@@ -152,7 +158,10 @@ function App() {
               <Route path="/batch-review"   element={<BatchReviewPage />} />
             </>
           )}
-          <Route path="/templates"      element={<TemplatesPage />} />
+          <Route
+            path="/templates"
+            element={canTeach ? <TemplatesPage /> : <Navigate to="/dashboard" replace />}
+          />
 
           {/* AI */}
           <Route path="/ai-api"         element={<AiApiPage />} />
@@ -175,18 +184,19 @@ function App() {
           <Route path="/course-cms"            element={<CourseCmsPage />} />
 
           {/* 課務管理 */}
-          <Route path="/course-template-management" element={<CourseTemplateManagementPage />} />
-          <Route path="/course-template-management/new" element={<CourseTemplateEditorPage />} />
-          <Route path="/course-template-management/:templateId" element={<CourseTemplateEditorPage />} />
-          <Route path="/class-management" element={<ClassManagementPage />} />
-          <Route path="/class-management/new" element={<Navigate to="/class-setup" replace />} />
-          <Route path="/class-setup" element={<ClassSetupPage />} />
+          <Route path="/course-template-management" element={canTeach ? <CourseTemplateManagementPage /> : <Navigate to="/dashboard" replace />} />
+          <Route path="/course-template-management/new" element={canTeach ? <CourseTemplateEditorPage /> : <Navigate to="/dashboard" replace />} />
+          <Route path="/course-template-management/:templateId" element={canTeach ? <CourseTemplateEditorPage /> : <Navigate to="/dashboard" replace />} />
+          <Route path="/class-management" element={canTeach ? <ClassManagementPage /> : <Navigate to="/dashboard" replace />} />
+          <Route path="/class-management/new" element={<Navigate to={canTeach ? "/class-setup" : "/dashboard"} replace />} />
+          <Route path="/class-setup" element={canTeach ? <ClassSetupPage /> : <Navigate to="/dashboard" replace />} />
+          {/* 舊評分表連結保留導回主工作頁，避免書籤落到不存在的獨立 editor。 */}
           <Route
             path="/class-management/:classId/ai/checks/:sessionId/edit"
-            element={<AiJudgeRubricEditorPage />}
+            element={canTeach ? <LegacyAiJudgeEditorRedirect /> : <Navigate to="/dashboard" replace />}
           />
-          <Route path="/class-management/:classId" element={<ClassWorkspacePage />} />
-          <Route path="/class-management/:classId/:section" element={<ClassWorkspacePage />} />
+          <Route path="/class-management/:classId" element={canTeach ? <ClassWorkspacePage /> : <Navigate to="/dashboard" replace />} />
+          <Route path="/class-management/:classId/:section" element={canTeach ? <ClassWorkspacePage /> : <Navigate to="/dashboard" replace />} />
 
           {/* 系統管理 */}
           {isAdmin && (

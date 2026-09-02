@@ -6,6 +6,7 @@ import SharedEmptyState from "../../../components/EmptyState/EmptyState";
 import { useAuth } from "../../../contexts/AuthContext";
 import { useToast } from "../../../hooks/useToast";
 import useAutoRefresh from "../../../hooks/useAutoRefresh";
+import useDialogPresence from "../../../hooks/useDialogPresence";
 import { UsersService } from "../../../services/users";
 import PageHeader from "../../../components/PageHeader/PageHeader";
 
@@ -49,12 +50,11 @@ function EmptyState({ hasQuery }) {
     <SharedEmptyState
       icon={hasQuery ? "search_off" : "manage_accounts"}
       title={hasQuery ? "找不到使用者" : "尚無使用者"}
-      description={hasQuery ? "請調整搜尋關鍵字或清除篩選。" : "點擊新增使用者建立第一個帳戶。"}
     />
   );
 }
 
-function UserModal({ mode, user, loading, onClose, onSubmit }) {
+function UserModal({ mode, user, loading, closing = false, onClose, onSubmit }) {
   const [form, setForm] = useState(() => initialForm(user));
   const isEdit = mode === "edit";
 
@@ -75,7 +75,10 @@ function UserModal({ mode, user, loading, onClose, onSubmit }) {
   }
 
   return (
-    <div className={styles.modalOverlay} onMouseDown={onClose}>
+    <div
+      className={`${styles.modalOverlay} ${closing ? styles.modalOverlayOut : ""}`}
+      onMouseDown={onClose}
+    >
       <form className={styles.modal} onSubmit={submit} onMouseDown={(e) => e.stopPropagation()}>
         <div className={styles.modalHeader}>
           <div>
@@ -156,9 +159,12 @@ function UserModal({ mode, user, loading, onClose, onSubmit }) {
   );
 }
 
-function ConfirmDelete({ user, loading, onClose, onConfirm }) {
+function ConfirmDelete({ user, loading, closing = false, onClose, onConfirm }) {
   return (
-    <div className={styles.modalOverlay} onMouseDown={onClose}>
+    <div
+      className={`${styles.modalOverlay} ${closing ? styles.modalOverlayOut : ""}`}
+      onMouseDown={onClose}
+    >
       <div className={styles.confirm} onMouseDown={(e) => e.stopPropagation()}>
         <div className={styles.confirmIcon}>
           <MIcon name="warning" size={24} />
@@ -228,6 +234,8 @@ export default function AdminPage() {
   const [deleting, setDeleting] = useState(false);
   const [modal, setModal] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const modalPresence  = useDialogPresence(modal);
+  const deletePresence = useDialogPresence(deleteTarget);
 
   /** silent = true 時不觸發 loading 與錯誤提示，供背景自動刷新使用 */
   const fetchUsers = useCallback(async (silent = false) => {
@@ -362,20 +370,22 @@ export default function AdminPage() {
         )}
       </div>
 
-      {modal && (
+      {modalPresence.open && (
         <UserModal
-          mode={modal.mode}
-          user={modal.user}
+          mode={modalPresence.item.mode}
+          user={modalPresence.item.user}
           loading={saving}
+          closing={modalPresence.closing}
           onClose={() => setModal(null)}
           onSubmit={handleSubmit}
         />
       )}
 
-      {deleteTarget && (
+      {deletePresence.open && (
         <ConfirmDelete
-          user={deleteTarget}
+          user={deletePresence.item}
           loading={deleting}
+          closing={deletePresence.closing}
           onClose={() => setDeleteTarget(null)}
           onConfirm={handleDelete}
         />

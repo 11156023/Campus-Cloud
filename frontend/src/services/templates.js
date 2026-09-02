@@ -17,9 +17,14 @@ export function safeTemplateIconUrl(url) {
 }
 
 export const TemplatesService = {
-  /** 列出可見範本（admin 全部；teacher 自有+可見；student 僅 ready 且可見） */
+  /** 列出可見範本（admin 全部；teacher 自有+可見）；學生無權限 */
   list(options) {
     return apiGet("/api/v1/templates/", options);
+  },
+
+  /** 開放學生自行申請的應用範本目錄（任何登入者） */
+  catalog(options) {
+    return apiGet("/api/v1/templates/catalog", options);
   },
 
   /** 單一範本 */

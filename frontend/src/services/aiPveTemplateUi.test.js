@@ -4,6 +4,8 @@ import {
   getConfirmationDetails,
   getResponseStatus,
   getToolDisplayData,
+  groupToolCallsByVmid,
+  validateTargets,
 } from '../../../AI_PVE_template/ui.js';
 
 describe('AI PVE template UI contract', () => {
@@ -28,6 +30,70 @@ describe('AI PVE template UI contract', () => {
       kind: 'confirmation',
       message: 'AI 已提出需要人工確認的指令。',
     });
+  });
+
+  test('three selected targets produce a valid payload shape', () => {
+    expect(validateTargets([
+      { vmid: '102', template_key: 'n8n' },
+      { vmid: '107', template_key: 'postgresql' },
+      { vmid: '115', template_key: 'python' },
+    ])).toEqual({
+      targets: [
+        { vmid: 102, template_key: 'n8n' },
+        { vmid: 107, template_key: 'postgresql' },
+        { vmid: 115, template_key: 'python' },
+      ],
+      error: null,
+    });
+  });
+
+  test('target validation supports optional slots and rejects invalid VMIDs', () => {
+    expect(validateTargets([
+      { vmid: '102', template_key: 'n8n' },
+      { vmid: '102', template_key: 'python' },
+      { vmid: '', template_key: '' },
+    ]).error).toBe('已填入的 VMID 不得重複。');
+    expect(validateTargets([
+      { vmid: '102', template_key: 'n8n' },
+      { vmid: '107', template_key: 'python' },
+      { vmid: '', template_key: '' },
+    ])).toEqual({
+      targets: [
+        { vmid: 102, template_key: 'n8n' },
+        { vmid: 107, template_key: 'python' },
+      ],
+      error: null,
+    });
+    expect(validateTargets([
+      { vmid: '', template_key: '' },
+      { vmid: '', template_key: '' },
+      { vmid: '', template_key: '' },
+    ]).error).toBe('至少填寫 1 台測試機器。');
+    expect(validateTargets([
+      { vmid: '102', template_key: '' },
+      { vmid: '', template_key: '' },
+      { vmid: '', template_key: '' },
+    ]).error).toBe('每台機器都必須選擇 AI 機器模板。');
+    expect(validateTargets([
+      { vmid: '102', template_key: 'n8n' },
+      { vmid: '', template_key: 'python' },
+      { vmid: '', template_key: '' },
+    ])).toEqual({
+      targets: [{ vmid: 102, template_key: 'n8n' }],
+      error: null,
+    });
+  });
+
+  test('tool calls are grouped by their target VMID', () => {
+    const groups = groupToolCallsByVmid({
+      tools_called: [
+        { name: 'ssh_exec', args: { vmid: 107 } },
+        { name: 'ssh_exec', result: { vmid: 102 } },
+        { name: 'get_resource_detail', args: {} },
+      ],
+    });
+    expect([...groups.keys()]).toEqual(['107', '102', 'unknown']);
+    expect(groups.get('107')).toHaveLength(1);
   });
 
   test('auto-executed response is complete and does not show confirmation', () => {

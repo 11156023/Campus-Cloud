@@ -91,12 +91,12 @@ class VMTemplate(SQLModel, table=True):
         ),
         description="克隆時是否允許使用者自訂/重設登入密碼；否則沿用範本內建帳密",
     )
-    requires_gpu: bool = Field(
+    student_requestable: bool = Field(
         default=False,
         sa_column=Column(
             sa.Boolean, nullable=False, server_default=sa.false()
         ),
-        description="使用此範本是否需要 GPU（僅 qemu；克隆時強制選擇 GPU）",
+        description="學生可否在一般申請表單直接選用這個範本（仍走審核）",
     )
     icon_url: str | None = Field(
         default=None, max_length=512, description="範本 icon 圖片 URL（選填）"

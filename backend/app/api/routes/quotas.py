@@ -32,7 +32,6 @@ def _to_public(session: SessionDep, quota: ResourceQuota) -> ResourceQuotaPublic
     user_email = user.email if user else None
     return ResourceQuotaPublic(
         id=quota.id,
-        scope=quota.scope,
         user_id=quota.user_id,
         user_email=user_email,
         max_cpu_cores=quota.max_cpu_cores,
@@ -104,7 +103,6 @@ def create_quota(
         raise ConflictError("此對象已有配額設定，請改用更新")
 
     quota = ResourceQuota(
-        scope=body.scope,
         user_id=body.user_id,
         max_cpu_cores=body.max_cpu_cores,
         max_memory_mb=body.max_memory_mb,
@@ -116,8 +114,7 @@ def create_quota(
         session=session,
         user_id=current_user.id,
         action=AuditAction.config_update,
-        details=f"Created {body.scope.value} quota for "
-        f"{body.user_id}",
+        details=f"Created user quota for {body.user_id}",
         commit=False,
     )
     session.commit()

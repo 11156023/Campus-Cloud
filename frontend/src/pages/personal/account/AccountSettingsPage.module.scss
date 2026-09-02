@@ -8,7 +8,7 @@
   flex: 1;
   max-width: 640px;
 
-  @include respond-to(md) {
+  @media (min-width: $breakpoint-sidebar) {
     padding: 0;
   }
 }
@@ -161,7 +161,7 @@
 
 .btnDanger {
   background: var(--color-danger);
-  color: #fff;
+  color: var(--color-text-on-primary);
 
   &:hover:not(:disabled) {
     box-shadow: var(--shadow-sm);
@@ -343,6 +343,19 @@
   background: color-mix(in srgb, var(--color-overlay) 70%, rgba(10, 14, 28, 0.45));
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
+  animation: fadeIn 0.15s ease;
+  transition: opacity 0.15s ease;
+}
+
+.modalOverlayOut {
+  animation: none;
+  opacity: 0;
+  pointer-events: none;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 .confirm {
@@ -350,12 +363,8 @@
   @include flex-column;
   gap: $spacing-16;
   padding: $spacing-24;
-  background: var(--color-surface-glass);
-  backdrop-filter: blur(20px) saturate(1.6);
-  -webkit-backdrop-filter: blur(20px) saturate(1.6);
-  border: 1px solid var(--color-surface-glass-border);
+  @include glass-surface($shadow: var(--shadow-lg));
   border-radius: $radius-12;
-  box-shadow: var(--shadow-lg);
   animation: confirmIn 0.18s cubic-bezier(0.25, 0.8, 0.25, 1);
 
   h2 {

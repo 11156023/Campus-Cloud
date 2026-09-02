@@ -8,7 +8,7 @@
   padding: $spacing-8 $spacing-16;
   flex: 1;
 
-  @include respond-to(md) {
+  @media (min-width: $breakpoint-sidebar) {
     padding: 0;
   }
 }
@@ -94,8 +94,8 @@
 }
 
 .statIconBusy {
-  background: color-mix(in srgb, #f59e0b 14%, transparent);
-  color: #d97706;
+  background: color-mix(in srgb, var(--color-pending) 14%, transparent);
+  color: var(--color-pending);
 }
 
 .statInfo {
@@ -154,79 +154,25 @@
   @include flex-column;
 }
 
-/* ── Empty state ── */
-.empty {
-  flex: 1;
-  @include flex-column;
-  align-items: center;
-  justify-content: center;
-  gap: $spacing-16;
-  padding: $spacing-48 $spacing-16;
-  text-align: center;
-}
-
-.emptyIcon {
-  width: 72px;
-  height: 72px;
-  border-radius: $radius-16;
-  background: var(--color-surface);
-  color: var(--color-text-secondary);
-  @include flex-center;
-}
-
-.emptyTitle {
-  font-size: $font-size-18;
-  font-weight: $font-weight-700;
-  color: var(--color-text-primary);
-}
-
-.emptyDesc {
-  font-size: $font-size-14;
-  color: var(--color-text-primary);
-  max-width: 320px;
-  line-height: $line-height-base;
-}
-
 /* ── Table ── */
 .tableWrap {
-  @include glass-surface($shadow: var(--shadow-sm));
-  border-radius: $radius-16;
-  overflow: hidden;
+  @include table-wrap;
 }
 
 .table {
-  width: 100%;
-  border-collapse: collapse;
+  @include table-base;
 }
 
 .th {
-  padding: $spacing-8 $spacing-16;
-  font-size: $font-size-12;
-  font-weight: $font-weight-500;
-  color: var(--color-text-muted);
-  text-align: left;
-  background: var(--color-hover);
-  border-bottom: 1px solid var(--color-border);
-  white-space: nowrap;
+  @include table-th;
 }
 
 .tr {
-  transition: background $transition-base;
-
-  &:not(:last-child) {
-    border-bottom: 1px solid var(--color-divider);
-  }
-
-  &:hover {
-    background: var(--color-hover);
-  }
+  @include table-tr;
 }
 
 .td {
-  padding: $spacing-8 $spacing-16;
-  font-size: $font-size-14;
-  color: var(--color-text-primary);
-  vertical-align: middle;
+  @include table-td;
 }
 
 /* ── Name cell ── */
@@ -286,6 +232,79 @@
   color: var(--color-text-secondary);
 }
 
+/* 收合摘要：區段 + VF 數量 chip 同行排列，過窄時換行 */
+.mapSummary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+}
+
+.vfChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 6px 2px 10px;
+  border-radius: $radius-pill;
+  font-size: $font-size-12;
+  background: var(--color-hover);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background $transition-base, color $transition-base;
+
+  &:hover {
+    background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+    color: var(--color-primary);
+  }
+
+  :global(.material-icons-outlined) {
+    transition: transform $transition-base;
+  }
+}
+
+.vfChipOpen :global(.material-icons-outlined) {
+  transform: rotate(180deg);
+}
+
+/* ── 展開列（完整 PCI 清單） ── */
+.trExpanded {
+  background: color-mix(in srgb, var(--color-primary) 6%, transparent);
+
+  &:not(:last-child) {
+    border-bottom: none;
+  }
+}
+
+.detailTr {
+  &:not(:last-child) {
+    border-bottom: 1px solid var(--color-divider);
+  }
+}
+
+.detailTd {
+  padding: $spacing-8 $spacing-16 $spacing-16;
+  background: color-mix(in srgb, var(--color-primary) 3%, transparent);
+}
+
+.detailBody {
+  @include flex-column;
+  gap: $spacing-8;
+}
+
+.detailNode {
+  margin-bottom: 4px;
+  font-size: $font-size-12;
+  font-weight: $font-weight-500;
+  color: var(--color-text-secondary);
+}
+
+.pciGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, max-content));
+  gap: 4px $spacing-8;
+}
+
 .muted {
   color: var(--color-text-muted);
 }
@@ -322,7 +341,7 @@
   margin-left: 2px;
 }
 
-.dotRunning { background: #28a745; }
+.dotRunning { background: var(--color-success); }
 .dotStopped { background: var(--color-text-muted); }
 
 /* ── Status badge ── */
@@ -332,7 +351,7 @@
 }
 
 .badge_available { background: color-mix(in srgb, var(--color-success) 12%, transparent); color: var(--color-success); }
-.badge_inuse     { background: color-mix(in srgb, #f59e0b 14%, transparent); color: #d97706; }
+.badge_inuse     { background: color-mix(in srgb, var(--color-info) 12%, transparent); color: var(--color-info); }
 .badge_full      { background: color-mix(in srgb, var(--color-danger)  12%, transparent); color: var(--color-danger); }
 .badge_unknown   { background: var(--color-hover); color: var(--color-text-muted); }
 

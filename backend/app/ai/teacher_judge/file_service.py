@@ -8,6 +8,7 @@ import os
 import shutil
 import uuid
 from copy import deepcopy
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal, cast
@@ -25,12 +26,21 @@ from app.ai.teacher_judge.schemas import (
 from app.ai.teacher_judge.template_command_service import SUPPORTED_TEMPLATE_KEYS
 from app.models.teacher_judge_file import TeacherJudgeFile, TeacherJudgeFileStatus
 from app.models.teacher_judge_script_artifact import TeacherJudgeScriptArtifact
+from app.models.teacher_judge_session import TeacherJudgeSession
 from app.services.rubric_parser import parse_document
 
 ConflictStrategy = Literal["overwrite", "copy"]
 
 DATA_ROOT = Path(__file__).resolve().parents[4] / "data" / "teacher-judge" / "files"
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class FileDeleteStage:
+    """Filesystem paths moved aside while a file row is deleted transactionally."""
+
+    path: Path | None
+    deleted_path: Path | None
 
 
 def _now() -> datetime:
@@ -42,6 +52,12 @@ def _now() -> datetime:
 def _safe_filename(filename: str) -> str:
     name = Path(filename or "rubric").name.strip()
     return name or "rubric"
+
+
+def _display_name_from_filename(filename: str) -> str:
+    """Return a readable rubric name while keeping the original filename separate."""
+    stem = Path(filename or "").stem.strip()
+    return stem or "評分表"
 
 
 def _suffix(filename: str) -> str:
@@ -314,7 +330,7 @@ def save_analyzed_file(
             file_hash=file_hash,
             template_key=template_key,
             source_type="uploaded",
-            display_name=display_name or original_filename,
+            display_name=display_name or _display_name_from_filename(original_filename),
             environment_keys=list(dict.fromkeys(environment_keys or [template_key])),
             analysis_revision=1,
             analysis_json=analysis.model_dump(mode="json"),
@@ -326,7 +342,7 @@ def save_analyzed_file(
         target_file.file_hash = file_hash
         target_file.template_key = template_key
         target_file.source_type = "uploaded"
-        target_file.display_name = display_name or target_filename
+        target_file.display_name = display_name or _display_name_from_filename(target_filename)
         target_file.environment_keys = list(dict.fromkeys(environment_keys or [template_key]))
         target_file.analysis_revision = int(target_file.analysis_revision or 1) + 1
         target_file.analysis_json = analysis.model_dump(mode="json")
@@ -482,9 +498,13 @@ def clone_file_asset(
     if source.teaching_class_id != teaching_class_id:
         raise HTTPException(status_code=404, detail="找不到評分表來源。")
     copied_filename: str | None = None
+    source_path: Path | None = None
     if source.source_type == "uploaded":
         if not source.original_filename or not source.file_hash:
             raise HTTPException(status_code=409, detail="原始評分表資訊不完整，無法複製。")
+        source_path = _stored_path(source.id, source.original_filename)
+        if not source_path.is_file():
+            raise HTTPException(status_code=404, detail="原始評分表檔案不存在，無法複製。")
         copied_filename = _copy_filename(
             session=session,
             teaching_class_id=teaching_class_id,
@@ -512,9 +532,7 @@ def clone_file_asset(
 
     assert copied_filename is not None
     assert source.original_filename is not None
-    source_path = _stored_path(source.id, source.original_filename)
-    if not source_path.is_file():
-        raise HTTPException(status_code=404, detail="原始評分表檔案不存在，無法複製。")
+    assert source_path is not None
     DATA_ROOT.mkdir(parents=True, exist_ok=True)
     final_path = _stored_path(clone.id, copied_filename)
     temp_path = _temp_path(clone.id, copied_filename)
@@ -528,13 +546,18 @@ def clone_file_asset(
     return clone
 
 
-def delete_file(
+def stage_file_delete(
     *,
     session: Session,
-    teaching_class_id: uuid.UUID,
-    file_id: uuid.UUID,
-) -> None:
-    file = get_file(session=session, teaching_class_id=teaching_class_id, file_id=file_id)
+    file: TeacherJudgeFile,
+) -> FileDeleteStage:
+    """Stage a rubric row and its stored bytes for deletion.
+
+    The database row is marked for deletion but not committed.  Callers that
+    own a larger transaction can commit the row together with its parent
+    session, then call :func:`finalize_file_delete`; on rollback call
+    :func:`restore_file_delete` to put the bytes back.
+    """
     path = (
         _stored_path(file.id, file.original_filename)
         if file.original_filename
@@ -549,6 +572,7 @@ def delete_file(
         assert deleted_path is not None
         _unlink_if_exists(deleted_path)
         os.replace(path, deleted_path)
+
     linked_artifacts = session.exec(
         select(TeacherJudgeScriptArtifact).where(
             TeacherJudgeScriptArtifact.source_file_id == file.id
@@ -557,16 +581,60 @@ def delete_file(
     for artifact in linked_artifacts:
         artifact.source_file_id = None
         session.add(artifact)
+
+    # Keep the DB consistent even when a backend is configured without
+    # foreign-key enforcement (for example, SQLite test databases).
+    linked_sessions = session.exec(
+        select(TeacherJudgeSession).where(
+            TeacherJudgeSession.selected_file_id == file.id
+        )
+    ).all()
+    for linked_session in linked_sessions:
+        linked_session.selected_file_id = None
+        linked_session.updated_at = _now()
+        linked_session.last_activity_at = linked_session.updated_at
+        session.add(linked_session)
+
     session.delete(file)
+    return FileDeleteStage(path=path, deleted_path=deleted_path)
+
+
+def finalize_file_delete(stage: FileDeleteStage | None) -> None:
+    """Remove bytes that were staged after the owning DB transaction commits."""
+    if stage is not None and stage.deleted_path is not None:
+        _unlink_if_exists(stage.deleted_path)
+
+
+def restore_file_delete(stage: FileDeleteStage | None) -> None:
+    """Restore bytes staged by :func:`stage_file_delete` after rollback."""
+    if (
+        stage is None
+        or stage.path is None
+        or stage.deleted_path is None
+        or not stage.deleted_path.exists()
+    ):
+        return
+    stage.path.parent.mkdir(parents=True, exist_ok=True)
+    _unlink_if_exists(stage.path)
+    os.replace(stage.deleted_path, stage.path)
+
+
+def delete_file(
+    *,
+    session: Session,
+    teaching_class_id: uuid.UUID,
+    file_id: uuid.UUID,
+) -> None:
+    file = get_file(session=session, teaching_class_id=teaching_class_id, file_id=file_id)
+    stage: FileDeleteStage | None = None
     try:
+        stage = stage_file_delete(session=session, file=file)
         session.commit()
     except Exception:
         session.rollback()
-        if path is not None and deleted_path is not None and deleted_path.exists():
-            os.replace(deleted_path, path)
+        restore_file_delete(stage)
         raise
-    if deleted_path is not None:
-        _unlink_if_exists(deleted_path)
+    finalize_file_delete(stage)
 
 
 def source_file_snapshot(

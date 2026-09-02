@@ -25,16 +25,18 @@ src/pages/personal/resources/
 
 ---
 
-## 在 SCSS Module 中引入共用樣式
+## 在 SCSS Module 中使用共用變數與 mixin
 
-每個 `.module.scss` 檔案最上方需加：
+`vite.config.js` 已透過 `css.preprocessorOptions.scss.additionalData` 對**所有** SCSS 檔全域注入：
 
 ```scss
-@use "../../../assets/styles/variables" as *;
-@use "../../../assets/styles/mixins" as *;
+@use "@/assets/styles/variables" as *;
+@use "@/assets/styles/mixins" as *;
 ```
 
-> 路徑依元件深度調整。引入後即可直接使用 `$spacing-*`、`$font-size-*`、`@include flex-center` 等。
+因此 `.module.scss` 內可直接使用 `$spacing-*`、`$font-size-*`、`@include flex-center` 等，**不需要（也不應）在檔案開頭手動再加 `@use variables / mixins`**——手動引入是冗餘的。舊檔殘留的手動引入無害，重構經過時順手移除即可。
+
+> 注意：全域注入僅涵蓋 `variables` 與 `mixins` 兩檔；`_themes.scss` 的顏色是 CSS 自訂屬性（`var(--color-*)`），本來就不需引入。
 
 ---
 
@@ -48,7 +50,7 @@ src/pages/personal/resources/
 
 ## 顏色系統
 
-**所有顏色一律使用 `_themes.scss` 中定義的 CSS 自訂屬性**，不可在元件 SCSS 內直接寫死 HEX 色碼（狀態色碼除外，見下方說明）。
+**所有顏色一律使用 `_themes.scss` 中定義的 CSS 自訂屬性**，不可在元件 SCSS 內直接寫死 HEX 色碼。狀態色也一律走 `--color-success` 等變數（僅下方明列的例外可寫死色碼）。
 
 ### 主要變數
 
@@ -88,6 +90,7 @@ src/pages/personal/resources/
 | `--color-border` | 一般邊框 |
 | `--color-divider` | 分隔線 |
 | `--color-hover` | Hover 背景 |
+| `--color-row-hover` | 表格列 hover 背景（比 `--color-hover` 深，避免與表頭同色） |
 | `--color-overlay` | Modal 遮罩 |
 
 #### 陰影
@@ -100,28 +103,34 @@ src/pages/personal/resources/
 
 ### 狀態色
 
-前端只使用以下四種語意顏色，**不使用黃色 / 橙色作為警示色**：
+前端使用以下五種語意顏色，**黃橙色僅限「待審核 / pending」語意，不作為警示色**——警示、錯誤一律紅色：
 
-| 變數 | 色碼 | 語意 | 使用情境 |
-|------|------|------|----------|
-| `--color-success` | `#28a745` | 🟢 正常 | 運行中、已連接、成功 |
-| `--color-info` | `#2b4d98` | 🔵 一般 | 進行中、審核中、說明 |
-| `--color-danger` | `#dc3545` | 🔴 危險 | 錯誤、失敗、危險操作 |
-| `--color-warning` | `#dc3545` | 🔴 同 danger | （等同 danger，已統一為紅色） |
-| —（灰色） | `--color-hover` / `--color-text-muted` | ⚫ 未啟用 | 已停止、已暫停、disabled |
+| 變數 | 亮色值 | 深色值 | 語意 | 使用情境 |
+|------|--------|--------|------|----------|
+| `--color-success` | `#28a745` | 同左 | 🟢 正常 | 運行中、已連接、成功 |
+| `--color-info` | `#2b4d98` | `#89a5e0` | 🔵 一般 | 進行中、說明、一般標記 |
+| `--color-pending` | `#d97706` | `#f59e0b` | 🟠 待審核 | 待審核、草稿、排程中、等待處理 |
+| `--color-danger` | `#dc3545` | 同左 | 🔴 危險 | 錯誤、失敗、危險操作 |
+| `--color-warning` | `#dc3545` | 同左 | 🔴 同 danger | （等同 danger，已統一為紅色） |
+| —（灰色） | `--color-hover` / `--color-text-muted` | — | ⚫ 未啟用 | 已停止、已暫停、disabled |
 
-> **例外**：可用名額不足的日曆格（AvailabilityPanel `calendarDayLimited`）保留黃色 `#f59e0b`，因其屬視覺漸層語意，非 UI 警示色。
+危險操作的 hover 加深色用 `--color-danger-dark`（`#b91c1c`）。
+
+> **例外**：終端機式的內容面固定深色、不隨主題切換——VNC / xterm 畫面底（ConsoleDialog、Classroom 的 `#1e1e1e`）、任務 log 輸出區（Jobs `dialogOutput`），以及需要白底墊圖的透明 logo（`tplLogo` 的 `#fff`）。
 >
 > **例外**：Gateway 頁的類 VSCode 設定檔編輯器（`ConfigCodeEditor.module.scss`）整組寫死 vs-dark 色票（`#1e1e1e`、`#252526`、`#007acc` 等）與 13px/12px 字級，刻意不隨主題切換——外框需與 Monaco `theme="vs-dark"` 一致，模擬 VSCode 視窗本身即為獨立配色的容器。
 
 #### 狀態 Badge 的標準寫法
 
 ```scss
-.badge_success { background: color-mix(in srgb, #28a745 12%, transparent); color: #28a745; }
-.badge_info    { background: color-mix(in srgb, #2b4d98 12%, transparent); color: #2b4d98; }
-.badge_danger  { background: color-mix(in srgb, #dc3545 12%, transparent); color: #dc3545; }
+.badge_success { background: color-mix(in srgb, var(--color-success) 12%, transparent); color: var(--color-success); }
+.badge_info    { background: color-mix(in srgb, var(--color-info)    12%, transparent); color: var(--color-info); }
+.badge_pending { background: color-mix(in srgb, var(--color-pending) 12%, transparent); color: var(--color-pending); }
+.badge_danger  { background: color-mix(in srgb, var(--color-danger)  12%, transparent); color: var(--color-danger); }
 .badge_muted   { background: var(--color-hover); color: var(--color-text-muted); }
 ```
+
+> 一律用 `var(--color-*)`，不要把狀態色寫死成 HEX——深色模式的 info / pending 亮色值才吃得到。
 
 ---
 
@@ -137,9 +146,11 @@ $spacing-24: 24px  $spacing-32: 32px  $spacing-48: 48px
 ### 字體大小
 
 ```scss
-$font-size-12: 12px   $font-size-14: 14px   $font-size-16: 16px
+$font-size-10: 10px   $font-size-12: 12px   $font-size-14: 14px   $font-size-16: 16px
 $font-size-18: 18px   $font-size-24: 24px   $font-size-28: 28px   $font-size-32: 32px
 ```
+
+> `$font-size-10` **僅限資料密集區**（密集網格、卡片 meta 列）的次要標籤使用；一般內文、說明文字最小 `$font-size-12`。
 
 ### 字重
 
@@ -299,7 +310,7 @@ import MIcon from "../components/MIcon";
 
 ### Dialog / Modal
 
-- Dialog 寬度：`max-width: 1100px`（一般）/ `1280px`（寬版，如 VNC）
+- Dialog 寬度四級：確認框／命名框 `max-width: 420px`；小型單欄表單 `max-width: 640px`；一般 `max-width: 1100px`；寬版（如 VNC）`1280px`
 - 高度：`height: 88vh`
 - 全螢幕：使用 `:fullscreen` 偽類，設 `max-width: 100%; height: 100%; border-radius: 0`
 - 遮罩：`position: fixed; inset: 0; background: var(--color-overlay); backdrop-filter: blur(4px); z-index: 300`
@@ -327,14 +338,30 @@ import MIcon from "../components/MIcon";
 
 // 危險按鈕
 .btnDanger {
-  background: #dc3545;
-  color: #fff;
-  border: 1px solid #dc3545;
-  &:hover:not(:disabled) { background: #b91c1c; }
+  background: var(--color-danger);
+  color: var(--color-text-on-primary);
+  border: 1px solid var(--color-danger);
+  &:hover:not(:disabled) { background: var(--color-danger-dark); }
 }
 ```
 
-> **規則**：所有按鈕 hover 都必須加 `:not(:disabled)`，disabled 狀態一律 `opacity: 0.4; cursor: not-allowed`。
+> **規則**：所有按鈕 hover 都必須加 `:not(:disabled)`，disabled 狀態一律 `opacity: 0.5; cursor: not-allowed`。
+
+### 表格（Table）
+
+列表頁表格一律使用 `_mixins.scss` 的表格 mixin 組，**不要在頁面內重抄整組樣式**：
+
+```scss
+.tableWrap { @include table-wrap; }        // 玻璃容器 + 圓角 + 橫向卷動
+.table     { @include table-base; min-width: 720px; }  // min-width 依內容自定，撐出卷動
+.th        { @include table-th; }
+.tr        { @include table-tr; }          // 一般列不亮 hover 時傳 $hover: false
+.td        { @include table-td; }
+```
+
+- 欄寬、對齊、特殊儲存格（`.thRight`、`.tdNowrap`…）等頁面差異寫在 `@include` 之後
+- RWD 行為統一為 **容器橫向卷動**（`table-wrap` 內建 `overflow-x: auto`），不做表格轉卡片
+- 表格嵌在既有卡片內時可只用 `table-base` / `table-th` / `table-tr` / `table-td`，省略外層 `table-wrap`
 
 ### Dropdown 選單
 
@@ -363,6 +390,37 @@ import MIcon from "../components/MIcon";
 }
 // 使用：animation: fadeIn 0.15s ease;
 ```
+
+### Dialog / Popup 的進出場（標準作法）
+
+Dialog 一律「遮罩 `fadeIn` + 內容 `slideUp`」進場；離場由共用 hook `hooks/useDialogPresence.js` 處理——關閉時先保留 DOM 150ms 套上 `Out` class 播放淡出，再卸載：
+
+```jsx
+import useDialogPresence from "../hooks/useDialogPresence";
+
+const dialog = useDialogPresence(editTarget);   // 布林或資料物件皆可
+// 關閉期間 dialog.item 會保留最後一筆資料，避免內容閃爍
+{dialog.open && (
+  <div className={`${styles.modalOverlay} ${dialog.closing ? styles.modalOverlayOut : ""}`}>
+    <EditModal target={dialog.item} … />
+  </div>
+)}
+```
+
+```scss
+.modalOverlay {
+  /* …定位與遮罩… */
+  animation: fadeIn 0.15s ease;
+  transition: opacity 0.15s ease;
+}
+.modalOverlayOut {
+  animation: none;   // 覆蓋入場 animation，讓 transition 接管
+  opacity: 0;
+  pointer-events: none;
+}
+```
+
+共用 Dialog 元件（如 `ConnectionDialog`、`ReverseProxyRuleModal`）接受 `closing` prop 套用 Out class，由父層的 `useDialogPresence` 控制。自含式 Dialog（如 `VncDialog`、`TerminalDialog`）則在內部 `setClosing(true)` 後 `setTimeout(onClose, 150)`。
 
 ### 離場動畫（關閉）
 

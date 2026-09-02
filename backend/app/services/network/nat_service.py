@@ -1,4 +1,4 @@
-﻿"""NAT 端口轉發服務 — 透過 Gateway VM 的 haproxy 管理 TCP/UDP 轉發規則。
+"""NAT 端口轉發服務 — 透過 Gateway VM 的 haproxy 管理 TCP/UDP 轉發規則。
 
 設計原則：
 - DB 為 source of truth，儲存所有 external_port → vm_ip:internal_port 映射

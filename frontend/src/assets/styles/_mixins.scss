@@ -12,6 +12,21 @@
   }
 }
 
+/* Desktop-first 收斂用：既有版面反轉成 mobile-first 成本過高時，
+   用此 mixin 取代 raw max-width media query，讓斷點吸附到共用級距。
+   新版面請優先用 mobile-first 的 respond-to。 */
+@mixin respond-below($breakpoint) {
+  @if $breakpoint == sm {
+    @media (max-width: $breakpoint-sm - 0.02px) { @content; }
+  } @else if $breakpoint == md {
+    @media (max-width: $breakpoint-md - 0.02px) { @content; }
+  } @else if $breakpoint == lg {
+    @media (max-width: $breakpoint-lg - 0.02px) { @content; }
+  } @else if $breakpoint == xl {
+    @media (max-width: $breakpoint-xl - 0.02px) { @content; }
+  }
+}
+
 @mixin flex-center {
   display: flex;
   align-items: center;
@@ -55,6 +70,58 @@
   border-radius: $radius-pill;
   font-size: $font-size-12;
   font-weight: $font-weight-500;
+}
+
+/* ── 標準列表表格 ──
+   全站列表頁的表格一律用這組 mixin（詳見 STYLE_GUIDE「表格」段）：
+   .tableWrap { @include table-wrap; }   外層玻璃容器＋橫向卷動
+   .table     { @include table-base; }   可加 min-width 撐出卷動
+   .th        { @include table-th; }
+   .tr        { @include table-tr; }     不要整列 hover 時傳 $hover: false
+   .td        { @include table-td; }
+   欄寬、對齊、特殊儲存格等頁面差異寫在 @include 之後。 */
+@mixin table-wrap {
+  @include glass-surface($shadow: var(--shadow-sm));
+  border-radius: $radius-16;
+  overflow: hidden;
+  overflow-x: auto;
+}
+
+@mixin table-base {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+@mixin table-th {
+  padding: $spacing-8 $spacing-16;
+  font-size: $font-size-12;
+  font-weight: $font-weight-500;
+  color: var(--color-text-muted);
+  text-align: left;
+  background: var(--color-hover);
+  border-bottom: 1px solid var(--color-border);
+  white-space: nowrap;
+}
+
+@mixin table-tr($hover: true) {
+  transition: background $transition-base;
+
+  &:not(:last-child) {
+    border-bottom: 1px solid var(--color-divider);
+  }
+
+  @if $hover {
+    &:hover {
+      background: var(--color-row-hover);
+    }
+  }
+}
+
+@mixin table-td {
+  padding: $spacing-8 $spacing-16;
+  font-size: $font-size-14;
+  color: var(--color-text-primary);
+  vertical-align: middle;
 }
 
 /* 玻璃表面基本組：背景塗層＋backdrop 濾鏡＋亮邊框＋陰影。

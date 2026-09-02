@@ -528,7 +528,7 @@ export type AiUsersUsageResponse = {
 /**
  * AlertEventPublic
  *
- * 告警事件（open = resolved_at 為 None）。
+ * 警告事件（open = resolved_at 為 None）。
  */
 export type AlertEventPublic = {
     /**

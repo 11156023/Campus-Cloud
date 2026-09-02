@@ -19,7 +19,7 @@ const navGroups = [
       { key: "my-resources",  label: "我的資源",    icon: "inventory_2" },
       { key: "my-requests",   label: "我的申請",    icon: "assignment" },
       { key: "resource-mgmt", label: "資源管理",    icon: "storage", adminOnly: true },
-      { key: "templates",     label: "機器範本",    icon: "library_books" },
+      { key: "templates",     label: "機器母範本",  icon: "library_books", instructorOnly: true },
       { key: "gpu-mgmt",      label: "GPU 管理",    icon: "memory", adminOnly: true },
     ],
   },
@@ -295,7 +295,7 @@ export default function Sidebar({ collapsed, mobileOpen, onToggle, onClose }) {
   return (
     <aside className={cls}>
       {/* ===== Brand ===== */}
-      <div className={styles.brand} onClick={() => window.innerWidth >= 768 && onToggle?.()}>
+      <div className={styles.brand} onClick={() => window.innerWidth >= 1024 && onToggle?.()}>
         <span className={styles.brandIcon}>
           <img src="/favicon.png" alt="SkyLab" />
         </span>

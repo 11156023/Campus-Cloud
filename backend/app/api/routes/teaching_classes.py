@@ -40,6 +40,7 @@ from app.models import (
 from app.models.base import get_datetime_utc
 from app.repositories import resource as resource_repo
 from app.repositories.user import get_user_by_email
+from app.services.course import course_service
 from app.services.proxmox import proxmox_service
 from app.services.resource import resource_service
 from app.services.teaching import (
@@ -327,7 +328,6 @@ def _serialize(session: SessionDep, item: TeachingClass) -> dict:
                 "id": environment.id,
                 "version_id": version.id,
                 "name": environment.name,
-                "code": environment.code,
                 "version": version.version,
                 "status": version.status,
             }
@@ -375,6 +375,11 @@ def create_class(body: ClassCreate, session: SessionDep, current_user: Instructo
     item = TeachingClass(owner_id=current_user.id, **body.model_dump())
     _validate_schedule(item)
     session.add(item)
+    session.flush()
+    course_service.ensure_class_path(
+        session,
+        teaching_class=item,
+    )
     session.commit()
     session.refresh(item)
     _generate_weeks(session, item)
@@ -1109,6 +1114,11 @@ def retry_failed_class(
         if topology_errors:
             raise BadRequestError("網路拓撲重試失敗：" + "；".join(topology_errors))
         item.status = TeachingClassStatus.active
+        course_service.ensure_class_path(
+            session,
+            teaching_class=item,
+            published=True,
+        )
         reservation = session.exec(
             select(ClassCapacityReservation).where(
                 ClassCapacityReservation.class_id == class_id
@@ -1313,6 +1323,11 @@ def provision_status(
             item.status = TeachingClassStatus.partial_failed
         else:
             item.status = TeachingClassStatus.active
+            course_service.ensure_class_path(
+                session,
+                teaching_class=item,
+                published=True,
+            )
             reservation = session.exec(
                 select(ClassCapacityReservation).where(
                     ClassCapacityReservation.class_id == class_id

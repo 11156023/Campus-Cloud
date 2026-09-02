@@ -68,8 +68,8 @@ PAGES: list[PageCapability] = [
     PageCapability(
         key="dashboard",
         title="總覽儀表板",
-        summary="查看目前資源、申請、告警與近期任務狀態。",
-        keywords=["首頁", "總覽", "dashboard", "狀態", "告警", "任務"],
+        summary="查看目前資源、申請、警告與近期任務狀態。",
+        keywords=["首頁", "總覽", "dashboard", "狀態", "警告", "任務"],
         group="個人",
         stage="overview",
         page_type="summary",

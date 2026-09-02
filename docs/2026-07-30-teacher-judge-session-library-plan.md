@@ -164,8 +164,10 @@ Library 不是新的萬用資料表。session 只引用 library item，正式內
 `run -> artifact -> session` 查詢，避免兩個 session ID 發生不一致。執行時仍使用
 既有 `target_snapshot_json` 保存當下機器與腳本版本。
 
-`teacher_judge_files` 不新增 `session_id`，因同一份評分表可以被多個 session 重用；
-由 `teacher_judge_sessions.selected_file_id` 表達目前選擇即可。
+`teacher_judge_files` 不新增 `session_id`，仍由 `teacher_judge_sessions.selected_file_id`
+表達目前選擇；但每個 active source 只能被一個 session 綁定。未綁定的 class-scoped
+來源可以被新 session 認領，已綁定來源不可在一般建立／切換流程共用，必須透過 fork
+建立獨立副本。
 
 ## 5. 主要資料流
 
@@ -451,7 +453,7 @@ production build。不得把沒有 isolated PostgreSQL/PVE/vLLM 證據的結果�
 
 ## 12. 不納入 MVP
 
-- Session 分享、多人同時編輯、branch/fork。
+- Session 分享、多人同時編輯與任意 branch；受控 fork 僅複製 rubric source，不複製歷史。
 - 向量資料庫或語意檢索。
 - 通用檔案 library、任意 attachment 類型。
 - 自動合併不同 session 記憶。
@@ -484,13 +486,14 @@ production build。不得把沒有 isolated PostgreSQL/PVE/vLLM 證據的結果�
 仍可直接送出一般訊息並將 user/assistant 訊息保存到資料庫；上傳或選擇評分表後，才啟用
 rubric proposal 與腳本產生。上傳新檔案不會清除同一 session 的既有聊天紀錄。
 
-本次變更未新增 schema，因此沿用既有 session migration；尚未宣稱 isolated PostgreSQL、
-vLLM 與 PVE 的完整 E2E 驗收。
+隔離 migration 為 `selected_file_id` 建立唯一（允許 NULL）索引，並先將歷史共用來源修復
+為獨立副本；尚未宣稱 isolated PostgreSQL、vLLM 與 PVE 的完整 E2E 驗收。
 
 ## 15. 2026-07-31 Session 刪除行為
 
 Session 詳情頁的封存按鈕旁提供刪除按鈕，必須經二次確認後呼叫
 `DELETE /teaching-classes/{class_id}/judge/sessions/{session_id}`。後端會在同一交易中
-刪除該 session 的訊息、腳本 artifact、腳本 runs 與 session；班級共用的
-`teacher_judge_files` 不刪除，避免影響其他 session 或 library。刪除成功後前端會移除列表項目
-並清空目前選取狀態。
+刪除該 session 的訊息、腳本 artifact、腳本 runs、所綁定的專屬
+`teacher_judge_files` 與 session；若遇到尚未完成 migration 的歷史共用資料，會保留仍被
+其他 session 綁定的來源。上傳 bytes 也會在交易成功後一併清除。刪除成功後前端會移除列表
+項目並清空目前選取狀態。

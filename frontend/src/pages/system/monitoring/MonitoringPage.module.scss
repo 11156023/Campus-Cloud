@@ -4,7 +4,7 @@
   padding: $spacing-8 $spacing-16;
   flex: 1;
 
-  @include respond-to(md) {
+  @media (min-width: $breakpoint-sidebar) {
     padding: 0;
   }
 }
@@ -89,7 +89,7 @@
 }
 
 .overviewValue {
-  font-size: $font-size-28;
+  font-size: $font-size-32;
   font-weight: $font-weight-700;
   color: var(--color-text-primary);
   font-variant-numeric: tabular-nums;
@@ -99,6 +99,7 @@
 .overviewUnit {
   font-size: $font-size-16;
   font-weight: $font-weight-400;
+  margin-left: $spacing-4;
   color: var(--color-text-muted);
 }
 
@@ -189,7 +190,7 @@
   text-align: center;
 }
 
-/* ── 告警 ── */
+/* ── 警告 ── */
 .alertCount {
   @include flex-center;
   min-width: 24px;
@@ -288,19 +289,11 @@
 
 /* ── 表格 ── */
 .table {
-  width: 100%;
-  border-collapse: collapse;
+  @include table-base;
 }
 
 .th {
-  padding: $spacing-8 $spacing-16;
-  font-size: $font-size-12;
-  font-weight: $font-weight-500;
-  color: var(--color-text-muted);
-  text-align: left;
-  background: var(--color-hover);
-  border-bottom: 1px solid var(--color-border);
-  white-space: nowrap;
+  @include table-th;
 }
 
 .thWide {
@@ -311,12 +304,9 @@
   text-align: right;
 }
 
+/* 一般列不做 hover——只有可點擊列（.trClickable）才亮 */
 .tr {
-  transition: background $transition-base;
-
-  &:not(:last-child) {
-    border-bottom: 1px solid var(--color-divider);
-  }
+  @include table-tr($hover: false);
 }
 
 .trClickable {
@@ -328,10 +318,7 @@
 }
 
 .td {
-  padding: $spacing-8 $spacing-16;
-  font-size: $font-size-14;
-  color: var(--color-text-primary);
-  vertical-align: middle;
+  @include table-td;
   font-variant-numeric: tabular-nums;
 }
 
@@ -454,14 +441,14 @@
   border-radius: $radius-8;
   font-size: $font-size-12;
   font-weight: $font-weight-500;
-  background: #dc3545;
-  color: #fff;
+  background: var(--color-danger);
+  color: var(--color-text-on-primary);
   cursor: pointer;
   white-space: nowrap;
   transition: background $transition-base;
 
   &:hover:not(:disabled) {
-    background: #b91c1c;
+    background: var(--color-danger-dark);
   }
 
   &:disabled {
@@ -504,9 +491,28 @@
   z-index: 300;
   @include flex-center;
   padding: $spacing-16;
+  animation: fadeIn 0.15s ease;
+  transition: opacity 0.15s ease;
+}
+
+.modalOverlayOut {
+  animation: none;
+  opacity: 0;
+  pointer-events: none;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 .modal {
+  animation: slideUp 0.18s cubic-bezier(0.25, 0.8, 0.25, 1);
   @include flex-column;
   gap: $spacing-16;
   width: 100%;

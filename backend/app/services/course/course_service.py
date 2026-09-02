@@ -161,6 +161,44 @@ def create_path(
     return _path_public(session, path)
 
 
+def ensure_class_path(
+    session: Session,
+    *,
+    teaching_class: TeachingClass,
+    published: bool = False,
+) -> CoursePath:
+    """Ensure every formal class has a student-facing course shell.
+
+    The shell exists independently from rooms, tasks and checkpoints.  This
+    keeps an active class visible to enrolled students even when the teacher
+    has not authored any learning content yet.
+    """
+
+    path = session.exec(
+        select(CoursePath).where(
+            CoursePath.teaching_class_id == teaching_class.id
+        )
+    ).first()
+    if path is None:
+        path = CoursePath(
+            title=teaching_class.name,
+            description=None,
+            created_by=teaching_class.owner_id,
+            teaching_class_id=teaching_class.id,
+            status=(
+                CoursePathStatus.published
+                if published
+                else CoursePathStatus.draft
+            ),
+        )
+    elif published:
+        path.status = CoursePathStatus.published
+        path.updated_at = get_datetime_utc()
+    session.add(path)
+    session.flush()
+    return path
+
+
 def update_path(
     session: Session, *, path_id: uuid.UUID, data: CoursePathUpdate
 ) -> CoursePathPublic:

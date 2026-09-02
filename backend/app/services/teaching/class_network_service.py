@@ -55,10 +55,11 @@ def _ensure_rule(
     )
 
 
-def _allow_one_way(
+def allow_one_way(
     session: Session,
     *,
-    class_id: uuid.UUID,
+    scope_id: uuid.UUID,
+    comment_prefix: str,
     source_vmid: int,
     target_vmid: int,
     protocol: str = "any",
@@ -72,7 +73,7 @@ def _allow_one_way(
     target = proxmox_service.find_resource(target_vmid)
     service = protocol if port is None else f"{protocol}/{port}"
     comment = (
-        f"{COMMENT_PREFIX}{str(class_id)[:8]}:{source_vmid}>{target_vmid}:{service}"
+        f"{comment_prefix}{str(scope_id)[:8]}:{source_vmid}>{target_vmid}:{service}"
     )
     protocol_fields: dict[str, Any] = {}
     if protocol != "any":
@@ -103,6 +104,27 @@ def _allow_one_way(
             "source": source_ip,
             **protocol_fields,
         },
+    )
+
+
+def _allow_one_way(
+    session: Session,
+    *,
+    class_id: uuid.UUID,
+    source_vmid: int,
+    target_vmid: int,
+    protocol: str = "any",
+    port: int | None = None,
+) -> None:
+    """Backward-compatible wrapper for class topology and existing tests."""
+    allow_one_way(
+        session,
+        scope_id=class_id,
+        comment_prefix=COMMENT_PREFIX,
+        source_vmid=source_vmid,
+        target_vmid=target_vmid,
+        protocol=protocol,
+        port=port,
     )
 
 

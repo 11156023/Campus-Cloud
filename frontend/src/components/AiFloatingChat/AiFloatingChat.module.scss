@@ -32,6 +32,14 @@
   border-radius: 20px;
   box-shadow: 0 12px 40px rgba(27, 51, 96, 0.12);
   animation: panelIn 180ms ease both;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.panelOut {
+  animation: none;
+  opacity: 0;
+  transform: translateX(16px);
+  pointer-events: none;
 }
 
 @keyframes panelIn {
@@ -280,7 +288,7 @@
     display: block;
     margin-top: $spacing-8;
     color: var(--color-text-muted);
-    font-size: 10px;
+    font-size: $font-size-10;
     text-align: center;
   }
 }
@@ -326,6 +334,7 @@
 }
 
 .fab {
+  animation: fabIn 0.18s ease;
   position: fixed;
   right: $spacing-24;
   bottom: $spacing-24;
@@ -345,6 +354,11 @@
 }
 
 .backdrop { display: none; }
+
+.backdropOut {
+  opacity: 0 !important;
+  pointer-events: none;
+}
 
 @media (max-width: 1439px) {
   .rootOpen {
@@ -371,6 +385,13 @@
     border: 0;
     background: var(--color-overlay);
     z-index: 1;
+    animation: panelBackdropIn 0.18s ease;
+    transition: opacity 0.18s ease;
+  }
+
+  @keyframes panelBackdropIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
   }
 }
 
@@ -380,4 +401,9 @@
   .fab { right: $spacing-16; bottom: $spacing-16; }
   .fab span { display: none; }
   .fab { width: 48px; padding: 0; justify-content: center; }
+}
+
+@keyframes fabIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
 }

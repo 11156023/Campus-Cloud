@@ -1,13 +1,15 @@
 @use "../../assets/styles/variables" as *;
 @use "../../assets/styles/mixins" as *;
 
-/* 對齊「課程學習」空狀態：置中圖示 + 一行灰字 */
+/* 極簡空狀態：置中圖示 + 一行灰字。
+   flex: 1 讓它在 flex-column 父容器有剩餘高度時垂直置中（頁面層級的空狀態） */
 .empty {
   @include flex-column;
+  flex: 1;
   align-items: center;
   justify-content: center;
   gap: $spacing-8;
-  padding: $spacing-32 $spacing-16;
+  padding: $spacing-48 $spacing-16;
   color: var(--color-text-muted);
   font-size: $font-size-14;
   text-align: center;
@@ -18,7 +20,7 @@
 }
 
 .title {
-  font-size: $font-size-14;
+  font-size: $font-size-16;
   color: var(--color-text-muted);
 }
 

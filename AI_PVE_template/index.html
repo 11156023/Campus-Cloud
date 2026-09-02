@@ -22,6 +22,11 @@
       .tool { margin: 10px 0; padding: 10px; border-left: 3px solid #60a5fa; background: #0f172a; }
       .pending { border-left-color: #f59e0b; }
       .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+      .target-list { display: grid; gap: 12px; }
+      .target-row { display: grid; grid-template-columns: auto minmax(70px, .35fr) minmax(0, 1.2fr); gap: 8px 12px; align-items: center; padding: 12px; border: 1px solid #334155; border-radius: 6px; }
+      .target-row strong { grid-row: span 2; color: #bfdbfe; }
+      .target-row label { margin: 0; font-size: .85rem; }
+      .target-row input, .target-row select { width: 100%; }
       .status { margin: 12px 0; padding: 12px 14px; border-radius: 8px; border: 1px solid #475569; background: #172033; }
       .status[data-kind="confirmation"] { border-color: #f59e0b; color: #fde68a; }
       .status[data-kind="error"] { border-color: #ef4444; color: #fecaca; }
@@ -32,12 +37,12 @@
       .confirmation-note { margin: 0 0 10px; color: #fde68a; }
       .confirmation-result { border: 1px solid #334155; }
       @keyframes spin { to { transform: rotate(360deg); } }
-      @media (max-width: 700px) { .grid { grid-template-columns: 1fr; } }
+      @media (max-width: 700px) { .grid { grid-template-columns: 1fr; } .target-row { grid-template-columns: 1fr 1.5fr; } .target-row strong { grid-column: 1 / -1; grid-row: auto; } }
     </style>
   </head>
   <body>
     <h1>AI PVE Template Test</h1>
-    <p class="muted">VMID 102 測試入口。所有授權、guard、SSH key 與 scope 驗證由 backend 負責。</p>
+      <p class="muted">多機模板測試入口（最多三台）。填入幾台就測試幾台；空白槽位會被忽略。初始 AI 上下文來自選取的模板，所有授權、guard、SSH key 與 scope 驗證由 backend 負責。</p>
 
     <div class="card">
       <div class="grid">
@@ -50,14 +55,27 @@
           <input id="token" type="password" autocomplete="off" />
         </div>
       </div>
-      <div class="grid">
-        <div>
-          <label for="template">機器模板</label>
-          <select id="template"><option value="">先載入模板</option></select>
+      <div class="target-list">
+        <div class="target-row">
+          <strong>機器 1</strong>
+          <label for="target1Vmid">VMID</label>
+          <input id="target1Vmid" class="target-vmid" inputmode="numeric" placeholder="例如 102" autocomplete="off" />
+          <label for="target1Template">機器模板</label>
+          <select id="target1Template" class="target-template"><option value="">先載入模板</option></select>
         </div>
-        <div>
-          <label for="vmid">測試 VMID</label>
-          <input id="vmid" value="102" readonly />
+        <div class="target-row">
+          <strong>機器 2</strong>
+          <label for="target2Vmid">VMID</label>
+          <input id="target2Vmid" class="target-vmid" inputmode="numeric" placeholder="例如 107" autocomplete="off" />
+          <label for="target2Template">機器模板</label>
+          <select id="target2Template" class="target-template"><option value="">先載入模板</option></select>
+        </div>
+        <div class="target-row">
+          <strong>機器 3</strong>
+          <label for="target3Vmid">VMID</label>
+          <input id="target3Vmid" class="target-vmid" inputmode="numeric" placeholder="例如 115" autocomplete="off" />
+          <label for="target3Template">機器模板</label>
+          <select id="target3Template" class="target-template"><option value="">先載入模板</option></select>
         </div>
       </div>
       <div class="row">

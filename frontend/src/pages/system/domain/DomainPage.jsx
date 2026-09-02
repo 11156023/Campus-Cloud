@@ -4,6 +4,7 @@ import MIcon from "../../../components/MIcon";
 import LoadingState from "../../../components/LoadingState/LoadingState";
 import EmptyState from "../../../components/EmptyState/EmptyState";
 import { useToast } from "../../../hooks/useToast";
+import useDialogPresence from "../../../hooks/useDialogPresence";
 import { CloudflareService } from "../../../services/cloudflare";
 import PageHeader from "../../../components/PageHeader/PageHeader";
 
@@ -22,7 +23,7 @@ function formatDate(value) {
 
 /* ── 供應商設定 Modal ───────────────────────────────────── */
 
-function ConfigModal({ config, loading, onClose, onSubmit }) {
+function ConfigModal({ config, loading, closing = false, onClose, onSubmit }) {
   const [form, setForm] = useState({
     account_id: config?.account_id ?? "",
     api_token: "",
@@ -46,7 +47,10 @@ function ConfigModal({ config, loading, onClose, onSubmit }) {
   }
 
   return (
-    <div className={styles.modalOverlay} onMouseDown={onClose}>
+    <div
+      className={`${styles.modalOverlay} ${closing ? styles.modalOverlayOut : ""}`}
+      onMouseDown={onClose}
+    >
       <form className={styles.modal} onSubmit={submit} onMouseDown={(e) => e.stopPropagation()}>
         <div className={styles.modalHeader}>
           <div>
@@ -115,7 +119,7 @@ function ConfigModal({ config, loading, onClose, onSubmit }) {
 
 /* ── DNS record 編輯 Modal ─────────────────────────────── */
 
-function RecordModal({ record, loading, onClose, onSubmit }) {
+function RecordModal({ record, loading, closing = false, onClose, onSubmit }) {
   const isEdit = Boolean(record);
   const [form, setForm] = useState({
     type: record?.type ?? "A",
@@ -144,7 +148,10 @@ function RecordModal({ record, loading, onClose, onSubmit }) {
   }
 
   return (
-    <div className={styles.modalOverlay} onMouseDown={onClose}>
+    <div
+      className={`${styles.modalOverlay} ${closing ? styles.modalOverlayOut : ""}`}
+      onMouseDown={onClose}
+    >
       <form className={styles.modal} onSubmit={submit} onMouseDown={(e) => e.stopPropagation()}>
         <div className={styles.modalHeader}>
           <div>
@@ -241,6 +248,7 @@ export default function DomainPage() {
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
   const [modal, setModal] = useState(null); // { kind: "config" } | { kind: "record", record? } | { kind: "deleteRecord", record }
+  const modalPresence = useDialogPresence(modal);
 
   const fetchConfig = useCallback(async () => {
     try {
@@ -396,7 +404,6 @@ export default function DomainPage() {
         <EmptyState
           icon="domain"
           title="尚未連線 Cloudflare"
-          description="點擊「連線設定」輸入 Account ID 與 API Token 後即可載入 Zone 與 DNS 紀錄"
         />
       ) : (
         <div className={styles.workbench}>
@@ -503,31 +510,36 @@ export default function DomainPage() {
         </div>
       )}
 
-      {modal?.kind === "config" && (
+      {modalPresence.item?.kind === "config" && (
         <ConfigModal
           config={config}
           loading={saving}
+          closing={modalPresence.closing}
           onClose={() => setModal(null)}
           onSubmit={handleSaveConfig}
         />
       )}
-      {modal?.kind === "record" && (
+      {modalPresence.item?.kind === "record" && (
         <RecordModal
-          record={modal.record}
+          record={modalPresence.item.record}
           loading={saving}
+          closing={modalPresence.closing}
           onClose={() => setModal(null)}
           onSubmit={handleSaveRecord}
         />
       )}
-      {modal?.kind === "deleteRecord" && (
-        <div className={styles.modalOverlay} onMouseDown={() => setModal(null)}>
+      {modalPresence.item?.kind === "deleteRecord" && (
+        <div
+          className={`${styles.modalOverlay} ${modalPresence.closing ? styles.modalOverlayOut : ""}`}
+          onMouseDown={() => setModal(null)}
+        >
           <div className={styles.confirm} onMouseDown={(e) => e.stopPropagation()}>
             <div className={styles.confirmIcon}>
               <MIcon name="warning" size={24} />
             </div>
             <h2>刪除 DNS 紀錄</h2>
             <p>
-              確定要刪除 <strong>{modal.record.name}</strong>（{modal.record.type}）嗎？此操作無法復原。
+              確定要刪除 <strong>{modalPresence.item.record.name}</strong>（{modalPresence.item.record.type}）嗎？此操作無法復原。
             </p>
             <div className={styles.modalActions}>
               <button type="button" className={styles.btnSecondary} onClick={() => setModal(null)}>

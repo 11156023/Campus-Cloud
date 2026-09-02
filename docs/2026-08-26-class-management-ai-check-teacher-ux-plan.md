@@ -145,7 +145,7 @@
 | 檢查名稱  [期中 Python 環境檢查___________]  | 對話／修改建議        |
 | 評分表名稱[期中 Python 評分表_____________]  |                       |
 |                                               | [產生評估項目初稿]    |
-| 評分環境（可複選）                            | [檢查目前評分表]      |
+| 評分環境（可複選）                            | [潤飾評分表]          |
 | [✓ Linux] [✓ Python] [□ N8N] [□ PostgreSQL]  |                       |
 | 後端環境判斷：尚未啟用（已保留串接位置）      | proposal diff         |
 |                                               | [套用選取] [略過]     |
@@ -188,9 +188,9 @@
 - 刪除動作；刪除已有 AI check steps 的項目時需確認。
 - read-only「AI 偵測判斷」：`detection_method`、`fallback` 與 `check_steps`，明確標示只由 AI proposal 更新。
 
-頁面提供兩層 AI 功能：
+頁面提供兩層 AI 功能；整份評分表的入口統一命名為「潤飾評分表」，不再另外提供「檢查目前評分表」按鈕：
 
-- **整份評分表助手**：依檢查名稱、所選環境與目前 items 產生初稿、補缺漏或整體潤飾。
+- **整份評分表助手**：依檢查名稱、所選環境與目前 items 產生初稿或潤飾整體內容；教師可直接編輯目前評分表的主題與說明。
 - **單一項目 AI 協助**：針對該項目改寫說明、評估可偵測性或補 check steps。
 
 AI 修改規則維持 human-in-the-loop：
@@ -216,7 +216,7 @@ AI 修改規則維持 human-in-the-loop：
 - 已選一份 active 評分表；或
 - 新文件已上傳並分析成功，取得 `file_id`。
 
-上傳完成但 session 建立失敗時，不刪除已分析文件；它仍是班級評分表 Library 的合法項目，並提示導師可重新建立檢查。
+上傳完成但 session 建立失敗時，不刪除已分析文件；它仍是班級尚未綁定的評分表來源，並提示導師可重新建立檢查。來源一旦綁定，就不能被另一個 session 直接共用。
 
 ### 4.8 建立請求契約
 
@@ -314,7 +314,7 @@ AI 修改規則維持 human-in-the-loop：
 - menu 錨定目前列並避免超出 viewport；sidebar 捲動或切換 session 時關閉。
 - `重新命名` 開啟小型 dialog，預填目前名稱；沿用既有 `PATCH title`。
 - `封存` 為非破壞動作，成功後移至已封存，不使用紅色確認。
-- `刪除` 維持目前二次確認，清楚列出會刪除聊天、腳本與執行紀錄，但不刪共用評分表來源。
+- `刪除` 維持目前二次確認，清楚列出會刪除聊天、腳本、執行紀錄與目前檢查的專屬評分表來源；其他檢查不受影響。
 - 每一列只允許一個 pending action；執行中 menu item 顯示 spinner 並防止連點。
 
 所有 icon trigger 的互動目標至少 36×36 px，並提供 tooltip、`aria-label` 與清楚 focus ring。
@@ -556,10 +556,12 @@ response 沿用 `TeacherJudgeSessionPublic`。
 - 尚未啟用 resolver 時 effective `template_key` 穩定取第一個候選，不因陣列序列化或 reload 漂移。
 - analysis update 的 `expected_revision` 正確時成功並加一；過期 revision 回 409 且資料不變。
 - `existing` 缺 `selected_file_id`、跨班級 file、replaced file 均拒絕。
+- 一份 active source 只能綁定一個 session；一般建立／切換遇到已綁定來源回 409，提示使用「複製檢查」或上傳新來源。
 - blank 模式傳 selected file、existing 模式傳 template/rubric name 均回清楚 validation error。
 - fork 空白 session 只建立新 session。
 - fork uploaded／created rubric 均產生新 `file_id`，兩份 `analysis_json` 後續可獨立修改。
 - fork 不複製 messages、summary、artifacts、runs。
+- 刪除 session 同一交易刪除其專屬 rubric 與上傳 bytes；刪除來源後不留下 session 的失效 file reference。
 - archived source 可 fork，但 archived session 本身仍不可編輯。
 - fork 跨班級／無權限／不存在來源 fail closed。
 - pin／unpin reload 後保留；列表永遠 pinned-first，未釘選仍依活動時間排序。

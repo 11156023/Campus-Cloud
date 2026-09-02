@@ -11,6 +11,13 @@
   @include flex-center;
   padding: $spacing-16;
   animation: fadeIn 0.15s ease;
+  transition: opacity 0.15s ease;
+}
+
+.overlayOut {
+  animation: none;
+  opacity: 0;
+  pointer-events: none;
 }
 
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -84,10 +91,10 @@
   flex-shrink: 0;
 }
 
-.dot_connecting   { background: #0891b2; }
-.dot_connected    { background: #28a745; }
+.dot_connecting   { background: var(--color-info); }
+.dot_connected    { background: var(--color-success); }
 .dot_disconnected { background: var(--color-text-muted); }
-.dot_error        { background: #dc3545; }
+.dot_error        { background: var(--color-danger); }
 
 .statusText {
   font-size: $font-size-12;
@@ -186,7 +193,7 @@
   margin-bottom: $spacing-8;
 }
 
-.terminalOverlayIconError { color: #dc3545; }
+.terminalOverlayIconError { color: var(--color-danger); }
 .terminalOverlayIconMuted { color: rgba(255, 255, 255, 0.25); }
 
 .terminalOverlayTitle {

@@ -29,6 +29,9 @@ from app.infrastructure.proxmox import get_proxmox_settings_for_node
 from app.infrastructure.proxmox import operations as proxmox_ops
 from app.infrastructure.queue import enqueue_task, report_progress
 from app.models import (
+    CourseEnvironment,
+    CourseEnvironmentNode,
+    CourseEnvironmentVersion,
     Resource,
     TaskRecord,
     TaskRecordStatus,
@@ -40,6 +43,7 @@ from app.models import (
 from app.repositories import task_record as task_record_repo
 from app.repositories import vm_template as template_repo
 from app.schemas.template import (
+    TemplateCatalogItem,
     VMTemplateCreate,
     VMTemplatePublic,
     VMTemplateUpdate,
@@ -123,6 +127,54 @@ def list_templates(*, session: Session, user: User) -> list[VMTemplatePublic]:
         )
         for t in templates
     ]
+
+
+def list_student_catalog(*, session: Session) -> list[TemplateCatalogItem]:
+    """The application catalogue any signed-in user may request a machine from.
+
+    Only ready, explicitly opened templates appear, and each row is enriched
+    with the PVE facts the request form needs (OS family and the source
+    machine's own spec, which is the clone's floor).
+    """
+    from app.services.proxmox.provisioning_service import (  # noqa: PLC0415
+        _template_disk_gb,
+        is_windows_template,
+    )
+
+    templates = template_repo.list_student_catalog(session=session)
+    if not templates:
+        return []
+    # VM 與 LXC 範本都要對帳，所以讀 pool 內的原始紀錄（VM 專用清單已排除 LXC）
+    raw_by_vmid = {
+        int(item["vmid"]): item for item in proxmox_ops.get_vm_templates()
+    }
+    catalog: list[TemplateCatalogItem] = []
+    for template in templates:
+        raw = raw_by_vmid.get(template.pve_vmid)
+        if raw is None:
+            # PVE 已經找不到的範本會在建立時失敗，不該出現在目錄裡
+            continue
+        max_memory = raw.get("maxmem")
+        is_lxc = template.resource_type.lower() == "lxc"
+        catalog.append(
+            TemplateCatalogItem(
+                id=template.id,
+                pve_vmid=template.pve_vmid,
+                name=template.name,
+                description=template.description,
+                resource_type=template.resource_type,
+                node=template.node,
+                version=template.version,
+                # ostype 只有 VM 讀得到，而且每次查詢都會打 PVE，
+                # 所以只對目錄裡的 VM 逐筆確認
+                is_windows=(not is_lxc) and is_windows_template(template.pve_vmid),
+                cores=template.default_cores or (raw.get("maxcpu") or None),
+                memory_mb=template.default_memory
+                or (int(max_memory) // (1024 * 1024) if max_memory else None),
+                disk_gb=template.default_disk or (_template_disk_gb(raw) or None),
+            )
+        )
+    return catalog
 
 
 def get_template_for_user(
@@ -234,9 +286,6 @@ async def create_template(
     resource_type = "lxc" if pve_resource.get("type") == "lxc" else "qemu"
     node = str(pve_resource["node"])
 
-    if data.requires_gpu and resource_type == "lxc":
-        raise BadRequestError("LXC 範本不支援 GPU 直通，無法設定需要 GPU")
-
     # 母機若是平台管理的資源，僅擁有者或 admin 能轉換（轉換後原 VM 消失）
     owned = session.get(Resource, data.source_vmid)
     if owned is not None and owned.user_id != user.id and not is_admin(user):
@@ -257,7 +306,7 @@ async def create_template(
             default_cores=data.default_cores,
             default_memory=data.default_memory,
             allow_password_change=data.allow_password_change,
-            requires_gpu=data.requires_gpu,
+            student_requestable=data.student_requestable,
             source_vmid=data.source_vmid,
         )
     else:
@@ -273,7 +322,7 @@ async def create_template(
             default_cores=data.default_cores,
             default_memory=data.default_memory,
             allow_password_change=data.allow_password_change,
-            requires_gpu=data.requires_gpu,
+            student_requestable=data.student_requestable,
             source_vmid=data.source_vmid,
         )
     try:
@@ -385,8 +434,6 @@ def update_template(
     updates: dict[str, Any] = data.model_dump(exclude_unset=True)
     for field, value in updates.items():
         setattr(template, field, value)
-    if template.requires_gpu and template.resource_type == "lxc":
-        raise BadRequestError("LXC 範本不支援 GPU 直通，無法設定需要 GPU")
     template_repo.touch(session=session, template=template)
     return _to_public(template)
 
@@ -576,6 +623,28 @@ def _clone_children_vmids(session: Session, pve_vmid: int) -> list[int]:
     return list(session.exec(stmt).all())
 
 
+def _environments_referencing(session: Session, template_id: uuid.UUID) -> list[str]:
+    """引用這個母範本的多機環境名稱（含草稿與已下架版本）。
+
+    已發布的環境會在學生按下啟動時才用到來源範本，所以刪除前必須先盤點；
+    草稿與已下架版本一樣要算，否則教師之後建立新版本會拿到空的來源。
+    """
+    rows = session.exec(
+        select(CourseEnvironment.name)
+        .join(
+            CourseEnvironmentVersion,
+            col(CourseEnvironmentVersion.environment_id) == col(CourseEnvironment.id),
+        )
+        .join(
+            CourseEnvironmentNode,
+            col(CourseEnvironmentNode.version_id) == col(CourseEnvironmentVersion.id),
+        )
+        .where(CourseEnvironmentNode.source_template_id == template_id)
+        .distinct()
+    ).all()
+    return [str(name) for name in rows]
+
+
 async def delete_template(
     *, session: Session, user: User, template_id: uuid.UUID
 ) -> TaskRecord:
@@ -592,6 +661,15 @@ async def delete_template(
             "Template still has cloned VMs: "
             + ", ".join(str(v) for v in sorted(children))
             + ". Delete them first."
+        )
+
+    environments = _environments_referencing(session, template.id)
+    if environments:
+        shown = "、".join(environments[:3])
+        more = f" 等 {len(environments)} 個" if len(environments) > 3 else ""
+        raise ConflictError(
+            f"多機環境「{shown}」{more}正在引用這個母範本，"
+            "請先把那些環境改用其他來源或下架後再刪除。"
         )
 
     return await enqueue_task(
