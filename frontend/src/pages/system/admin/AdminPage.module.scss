@@ -303,7 +303,7 @@
   @include flex-column;
   gap: $spacing-16;
   padding: $spacing-24;
-  @include glass-surface($shadow: var(--shadow-xl));
+  @include glass-surface($shadow: var(--shadow-lg));
   border-radius: $radius-8;
 }
 
