@@ -185,10 +185,25 @@
   @include glass-surface;
   border-radius: $radius-16;
   display: grid;
-  grid-template-columns: auto 1fr;
   grid-template-rows: 1fr auto;
   gap: 16px;
   padding: $spacing-16;
+  width: 100%;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: transform $transition-base, border-color $transition-base, box-shadow $transition-base;
+
+  &:hover {
+    transform: translateY(-2px);
+    // 研究卡靜止時是虛線（代表需要申請），hover 一律收斂成實線，兩張卡回饋才一致。
+    border-style: solid;
+    border-color: color-mix(in srgb, var(--color-primary) 45%, var(--color-border));
+    box-shadow: 0 8px 20px color-mix(in srgb, var(--color-primary) 16%, transparent);
+
+    .secondaryButton { background: var(--color-primary-dark); }
+  }
 
   > div { min-width: 0; }
 
@@ -205,9 +220,21 @@
   }
 
   .secondaryButton {
-    grid-column: 1 / -1;
     justify-self: start;
     align-self: end;
+    // 整張卡片才是點擊目標，這顆只是視覺提示，不自己攔截滑鼠。
+    pointer-events: none;
+  }
+
+  // 按鈕移到右側後，文字剩下的寬度才夠不斷成三行：
+  // 1200px 時卡片僅 384px（文字 194px）太擠，1400px 起卡片有 484px 才足夠。
+  @media (min-width: 1400px) {
+    grid-template-columns: 1fr auto;
+    grid-template-rows: auto;
+    align-items: center;
+    gap: $spacing-24;
+
+    .secondaryButton { align-self: center; }
   }
 }
 
@@ -232,10 +259,6 @@
   border-radius: $radius-8;
   background: var(--color-primary);
   color: var(--color-text-on-primary);
-
-  &:hover {
-    background: var(--color-primary-dark);
-  }
 }
 
 /* ── 快速練習環境 ── */

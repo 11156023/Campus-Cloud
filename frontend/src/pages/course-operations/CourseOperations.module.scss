@@ -10,6 +10,8 @@
 .btnSecondary { border: 1px solid var(--color-border); color: var(--color-text); background: var(--color-surface); }
 .btnSecondary:hover:not(:disabled) { background: var(--color-hover); }
 .btnSecondary:disabled { opacity: 0.5; cursor: not-allowed; }
+/* 頁首返回鍵：與「申請虛擬機 / 容器」頁的 .backBtn 一致 */
+.backBtn { box-shadow: var(--shadow-sm); white-space: nowrap; }
 .backLink { align-self: flex-start; padding: 5px 4px; color: var(--color-text-secondary); background: transparent; }
 .backLink:hover { color: var(--color-primary); }
 .iconBtn { width: 32px; height: 32px; padding: 0; color: var(--color-text-secondary); background: transparent; }
@@ -40,10 +42,12 @@
 .table td small { display: block; max-width: 420px; margin-top: 3px; color: var(--color-text-muted); font-size: $font-size-12; line-height: 1.35; }
 .rowLink { cursor: pointer; transition: background $transition-base; }
 .rowLink:hover { background: var(--color-hover); }
-.statusBadge, .lockBadge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border-radius: $radius-pill; font-size: $font-size-12; font-weight: $font-weight-500; white-space: nowrap; }
-.status_published, .status_active { color: var(--color-success); background: color-mix(in srgb, var(--color-success) 12%, transparent); }
-.status_draft, .status_planning { color: var(--color-pending); background: color-mix(in srgb, var(--color-pending) 13%, transparent); }
-.status_archived { color: var(--color-text-muted); background: var(--color-hover); }
+.statusBadge, .lockBadge { @include badge-base; gap: 4px; padding: 2px 10px; white-space: nowrap; }
+.status_active, .status_published { color: var(--color-success); background: color-mix(in srgb, var(--color-success) 12%, transparent); }
+.status_planning, .status_draft, .status_pending_review { color: var(--color-pending); background: color-mix(in srgb, var(--color-pending) 12%, transparent); }
+.status_provisioning { color: var(--color-info); background: color-mix(in srgb, var(--color-info) 12%, transparent); }
+.status_partial_failed { color: var(--color-danger); background: color-mix(in srgb, var(--color-danger) 12%, transparent); }
+.status_archived, .status_retired { color: var(--color-text-muted); background: var(--color-hover); }
 
 .emptyState { display: flex; min-height: 180px; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 24px; color: var(--color-text-muted); text-align: center; }
 .emptyState p { margin: 0; font-size: $font-size-14; }
@@ -77,7 +81,6 @@
 .templateChoices p { margin: 4px 0; color: var(--color-text-secondary); font-size: $font-size-12; line-height: 1.4; }
 .templateChoices small { color: var(--color-text-muted); font-size: $font-size-10; }
 
-.headerState { display: flex; align-items: center; gap: 7px; }
 
 .lockBadge { color: var(--color-pending); background: color-mix(in srgb, var(--color-pending) 12%, transparent); }
 .workspaceTabs { padding-bottom: 8px; border-bottom: 1px solid var(--color-border); }
@@ -200,12 +203,8 @@
 .classCardAlert .classCardAction > span { color: var(--color-danger); }
 .classCardAlert .classCardAction button { color: var(--color-danger); background: color-mix(in srgb, var(--color-danger) 9%, transparent); }
 .classCardAlert .classCardAction button:hover { background: color-mix(in srgb, var(--color-danger) 16%, transparent); }
-.statusBadge { padding: 3px 9px; border: 1px solid transparent; }
-.status_planning, .status_draft { border-color: color-mix(in srgb, var(--color-pending) 20%, var(--color-border)); background: transparent; }
-.status_active, .status_published { border-color: color-mix(in srgb, var(--color-success) 20%, var(--color-border)); background: transparent; }
-.status_pending_review { border-color: color-mix(in srgb, var(--color-pending) 35%, var(--color-border)); color: var(--color-pending); background: color-mix(in srgb, var(--color-pending) 6%, var(--color-surface)); }
 
-.heatmapCard { container-type: inline-size; overflow: visible; }
+.heatmapCard { overflow: visible; }
 .heatmapHeader { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding: 22px 22px 18px; }
 .heatmapHeader h2 { margin: 3px 0 0; color: var(--color-text-primary); font-size: $font-size-18; letter-spacing: -.02em; }
 .heatmapHeader p { margin: 6px 0 0; color: var(--color-text-secondary); font-size: $font-size-14; line-height: 1.5; }
@@ -213,7 +212,7 @@
 .prototypeBadge { display: inline-flex; align-items: center; gap: 5px; flex: 0 0 auto; padding: 5px 9px; border: 1px solid color-mix(in srgb, var(--color-pending) 24%, var(--color-border)); border-radius: $radius-pill; color: var(--color-pending); background: color-mix(in srgb, var(--color-pending) 7%, var(--color-surface)); font-size: $font-size-12; font-weight: $font-weight-500; }
 .liveBadge { display: inline-flex; align-items: center; gap: 5px; flex: 0 0 auto; padding: 5px 9px; border: 1px solid color-mix(in srgb, var(--color-success) 28%, var(--color-border)); border-radius: $radius-pill; color: var(--color-success); background: color-mix(in srgb, var(--color-success) 7%, var(--color-surface)); font-size: $font-size-12; font-weight: $font-weight-500; }
 .heatmapToolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 0 22px 18px; border-bottom: 1px solid var(--color-border); }
-.machineTabs { display: flex; flex: 1 1 240px; gap: 7px; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+.machineTabs { display: flex; gap: 7px; min-width: 0; overflow-x: auto; scrollbar-width: none; }
 .machineTabs::-webkit-scrollbar { display: none; }
 .machineTabs > button { display: flex; align-items: center; gap: 9px; flex: 0 0 auto; min-width: 150px; box-sizing: border-box; padding: 9px 12px; border: 1px solid var(--color-border); border-radius: $radius-8; color: var(--color-text-secondary); background: var(--color-surface); text-align: left; transition: border-color $transition-base, background $transition-base, color $transition-base; }
 .machineTabs > button:hover { border-color: color-mix(in srgb, var(--color-primary) 35%, var(--color-border)); background: var(--color-hover); }
@@ -227,9 +226,9 @@
 .metricTabs button { display: inline-flex; align-items: center; gap: 5px; min-height: 32px; padding: 0 13px; border: 0; border-radius: $radius-8; color: var(--color-text-secondary); background: transparent; font-size: $font-size-12; font-weight: $font-weight-500; }
 .metricTabs button.metricTabActive { color: var(--color-text-primary); background: var(--color-surface); box-shadow: 0 1px 3px color-mix(in srgb, var(--color-text-primary) 12%, transparent); }
 .heatmapSummary { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 16px 22px; }
-.heatmapSummary > div:first-child { display: flex; flex: 1 1 0; align-items: center; gap: 10px; min-width: 0; }
+.heatmapSummary > div:first-child { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .heatmapSummary > div:first-child > div { display: flex; flex-direction: column; min-width: 0; }
-.heatmapSummary strong { overflow: hidden; color: var(--color-text-primary); font-size: $font-size-14; text-overflow: ellipsis; white-space: nowrap; }
+.heatmapSummary strong { color: var(--color-text-primary); font-size: $font-size-14; }
 .heatmapSummary small { color: var(--color-text-muted); font-size: $font-size-10; }
 .selectedMachineIcon { display: grid; width: 36px; height: 36px; flex: 0 0 auto; place-items: center; border-radius: $radius-8; color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 10%, var(--color-surface)); }
 .heatmapSummary dl { display: flex; gap: 0; margin: 0; }
@@ -257,18 +256,6 @@
 .heatLegend span { display: inline-flex; align-items: center; gap: 5px; }
 .heatLegend i { display: inline-block; width: 15px; height: 15px; border: 1px solid var(--color-border); border-radius: 4px; }
 .legendScale { gap: 3px !important; }
-
-@container (max-width: 640px) {
-  .heatmapHeader, .heatmapToolbar, .heatmapSummary { align-items: stretch; flex-direction: column; }
-  .machineTabs { display: grid; width: 100%; grid-template-columns: 1fr; overflow: visible; }
-  .machineTabs > button { width: 100%; min-width: 0; }
-  .metricTabs { align-self: flex-start; }
-  .heatmapSummary dl { width: 100%; }
-  .heatmapSummary dl > div { flex: 1; min-width: 0; padding-left: 10px; }
-  .heatGrid { grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); }
-}
-.status_provisioning { border-color: color-mix(in srgb, var(--color-primary) 35%, var(--color-border)); color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 6%, var(--color-surface)); }
-.status_partial_failed { border-color: color-mix(in srgb, var(--color-danger) 35%, var(--color-border)); color: var(--color-danger); background: color-mix(in srgb, var(--color-danger) 6%, var(--color-surface)); }
 .stepTabs { align-self: flex-start; padding: 4px; }
 .stepTabs button { min-width: 170px; justify-content: flex-start; }
 
@@ -449,8 +436,6 @@
 .inspectorDanger { display: inline-flex; min-height: 34px; align-items: center; justify-content: center; gap: 5px; margin-top: auto; padding: 0 10px; border: 1px solid color-mix(in srgb, var(--color-danger) 35%, var(--color-border)); border-radius: $radius-8; color: var(--color-danger); background: var(--color-surface); cursor: pointer; }
 .table { min-width: 720px; }
 
-.headerState { flex-wrap: wrap; justify-content: flex-end; }
-
 .jobGrid span { color: var(--color-text-muted); font-size: $font-size-10; }
 .jobGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; padding: 16px 28px; border-bottom: 1px solid var(--color-border); background: color-mix(in srgb, var(--color-hover) 34%, var(--color-surface)); }
 .jobGrid article { display: flex; flex-direction: column; gap: 3px; padding: 10px 12px; border: 1px solid var(--color-border); border-radius: $radius-8; background: var(--color-surface); }
@@ -461,9 +446,6 @@
 .weekDate { display: flex; flex-direction: column; align-self: center; gap: 4px; }
 .weekDate strong { color: var(--color-primary); font-size: $font-size-12; }
 .weekDate span { color: var(--color-text-secondary); font-size: $font-size-12; font-variant-numeric: tabular-nums; }
-.weekPublishButton { display: inline-flex; width: fit-content; align-items: center; gap: 4px; margin-top: 5px; padding: 4px 7px; border: 1px solid var(--color-border); border-radius: 999px; color: var(--color-text-muted); background: var(--color-surface); font-size: $font-size-10; font-weight: $font-weight-500; cursor: pointer; }
-.weekPublishButton:disabled { cursor: not-allowed; opacity: .45; }
-.weekPublished { border-color: color-mix(in srgb, var(--color-success) 35%, var(--color-border)); color: var(--color-success); background: color-mix(in srgb, var(--color-success) 8%, var(--color-surface)); }
 .weekFiles { display: flex; min-width: 0; flex-direction: column; gap: 6px; }
 .weekFiles > span { color: var(--color-text-secondary); font-size: $font-size-12; font-weight: $font-weight-500; }
 .weekFileList { display: flex; min-height: 40px; align-items: center; flex-wrap: wrap; gap: 6px; }

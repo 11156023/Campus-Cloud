@@ -301,9 +301,6 @@ export default function GpuMgmtPage() {
                       <tr className={`${styles.tr} ${expanded ? styles.trExpanded : ""}`}>
                         <td className={styles.td}>
                           <div className={styles.nameCell}>
-                            <div className={styles.nameIcon}>
-                              <MIcon name="memory" size={18} />
-                            </div>
                             <div>
                               <div className={styles.namePrimary}>{n.mapping}</div>
                               <div className={styles.nameSub}>

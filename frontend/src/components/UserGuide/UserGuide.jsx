@@ -528,7 +528,6 @@ export default function UserGuide() {
             </div>
 
             <div className={styles.content}>
-              <span className={styles.focusLabel}><MIcon name="ads_click" size={15} />現在聚焦的功能</span>
               <h2 id="global-guide-title">{current.title}</h2>
               <p>{current.text}</p>
             </div>

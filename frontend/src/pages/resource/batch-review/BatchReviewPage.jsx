@@ -184,7 +184,7 @@ export default function BatchReviewPage() {
 
   return (
     <div className={styles.page}>
-      <PageHeader title="批量建立審核" subtitle="審核教師提交的批次 VM 配置申請" />
+      <PageHeader title="批量審核" subtitle="審核教師提交的批次 VM 配置申請" />
 
       <div className={styles.statRow}>
         <div className={styles.statCard}>
@@ -263,9 +263,6 @@ export default function BatchReviewPage() {
                     <tr key={b.id} className={styles.tr}>
                       <td className={styles.td}>
                         <div className={styles.nameCell}>
-                          <div className={styles.nameIcon}>
-                            <MIcon name="library_add" size={18} />
-                          </div>
                           <div>
                             <div className={styles.namePrimary}>{b.hostname_prefix}</div>
                             <div className={styles.nameSub}>{b.resource_type?.toUpperCase()}</div>

@@ -32,15 +32,6 @@ const TABS = [
   ["ai", "auto_awesome", "AI 檢查", "機器與上課情況"],
 ];
 
-const STATUS = {
-  planning: "準備中",
-  pending_review: "等待審核",
-  provisioning: "正在建立",
-  partial_failed: "需要處理",
-  active: "可以上課",
-  archived: "已結束",
-};
-
 const JOB_STATUS = {
   pending_review: "待審核", approved: "已核准", pending: "等待建立",
   running: "建立中", completed: "已完成", failed: "失敗",
@@ -812,18 +803,17 @@ export default function ClassWorkspacePage() {
   }
 
   if (loading) return <LoadingState fullPage text="正在讀取班級…" />;
-  if (!item) return <div className={styles.page}><button type="button" className={styles.backLink} onClick={() => navigate("/class-management")}><MIcon name="arrow_back" size={18} />返回班級清單</button><p className={styles.errorMessage}>{error || "找不到班級"}</p></div>;
+  if (!item) return <div className={styles.page}><button type="button" className={styles.backLink} onClick={() => navigate("/class-management")}><MIcon name="arrow_back" size={18} />返回班級管理</button><p className={styles.errorMessage}>{error || "找不到班級"}</p></div>;
   const postUnavailable = ["classroom", "progress", "ai"].includes(tab) && item.status !== "active";
   const completed = [item.students.length > 0, Boolean(item.course_environment) && item.nodes.length > 0].filter(Boolean).length;
 
   return <div className={styles.page}>
-    <button type="button" className={styles.backLink} onClick={() => navigate("/class-management")}><MIcon name="arrow_back" size={18} />返回班級清單</button>
     <PageHeader
       eyebrow={`${item.code} · ${item.term}`}
       title={item.name}
       subtitle={`${item.students.length} 位學生 · ${item.weeks.length} 個課次 · 每週${["一", "二", "三", "四", "五", "六", "日"][item.weekday]} ${item.startTime}–${item.endTime}`}
     >
-      <div className={styles.headerState}><span className={`${styles.statusBadge} ${styles[`status_${item.status}`]}`}>{STATUS[item.status] ?? item.status}</span></div>
+      <div className={styles.pageActions}><button type="button" className={`${styles.btnSecondary} ${styles.backBtn}`} onClick={() => navigate("/class-management")}><MIcon name="arrow_back" size={18} />返回班級管理</button></div>
     </PageHeader>
     {error && <p className={styles.errorMessage}>{error}</p>}
     <section className={styles.workflowTabsBar} aria-label="班級管理流程">

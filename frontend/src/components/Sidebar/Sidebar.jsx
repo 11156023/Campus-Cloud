@@ -84,7 +84,7 @@ const navGroups = [
     items: [
       { key: "monitoring",    label: "資源監控",       icon: "monitor_heart", adminOnly: true },
       { key: "jobs",          label: "背景任務",       icon: "task_alt" },
-      { key: "audit",         label: "Audit Logs",     icon: "receipt_long", adminOnly: true },
+      { key: "audit",         label: "稽核日誌",     icon: "receipt_long", adminOnly: true },
     ],
   },
 ];

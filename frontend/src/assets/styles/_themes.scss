@@ -23,6 +23,8 @@
   --color-primary: #5471bf;
   --color-primary-dark: #2b4d98;
   --color-primary-light: #6a7fb3;
+  /* 品牌色文字／邊框用：亮暗兩色都達 AA，勿與 --color-text-primary 混淆 */
+  --color-primary-on-surface: #2b4d98;
 
   /* ----- Text ----- */
   --color-text: #5471bf;
@@ -93,6 +95,7 @@ body.dark {
   --color-primary: #4361a2;
   --color-primary-dark: rgb(47, 78, 140);
   --color-primary-light: #89a5e0;
+  --color-primary-on-surface: #89a5e0;
 
   /* ----- Text ----- */
   --color-text: #d4deef;

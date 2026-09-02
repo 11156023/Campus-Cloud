@@ -17,7 +17,7 @@ export default function AiPvePage() {
   return (
     <div className={styles.page}>
       <PageHeader
-        title="AI PVE 維運助手"
+        title="PVE 維運助手"
         subtitle="管理員專用的全站 PVE 維運工具，可查詢 VM/LXC 與節點狀態，執行指令前會再次確認"
       />
       <AiPveChat initialPrompt={initialPromptRef.current} />
