@@ -362,8 +362,10 @@ export default function AiFloatingChat({ open = false, onOpenChange = () => {} }
     const recommendIndex = flow
       ? flow.steps.findIndex((step) => step.action === "recommend")
       : -1;
+    /* 進度停在規劃那一步：欄位填好了，但檢查、輸入密碼、按送出都還在同一張
+       表單上，還沒走到「等待審核」。 */
     const followUp = flow && recommendIndex >= 0
-      ? { steps: flow.steps, stepsFloor: recommendIndex + 1 }
+      ? { steps: flow.steps, stepsFloor: recommendIndex }
       : {};
 
     /* 申請表單開著就直接填進去——填好的表單本身就是結果，

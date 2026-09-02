@@ -116,9 +116,8 @@ def test_the_flow_comes_along_so_planning_does_not_dead_end() -> None:
         _history("我要架網站", "不需要 GPU", "Linux 指令列就好", "整個學期")
     )
     assert done.ready is True
-    # 問完了，下一步是確認內容並送出
-    assert [step.status for step in done.steps][:3] == ["done", "done", "current"]
-    assert done.steps[2].state == {"create": True}
+    # 問完了進度仍停在這一步：檢查、輸入密碼、按送出都還在同一張表單上
+    assert [step.status for step in done.steps] == ["done", "current", "todo", "todo"]
 
 
 def test_a_single_rich_sentence_can_answer_several_questions_at_once() -> None:

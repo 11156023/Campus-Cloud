@@ -155,8 +155,9 @@ def read_intake(
     flow_fields = {
         "flow_id": flow.flow_id,
         "flow_title": flow.title,
-        # 問答進行中就停在規劃那一步，問完換下一步（填申請單）
-        "steps": public_steps(flow, recommend_index if missing else recommend_index + 1),
+        # 進度停在規劃那一步：填完還要自己檢查、輸入密碼、按送出，
+        # 都在同一張表單上，還沒到「等待審核」。
+        "steps": public_steps(flow, recommend_index),
     } if flow else {}
 
     if not missing:

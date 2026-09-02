@@ -98,7 +98,7 @@ async def test_whole_task_falls_back_to_a_step_by_step_flow(
     assert result.action == "guide"
     assert result.flow_id == "request_machine"
     assert [step.status for step in result.steps] == [
-        "current", "todo", "todo", "todo", "todo",
+        "current", "todo", "todo", "todo",
     ]
     # 先把人帶到表單，規劃才拿得到表單上的真實候選（GPU、時段、作業系統）。
     assert result.steps[0].path == "/my-requests"

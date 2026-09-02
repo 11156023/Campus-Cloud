@@ -60,7 +60,10 @@ _FLOWS: tuple[NavigationFlow, ...] = (
             NavigationStep(
                 title="打開申請單",
                 path="/my-requests",
-                detail="申請表單就是這次要填的東西，先打開它，後面的每一步都在這張表單上完成。",
+                detail=(
+                    "後面每一步都在這張表單上完成：AI 幫你填、你檢查規格與時段、"
+                    "帳號密碼一律自己輸入，確認後按送出。"
+                ),
                 state={"create": True},
             ),
             NavigationStep(
@@ -68,12 +71,6 @@ _FLOWS: tuple[NavigationFlow, ...] = (
                 path="/my-requests",
                 detail="我會問用途、要不要 GPU、要不要圖形桌面、用多久，然後直接把欄位填進表單；想自己填就跳過這步。",
                 action="recommend",
-            ),
-            NavigationStep(
-                title="確認內容並送出",
-                path="/my-requests",
-                detail="檢查規格與時段，帳號密碼一律由你自己輸入，確認後送出。",
-                state={"create": True},
             ),
             NavigationStep(
                 title="等待審核",
