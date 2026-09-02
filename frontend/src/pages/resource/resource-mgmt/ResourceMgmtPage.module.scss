@@ -208,7 +208,7 @@
 }
 
 .environmentMachineRow {
-  background: color-mix(in srgb, var(--color-hover) 30%, var(--color-surface));
+  background: var(--color-surface);
 }
 
 .environmentToggle {

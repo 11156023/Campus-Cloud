@@ -274,7 +274,7 @@
 
 .detailTd {
   padding: $spacing-8 $spacing-16 $spacing-16;
-  background: color-mix(in srgb, var(--color-primary) 3%, transparent);
+  background: var(--color-surface);
 }
 
 .detailBody {

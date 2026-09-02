@@ -111,11 +111,20 @@
 }
 
 /* ── Row actions ── */
+/* 沒有可用操作時的空值符號，與系統欄的「—」同一套慣例。 */
+.emptyAction {
+  font-size: $font-size-12;
+  color: var(--color-text-muted);
+}
+
+/* 內容靠左對齊「操作」表頭；靠右會在表頭與按鈕之間留下一大片空白。 */
 .rowActions {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
   gap: $spacing-8;
+  flex-wrap: nowrap;
+
+  > * { flex-shrink: 0; }
 }
 
 .expandBtn {
@@ -124,14 +133,17 @@
   border-radius: $radius-8;
   color: var(--color-text-muted);
   cursor: pointer;
+  flex-shrink: 0;
   @include flex-center;
-  transition: background $transition-base, transform $transition-base;
+  transition: background $transition-base;
 
   &:hover { background: var(--color-hover); }
 }
 
-.expandBtnOpen {
-  transform: rotate(180deg);
+/* 沒有詳細資訊的列用同寬佔位，讓名稱欄整欄對齊。 */
+.expandPlaceholder {
+  width: 26px;
+  flex-shrink: 0;
 }
 
 /* ── Expanded detail row ── */
@@ -143,18 +155,21 @@
 
 .detailTd {
   padding: $spacing-8 $spacing-16 $spacing-16;
-  background: color-mix(in srgb, var(--color-primary) 3%, transparent);
+  background: var(--color-surface);
 }
 
+/* 帳號、申請原因、預約期間橫向排成一列，空間不足才換行。 */
 .detailBody {
-  @include flex-column;
-  gap: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px $spacing-24;
 }
 
 .infoRow {
   display: flex;
   align-items: baseline;
-  gap: $spacing-8;
+  gap: 6px;
   min-width: 0;
 }
 
@@ -165,11 +180,9 @@
   font-size: $font-size-12;
   color: var(--color-text-muted);
   flex-shrink: 0;
-  width: 72px;
 }
 
 .infoValue {
-  flex: 1;
   font-size: $font-size-12;
   color: var(--color-text);
   min-width: 0;
@@ -191,9 +204,11 @@
 .badge_muted   { background: var(--color-hover); color: var(--color-status-neutral); }
 
 /* ── Review comment ── */
+/* 駁回原因與失敗訊息是整段文字，在 .detailBody 的橫排裡各自獨佔一行。 */
 .reviewComment {
   display: flex;
   align-items: flex-start;
+  flex-basis: 100%;
   gap: 5px;
   padding: 8px 12px;
   border-radius: $radius-8;
