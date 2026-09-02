@@ -41,6 +41,8 @@ export default function AdminDashboardPage() {
   const { user } = useAuth();
   const [assistantPrompt, setAssistantPrompt] = useState("");
   const [conversationPrompt, setConversationPrompt] = useState("");
+  /* 放大模式：對話佔滿版面，上面的「需要前往確認」暫時收起來 */
+  const [focusMode, setFocusMode] = useState(false);
   const [checks, setChecks] = useState({ alerts: 0, failedJobs: 0, requests: 0, batches: 0, aiRequests: 0, unavailable: 0 });
   const [loading, setLoading] = useState(true);
 
@@ -80,6 +82,7 @@ export default function AdminDashboardPage() {
   function resetAssistant() {
     setConversationPrompt("");
     setAssistantPrompt("");
+    setFocusMode(false);
   }
 
   function openAssistant(event) {
@@ -89,15 +92,15 @@ export default function AdminDashboardPage() {
     setConversationPrompt(prompt);
   }
 
-  return <div className={styles.page}>
+  return <div className={`${styles.page} ${focusMode ? styles.pageFocused : ""}`}>
     <PageHeader title={`${name}，要處理哪一件事？`} subtitle="直接詢問維運助手，或查看目前需要優先確認的問題。" />
 
-    <section className={styles.attention} aria-labelledby="admin-attention-title">
+    {!focusMode && <section className={styles.attention} aria-labelledby="admin-attention-title">
       <div className={styles.sectionHeading}><div><span className={styles.eyebrow}>優先處理</span><h2 id="admin-attention-title">需要前往確認</h2></div><button type="button" onClick={() => navigate("/monitoring")}>開啟系統監控<MIcon name="arrow_forward" size={16} /></button></div>
       {loading ? <div className={styles.checking}><MIcon name="sync" size={20} />正在確認需要處理的項目…</div> : issues.length ? <div className={styles.issueList}>{issues.map((issue) => <button type="button" key={issue.key} className={styles[`issue_${issue.tone}`]} onClick={() => navigate(issue.path)}><span className={styles.issueIcon}><MIcon name={issue.icon} size={20} /></span><span><strong>{issue.title}</strong><small>{issue.description}</small></span><em>{issue.count}</em><MIcon name="arrow_forward" size={18} /></button>)}</div> : <div className={styles.allClear}><span><MIcon name="check_circle" size={21} /></span><div><strong>目前沒有需要立即處理的項目</strong><p>待審核申請、失敗任務與系統警告都已清空。</p></div></div>}
-    </section>
+    </section>}
 
-    <section className={`${styles.assistantSection} ${conversationPrompt ? styles.assistantSectionExpanded : ""}`} aria-labelledby="admin-assistant-title">
+    <section className={`${styles.assistantSection} ${conversationPrompt ? styles.assistantSectionExpanded : ""} ${focusMode ? styles.assistantSectionFocused : ""}`} aria-labelledby="admin-assistant-title">
       <div className={styles.assistantHero}>
         <div className={styles.assistantIntro}>
           <span className={styles.assistantIcon}><MIcon name="support_agent" size={28} /></span>
@@ -109,10 +112,17 @@ export default function AdminDashboardPage() {
           </div>
         </div>
         {conversationPrompt && (
-          <button type="button" className={styles.assistantReset} onClick={resetAssistant}>
-            <MIcon name="refresh" size={16} />
-            重新問一題
-          </button>
+          <div className={styles.assistantActions}>
+            {/* 問問題時把上面那區暫時收起來，對話拿到整個版面；隨時可以回去 */}
+            <button type="button" className={styles.assistantReset} onClick={() => setFocusMode((value) => !value)}>
+              <MIcon name={focusMode ? "close_fullscreen" : "open_in_full"} size={16} />
+              {focusMode ? "回到總覽" : "放大對話"}
+            </button>
+            <button type="button" className={styles.assistantReset} onClick={resetAssistant}>
+              <MIcon name="refresh" size={16} />
+              重新問一題
+            </button>
+          </div>
         )}
         {!conversationPrompt && <form className={styles.assistantForm} onSubmit={openAssistant}>
           <div className={styles.assistantInput}>
@@ -126,7 +136,7 @@ export default function AdminDashboardPage() {
           </div>
         </form>}
       </div>
-      {conversationPrompt && <AiPveChat initialPrompt={conversationPrompt} compact />}
+      {conversationPrompt && <AiPveChat initialPrompt={conversationPrompt} compact={!focusMode} fill={focusMode} />}
     </section>
 
   </div>;

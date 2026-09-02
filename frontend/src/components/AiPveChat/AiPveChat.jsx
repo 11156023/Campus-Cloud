@@ -17,7 +17,7 @@ export function sanitizeAiPveContent(value) {
     .trim();
 }
 
-export default function AiPveChat({ initialPrompt = "", compact = false }) {
+export default function AiPveChat({ initialPrompt = "", compact = false, fill = false }) {
   const toast = useToast();
   const initialPromptRef = useRef(String(initialPrompt ?? "").trim());
   const initialPromptHandledRef = useRef(false);
@@ -159,7 +159,7 @@ export default function AiPveChat({ initialPrompt = "", compact = false }) {
   }
 
   return (
-    <div className={`${styles.chatCard} ${compact ? styles.compact : ""}`}>
+    <div className={`${styles.chatCard} ${compact ? styles.compact : ""} ${fill ? styles.fill : ""}`}>
       <div className={styles.chatLog} aria-live="polite">
         {messages.map((message, index) => (
           <div
