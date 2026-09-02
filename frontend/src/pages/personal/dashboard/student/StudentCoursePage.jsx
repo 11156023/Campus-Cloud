@@ -22,24 +22,12 @@ import styles from "./StudentCoursePage.module.scss";
 
 /** AI 任務的每個檢查項目可被自動判定的程度。 */
 const AI_DETECTABLE_META = {
-  auto: { label: "可自動檢查", icon: "smart_toy", tone: "auto" },
-  partial: { label: "部分自動檢查", icon: "rule", tone: "partial" },
+  auto: { label: "AI 可提供檢查建議", icon: "smart_toy", tone: "auto" },
+  partial: { label: "AI 輔助＋老師確認", icon: "rule", tone: "partial" },
   manual: { label: "老師人工確認", icon: "person_check", tone: "manual" },
 };
 
-/** 一次 AI Check 送出後的執行狀態。 */
-const AI_CHECK_STATUS_META = {
-  pending: { label: "等待 AI Check", icon: "hourglass_top", tone: "pending" },
-  running: { label: "AI 檢查中", icon: "sync", tone: "running" },
-  completed: { label: "已收到 AI 回覆", icon: "task_alt", tone: "completed" },
-  failed: { label: "檢查失敗", icon: "error_outline", tone: "failed" },
-  cancelled: { label: "已取消", icon: "block", tone: "cancelled" },
-};
-
 const NO_COURSE_STATUS = { label: "目前沒有課程", tone: "muted", icon: "event_busy" };
-
-/** AI Check 送出後、尚未有結論前的輪詢間隔。 */
-const AI_CHECK_POLL_MS = 2500;
 
 function StatusBadge({ meta }) {
   return (
@@ -70,8 +58,7 @@ export default function StudentCoursePage() {
     practiceMachines: [],
   });
   const [expandedAssignmentId, setExpandedAssignmentId] = useState(null);
-  const [assignmentChecks, setAssignmentChecks] = useState({});
-  const [checkingAssignmentId, setCheckingAssignmentId] = useState(null);
+  const [reportingItemKey, setReportingItemKey] = useState(null);
   const [activePracticeResource, setActivePracticeResource] = useState(null);
   const [openingMachineId, setOpeningMachineId] = useState(null);
 
@@ -158,47 +145,6 @@ export default function StudentCoursePage() {
     };
   }, [pathId]);
 
-  // AI Check 送出後沒有推播，靠輪詢把 pending/running 的結果補上。
-  useEffect(() => {
-    if (!view.activePath?.id) return undefined;
-    const activeChecks = assignmentsUntilToday(view.aiAssignments)
-      .map((assignment) => [
-        String(assignment.id),
-        assignmentChecks[assignment.id] ?? assignment.latest_check,
-      ])
-      .filter(([, check]) => check?.status === "pending" || check?.status === "running");
-    if (activeChecks.length === 0) return undefined;
-
-    let cancelled = false;
-    const timer = window.setTimeout(async () => {
-      const updates = await Promise.all(activeChecks.map(async ([assignmentId, check]) => {
-        try {
-          const nextCheck = await CoursesService.getAiCheck(
-            view.activePath.id,
-            assignmentId,
-            check.run_id,
-          );
-          return [assignmentId, nextCheck];
-        } catch {
-          return null;
-        }
-      }));
-      if (cancelled) return;
-      setAssignmentChecks((current) => {
-        const next = { ...current };
-        updates.filter(Boolean).forEach(([assignmentId, check]) => {
-          next[assignmentId] = check;
-        });
-        return next;
-      });
-    }, AI_CHECK_POLL_MS);
-
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-    };
-  }, [assignmentChecks, view.activePath?.id, view.aiAssignments]);
-
   const nextRoom = pickInProgress(view.pathDetail?.rooms);
   const roomProgress = toPercent(nextRoom?.progress_percent);
   const deployment = view.roomDetail?.my_deployment;
@@ -259,20 +205,31 @@ export default function StudentCoursePage() {
     setExpandedAssignmentId((current) => (current === assignmentId ? null : assignmentId));
   }
 
-  async function submitAiCheck(assignment) {
-    if (checkingAssignmentId) return;
-    setCheckingAssignmentId(assignment.id);
+  async function updateCompletion(assignment, taskItem) {
+    if (reportingItemKey) return;
+    const itemKey = `${assignment.id}:${taskItem.id}`;
+    const completedItemIds = new Set(assignment.completion?.completed_item_ids ?? []);
+    const completed = !completedItemIds.has(taskItem.id);
+    setReportingItemKey(itemKey);
     setExpandedAssignmentId(assignment.id);
     try {
-      const check = await CoursesService.startAiCheck(view.activePath.id, assignment.id);
-      setAssignmentChecks((current) => ({ ...current, [assignment.id]: check }));
-      toast.success(check.status === "completed"
-        ? "AI Check 已完成"
-        : "已送出，AI 正在檢查你的課堂環境");
+      const completion = await CoursesService.updateAssignmentCompletion(
+        view.activePath.id,
+        assignment.id,
+        taskItem.id,
+        completed,
+      );
+      setView((current) => ({
+        ...current,
+        aiAssignments: current.aiAssignments.map((item) => (
+          item.id === assignment.id ? { ...item, completion } : item
+        )),
+      }));
+      toast.success(completed ? "已勾選這個任務" : "已取消這個任務的勾選");
     } catch (error) {
-      toast.error(error?.message ?? "目前無法送出 AI Check");
+      toast.error(error?.message ?? "目前無法更新完成狀態");
     } finally {
-      setCheckingAssignmentId(null);
+      setReportingItemKey(null);
     }
   }
 
@@ -448,9 +405,13 @@ export default function StudentCoursePage() {
           <div className={styles.assignmentList}>
             {aiAssignments.map((assignment, index) => {
               const expanded = expandedAssignmentId === assignment.id;
-              const check = assignmentChecks[assignment.id] ?? assignment.latest_check;
-              const checkMeta = check ? AI_CHECK_STATUS_META[check.status] : null;
-              const checkRunning = check?.status === "pending" || check?.status === "running";
+              const completedItemIds = new Set(
+                assignment.completion?.completed_item_ids ?? [],
+              );
+              const completedItemCount = (assignment.items ?? []).filter(
+                (item) => completedItemIds.has(item.id),
+              ).length;
+              const completionReported = Boolean(assignment.completion?.completed);
               return (
                 <article
                   key={assignment.id}
@@ -472,15 +433,10 @@ export default function StudentCoursePage() {
                         {" · "}{assignment.items?.length ?? 0} 個檢查項目
                       </small>
                     </span>
-                    {checkMeta ? (
-                      <span className={`${styles.assignmentStatus} ${styles[`assignmentStatus_${checkMeta.tone}`]}`}>
-                        <MIcon name={checkMeta.icon} size={16} />{checkMeta.label}
-                      </span>
-                    ) : (
-                      <span className={`${styles.assignmentStatus} ${styles.assignmentStatus_ready}`}>
-                        <MIcon name="radio_button_unchecked" size={16} />尚未送檢
-                      </span>
-                    )}
+                    <span className={`${styles.assignmentStatus} ${completionReported ? styles.assignmentStatus_completed : styles.assignmentStatus_ready}`}>
+                      <MIcon name={completionReported ? "check_circle" : "checklist"} size={16} />
+                      {completedItemCount}/{assignment.items?.length ?? 0} 已完成
+                    </span>
                     <MIcon name={expanded ? "expand_less" : "expand_more"} size={21} />
                   </button>
 
@@ -490,7 +446,7 @@ export default function StudentCoursePage() {
                         <span><MIcon name="auto_awesome" size={19} /></span>
                         <div>
                           <strong>AI 整理的任務重點</strong>
-                          <p>{assignment.summary || "依照下面的項目完成操作，完成後再送出 AI Check。"}</p>
+                          <p>{assignment.summary || "依照下面的項目完成操作，完成後回報老師即可。"}</p>
                         </div>
                       </div>
 
@@ -498,8 +454,23 @@ export default function StudentCoursePage() {
                         {(assignment.items ?? []).map((item, itemIndex) => {
                           const detectableMeta = AI_DETECTABLE_META[item.detectable]
                             ?? AI_DETECTABLE_META.manual;
+                          const itemKey = `${assignment.id}:${item.id}`;
+                          const itemCompleted = completedItemIds.has(item.id);
                           return (
-                            <li className={styles.aiRequirementItem} key={item.id}>
+                            <li
+                              className={`${styles.aiRequirementItem} ${itemCompleted ? styles.aiRequirementItemCompleted : ""}`}
+                              key={item.id}
+                            >
+                              <label className={styles.requirementCheckbox}>
+                                <input
+                                  type="checkbox"
+                                  checked={itemCompleted}
+                                  onChange={() => updateCompletion(assignment, item)}
+                                  disabled={reportingItemKey !== null}
+                                  aria-label={`${itemCompleted ? "取消" : "標記"}${item.title}完成`}
+                                />
+                                {reportingItemKey === itemKey && <MIcon name="sync" size={15} />}
+                              </label>
                               <span className={styles.aiRequirementNumber}>{itemIndex + 1}</span>
                               <div className={styles.aiRequirementContent}>
                                 <strong>{item.title}</strong>
@@ -514,73 +485,10 @@ export default function StudentCoursePage() {
                         })}
                       </ol>
 
-                      {check && (
-                        <section
-                          className={`${styles.aiReply} ${styles[`aiReply_${check.status}`]}`}
-                          aria-label="AI Check 回覆"
-                        >
-                          <header>
-                            <span>
-                              <MIcon
-                                name={checkRunning
-                                  ? "sync"
-                                  : check.status === "completed" ? "smart_toy" : "error_outline"}
-                                size={20}
-                              />
-                            </span>
-                            <div>
-                              <strong>{checkRunning ? "AI 正在檢查你的課堂環境" : "AI Check 回覆"}</strong>
-                              <small>
-                                {typeof check.score === "number"
-                                  ? `評分 ${check.score}/${check.max_score ?? 5}`
-                                  : checkMeta?.label}
-                              </small>
-                            </div>
-                          </header>
-                          {(check.summary || check.error) && <p>{check.error || check.summary}</p>}
-                          {(check.items ?? []).length > 0 && (
-                            <div className={styles.aiReplyItems}>
-                              {check.items.map((item, itemIndex) => (
-                                <div key={`${item.item_id}-${itemIndex}`}>
-                                  <MIcon
-                                    name={item.status === "passed" ? "check_circle" : "tips_and_updates"}
-                                    size={17}
-                                  />
-                                  <span>
-                                    <strong>{item.title || "評分項目"}</strong>
-                                    {item.comment && <small>{item.comment}</small>}
-                                  </span>
-                                  {typeof item.score === "number" && (
-                                    <em>{item.score}/{item.max_score ?? 1}</em>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </section>
-                      )}
-
-                      <footer className={styles.assignmentActions}>
-                        <span>
-                          <MIcon name="info" size={16} />
-                          送出前請先啟動課堂機器，AI 只會檢查你自己的環境。
-                        </span>
-                        <button
-                          type="button"
-                          className={styles.aiCheckButton}
-                          onClick={() => submitAiCheck(assignment)}
-                          disabled={checkingAssignmentId !== null || checkRunning}
-                        >
-                          <MIcon name={checkRunning ? "sync" : "fact_check"} size={18} />
-                          {checkRunning
-                            ? "AI 檢查中…"
-                            : checkingAssignmentId === assignment.id
-                              ? "正在送出…"
-                              : check?.status === "completed"
-                                ? "完成修正，再次 AI Check"
-                                : "我完成了，送出 AI Check"}
-                        </button>
-                      </footer>
+                      <p className={styles.assignmentNote}>
+                        <MIcon name="info" size={16} />
+                        勾選只會記錄你的完成狀態，不會啟動 AI 檢查。
+                      </p>
                     </div>
                   )}
                 </article>
@@ -590,7 +498,7 @@ export default function StudentCoursePage() {
         ) : (
           <EmptyState
             icon="checklist"
-            title="截至今天沒有需要送檢的任務"
+            title="截至今天沒有需要完成的任務"
             description="老師發布並核准 AI 任務後，會依發布日期完整列在這裡。"
           />
         )}
