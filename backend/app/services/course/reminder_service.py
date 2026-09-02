@@ -131,6 +131,7 @@ def list_student_reminders(
             TeachingClassStudent.user_id == user_id,
             TeachingClassStudent.status == "active",
             CoursePath.status == CoursePathStatus.published,
+            TeachingClassWeek.status.in_(["published", "completed"]),
             TeachingClassWeek.session_date >= today,
             TeachingClassWeek.session_date <= today + timedelta(days=2),
             TeachingClassWeek.title != "",

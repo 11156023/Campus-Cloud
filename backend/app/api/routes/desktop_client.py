@@ -1,4 +1,4 @@
-﻿"""Desktop client download & device auth endpoints.
+"""Desktop client download & device auth endpoints.
 
 The desktop client authenticates via a "device auth" flow:
 1. Client calls POST /auth/device-code  -> gets a device_code
@@ -19,6 +19,14 @@ from pydantic import BaseModel
 
 from app.api.deps import CurrentUser, SessionDep
 from app.core.config import settings
+from app.schemas.wireguard import (
+    WireGuardConnectRequest,
+    WireGuardConnectResponse,
+    WireGuardDisconnectRequest,
+    WireGuardDisconnectResponse,
+    WireGuardRefreshRequest,
+)
+from app.services.network import wireguard_service
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +54,9 @@ _device_codes: dict[str, dict] = {}  # code -> {token, created_at}
 def _cleanup_expired() -> None:
     """Remove expired device codes."""
     now = time.time()
-    expired = [k for k, v in _device_codes.items() if now - v["created_at"] > _DEVICE_CODE_TTL]
+    expired = [
+        k for k, v in _device_codes.items() if now - v["created_at"] > _DEVICE_CODE_TTL
+    ]
     for k in expired:
         del _device_codes[k]
 
@@ -77,7 +87,9 @@ def create_device_code() -> DeviceCodeResponse:
     _device_codes[code] = {"token": None, "created_at": time.time()}
     frontend_url = str(settings.FRONTEND_HOST).rstrip("/")
     login_url = f"{frontend_url}/login?device_code={code}"
-    return DeviceCodeResponse(device_code=code, login_url=login_url, expires_in=_DEVICE_CODE_TTL)
+    return DeviceCodeResponse(
+        device_code=code, login_url=login_url, expires_in=_DEVICE_CODE_TTL
+    )
 
 
 @router.post("/auth/approve")
@@ -128,6 +140,66 @@ def poll_device_code(code: str) -> DevicePollResponse:
         return DevicePollResponse(status="approved", access_token=token)
 
     return DevicePollResponse(status="pending")
+
+
+# ─── WireGuard tunnel lifecycle ─────────────────────────────────────────────
+
+
+@router.post(
+    "/wireguard/connect",
+    response_model=WireGuardConnectResponse,
+)
+def connect_wireguard(
+    body: WireGuardConnectRequest,
+    session: SessionDep,
+    current_user: CurrentUser,
+) -> WireGuardConnectResponse:
+    """Authorize this desktop device and return its split-tunnel config.
+
+    The client generates and retains the private key. Only the public key is
+    sent to the control plane.
+    """
+    return wireguard_service.connect(
+        session=session,
+        user_id=current_user.id,
+        device_id=body.device_id,
+        public_key=body.public_key,
+    )
+
+
+@router.post(
+    "/wireguard/refresh",
+    response_model=WireGuardConnectResponse,
+)
+def refresh_wireguard(
+    body: WireGuardRefreshRequest,
+    session: SessionDep,
+    current_user: CurrentUser,
+) -> WireGuardConnectResponse:
+    """Renew this device lease and rebuild its current resource ACLs."""
+    return wireguard_service.refresh(
+        session=session,
+        user_id=current_user.id,
+        device_id=body.device_id,
+    )
+
+
+@router.post(
+    "/wireguard/disconnect",
+    response_model=WireGuardDisconnectResponse,
+)
+def disconnect_wireguard(
+    body: WireGuardDisconnectRequest,
+    session: SessionDep,
+    current_user: CurrentUser,
+) -> WireGuardDisconnectResponse:
+    """Revoke this device's Gateway peer and all associated VM ACLs."""
+    disconnected = wireguard_service.disconnect(
+        session=session,
+        user_id=current_user.id,
+        device_id=body.device_id,
+    )
+    return WireGuardDisconnectResponse(disconnected=disconnected)
 
 
 # ─── Download endpoint ───────────────────────────────────────────────────────
@@ -193,7 +265,9 @@ def download_desktop_client(session: SessionDep, current_user: CurrentUser):
             ),
         )
 
-    media_type = mimetypes.guess_type(download_path.name)[0] or "application/octet-stream"
+    media_type = (
+        mimetypes.guess_type(download_path.name)[0] or "application/octet-stream"
+    )
 
     return FileResponse(
         download_path,

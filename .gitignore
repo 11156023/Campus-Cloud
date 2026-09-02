@@ -41,6 +41,7 @@ vllm-service/.runtime/
 vllm-service/litellm/config.yaml
 AGENTS.md
 data/teacher-judge/
+backend/data/teaching-class-tasks/
 data/avatars/
 vllm-API/models.json
 vllm-service/models.json

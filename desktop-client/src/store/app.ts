@@ -1,6 +1,7 @@
 ﻿import { on, onListener, send } from "@/utils/ipcUtils";
 import { defineStore } from "pinia";
 import { ipcRouters, listeners } from "../../electron/core/IpcRouter";
+import router from "../router";
 
 interface AppState {
   loggedIn: boolean;
@@ -84,6 +85,15 @@ export const useAppStore = defineStore("app", {
         this.loggedIn = !!data.loggedIn;
         this.loginInProgress = !!data.loginInProgress;
       });
+      on(ipcRouters.AUTH.logout, () => {
+        this.loggedIn = false;
+        this.loginInProgress = false;
+        this.tunnelStatus = { ...DEFAULT_TUNNEL_STATUS };
+        this.stopSessionPolling();
+        if (router.currentRoute.value.name !== "Login") {
+          void router.replace({ name: "Login" });
+        }
+      });
       on(ipcRouters.SETTINGS.getSettings, data => {
         if (data) {
           this.language = data.language || "zh-CN";
@@ -100,9 +110,7 @@ export const useAppStore = defineStore("app", {
         this.resources = Array.isArray(data) ? data : [];
       });
       on(ipcRouters.SESSION.getSessionStatuses, data => {
-        const next: SkyLabSessionStatus[] = Array.isArray(data)
-          ? data
-          : [];
+        const next: SkyLabSessionStatus[] = Array.isArray(data) ? data : [];
         this.sessionStatuses = next;
         // Forget in-memory dismissals once should_warn goes false.
         this.dismissedWarnings = this.dismissedWarnings.filter(vmid => {
@@ -178,8 +186,6 @@ export const useAppStore = defineStore("app", {
     },
     logout() {
       send(ipcRouters.AUTH.logout);
-      this.loggedIn = false;
-      this.stopSessionPolling();
     }
   }
 });

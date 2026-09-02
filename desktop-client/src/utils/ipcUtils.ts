@@ -1,5 +1,6 @@
-import { ipcRenderer } from "electron";
 import { ElMessage } from "element-plus";
+
+const ipcRenderer = window.electronIpcRenderer;
 
 export const send = (router: IpcRouter, params?: any) => {
   ipcRenderer.send(router.path, params);

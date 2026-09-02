@@ -1,4 +1,5 @@
 import BeanFactory from "../core/BeanFactory";
+import { isIP } from "net";
 import Logger from "../core/Logger";
 import SystemService from "../service/SystemService";
 import PathUtils from "../utils/PathUtils";
@@ -51,7 +52,13 @@ class SystemController extends BaseController {
 
   openSsh(req: ControllerParam) {
     const port = Number(req.args?.port);
-    if (!Number.isFinite(port) || port <= 0) {
+    const host = String(req.args?.host || "");
+    if (
+      !Number.isInteger(port) ||
+      port <= 0 ||
+      port > 65535 ||
+      isIP(host) !== 4
+    ) {
       req.event.reply(
         req.channel,
         ResponseUtils.fail(new Error("invalid port"))
@@ -59,12 +66,38 @@ class SystemController extends BaseController {
       return;
     }
     this._systemService
-      .openSsh(port)
+      .openSsh(port, "root", host)
       .then(() => {
         req.event.reply(req.channel, ResponseUtils.success());
       })
       .catch((err: Error) => {
         Logger.error("SystemController.openSsh", err);
+        req.event.reply(req.channel, ResponseUtils.fail(err));
+      });
+  }
+
+  openRdp(req: ControllerParam) {
+    const port = Number(req.args?.port);
+    const host = String(req.args?.host || "");
+    if (
+      !Number.isInteger(port) ||
+      port <= 0 ||
+      port > 65535 ||
+      isIP(host) !== 4
+    ) {
+      req.event.reply(
+        req.channel,
+        ResponseUtils.fail(new Error("invalid port"))
+      );
+      return;
+    }
+    this._systemService
+      .openRdp(port, host)
+      .then(() => {
+        req.event.reply(req.channel, ResponseUtils.success());
+      })
+      .catch((err: Error) => {
+        Logger.error("SystemController.openRdp", err);
         req.event.reply(req.channel, ResponseUtils.fail(err));
       });
   }

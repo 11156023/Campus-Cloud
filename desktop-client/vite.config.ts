@@ -36,10 +36,7 @@ export default defineConfig(({ command }) => {
           // Main process entry file of the Electron App.
           entry: "electron/main/index.ts",
           onstart({ startup }) {
-            if (process.env.VSCODE_DEBUG) {
-            } else {
-              startup();
-            }
+            if (!process.env.VSCODE_DEBUG) startup();
           },
           vite: {
             build: {
@@ -94,15 +91,13 @@ export default defineConfig(({ command }) => {
         "@build": pathResolve("build")
       }
     },
-    server:
-      process.env.VSCODE_DEBUG &&
-      (() => {
-        const url = new URL(pkg.debug.env.VITE_DEV_SERVER_URL);
-        return {
-          host: url.hostname,
-          port: +url.port
-        };
-      })(),
+    // Keep the Electron renderer separate from the web frontend on :5173.
+    // The backend's device-login URL must always open the web application.
+    server: {
+      host: "127.0.0.1",
+      port: 3344,
+      strictPort: true
+    },
     clearScreen: false
   };
 });

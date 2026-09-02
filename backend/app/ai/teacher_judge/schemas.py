@@ -141,6 +141,7 @@ TeacherJudgeFileSourceTypeLiteral = Literal["uploaded", "created"]
 
 class TeacherJudgeSessionCreateRequest(BaseModel):
     title: str = Field(..., min_length=1, max_length=255)
+    teaching_class_week_id: uuid.UUID | None = None
     selected_file_id: uuid.UUID | None = None
     creation_mode: TeacherJudgeSessionCreationModeLiteral | None = None
     rubric_name: str | None = Field(default=None, max_length=255)
@@ -193,6 +194,7 @@ class TeacherJudgeSessionCreateRequest(BaseModel):
 
 class TeacherJudgeSessionUpdateRequest(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=255)
+    teaching_class_week_id: uuid.UUID | None = None
     selected_file_id: uuid.UUID | None = None
     status: TeacherJudgeSessionStatusLiteral | None = None
     is_pinned: bool | None = None
@@ -211,6 +213,7 @@ class TeacherJudgeSessionUpdateRequest(BaseModel):
 class TeacherJudgeSessionPublic(BaseModel):
     id: str
     teaching_class_id: str
+    teaching_class_week_id: str | None = None
     title: str
     status: TeacherJudgeSessionStatusLiteral
     selected_file_id: str | None
