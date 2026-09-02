@@ -12,8 +12,8 @@
 }
 
 .compact {
-  height: min(540px, calc(100vh - 280px));
-  min-height: 360px;
+  height: min(580px, calc(100vh - 250px));
+  min-height: 380px;
   border-radius: 0 0 $radius-16 $radius-16;
   box-shadow: none;
 }
@@ -258,10 +258,16 @@
   animation: pulse 1.2s ease-in-out infinite;
 }
 
-.composer { @include flex-column; gap: $spacing-8; }
+/* 輸入與送出並排：兩行式的送出鍵把輸出區的高度吃掉了 */
+.composer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: stretch;
+  gap: $spacing-8;
+}
 
 .composer textarea {
-  min-height: 88px;
+  min-height: 52px;
   padding: 10px $spacing-16;
   border: 1px solid var(--color-border);
   border-radius: $radius-8;
@@ -278,7 +284,8 @@
 }
 
 .composer textarea:disabled { cursor: not-allowed; opacity: .55; }
-.composerActions { display: flex; justify-content: flex-end; }
+.composerActions { display: flex; }
+.composerActions button { height: 100%; }
 
 .btnPrimary,
 .btnSecondary,

@@ -40,14 +40,36 @@
   padding: $spacing-32;
   align-items: center;
 }
-/* 對話開始後這一列縮成「標題 + 重新問一題」，版面讓給對話本身 */
+/* 對話開始後這一列縮成一條窄標頭，版面全部讓給輸出 */
 .assistantSectionExpanded .assistantHero {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: $spacing-16;
-  padding: $spacing-16 $spacing-24;
+  padding: 10px $spacing-16 10px $spacing-24;
   border-bottom: 1px solid var(--color-divider);
+}
+.assistantSectionExpanded .assistantIntro {
+  align-items: center;
+  gap: 10px;
+}
+.assistantSectionExpanded .assistantIcon {
+  /* 圖示字級固定 28，框留到 40 才不會擠邊 */
+  width: 40px;
+  height: 40px;
+  border-radius: $radius-8;
+}
+.assistantSectionExpanded .assistantIntro h2 {
+  margin: 0;
+  font-size: $font-size-16;
+}
+.assistantSectionExpanded .assistantLabel {
+  display: none;
+}
+.assistantSectionExpanded .assistantReset {
+  min-height: 34px;
+  padding: 0 12px;
+  font-size: $font-size-12;
 }
 
 .assistantReset {
