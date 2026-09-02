@@ -54,6 +54,10 @@ export default function AvailabilityPanel({ draft, startAt, endAt, onChange, onH
   const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState(false);
+  const [refreshing, setRefreshing] = useState(false); // 已有月曆時的背景更新
+  const dataRef = useRef(null);
+  dataRef.current = data;
+  const hasRequestedRef = useRef(false);
 
   const today = useMemo(() => new Date(), []);
   const todayStr = useMemo(() => toDateStr(today), [today]);
@@ -104,6 +108,7 @@ export default function AvailabilityPanel({ draft, startAt, endAt, onChange, onH
     if (!draftKey) {
       setData(null);
       setLoading(false);
+      setRefreshing(false);
       return;
     }
     let cancelled = false;
@@ -113,15 +118,22 @@ export default function AvailabilityPanel({ draft, startAt, endAt, onChange, onH
       setData(cached.data);
       setError(false);
       setLoading(false);
+      setRefreshing(false);
       return;
     }
 
     const controller = new AbortController();
-    setData(null);
-    setLoading(true);
+    /* 已有月曆時保留舊資料只標示「更新中」，不要清空後閃成骨架屏 */
+    const hasStale = dataRef.current != null;
+    if (hasStale) setRefreshing(true);
+    else setLoading(true);
     setError(false);
+    /* 送出過第一次請求後，之後每次規格異動一律等使用者停手再送：
+       舊寫法在清空 data 後 debounce 會退化成 0ms，連續拖曳滑桿會對後端連發請求 */
+    const delay = hasRequestedRef.current ? AVAILABILITY_DEBOUNCE_MS : 0;
     const timeoutId = window.setTimeout(() => {
       if (cancelled) return;
+      hasRequestedRef.current = true;
       VmRequestAvailabilityService.preview(draft, { signal: controller.signal })
         .then((res) => {
           if (cancelled) return;
@@ -133,9 +145,11 @@ export default function AvailabilityPanel({ draft, startAt, endAt, onChange, onH
           setError(true);
         })
         .finally(() => {
-          if (!cancelled) setLoading(false);
+          if (cancelled) return;
+          setLoading(false);
+          setRefreshing(false);
         });
-    }, data ? AVAILABILITY_DEBOUNCE_MS : 0);
+    }, delay);
 
     return () => {
       cancelled = true;
@@ -266,10 +280,14 @@ export default function AvailabilityPanel({ draft, startAt, endAt, onChange, onH
   const hasRange       = picking === PICK_IDLE && Boolean(startDate) && Boolean(endDate) && startDate !== endDate;
 
   return (
-    <div className={styles.root}>
+    <div className={styles.root} aria-busy={refreshing || undefined}>
+
+      {refreshing && (
+        <p className={styles.refreshingHint} aria-live="polite">正在依新規格更新可用時段…</p>
+      )}
 
       {/* ── Calendar ── */}
-      <div className={styles.calendar}>
+      <div className={`${styles.calendar} ${refreshing ? styles.calendarRefreshing : ""}`}>
         <div className={styles.calendarNav}>
           <button type="button" className={styles.calendarNavBtn} onClick={prevMonth} disabled={!canGoPrevious}>
             <MIcon name="chevron_left" size={18} />
