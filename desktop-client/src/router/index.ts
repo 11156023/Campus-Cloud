@@ -35,8 +35,23 @@ const routes: RouteRecordRaw[] = [
           hidden: true
         },
         component: () => import("@/views/config/index.vue")
+      },
+      {
+        path: "/about",
+        name: "About",
+        meta: {
+          title: "router.about.title",
+          icon: "info-sharp",
+          keepAlive: false,
+          hidden: true
+        },
+        component: () => import("@/views/about/index.vue")
       }
     ]
+  },
+  {
+    path: "/:pathMatch(.*)*",
+    redirect: "/"
   }
 ];
 
