@@ -143,7 +143,7 @@ export default function AiApiKeysPage() {
 
   return (
     <div className={styles.page}>
-      <PageHeader title="AI API 金鑰管理" subtitle="查看目前資料庫中所有 AI API 金鑰紀錄與狀態（僅顯示現存紀錄）。" />
+      <PageHeader title="金鑰管理" subtitle="查看目前資料庫中所有 AI API 金鑰紀錄與狀態（僅顯示現存紀錄）。" />
 
       {/* ── Stat cards ── */}
       <div className={styles.statRow}>

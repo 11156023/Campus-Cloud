@@ -222,32 +222,29 @@ export function RubricStats({
           </button>
         )}
       </div>
-      <div className={styles.statsGrid}>
-        <div className={styles.statBox}>
-          <p className={styles.statValue}>{total}</p>
-          <p className={styles.statLabel}>共幾題</p>
-        </div>
-        <div className={`${styles.statBox} ${styles.statBox_success}`}>
-          <p className={styles.statValue}>
-            <MIcon name="check_circle" size={16} />
-            {autoCount}
-          </p>
-          <p className={styles.statLabel}>可自動偵測（{pct(autoCount)}%）</p>
-        </div>
-        <div className={`${styles.statBox} ${styles.statBox_info}`}>
-          <p className={styles.statValue}>
-            <MIcon name="info" size={16} />
-            {partialCount}
-          </p>
-          <p className={styles.statLabel}>部分可偵測（{pct(partialCount)}%）</p>
-        </div>
-        <div className={`${styles.statBox} ${styles.statBox_danger}`}>
-          <p className={styles.statValue}>
-            <MIcon name="schedule" size={16} />
-            {manualCount}
-          </p>
-          <p className={styles.statLabel}>需人工評閱（{pct(manualCount)}%）</p>
-        </div>
+      <div
+        className={styles.statsBar}
+        role="img"
+        aria-label={`共 ${total} 題：可自動偵測 ${pct(autoCount)}%、部分可偵測 ${pct(partialCount)}%、需人工評閱 ${pct(manualCount)}%`}
+      >
+        {autoCount > 0 && <span className={styles.statsSeg_auto} style={{ flexGrow: autoCount }} />}
+        {partialCount > 0 && <span className={styles.statsSeg_partial} style={{ flexGrow: partialCount }} />}
+        {manualCount > 0 && <span className={styles.statsSeg_manual} style={{ flexGrow: manualCount }} />}
+      </div>
+      <div className={styles.statsLegend}>
+        <span className={styles.legendItem}>
+          <i className={styles.legendDot_auto} />
+          可自動偵測 {autoCount}（{pct(autoCount)}%）
+        </span>
+        <span className={styles.legendItem}>
+          <i className={styles.legendDot_partial} />
+          部分可偵測 {partialCount}（{pct(partialCount)}%）
+        </span>
+        <span className={styles.legendItem}>
+          <i className={styles.legendDot_manual} />
+          需人工評閱 {manualCount}（{pct(manualCount)}%）
+        </span>
+        <span className={styles.legendTotal}>共 {total} 題</span>
       </div>
     </div>
   );
@@ -613,6 +610,7 @@ function ConfirmModal({ title, description, actions, closing = false, onClose })
 
 function CreateCheckForm({
   classId,
+  weeks = [],
   sourceOnly = false,
   embedded = false,
   initialMode = "",
@@ -622,6 +620,10 @@ function CreateCheckForm({
 }) {
   const toast = useToast();
   const requestVersionRef = useRef(0);
+  const availableWeeks = weeks.filter((week) => week.title?.trim());
+  const [selectedWeekId, setSelectedWeekId] = useState(
+    availableWeeks[0]?.id ?? "",
+  );
   const [mode, setMode] = useState(initialMode);
   const [rubricName, setRubricName] = useState("");
   const [environmentKeys, setEnvironmentKeys] = useState(() => (
@@ -668,6 +670,10 @@ function CreateCheckForm({
 
   async function uploadFile(file, conflictStrategy = null) {
     if (!file) return;
+    if (!sourceOnly && !selectedWeekId) {
+      setError("請先選擇這份檢查要放入的週任務。");
+      return;
+    }
     const requestVersion = requestVersionRef.current;
     setUploading(true);
     setError("");
@@ -696,6 +702,7 @@ function CreateCheckForm({
             }),
             creationMode: "existing",
             selectedFileId: uploaded.id,
+            teachingClassWeekId: selectedWeekId,
           });
           if (requestVersion === requestVersionRef.current) onCreated(created, "uploaded");
         } catch (createError) {
@@ -740,6 +747,7 @@ function CreateCheckForm({
           rubricName: mode === "blank" ? rubricName : undefined,
           environmentKeys: mode === "blank" ? environmentKeys : undefined,
           selectedFileId: mode === "existing" ? selectedFileId : null,
+          teachingClassWeekId: selectedWeekId,
         });
         onCreated(created, mode);
       }
@@ -754,6 +762,7 @@ function CreateCheckForm({
       <section className={embedded ? styles.createCheckPanel : `${styles.confirm} ${styles.createCheckDialog}`} role={embedded ? undefined : "dialog"} aria-modal={embedded ? undefined : "true"} aria-labelledby="create-check-title">
         <div className={styles.modalHeader}><div>{embedded && <button type="button" className={styles.inlineBackButton} disabled={creating || uploading} onClick={onClose}><MIcon name="arrow_back" size={17} />返回建立方式</button>}<h2 id="create-check-title">{sourceOnly ? "新增評分表來源" : mode === "blank" ? "從零開始建立" : "使用已有評分文件"}</h2><p>{sourceOnly ? "建立或選用一份班級評分表，完成後會套用到目前檢查。" : mode === "blank" ? "建立空白評分表後，會留在 AI 檢查主頁編輯評分項目與 AI 提案。" : "選擇已保存的評分表，或上傳文件交由 AI 分析；完成後會回到 AI 檢查主頁。"}</p></div>{!embedded && <button type="button" className={styles.iconBtn} aria-label="關閉" disabled={creating || uploading} onClick={onClose}><MIcon name="close" size={18} /></button>}</div>
         <form onSubmit={submit}>
+          {!sourceOnly && <label className={styles.dialogField}><span>放到哪一週任務？</span><select value={selectedWeekId} onChange={(event) => setSelectedWeekId(event.target.value)} required><option value="" disabled>{availableWeeks.length ? "請選擇週任務" : "請先建立有名稱的週任務"}</option>{availableWeeks.map((week) => <option key={week.id} value={week.id}>第 {week.week ?? week.week_number} 週 · {week.title}{["published", "completed"].includes(week.status) ? "" : "（草稿）"}</option>)}</select><small>AI 檢查核准後，Checkpoint 才會顯示在學生端；草稿週次發布後才會讓學生看到。</small></label>}
           {!embedded && <fieldset className={styles.modeFieldset}><legend>如何建立評分表？</legend><div className={styles.modeChoices}><label className={mode === "blank" ? styles.modeChoiceActive : styles.modeChoice}><input type="radio" name="creation-mode" checked={mode === "blank"} onChange={() => handleModeChange("blank")} /><span><b>從零開始建立</b><small>建立空白評分表，接著手動新增項目或請 AI 產生初稿。</small></span></label><label className={mode === "existing" ? styles.modeChoiceActive : styles.modeChoice}><input type="radio" name="creation-mode" checked={mode === "existing"} onChange={() => handleModeChange("existing")} /><span><b>使用已有評分文件</b><small>選擇班級已保存的評分表，或上傳 .docx／.pdf；檢查名稱會使用文件名稱。</small></span></label></div></fieldset>}
            {mode === "blank" && <div className={styles.modeFields}><label className={styles.dialogField}><span>評分表名稱</span><input autoFocus={sourceOnly} value={rubricName} maxLength={255} placeholder="例如：期中 Python 評分表" onChange={(event) => setRubricName(event.target.value)} /></label><fieldset className={styles.modeFieldset}><legend>評分環境（可複選）</legend><div className={styles.dialogChips}>{TEMPLATE_OPTIONS.map((option) => <label key={option.key} className={environmentKeys.includes(option.key) ? styles.dialogChipActive : styles.dialogChip}><input type="checkbox" checked={environmentKeys.includes(option.key)} onChange={() => toggleEnvironment(option.key)} />{option.label}</label>)}</div></fieldset></div>}
            {mode === "existing" && <div className={styles.existingPicker}>
@@ -764,13 +773,13 @@ function CreateCheckForm({
                  <p className={styles.uploadEnvironmentHint}>第一個選擇會作為 AI 分析的主要情境，其餘環境可提供跨環境檢查能力。</p>
                  <div className={styles.dialogChips}>{TEMPLATE_OPTIONS.map((option) => <label key={option.key} className={environmentKeys.includes(option.key) ? styles.dialogChipActive : styles.dialogChip}><input type="checkbox" checked={environmentKeys.includes(option.key)} onChange={() => toggleEnvironment(option.key)} disabled={uploading || creating} />{option.label}</label>)}</div>
                </fieldset>
-               <RubricUploader onUpload={(file) => uploadFile(file)} onInvalidFile={setError} isLoading={uploading || creating} />
+               <RubricUploader onUpload={(file) => uploadFile(file)} onInvalidFile={setError} isLoading={uploading || creating || (!sourceOnly && !selectedWeekId)} />
              </div>
               <div className={styles.savedRubricBlock}><div className={styles.existingPickerHead}><div><span>或選擇已保存評分表</span><small>每份來源只能綁定一個檢查；若要重構，請使用「重構」。</small></div></div>{files.length ? <div className={styles.existingList}>{files.map((file) => <label key={file.id} className={selectedFileId === file.id ? styles.existingRowActive : styles.existingRow}><input type="radio" name="saved-rubric" checked={selectedFileId === file.id} onChange={() => setSelectedFileId(file.id)} /><span><b>{getRubricDisplayName(file, "未命名評分表")}</b><small>{(file.environment_keys?.length ? file.environment_keys : [file.template_key]).map(getTemplateLabel).join("、")} · {file.analysis_json?.items?.length ?? 0} 項 · {formatDateTime(file.updated_at)}</small></span></label>)}</div> : <p className={styles.mutedText}>尚未有可用的評分表。</p>}</div>
              {conflictFile && <div className={styles.conflictActions} role="alert"><span>「{conflictFile.name}」已存在：</span><button type="button" className={styles.btnSecondary} disabled={uploading || creating} onClick={() => uploadFile(conflictFile, "copy")}>建立副本</button><button type="button" className={styles.btnDanger} disabled={uploading || creating} onClick={() => uploadFile(conflictFile, "overwrite")}>覆蓋原本</button><button type="button" className={styles.iconBtn} aria-label="取消同名處理" onClick={() => setConflictFile(null)}><MIcon name="close" size={16} /></button></div>}
            </div>}
           {error && <p className={styles.dialogError} role="alert">{error}</p>}
-          <div className={styles.modalActions}>{!embedded && <button type="button" className={styles.btnSecondary} disabled={creating || uploading} onClick={onClose}>取消</button>}{mode !== "existing" || sourceOnly ? <button type="submit" className={styles.btnPrimary} disabled={!mode || (mode === "blank" ? !rubricName.trim() || !environmentKeys.length : !selectedFileId) || creating || uploading}>{creating ? <><Spinner size={15} />建立中…</> : sourceOnly ? "新增來源" : mode === "blank" ? "建立檢查" : "使用這份評分表"}</button> : <p className={styles.uploadAutoHint}>選擇檔案後按「上傳並分析」，完成後會回到 AI 檢查主頁。</p>}</div>
+          <div className={styles.modalActions}>{!embedded && <button type="button" className={styles.btnSecondary} disabled={creating || uploading} onClick={onClose}>取消</button>}{mode !== "existing" || sourceOnly ? <button type="submit" className={styles.btnPrimary} disabled={!mode || (!sourceOnly && !selectedWeekId) || (mode === "blank" ? !rubricName.trim() || !environmentKeys.length : !selectedFileId) || creating || uploading}>{creating ? <><Spinner size={15} />建立中…</> : sourceOnly ? "新增來源" : mode === "blank" ? "建立檢查" : "使用這份評分表"}</button> : <p className={styles.uploadAutoHint}>選擇檔案後按「上傳並分析」，完成後會回到 AI 檢查主頁。</p>}</div>
         </form>
       </section>
   );
@@ -1437,35 +1446,29 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
 
   return (
     <div className={styles.tabBody}>
-      <div className={styles.sectionHead}>
-        <div>
-          <h3 className={styles.sectionTitle}>評分表</h3>
-          <p className={styles.sectionDesc}>上傳評分文件，查看 AI 偵測判斷並調整評分項目</p>
+      {analysis && (
+        <div className={styles.tabToolbar}>
+          <button
+            type="button"
+            className={styles.btnSecondary}
+            onClick={handleExport}
+            disabled={isExporting}
+          >
+            {isExporting ? <Spinner /> : <MIcon name="download" size={16} />}
+            {isExporting ? "匯出中..." : "匯出 Excel"}
+          </button>
+          <button
+            type="button"
+            className={styles.btnPrimary}
+            onClick={handleCreateScript}
+            disabled={isCreatingScript || isChatting || readOnly || items.length === 0}
+            title={items.length === 0 ? "請先新增至少一個評估項目" : undefined}
+          >
+            {isCreatingScript ? <Spinner /> : <MIcon name="auto_fix_high" size={16} />}
+            {isCreatingScript ? "製作中..." : "製作檢查腳本"}
+          </button>
         </div>
-        {analysis && (
-          <div className={styles.sectionActions}>
-            <button
-              type="button"
-              className={styles.btnPrimary}
-              onClick={handleCreateScript}
-              disabled={isCreatingScript || isChatting || readOnly || items.length === 0}
-              title={items.length === 0 ? "請先新增至少一個評估項目" : undefined}
-            >
-              {isCreatingScript ? <Spinner /> : <MIcon name="auto_fix_high" size={16} />}
-              {isCreatingScript ? "製作中..." : "製作檢查腳本"}
-            </button>
-            <button
-              type="button"
-              className={styles.btnSecondary}
-              onClick={handleExport}
-              disabled={isExporting}
-            >
-              {isExporting ? <Spinner /> : <MIcon name="download" size={16} />}
-              {isExporting ? "匯出中..." : "匯出 Excel"}
-            </button>
-          </div>
-        )}
-      </div>
+      )}
 
       {isCreatingScript && (
         <div className={styles.noticeInfo}>
@@ -1609,7 +1612,12 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
                 <p className={styles.mutedText}>
                   主要評分情境：{getTemplateLabel(analysisTemplateKey)}
                 </p>
-                {analysis.summary && <p className={styles.summaryBox}>{analysis.summary}</p>}
+                {analysis.summary && (
+                  <details className={styles.summaryDetails}>
+                    <summary>AI 評估摘要</summary>
+                    <p>{analysis.summary}</p>
+                  </details>
+                )}
               </div>
 
               <div className={styles.card}>
@@ -1643,6 +1651,15 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
         </div>
 
         <div className={styles.analysisAside}>
+          {judgeSession?.id && onAddSource && (
+            <RubricSourceRail
+              classId={classId}
+              judgeSession={judgeSession}
+              readOnly={readOnly}
+              onSessionUpdated={onSessionUpdated}
+              onAddSource={onAddSource}
+            />
+          )}
           <div className={`${styles.card} ${styles.chatCard}`}>
             <h4 className={styles.cardTitle}>
               <MIcon name="smart_toy" size={18} />
@@ -1676,15 +1693,6 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
               disabled={readOnly || isChatting || isClearingMessages}
             />}
           </div>
-          {judgeSession?.id && onAddSource && (
-            <RubricSourceRail
-              classId={classId}
-              judgeSession={judgeSession}
-              readOnly={readOnly}
-              onSessionUpdated={onSessionUpdated}
-              onAddSource={onAddSource}
-            />
-          )}
         </div>
       </div>
 
@@ -1883,13 +1891,6 @@ function ScriptsTab({ classId, sessionId, readOnly = false, onScriptApproved }) 
 
   return (
     <div className={styles.tabBody}>
-      <div className={styles.sectionHead}>
-        <div>
-          <h3 className={styles.sectionTitle}>收集腳本</h3>
-          <p className={styles.sectionDesc}>管理班級內由評分表產生的受管收集腳本。</p>
-        </div>
-      </div>
-
       {loading ? (
         <LoadingState text="載入腳本中..." />
       ) : error ? (
@@ -2229,26 +2230,6 @@ function ExecutionTab({ classId, sessionId, readOnly = false, members }) {
 
   return (
     <div className={styles.tabBody}>
-      <div className={styles.sectionHead}>
-        <div>
-          <h3 className={styles.sectionTitle}>執行與結果</h3>
-          <p className={styles.sectionDesc}>
-            選擇班級內運行中的 VM/LXC，套用已核准的檢查腳本。
-          </p>
-        </div>
-        <button
-          type="button"
-          className={styles.btnPrimary}
-          onClick={() => setDialogOpen(true)}
-          disabled={
-            readOnly || selectedVmids.length === 0 || approvedScripts.length === 0
-          }
-        >
-          <MIcon name="play_circle_outline" size={16} />
-          執行腳本
-        </button>
-      </div>
-
       <div className={styles.execToolbar}>
         <span className={styles.mutedText}>
           可執行 {runningMembers.length} / 全部 {members.length} 台，已選{" "}
@@ -2270,6 +2251,17 @@ function ExecutionTab({ classId, sessionId, readOnly = false, members }) {
             disabled={selectedVmids.length === 0}
           >
             清除
+          </button>
+          <button
+            type="button"
+            className={styles.btnPrimary}
+            onClick={() => setDialogOpen(true)}
+            disabled={
+              readOnly || selectedVmids.length === 0 || approvedScripts.length === 0
+            }
+          >
+            <MIcon name="play_circle_outline" size={16} />
+            執行腳本
           </button>
         </div>
       </div>
@@ -2549,7 +2541,7 @@ const TEACHER_JUDGE_TABS = [
   { key: "execution", label: "執行與結果", icon: "play_circle_outline" },
 ];
 
-function TeacherWorkspacePanel({ classId, members }) {
+function TeacherWorkspacePanel({ classId, members, weeks = [] }) {
   const toast = useToast();
   const [searchParams] = useSearchParams();
   const requestedSessionId = searchParams.get("check");
@@ -2588,6 +2580,12 @@ function TeacherWorkspacePanel({ classId, members }) {
     () => sessions.find((item) => item.id === openMenuId) ?? null,
     [openMenuId, sessions],
   );
+  // 檢查名稱多半直接沿用評分表檔名；相同時 meta 列不再重複顯示一次
+  const activeSessionFilePrefix = useMemo(() => {
+    if (!activeSession) return "";
+    const fileLabel = getRubricDisplayName(activeSession.selected_file_name, "尚未選擇評分表");
+    return fileLabel === getRubricDisplayName(activeSession.title) ? "" : `${fileLabel} · `;
+  }, [activeSession]);
   const sessionMenuItemKeep = useDialogPresence(openSessionMenuItem, 130);
 
   const loadSessions = useCallback(async () => {
@@ -2870,8 +2868,8 @@ function TeacherWorkspacePanel({ classId, members }) {
         </aside>
 
         <section className={styles.sessionMain}>
-          {creationView === "choose" ? <CreateCheckChooser onChoose={handleCreationChoice} onCancel={() => setCreationView(null)} /> : creationView ? <CreateCheckForm key={creationView} classId={classId} embedded initialMode={creationView} onClose={() => setCreationView("choose")} onCreated={handleCreated} /> : !activeSession ? <div className={styles.card}><div className={styles.mainEmpty}><MIcon name="checklist" size={30} /><p>{statusFilter === "active" ? "請從左側選擇一項檢查，或新增檢查。" : "請選擇已封存的檢查查看內容與結果。"}</p><button type="button" className={styles.btnPrimary} onClick={() => statusFilter === "active" ? (setSourceOnly(false), setCreationView("choose")) : setStatusFilter("active")}>{statusFilter === "active" ? "新增檢查" : "查看進行中"}</button></div></div> : <>
-            <div className={styles.sessionHeader}><div><h3>{activeSession.title}</h3><p>{getRubricDisplayName(activeSession.selected_file_name, "尚未選擇評分表")} · 對話 {activeSession.message_count ?? 0} · 腳本 {activeSession.script_count ?? 0} · 執行 {activeSession.run_count ?? 0}</p></div>{activeSession.status === "archived" && <span className={styles.archivedNotice}><MIcon name="lock" size={14} />這項檢查已封存，只能查看或複製</span>}</div>
+          {creationView === "choose" ? <CreateCheckChooser onChoose={handleCreationChoice} onCancel={() => setCreationView(null)} /> : creationView ? <CreateCheckForm key={creationView} classId={classId} weeks={weeks} embedded initialMode={creationView} onClose={() => setCreationView("choose")} onCreated={handleCreated} /> : !activeSession ? <div className={styles.card}><div className={styles.mainEmpty}><MIcon name="checklist" size={30} /><p>{statusFilter === "active" ? "請從左側選擇一項檢查，或新增檢查。" : "請選擇已封存的檢查查看內容與結果。"}</p><button type="button" className={styles.btnPrimary} onClick={() => statusFilter === "active" ? (setSourceOnly(false), setCreationView("choose")) : setStatusFilter("active")}>{statusFilter === "active" ? "新增檢查" : "查看進行中"}</button></div></div> : <>
+            <div className={styles.sessionHeader}><div><h3>{activeSession.title}</h3><p>{activeSessionFilePrefix}對話 {activeSession.message_count ?? 0} · 腳本 {activeSession.script_count ?? 0} · 執行 {activeSession.run_count ?? 0}</p></div>{activeSession.status === "archived" && <span className={styles.archivedNotice}><MIcon name="lock" size={14} />這項檢查已封存，只能查看或複製</span>}</div>
             <div className={styles.subTabs} role="tablist" aria-label="檢查工作頁籤">{TEACHER_JUDGE_TABS.map((tab) => <button key={tab.key} type="button" role="tab" aria-selected={activeTab === tab.key} className={activeTab === tab.key ? styles.subTabActive : styles.subTab} onClick={() => setActiveTab(tab.key)}><MIcon name={tab.icon} size={16} />{tab.label}</button>)}</div>
             {activeTab === "rubrics" && <RubricsTab key={activeSession.id} classId={classId} judgeSession={activeSession} onSessionUpdated={updateSessionInList} onAddSource={() => { setSourceOnly(true); setCreateOpen(true); }} onScriptCreated={() => { loadSessions(); setActiveTab("scripts"); }} showFileLibrary={false} />}
             {activeTab === "scripts" && <ScriptsTab classId={classId} sessionId={activeSession.id} readOnly={activeSession.status === "archived"} onScriptApproved={() => setActiveTab("execution")} />}
@@ -2882,13 +2880,13 @@ function TeacherWorkspacePanel({ classId, members }) {
 
       {typeof document !== "undefined" && sessionMenuItemKeep.open && sessionMenuPos.item && createPortal(renderSessionMenu(sessionMenuItemKeep.item), document.body)}
 
-      {createDialog.open && <CreateCheckForm classId={classId} sourceOnly={sourceOnly} closing={createDialog.closing} onClose={() => { setCreateOpen(false); setSourceOnly(false); }} onCreated={handleCreated} />}
+      {createDialog.open && <CreateCheckForm classId={classId} weeks={weeks} sourceOnly={sourceOnly} closing={createDialog.closing} onClose={() => { setCreateOpen(false); setSourceOnly(false); }} onCreated={handleCreated} />}
        {renameDialog.open && <div className={`${styles.modalOverlay} ${renameDialog.closing ? styles.modalOverlayOut : ""}`} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setRenameTarget(null); }}><form className={`${styles.confirm} ${styles.renameDialog}`} role="dialog" aria-modal="true" aria-labelledby="rename-check-title" onSubmit={renameSession}><div className={styles.modalHeader}><h2 id="rename-check-title">重新命名檢查</h2><button type="button" className={styles.iconBtn} aria-label="關閉" onClick={() => setRenameTarget(null)}><MIcon name="close" size={18} /></button></div><label className={styles.dialogField}><span>檢查名稱</span><input autoFocus value={renameTitle} maxLength={255} onChange={(event) => setRenameTitle(event.target.value)} /></label><div className={styles.modalActions}><button type="button" className={styles.btnSecondary} onClick={() => setRenameTarget(null)}>取消</button><button type="submit" className={styles.btnPrimary} disabled={!renameTitle.trim() || busySessionIds.has(renameDialog.item.id)}>儲存</button></div></form></div>}
       {deleteCheckDialog.open && <ConfirmModal title="確認刪除檢查？" description={`「${deleteCheckDialog.item.title}」及其專屬評分表來源、對話、檢查腳本與執行紀錄將直接刪除，且無法復原；其他檢查不受影響。`} closing={deleteCheckDialog.closing} onClose={() => { if (!deleting) setDeleteTarget(null); }} actions={<><button type="button" className={styles.btnSecondary} disabled={deleting} onClick={() => setDeleteTarget(null)}>取消</button><button type="button" className={styles.btnDanger} disabled={deleting} onClick={deleteSession}>{deleting ? "刪除中…" : "確認刪除"}</button></>} />}
     </div>
   );
 }
 
-export default function AiJudgePanel({ classId, members }) {
-  return <TeacherWorkspacePanel classId={classId} members={members} />;
+export default function AiJudgePanel({ classId, members, weeks = [] }) {
+  return <TeacherWorkspacePanel classId={classId} members={members} weeks={weeks} />;
 }

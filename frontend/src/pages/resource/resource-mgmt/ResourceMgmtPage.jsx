@@ -116,7 +116,6 @@ function EnvironmentMachineRow({ machine, onUpdated }) {
       <td className={styles.td}>
         <div className={`${styles.nameCell} ${styles.environmentMachineName}`}>
           <span className={styles.machineBranch} aria-hidden="true">└</span>
-          <div className={styles.nameIcon}><MIcon name={type.icon} size={18} /></div>
           <div>
             <div className={styles.namePrimary}>{machine.name}</div>
             <div className={styles.nameSub}>{machine.role} · {type.label}</div>
@@ -150,7 +149,14 @@ function EnvironmentGroupRows({ group, onUpdated }) {
   const allRunning = running === group.machines.length;
   return (
     <>
-      <tr className={`${styles.tr} ${styles.environmentGroupRow}`}>
+      <tr
+        className={`${styles.tr} ${styles.environmentGroupRow}`}
+        onClick={(event) => {
+          /* 整列都可以開合，但列內的按鈕與勾選框各自處理自己的點擊 */
+          if (event.target.closest("button, input, label")) return;
+          setExpanded((value) => !value);
+        }}
+      >
         <td className={`${styles.td} ${styles.checkCell}`} />
         <td className={styles.td}>
           <button
@@ -160,13 +166,12 @@ function EnvironmentGroupRows({ group, onUpdated }) {
             onClick={() => setExpanded((value) => !value)}
           >
             <MIcon name={expanded ? "expand_more" : "chevron_right"} size={20} />
-            <span className={styles.environmentIcon}><MIcon name={group.kind === "course" ? "school" : "bolt"} size={19} /></span>
             <span><strong>{group.kindLabel}｜{group.title}</strong><small>{group.machines.length} 台機器 · 整組管理</small></span>
           </button>
         </td>
         <td className={styles.td}>
           <div className={styles.envPrimary}>{group.kind === "course" ? "課程多機環境" : "快速練習環境"}</div>
-          <div className={styles.envSub}>整組檢視、逐台操作</div>
+          <div className={styles.envSub}>整組檢視</div>
         </td>
         <td className={styles.td}>
           <span className={`${styles.badge} ${styles[`badge_${allRunning ? "success" : "info"}`]}`}>{running}/{group.machines.length} 執行中</span>
@@ -174,11 +179,7 @@ function EnvironmentGroupRows({ group, onUpdated }) {
         <td className={styles.td}><span className={styles.noAction}>展開查看</span></td>
         <td className={styles.td}><strong className={styles.environmentTiming}>{group.timingLabel}</strong></td>
         <td className={styles.td}>{group.nodeLabel}</td>
-        <td className={styles.td}>
-          <button type="button" className={styles.consoleBtn} onClick={() => setExpanded((value) => !value)}>
-            <MIcon name="dns" size={14} />{expanded ? "收合機器" : "使用機器"}
-          </button>
-        </td>
+        <td className={styles.td}><span className={styles.noAction}>展開後逐台操作</span></td>
       </tr>
       {expanded && group.machines.map((machine) => (
         <EnvironmentMachineRow key={machine.id} machine={machine} onUpdated={onUpdated} />
@@ -371,9 +372,6 @@ function ResourceRow({ resource, onUpdated, onDeleted, selected = false, onToggl
         {/* 名稱 */}
         <td className={styles.td}>
           <div className={styles.nameCell}>
-            <div className={styles.nameIcon}>
-              <MIcon name={type.icon} size={18} />
-            </div>
             <div>
               {resource.vmid > 0 ? (
                 <button
@@ -592,7 +590,7 @@ export default function ResourceMgmtPage() {
   return (
     <div className={styles.page}>
       {/* ── 頁首 ── */}
-      <PageHeader title="虛擬機與容器" subtitle="查看與管理系統中所有虛擬機與 LXC 容器">
+      <PageHeader title="資源管理" subtitle="查看與管理系統中所有虛擬機與 LXC 容器">
         <div className={styles.pageActions}>
           <button type="button" className={styles.btnPrimary} onClick={() => navigate("/my-requests")}>
             <MIcon name="add" size={16} />
@@ -626,6 +624,16 @@ export default function ResourceMgmtPage() {
         ) : (
           <div className={styles.tableWrap}>
             <table className={styles.table}>
+              <colgroup>
+                <col className={styles.colCheck} />
+                <col />
+                <col className={styles.colEnv} />
+                <col className={styles.colStatus} />
+                <col className={styles.colIp} />
+                <col className={styles.colExpiry} />
+                <col className={styles.colNode} />
+                <col className={styles.colActions} />
+              </colgroup>
               <thead>
                 <tr>
                   <th className={`${styles.th} ${styles.checkCell}`}>

@@ -504,8 +504,7 @@ export default function AiApiPage() {
     <div className={styles.page}>
       {/* ── Header ── */}
       <PageHeader
-        title="AI API 金鑰申請與管理"
-        titleExtra={<span className={styles.breadcrumb}>SkyLab AI API</span>}
+        title="AI API"
         subtitle="申請、管理與查詢 AI API 金鑰。"
       />
 

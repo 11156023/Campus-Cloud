@@ -1,4 +1,12 @@
+import { ipcRenderer } from "electron";
 import pkg from "../../package.json";
+
+Object.defineProperty(window, "electronIpcRenderer", {
+  value: ipcRenderer,
+  configurable: false,
+  enumerable: false,
+  writable: false
+});
 
 function domReady(
   condition: DocumentReadyState[] = ["complete", "interactive"]
@@ -72,7 +80,7 @@ function useLoading() {
   oStyle.id = "app-loading-style";
   oStyle.innerHTML = styleContent;
   oDiv.className = "app-loading-wrap";
-  oDiv.innerHTML = `<div class="${className}"><div></div></div><div style="font-size: 16px; font-weight: bold;color: #5F3BB0;">Frpc Desktop v${pkg.version}</div>`;
+  oDiv.innerHTML = `<div class="${className}"><div></div></div><div style="font-size: 16px; font-weight: bold;color: #5F3BB0;">SkyLab Connect v${pkg.version}</div>`;
 
   return {
     appendLoading() {

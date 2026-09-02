@@ -32,15 +32,6 @@ const TABS = [
   ["ai", "auto_awesome", "AI 檢查", "機器與上課情況"],
 ];
 
-const STATUS = {
-  planning: "準備中",
-  pending_review: "等待審核",
-  provisioning: "正在建立",
-  partial_failed: "需要處理",
-  active: "可以上課",
-  archived: "已結束",
-};
-
 const JOB_STATUS = {
   pending_review: "待審核", approved: "已核准", pending: "等待建立",
   running: "建立中", completed: "已完成", failed: "失敗",
@@ -359,7 +350,7 @@ function WeeklyContent({ item, onRefresh }) {
     finally { setSaving(false); }
   }
   return <div className={styles.stack}>
-    <section className={styles.card}><div className={styles.cardHeader}><div><h2>每週上課內容（{weeks.length} 週）</h2></div></div><div className={styles.weekRows}>{weeks.map((week) => <article key={week.id}><div className={styles.weekDate}><strong>第 {week.week} 週</strong><span>{week.date}</span></div><label className={styles.field}><span>主題／任務</span><input disabled={locked} value={week.title} onChange={(event) => update(week.id, "title", event.target.value)} placeholder="輸入本週主題或任務" /></label><div className={styles.weekFiles}><span>任務檔案</span><div className={styles.weekFileList}>{week.files.map((file) => <span className={styles.weekFileChip} key={file.id ?? file.filename}><MIcon name="description" size={15} /><b>{file.filename}</b>{!locked && file.id && <button type="button" disabled={uploadingWeek === week.id} aria-label={`移除 ${file.filename}`} onClick={() => removeFile(week.id, file)}><MIcon name="close" size={14} /></button>}</span>)}{!locked && <label className={styles.weekUploadButton}><input type="file" multiple disabled={uploadingWeek === week.id} onChange={(event) => { upload(week.id, event.target.files); event.target.value = ""; }} /><MIcon name="upload_file" size={16} />{uploadingWeek === week.id ? "上傳中…" : "上傳檔案"}</label>}</div></div></article>)}</div>{message && <p className={styles.inlineMessage}>{message}</p>}{!locked && <div className={styles.actionFooter}><button type="button" className={styles.btnPrimary} disabled={saving || Boolean(uploadingWeek)} onClick={save}><MIcon name="save" size={16} />{saving ? "儲存中…" : "儲存每週內容"}</button></div>}</section>
+    <section className={styles.card}><div className={styles.cardHeader}><div><h2>每週上課內容（{weeks.length} 週）</h2><p>任務只有在設為「已發布」後，學生才會在課程頁看到名稱與 PDF。</p></div></div><div className={styles.weekRows}>{weeks.map((week) => { const published = ["published", "completed"].includes(week.status); return <article key={week.id}><div className={styles.weekDate}><strong>第 {week.week} 週</strong><span>{week.date}</span><button type="button" disabled={locked || !week.title.trim()} className={`${styles.weekPublishButton} ${published ? styles.weekPublished : ""}`} onClick={() => update(week.id, "status", published ? "draft" : "published")}><MIcon name={published ? "visibility" : "visibility_off"} size={14} />{published ? "已發布" : "保留草稿"}</button></div><label className={styles.field}><span>主題／任務</span><input disabled={locked} value={week.title} onChange={(event) => update(week.id, "title", event.target.value)} placeholder="輸入本週主題或任務" /></label><div className={styles.weekFiles}><span>任務檔案</span><div className={styles.weekFileList}>{week.files.map((file) => <span className={styles.weekFileChip} key={file.id ?? file.filename}><MIcon name="description" size={15} /><b>{file.filename}</b>{!locked && file.id && <button type="button" disabled={uploadingWeek === week.id} aria-label={`移除 ${file.filename}`} onClick={() => removeFile(week.id, file)}><MIcon name="close" size={14} /></button>}</span>)}{!locked && <label className={styles.weekUploadButton}><input type="file" multiple disabled={uploadingWeek === week.id} onChange={(event) => { upload(week.id, event.target.files); event.target.value = ""; }} /><MIcon name="upload_file" size={16} />{uploadingWeek === week.id ? "上傳中…" : "上傳檔案"}</label>}</div></div></article>; })}</div>{message && <p className={styles.inlineMessage}>{message}</p>}{!locked && <div className={styles.actionFooter}><button type="button" className={styles.btnPrimary} disabled={saving || Boolean(uploadingWeek)} onClick={save}><MIcon name="save" size={16} />{saving ? "儲存中…" : "儲存每週內容"}</button></div>}</section>
   </div>;
 }
 
@@ -684,7 +675,7 @@ function AiJudgeWorkspace({ item }) {
   if (loading) {
     return <LoadingState text="正在讀取班級機器…" />;
   }
-  return <AiJudgePanel classId={item.id} members={members} />;
+  return <AiJudgePanel classId={item.id} members={members} weeks={item.weeks} />;
 }
 
 function LockedFeature({ section }) {
@@ -812,18 +803,17 @@ export default function ClassWorkspacePage() {
   }
 
   if (loading) return <LoadingState fullPage text="正在讀取班級…" />;
-  if (!item) return <div className={styles.page}><button type="button" className={styles.backLink} onClick={() => navigate("/class-management")}><MIcon name="arrow_back" size={18} />返回班級清單</button><p className={styles.errorMessage}>{error || "找不到班級"}</p></div>;
+  if (!item) return <div className={styles.page}><button type="button" className={styles.backLink} onClick={() => navigate("/class-management")}><MIcon name="arrow_back" size={18} />返回班級管理</button><p className={styles.errorMessage}>{error || "找不到班級"}</p></div>;
   const postUnavailable = ["classroom", "progress", "ai"].includes(tab) && item.status !== "active";
   const completed = [item.students.length > 0, Boolean(item.course_environment) && item.nodes.length > 0].filter(Boolean).length;
 
   return <div className={styles.page}>
-    <button type="button" className={styles.backLink} onClick={() => navigate("/class-management")}><MIcon name="arrow_back" size={18} />返回班級清單</button>
     <PageHeader
       eyebrow={`${item.code} · ${item.term}`}
       title={item.name}
       subtitle={`${item.students.length} 位學生 · ${item.weeks.length} 個課次 · 每週${["一", "二", "三", "四", "五", "六", "日"][item.weekday]} ${item.startTime}–${item.endTime}`}
     >
-      <div className={styles.headerState}><span className={`${styles.statusBadge} ${styles[`status_${item.status}`]}`}>{STATUS[item.status] ?? item.status}</span></div>
+      <div className={styles.pageActions}><button type="button" className={`${styles.btnSecondary} ${styles.backBtn}`} onClick={() => navigate("/class-management")}><MIcon name="arrow_back" size={18} />返回班級管理</button></div>
     </PageHeader>
     {error && <p className={styles.errorMessage}>{error}</p>}
     <section className={styles.workflowTabsBar} aria-label="班級管理流程">

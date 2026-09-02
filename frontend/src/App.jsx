@@ -11,7 +11,7 @@ import styles from "./App.module.scss";
 // 個人
 const AdminDashboardPage = lazy(() => import("./pages/personal/dashboard/admin/AdminDashboardPage"));
 const TeacherDashboardPage = lazy(() => import("./pages/personal/dashboard/teacher/TeacherDashboardPage"));
-const StudentHomePage = lazy(() => import("./pages/personal/dashboard/student/StudentHomePage"));
+const StudentHomePage = lazy(() => import("./pages/personal/dashboard/StudentHomePage"));
 const StudentCoursePage = lazy(() => import("./pages/personal/dashboard/student/StudentCoursePage"));
 const QuickTemplateFormPage = lazy(() => import("./pages/personal/quick-practice/QuickTemplateFormPage"));
 const ResourcesPage = lazy(() => import("./pages/personal/resources/ResourcesPage"));
@@ -104,6 +104,9 @@ function App() {
   const { user, loading, authStatus, retrySession } = useAuth();
   const isAdmin = Boolean(user?.is_superuser || user?.role === "admin");
   const canTeach = isAdmin || user?.role === "teacher";
+  const isDeviceApproval = Boolean(
+    new URLSearchParams(window.location.search).get("device_code"),
+  );
 
   if (authStatus === AuthSessionStatus.UNAVAILABLE && !user) {
     return (
@@ -120,7 +123,13 @@ function App() {
     <Routes>
       <Route
         path="/login"
-        element={user ? <Navigate to="/dashboard" replace /> : <LoginPage />}
+        element={
+          user && !isDeviceApproval ? (
+            <Navigate to="/dashboard" replace />
+          ) : (
+            <LoginPage />
+          )
+        }
       />
 
       {user ? (

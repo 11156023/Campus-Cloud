@@ -259,6 +259,9 @@ def session_public(db: Session, item: TeacherJudgeSession) -> TeacherJudgeSessio
     return TeacherJudgeSessionPublic(
         id=str(item.id),
         teaching_class_id=str(item.teaching_class_id),
+        teaching_class_week_id=(
+            str(item.teaching_class_week_id) if item.teaching_class_week_id else None
+        ),
         title=item.title,
         status=item.status.value,
         selected_file_id=str(item.selected_file_id) if item.selected_file_id else None,
@@ -327,6 +330,7 @@ def fork_session_data(
             )
         clone = TeacherJudgeSession(
             teaching_class_id=source.teaching_class_id,
+            teaching_class_week_id=source.teaching_class_week_id,
             title=(title.strip() if title else _fork_title(db, source.teaching_class_id, source.title)),
             status=TeacherJudgeSessionStatus.active,
             selected_file_id=cloned_file.id if cloned_file else None,

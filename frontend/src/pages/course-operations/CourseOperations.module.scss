@@ -10,6 +10,8 @@
 .btnSecondary { border: 1px solid var(--color-border); color: var(--color-text); background: var(--color-surface); }
 .btnSecondary:hover:not(:disabled) { background: var(--color-hover); }
 .btnSecondary:disabled { opacity: 0.5; cursor: not-allowed; }
+/* 頁首返回鍵：與「申請虛擬機 / 容器」頁的 .backBtn 一致 */
+.backBtn { box-shadow: var(--shadow-sm); white-space: nowrap; }
 .backLink { align-self: flex-start; padding: 5px 4px; color: var(--color-text-secondary); background: transparent; }
 .backLink:hover { color: var(--color-primary); }
 .iconBtn { width: 32px; height: 32px; padding: 0; color: var(--color-text-secondary); background: transparent; }
@@ -40,10 +42,12 @@
 .table td small { display: block; max-width: 420px; margin-top: 3px; color: var(--color-text-muted); font-size: $font-size-12; line-height: 1.35; }
 .rowLink { cursor: pointer; transition: background $transition-base; }
 .rowLink:hover { background: var(--color-hover); }
-.statusBadge, .lockBadge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border-radius: $radius-pill; font-size: $font-size-12; font-weight: $font-weight-500; white-space: nowrap; }
-.status_published, .status_active { color: var(--color-success); background: color-mix(in srgb, var(--color-success) 12%, transparent); }
-.status_draft, .status_planning { color: var(--color-pending); background: color-mix(in srgb, var(--color-pending) 13%, transparent); }
-.status_archived { color: var(--color-text-muted); background: var(--color-hover); }
+.statusBadge, .lockBadge { @include badge-base; gap: 4px; padding: 2px 10px; white-space: nowrap; }
+.status_active, .status_published { color: var(--color-success); background: color-mix(in srgb, var(--color-success) 12%, transparent); }
+.status_planning, .status_draft, .status_pending_review { color: var(--color-pending); background: color-mix(in srgb, var(--color-pending) 12%, transparent); }
+.status_provisioning { color: var(--color-info); background: color-mix(in srgb, var(--color-info) 12%, transparent); }
+.status_partial_failed { color: var(--color-danger); background: color-mix(in srgb, var(--color-danger) 12%, transparent); }
+.status_archived, .status_retired { color: var(--color-text-muted); background: var(--color-hover); }
 
 .emptyState { display: flex; min-height: 180px; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 24px; color: var(--color-text-muted); text-align: center; }
 .emptyState p { margin: 0; font-size: $font-size-14; }
@@ -77,7 +81,6 @@
 .templateChoices p { margin: 4px 0; color: var(--color-text-secondary); font-size: $font-size-12; line-height: 1.4; }
 .templateChoices small { color: var(--color-text-muted); font-size: $font-size-10; }
 
-.headerState { display: flex; align-items: center; gap: 7px; }
 
 .lockBadge { color: var(--color-pending); background: color-mix(in srgb, var(--color-pending) 12%, transparent); }
 .workspaceTabs { padding-bottom: 8px; border-bottom: 1px solid var(--color-border); }
@@ -200,10 +203,6 @@
 .classCardAlert .classCardAction > span { color: var(--color-danger); }
 .classCardAlert .classCardAction button { color: var(--color-danger); background: color-mix(in srgb, var(--color-danger) 9%, transparent); }
 .classCardAlert .classCardAction button:hover { background: color-mix(in srgb, var(--color-danger) 16%, transparent); }
-.statusBadge { padding: 3px 9px; border: 1px solid transparent; }
-.status_planning, .status_draft { border-color: color-mix(in srgb, var(--color-pending) 20%, var(--color-border)); background: transparent; }
-.status_active, .status_published { border-color: color-mix(in srgb, var(--color-success) 20%, var(--color-border)); background: transparent; }
-.status_pending_review { border-color: color-mix(in srgb, var(--color-pending) 35%, var(--color-border)); color: var(--color-pending); background: color-mix(in srgb, var(--color-pending) 6%, var(--color-surface)); }
 
 .heatmapCard { overflow: visible; }
 .heatmapHeader { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding: 22px 22px 18px; }
@@ -257,8 +256,6 @@
 .heatLegend span { display: inline-flex; align-items: center; gap: 5px; }
 .heatLegend i { display: inline-block; width: 15px; height: 15px; border: 1px solid var(--color-border); border-radius: 4px; }
 .legendScale { gap: 3px !important; }
-.status_provisioning { border-color: color-mix(in srgb, var(--color-primary) 35%, var(--color-border)); color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 6%, var(--color-surface)); }
-.status_partial_failed { border-color: color-mix(in srgb, var(--color-danger) 35%, var(--color-border)); color: var(--color-danger); background: color-mix(in srgb, var(--color-danger) 6%, var(--color-surface)); }
 .stepTabs { align-self: flex-start; padding: 4px; }
 .stepTabs button { min-width: 170px; justify-content: flex-start; }
 
@@ -438,8 +435,6 @@
 .audienceClassItem small { color: var(--color-text-muted); font-size: $font-size-10; }
 .inspectorDanger { display: inline-flex; min-height: 34px; align-items: center; justify-content: center; gap: 5px; margin-top: auto; padding: 0 10px; border: 1px solid color-mix(in srgb, var(--color-danger) 35%, var(--color-border)); border-radius: $radius-8; color: var(--color-danger); background: var(--color-surface); cursor: pointer; }
 .table { min-width: 720px; }
-
-.headerState { flex-wrap: wrap; justify-content: flex-end; }
 
 .jobGrid span { color: var(--color-text-muted); font-size: $font-size-10; }
 .jobGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; padding: 16px 28px; border-bottom: 1px solid var(--color-border); background: color-mix(in srgb, var(--color-hover) 34%, var(--color-surface)); }

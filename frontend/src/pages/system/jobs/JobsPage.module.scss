@@ -156,8 +156,10 @@
   @include table-th;
 }
 
+/* 每一列都可點開任務詳情。 */
 .tr {
   @include table-tr;
+  @include table-tr-clickable;
 }
 
 .td {
@@ -167,17 +169,7 @@
 .nameCell {
   display: flex;
   align-items: center;
-  gap: $spacing-8;
-}
-
-.nameIcon {
-  width: 34px;
-  height: 34px;
-  border-radius: $radius-8;
-  background: var(--color-hover);
-  color: var(--color-primary);
-  @include flex-center;
-  flex-shrink: 0;
+  gap: $spacing-16;
 }
 
 .namePrimary {

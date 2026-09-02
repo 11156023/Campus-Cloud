@@ -220,6 +220,6 @@ uv run prek run --all-files  # 手動執行
 ## 參考
 
 - 主專案：[`../README.md`](../README.md)
-- 開發指引：[`../development.md`](../development.md)
-- 部署指引：[`../deployment.md`](../deployment.md)
+- 開發指引：[`../docs/development.md`](../docs/development.md)
+- 部署指引：[`../docs/deployment.md`](../docs/deployment.md)
 - VM 放置邏輯：[`../placement.md`](../placement.md)

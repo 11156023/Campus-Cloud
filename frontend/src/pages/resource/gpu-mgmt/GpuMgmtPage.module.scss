@@ -179,17 +179,7 @@
 .nameCell {
   display: flex;
   align-items: center;
-  gap: $spacing-8;
-}
-
-.nameIcon {
-  width: 34px;
-  height: 34px;
-  border-radius: $radius-8;
-  background: var(--color-hover);
-  color: var(--color-primary);
-  @include flex-center;
-  flex-shrink: 0;
+  gap: $spacing-16;
 }
 
 .namePrimary {
@@ -284,7 +274,7 @@
 
 .detailTd {
   padding: $spacing-8 $spacing-16 $spacing-16;
-  background: color-mix(in srgb, var(--color-primary) 3%, transparent);
+  background: var(--color-surface);
 }
 
 .detailBody {

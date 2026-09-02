@@ -167,7 +167,7 @@ class CourseScheduleStudent(BaseModel):
     end_at: datetime
     teacher: str
     location: str | None = None
-    state: Literal["now", "later", "ended"]
+    state: Literal["now", "later", "available", "ended"]
     label: str
 
 
@@ -257,19 +257,71 @@ class CourseAICheckStudent(BaseModel):
     items: list[CourseAICheckItemStudent] = Field(default_factory=list)
 
 
+class CourseAICheckSubmit(BaseModel):
+    """Optionally limit a student-triggered run to one displayed checkpoint."""
+
+    item_id: str | None = Field(default=None, min_length=1, max_length=255)
+
+
+class CourseAISourceDocumentStudent(BaseModel):
+    """學生可查看的老師任務文件；不公開內部檔案路徑。"""
+
+    filename: str
+    display_name: str
+    media_type: Literal["application/pdf"] = "application/pdf"
+
+
 class CourseAIAssignmentStudent(BaseModel):
     """老師核准後，公開給所屬學生的 AI 評分任務。"""
 
     id: uuid.UUID
     teaching_class_id: uuid.UUID
     teaching_class_name: str
+    session_id: uuid.UUID | None = None
+    teaching_class_week_id: uuid.UUID | None = None
     title: str
     summary: str = ""
     template_key: str
     version: int
     approved_at: datetime | None = None
     items: list[CourseAITaskItemStudent]
+    source_document: CourseAISourceDocumentStudent | None = None
     latest_check: CourseAICheckStudent | None = None
+    checkpoint_checks: dict[str, CourseAICheckStudent] = Field(default_factory=dict)
+
+
+class CourseWeeklyTaskFileStudent(BaseModel):
+    """A teacher-provided PDF that an enrolled student may preview."""
+
+    id: uuid.UUID
+    filename: str
+    media_type: Literal["application/pdf"] = "application/pdf"
+
+
+class CourseWeeklyCheckpointStudent(BaseModel):
+    id: str
+    task_id: uuid.UUID
+    assignment_id: uuid.UUID | None = None
+    assignment_title: str
+    check_available: bool = False
+    title: str
+    description: str = ""
+    detectable: Literal["auto", "partial", "manual"] = "manual"
+    order: int = 0
+    latest_check: CourseAICheckStudent | None = None
+
+
+class CourseWeeklyTaskStudent(BaseModel):
+    """Published weekly content from the teaching class linked to a path."""
+
+    id: uuid.UUID
+    teaching_class_id: uuid.UUID
+    teaching_class_name: str
+    week_number: int
+    session_date: date
+    title: str
+    files: list[CourseWeeklyTaskFileStudent] = Field(default_factory=list)
+    checkpoints: list[CourseWeeklyCheckpointStudent] = Field(default_factory=list)
 
 
 class CoursePracticeMachineStudent(BaseModel):
@@ -374,7 +426,12 @@ __all__ = [
     "CourseAITaskItemStudent",
     "CourseAICheckItemStudent",
     "CourseAICheckStudent",
+    "CourseAICheckSubmit",
+    "CourseAISourceDocumentStudent",
     "CourseAIAssignmentStudent",
+    "CourseWeeklyTaskFileStudent",
+    "CourseWeeklyCheckpointStudent",
+    "CourseWeeklyTaskStudent",
     "CoursePracticeMachineStudent",
     "CourseDeploymentPublic",
     "CourseRoomStudentDetail",
