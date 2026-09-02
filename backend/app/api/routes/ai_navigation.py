@@ -18,5 +18,10 @@ async def resolve_navigation_route(
     session: SessionDep,
     current_user: CurrentUser,
 ) -> NavigationResolveResponse:
-    return await resolve_navigation(request.query, current_user, session=session)
-
+    return await resolve_navigation(
+        request.query,
+        current_user,
+        session=session,
+        history=request.history,
+        current_path=request.current_path,
+    )

@@ -439,6 +439,12 @@ export default function RequestsPage() {
     if (view === "list") fetchRequests();
   }, [view, fetchRequests]);
 
+  /* 已經停在本頁時 useState 的初值不會再跑一次，所以導覽助手在這頁按「填寫申請單」
+     只會換掉 location.state。這裡補上反應，讓表單照樣打開。 */
+  useEffect(() => {
+    if (location.state?.create) setView(VIEW_CREATE);
+  }, [location.key, location.state?.create]);
+
   useAutoRefresh(() => {
     if (view === "list") fetchRequests(true);
   });

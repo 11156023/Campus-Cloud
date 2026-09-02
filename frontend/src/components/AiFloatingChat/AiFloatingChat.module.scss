@@ -257,6 +257,51 @@
   }
 }
 
+/* 流程導覽：目前這一步高亮，已經過的那幾步壓低對比 */
+.stepList {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-8;
+  margin: 12px 0 0;
+  padding: 0;
+
+  button {
+    width: 100%;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--color-border);
+    border-radius: $radius-12;
+    background: var(--color-surface);
+    color: var(--color-text-primary);
+    text-align: left;
+    cursor: pointer;
+
+    &:hover { border-color: var(--color-primary); }
+
+    span { display: flex; flex-direction: column; gap: 2px; }
+    strong { font-size: $font-size-14; }
+    small { color: var(--color-text-muted); font-size: $font-size-12; }
+  }
+}
+
+.step_current button {
+  border-color: var(--color-primary);
+  box-shadow: inset 3px 0 0 var(--color-primary);
+}
+
+.step_done button {
+  opacity: 0.62;
+
+  strong { text-decoration: line-through; }
+}
+
+.step_todo button {
+  opacity: 0.9;
+}
+
 .typing {
   display: flex;
   align-items: center;

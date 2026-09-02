@@ -34,6 +34,15 @@ const DEFAULT_CONTEXT = {
 };
 
 const NAVIGATION_PATTERN = /(帶我|前往|打開|開啟|跳到|導航|在哪|哪裡|頁面)/i;
+/* 「我要申請一台機器」這種整件事的描述沒有導覽關鍵字，但正是流程導覽要接的。 */
+const GUIDE_PATTERN = /(怎麼|怎樣|如何|步驟|流程|我要|我想|幫我)/i;
+/* 諮詢型問題（比較、選哪個）留給推薦 AI，導覽只回答「去哪裡、怎麼走」。 */
+const ADVICE_PATTERN = /(還是|哪個|哪種|差別|差異|比較|該用|建議|推薦|適合)/i;
+
+export function wantsNavigation(text) {
+  if (ADVICE_PATTERN.test(text)) return false;
+  return NAVIGATION_PATTERN.test(text) || GUIDE_PATTERN.test(text);
+}
 
 function stripThinkTags(text) {
   return String(text || "").replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
@@ -43,31 +52,8 @@ function pageContextFor(pathname) {
   return PAGE_CONTEXTS.find((item) => item.match.test(pathname)) ?? DEFAULT_CONTEXT;
 }
 
-// The navigation service still returns a few legacy paths. Keep the mapping
-// here so the assistant always opens a route that exists in the current UI.
-const PATH_MAP = {
-  "/": "/dashboard",
-  "/resources": "/resource-mgmt",
-  "/resources-create": "/my-requests",
-  "/approvals": "/request-review",
-  "/gpu-management": "/gpu-mgmt",
-  "/ai-api-approvals": "/ai-api-review",
-  "/ai-api-credentials": "/ai-api-keys",
-  "/admin/audit-logs": "/audit",
-  "/admin/domains": "/domain",
-  "/admin/gateway": "/gateway",
-  "/admin/ip-management": "/ip-management",
-  "/admin/configuration": "/settings",
-  "/admin/batch-provision-review": "/batch-review",
-  "/admin/ai-management": "/ai-monitoring",
-  "/admin/ai-monitoring": "/ai-monitoring",
-};
-
-function mapPath(path) {
-  if (!path) return null;
-  const [clean, query] = path.split("?");
-  const target = PATH_MAP[clean] ?? clean;
-  return query ? `${target}?${query}` : target;
+function newSessionId() {
+  return globalThis.crypto?.randomUUID?.() ?? `nav-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
 function displayName(user) {
@@ -82,7 +68,37 @@ function TypingIndicator() {
   );
 }
 
-function Message({ message, onNavigate }) {
+const STEP_ICON = { done: "check_circle", current: "play_circle", todo: "radio_button_unchecked" };
+
+/* 步驟狀態以「使用者現在在哪一頁」為準，所以他一邊照做、清單就一邊往前推。
+   找不到對應頁面時才退回後端算好的狀態。 */
+export function stepStatuses(steps, currentPath) {
+  const byPath = steps.findIndex((step) => step.path === currentPath);
+  const active = byPath >= 0 ? byPath : steps.findIndex((step) => step.status === "current");
+  if (active < 0) return steps.map((step) => step.status);
+  return steps.map((_, index) => (index < active ? "done" : index === active ? "current" : "todo"));
+}
+
+function StepList({ steps, currentPath, onNavigate }) {
+  const statuses = stepStatuses(steps, currentPath);
+  return (
+    <ol className={styles.stepList}>
+      {steps.map((step, index) => (
+        <li key={`${step.path}-${index}`} className={styles[`step_${statuses[index]}`]}>
+          <button type="button" onClick={() => onNavigate(step.path, step.state)}>
+            <MIcon name={STEP_ICON[statuses[index]] ?? STEP_ICON.todo} size={17} />
+            <span>
+              <strong>{index + 1}. {step.title}</strong>
+              {step.detail && <small>{step.detail}</small>}
+            </span>
+          </button>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function Message({ message, currentPath, onNavigate }) {
   const isUser = message.role === "user";
   return (
     <div className={`${styles.message} ${isUser ? styles.messageUser : styles.messageAssistant}`}>
@@ -93,10 +109,13 @@ function Message({ message, onNavigate }) {
       )}
       <div className={styles.messageContent}>
         <div className={styles.messageText}>{message.content}</div>
+        {message.steps?.length > 0 && (
+          <StepList steps={message.steps} currentPath={currentPath} onNavigate={onNavigate} />
+        )}
         {message.targets?.length > 0 && (
           <div className={styles.actionList}>
             {message.targets.map((target) => (
-              <button key={target.path} type="button" onClick={() => onNavigate(target.path)}>
+              <button key={target.path} type="button" onClick={() => onNavigate(target.path, target.state)}>
                 <span>
                   <strong>{target.title}</strong>
                   {target.reason && <small>{target.reason}</small>}
@@ -123,6 +142,8 @@ export default function AiFloatingChat({ open = false, onOpenChange = () => {} }
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef(null);
   const inputRef = useRef(null);
+  // 只用來把同一段對話的用量記錄串起來；按「建立新對話」就換一個
+  const sessionIdRef = useRef(newSessionId());
   const pageContext = useMemo(() => pageContextFor(location.pathname), [location.pathname]);
 
   useEffect(() => {
@@ -141,29 +162,49 @@ export default function AiFloatingChat({ open = false, onOpenChange = () => {} }
     setMessages([]);
     setHistory([]);
     setInput("");
+    sessionIdRef.current = newSessionId();
     inputRef.current?.focus();
   }
 
-  function handleNavigate(path) {
-    const target = mapPath(path);
-    if (!target) return;
-    navigate(target);
+  function handleNavigate(path, state) {
+    if (!path) return;
+    navigate(path, state ? { state } : undefined);
     if (window.matchMedia("(max-width: 1439px)").matches) close();
   }
 
-  async function sendNavigation(text) {
-    const data = await AiNavigationService.resolve(text);
+  async function sendNavigation(text, nextHistory) {
+    const data = await AiNavigationService.resolve(text, {
+      // 送出前的前文（不含這一輪），讓「然後呢」這種追問有東西可以指
+      history: nextHistory.slice(0, -1),
+      currentPath: location.pathname,
+      sessionId: sessionIdRef.current,
+    });
+    const steps = data.steps ?? [];
+
+    if (data.action === "guide" && steps.length) {
+      const content = `${data.flow_title ?? "操作流程"}：照著下面的步驟走，我會跟著你目前的頁面標記進度。`;
+      const assistantMessage = { role: "assistant", content, steps };
+      setMessages((previous) => [...previous, assistantMessage]);
+      setHistory((previous) => [...previous, {
+        role: "assistant",
+        content: `${content}（${steps.map((step) => step.title).join("→")}）`,
+      }]);
+      return true;
+    }
+
     const targets = [...(data.primary ? [data.primary] : []), ...(data.suggestions ?? [])]
       .filter((target, index, all) => all.findIndex((item) => item.path === target.path) === index);
 
+    // 導覽答不出東西時，交給一般問答回答，不要用「找不到頁面」把使用者擋掉。
+    if (!targets.length) return false;
+
     const content = data.action === "clarify"
       ? (data.clarification_question || "你想前往哪一類功能？")
-      : targets.length
-        ? "我找到以下可能符合需求的功能："
-        : "目前找不到符合的頁面，請換個方式描述。";
+      : "我找到以下可能符合需求的功能：";
     const assistantMessage = { role: "assistant", content, targets };
     setMessages((previous) => [...previous, assistantMessage]);
     setHistory((previous) => [...previous, { role: "assistant", content }]);
+    return true;
   }
 
   async function sendChat(text, nextHistory) {
@@ -200,8 +241,10 @@ export default function AiFloatingChat({ open = false, onOpenChange = () => {} }
     setLoading(true);
 
     try {
-      if (NAVIGATION_PATTERN.test(text)) await sendNavigation(text);
-      else await sendChat(text, nextHistory);
+      const handled = wantsNavigation(text)
+        ? await sendNavigation(text, nextHistory)
+        : false;
+      if (!handled) await sendChat(text, nextHistory);
     } catch (error) {
       setMessages((previous) => [...previous, {
         role: "assistant",
@@ -268,7 +311,12 @@ export default function AiFloatingChat({ open = false, onOpenChange = () => {} }
               </div>
             ) : (
               messages.map((message, index) => (
-                <Message key={`${message.role}-${index}`} message={message} onNavigate={handleNavigate} />
+                <Message
+                  key={`${message.role}-${index}`}
+                  message={message}
+                  currentPath={location.pathname}
+                  onNavigate={handleNavigate}
+                />
               ))
             )}
             {loading && (
