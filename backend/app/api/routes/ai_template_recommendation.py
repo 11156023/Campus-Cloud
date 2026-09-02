@@ -19,6 +19,7 @@ from app.ai.template_recommendation.node_service import (
 from app.ai.template_recommendation.prompt import (
     build_chat_runtime_context,
     build_chat_system_prompt,
+    build_intake_focus_block,
 )
 from app.ai.template_recommendation.recommendation_service import (
     generate_ai_plan,
@@ -345,6 +346,11 @@ async def chat(
         is_first_turn=is_first_turn,
         runtime_context=runtime_context,
     )
+    # 配置模式：把這一輪的主題固定住，問句仍由顧問語氣產生
+    if request.focus_hint:
+        system_prompt = (
+            f"{system_prompt}\n\n{build_intake_focus_block(request.focus_hint.strip())}"
+        )
 
     messages: list[dict[str, str]] = [{"role": "system", "content": system_prompt}]
     for msg in request.messages:

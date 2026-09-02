@@ -2,9 +2,16 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass
+from typing import Literal
 
 from app.models import User
 from app.models.user import UserRole
+
+# 存取層級與 App.jsx 的路由守衛一一對應：
+#   all   -> 任何登入者
+#   staff -> canTeach（teacher 或 admin）
+#   admin -> isAdmin（is_superuser 或 role == admin）
+RouteAccess = Literal["all", "staff", "admin"]
 
 
 @dataclass(frozen=True)
@@ -13,168 +20,214 @@ class NavigationRoute:
     title: str
     summary: str
     keywords: tuple[str, ...]
-    allow_student: bool = True
-    allow_teacher: bool = True
-    allow_admin: bool = True
+    access: RouteAccess = "all"
 
 
+# 路徑必須實際存在於 frontend/src/App.jsx；
+# test_ai_navigation_catalog.py 會逐一比對，改路由時這裡會一起紅燈。
 _ROUTES: tuple[NavigationRoute, ...] = (
     NavigationRoute(
-        path="/",
-        title="儀表板",
-        summary="查看總覽與快速入口。",
+        path="/dashboard",
+        title="首頁",
+        summary="依身分顯示的總覽與快速入口。",
         keywords=("首頁", "儀表板", "dashboard", "總覽", "主頁"),
     ),
     NavigationRoute(
         path="/my-resources",
         title="我的資源",
-        summary="查看我名下的 VM/LXC 資源。",
-        keywords=("我的資源", "我的機器", "我有哪些機器", "my resource", "my vm"),
+        summary="查看與操作我名下的 VM/LXC 機器。",
+        keywords=("我的資源", "我的機器", "我有哪些機器", "my resource", "my vm", "開機", "關機"),
     ),
     NavigationRoute(
-        path="/resources",
-        title="所有資源",
-        summary="管理全站資源列表。",
-        keywords=("所有資源", "全部資源", "資源清單", "resources"),
-        allow_student=False,
-        allow_teacher=False,
+        path="/my-requests",
+        title="我的申請",
+        summary="提交新的機器申請，並追蹤審核進度。",
+        keywords=("申請", "申請單", "我的申請", "request", "申請 vm", "申請 lxc", "借機器"),
     ),
     NavigationRoute(
-        path="/resources-create",
-        title="快速建立資源",
-        summary="直接建立 VM/LXC。",
-        keywords=("建立資源", "快速建立", "create vm", "create lxc"),
-        allow_student=False,
-        allow_teacher=False,
+        path="/account",
+        title="帳號設定",
+        summary="修改個人資料與密碼。",
+        keywords=("帳號", "個人設定", "改密碼", "account", "profile"),
     ),
     NavigationRoute(
-        path="/applications",
-        title="申請列表",
-        summary="提交與查看資源申請。",
-        keywords=("申請", "申請單", "request", "applications", "vm 申請"),
-    ),
-    NavigationRoute(
-        path="/applications-create",
-        title="新增申請",
-        summary="建立新的資源申請。",
-        keywords=("新增申請", "申請 vm", "申請 lxc", "create request"),
-    ),
-    NavigationRoute(
-        path="/approvals",
-        title="審核中心",
-        summary="審核資源申請。",
-        keywords=("審核", "approval", "審批", "簽核"),
-        allow_student=False,
-        allow_teacher=False,
-    ),
-    NavigationRoute(
-        path="/class-management",
-        title="班級管理",
-        summary="管理正式班級、學生、課程環境與上課監看。",
-        keywords=("班級", "課程", "學生", "教室", "上課"),
-        allow_student=False,
-    ),
-    NavigationRoute(
-        path="/firewall",
-        title="防火牆",
-        summary="設定網路連線與規則。",
-        keywords=("防火牆", "firewall", "網路規則", "連線規則"),
-    ),
-    NavigationRoute(
-        path="/reverse-proxy",
-        title="反向代理",
-        summary="管理反向代理規則與 Runtime。",
-        keywords=("反向代理", "reverse proxy", "網域轉發", "traefik"),
-    ),
-    NavigationRoute(
-        path="/gpu-management",
-        title="GPU 管理",
-        summary="查看 GPU 映射與使用狀態。",
-        keywords=("gpu", "顯卡", "cuda", "gpu 管理"),
+        path="/courses",
+        title="課程",
+        summary="瀏覽課程與練習關卡。",
+        keywords=("課程", "關卡", "course", "學習", "練習"),
     ),
     NavigationRoute(
         path="/jobs",
         title="背景任務",
-        summary="查看任務執行進度與結果。",
-        keywords=("任務", "job", "背景任務", "排程"),
+        summary="查看建立、克隆與批次任務的執行進度。",
+        keywords=("任務", "job", "背景任務", "進度", "排程"),
+    ),
+    NavigationRoute(
+        path="/firewall",
+        title="防火牆",
+        summary="設定機器的連線與埠規則。",
+        keywords=("防火牆", "firewall", "開埠", "port", "連線規則"),
+    ),
+    NavigationRoute(
+        path="/reverse-proxy",
+        title="反向代理",
+        summary="把機器上的服務對外公開成網址。",
+        keywords=("反向代理", "reverse proxy", "對外網址", "公開網站", "traefik", "https"),
     ),
     NavigationRoute(
         path="/ai-api",
         title="AI API",
-        summary="管理 AI API 金鑰與個人用量。",
-        keywords=("ai api", "token 用量", "金鑰", "ai 用量"),
+        summary="申請 AI API 金鑰並查看個人用量。",
+        keywords=("ai api", "金鑰", "api key", "token 用量", "llm"),
+    ),
+    # --- 教師與管理者 ---
+    NavigationRoute(
+        path="/templates",
+        title="範本管理",
+        summary="把機器轉成範本，或開放範本給學生申請。",
+        keywords=("範本", "模板", "template", "母範本", "轉範本"),
+        access="staff",
     ),
     NavigationRoute(
-        path="/ai-pve",
-        title="AI PVE 維運助手",
-        summary="查詢全站 PVE 狀態並協助執行維運操作。",
-        keywords=("ai pve", "pve 維運", "節點狀態", "vm 維運"),
-        allow_student=False,
-        allow_teacher=False,
+        path="/class-management",
+        title="班級管理",
+        summary="管理班級名單、每週內容、上課監看與 AI 檢查。",
+        keywords=("班級", "課堂", "學生名單", "每週", "上課", "class"),
+        access="staff",
+    ),
+    NavigationRoute(
+        path="/class-setup",
+        title="建立班級",
+        summary="開一個新班級並設定課程環境。",
+        keywords=("開班", "建立班級", "新增班級", "create class"),
+        access="staff",
+    ),
+    NavigationRoute(
+        path="/course-template-management",
+        title="課程環境範本",
+        summary="設計課堂要用的多機環境並開放快速練習。",
+        keywords=("課程環境", "環境範本", "多機環境", "快速練習"),
+        access="staff",
+    ),
+    NavigationRoute(
+        path="/course-cms",
+        title="課程內容管理",
+        summary="編輯課程關卡、任務與題目。",
+        keywords=("課程內容", "關卡編輯", "出題", "cms"),
+        access="staff",
+    ),
+    # --- 僅管理者 ---
+    NavigationRoute(
+        path="/resource-mgmt",
+        title="資源管理",
+        summary="管理全站的機器資源。",
+        keywords=("資源管理", "所有資源", "全部機器", "resources"),
+        access="admin",
+    ),
+    NavigationRoute(
+        path="/request-review",
+        title="申請審核",
+        summary="審核使用者送出的機器申請。",
+        keywords=("審核", "審批", "approval", "核准申請"),
+        access="admin",
+    ),
+    NavigationRoute(
+        path="/batch-review",
+        title="批次開通審核",
+        summary="審核整批建立的課堂機器。",
+        keywords=("批次審核", "批次開通", "batch"),
+        access="admin",
+    ),
+    NavigationRoute(
+        path="/gpu-mgmt",
+        title="GPU 管理",
+        summary="查看 GPU 映射、vGPU 規格與使用狀況。",
+        keywords=("gpu", "顯卡", "cuda", "vgpu"),
+        access="admin",
+    ),
+    NavigationRoute(
+        path="/quotas",
+        title="配額設定",
+        summary="設定各角色可用的資源上限。",
+        keywords=("配額", "quota", "上限", "限制"),
+        access="admin",
+    ),
+    NavigationRoute(
+        path="/monitoring",
+        title="資源監控",
+        summary="查看節點與機器的即時負載。",
+        keywords=("監控", "monitoring", "負載", "cpu 使用率"),
+        access="admin",
+    ),
+    NavigationRoute(
+        path="/audit",
+        title="稽核紀錄",
+        summary="查詢系統操作紀錄。",
+        keywords=("稽核", "audit", "操作紀錄", "log"),
+        access="admin",
+    ),
+    NavigationRoute(
+        path="/settings",
+        title="系統設定",
+        summary="調整平台層級的設定與政策。",
+        keywords=("系統設定", "設定", "configuration", "政策"),
+        access="admin",
+    ),
+    NavigationRoute(
+        path="/ip-management",
+        title="IP 管理",
+        summary="配置子網與 IP 配發。",
+        keywords=("ip", "子網", "subnet", "網段"),
+        access="admin",
+    ),
+    NavigationRoute(
+        path="/domain",
+        title="網域管理",
+        summary="管理 DNS 與 Cloudflare 網域設定。",
+        keywords=("網域", "domain", "dns", "cloudflare"),
+        access="admin",
+    ),
+    NavigationRoute(
+        path="/gateway",
+        title="閘道 VM",
+        summary="管理對外流量的 Gateway VM。",
+        keywords=("閘道", "gateway", "對外流量"),
+        access="admin",
     ),
     NavigationRoute(
         path="/admin",
         title="管理主頁",
-        summary="系統管理總覽。",
-        keywords=("admin", "管理主頁", "後台"),
-        allow_student=False,
-        allow_teacher=False,
+        summary="系統管理總覽入口。",
+        keywords=("管理主頁", "後台", "admin"),
+        access="admin",
     ),
     NavigationRoute(
-        path="/admin/ai-management",
-        title="AI 管理中心",
-        summary="管理 AI API 申請、憑證與流程。",
-        keywords=("ai 管理", "ai management", "ai 審核"),
-        allow_student=False,
-        allow_teacher=False,
+        path="/ai-pve",
+        title="AI 維運助手",
+        summary="用自然語言查詢 PVE 狀態並協助維運。",
+        keywords=("ai pve", "維運", "節點狀態", "pve"),
+        access="admin",
     ),
     NavigationRoute(
-        path="/admin/ai-monitoring",
-        title="AI 監控",
-        summary="查看全局 AI 使用統計。",
-        keywords=("ai 監控", "ai monitoring", "全局用量"),
-        allow_student=False,
-        allow_teacher=False,
+        path="/ai-api-review",
+        title="AI API 審核",
+        summary="審核使用者的 AI API 申請。",
+        keywords=("ai api 審核", "api 申請審核"),
+        access="admin",
     ),
     NavigationRoute(
-        path="/admin/configuration",
-        title="系統設定",
-        summary="設定平台系統參數。",
-        keywords=("系統設定", "configuration", "設定"),
-        allow_student=False,
-        allow_teacher=False,
+        path="/ai-api-keys",
+        title="AI API 金鑰管理",
+        summary="管理平台發出的 AI API 金鑰。",
+        keywords=("金鑰管理", "api key 管理"),
+        access="admin",
     ),
     NavigationRoute(
-        path="/admin/domains",
-        title="網域管理",
-        summary="管理 Cloudflare / DNS 網域設定。",
-        keywords=("網域", "dns", "domain", "cloudflare"),
-        allow_student=False,
-        allow_teacher=False,
-    ),
-    NavigationRoute(
-        path="/admin/gateway",
-        title="Gateway VM",
-        summary="管理 Gateway VM 與網路服務。",
-        keywords=("gateway", "網關", "gateway vm"),
-        allow_student=False,
-        allow_teacher=False,
-    ),
-    NavigationRoute(
-        path="/admin/ip-management",
-        title="IP 管理",
-        summary="配置子網與 IP 配置。",
-        keywords=("ip 管理", "子網", "subnet"),
-        allow_student=False,
-        allow_teacher=False,
-    ),
-    NavigationRoute(
-        path="/admin/audit-logs",
-        title="Audit Logs",
-        summary="查詢系統操作稽核紀錄。",
-        keywords=("audit", "稽核", "操作紀錄"),
-        allow_student=False,
-        allow_teacher=False,
+        path="/ai-monitoring",
+        title="AI 使用監控",
+        summary="查看全站 AI 用量與成本。",
+        keywords=("ai 監控", "ai 用量", "ai monitoring"),
+        access="admin",
     ),
 )
 
@@ -191,17 +244,21 @@ def resolve_user_role(user: User) -> UserRole:
         return UserRole.student
 
 
+def can_access(access: RouteAccess, role: UserRole) -> bool:
+    if access == "all":
+        return True
+    if access == "staff":
+        return role in {UserRole.teacher, UserRole.admin}
+    return role == UserRole.admin
+
+
 def get_routes_for_user(user: User) -> tuple[NavigationRoute, ...]:
     role = resolve_user_role(user)
-    routes: list[NavigationRoute] = []
-    for route in _ROUTES:
-        if role == UserRole.admin and route.allow_admin:
-            routes.append(route)
-        elif role == UserRole.teacher and route.allow_teacher:
-            routes.append(route)
-        elif role == UserRole.student and route.allow_student:
-            routes.append(route)
-    return tuple(routes)
+    return tuple(route for route in _ROUTES if can_access(route.access, role))
+
+
+def all_routes() -> tuple[NavigationRoute, ...]:
+    return _ROUTES
 
 
 def find_route_by_path(

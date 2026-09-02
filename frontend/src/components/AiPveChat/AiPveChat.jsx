@@ -1,4 +1,7 @@
 import { useEffect, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import rehypeSanitize from "rehype-sanitize";
+import remarkGfm from "remark-gfm";
 import MIcon from "../MIcon";
 import { useToast } from "../../hooks/useToast";
 import { AiPveLogService } from "../../services/aiPveLog";
@@ -14,7 +17,7 @@ export function sanitizeAiPveContent(value) {
     .trim();
 }
 
-export default function AiPveChat({ initialPrompt = "", compact = false }) {
+export default function AiPveChat({ initialPrompt = "", compact = false, fill = false }) {
   const toast = useToast();
   const initialPromptRef = useRef(String(initialPrompt ?? "").trim());
   const initialPromptHandledRef = useRef(false);
@@ -156,12 +159,7 @@ export default function AiPveChat({ initialPrompt = "", compact = false }) {
   }
 
   return (
-    <div className={`${styles.chatCard} ${compact ? styles.compact : ""}`}>
-      <div className={styles.chatCardHead}>
-        <MIcon name="comment" size={18} />
-        對話記錄
-      </div>
-
+    <div className={`${styles.chatCard} ${compact ? styles.compact : ""} ${fill ? styles.fill : ""}`}>
       <div className={styles.chatLog} aria-live="polite">
         {messages.map((message, index) => (
           <div
@@ -172,7 +170,13 @@ export default function AiPveChat({ initialPrompt = "", compact = false }) {
               <MIcon name={message.role === "assistant" ? "smart_toy" : "person"} size={16} />
               <span>{message.role === "assistant" ? "AI-PVE" : "你"}</span>
             </div>
-            <p className={styles.msgContent}>{sanitizeAiPveContent(message.content)}</p>
+            {/* 維運回覆常是節點清單、用量表格與指令片段，直接印純文字會看到
+                一堆星號與管線符號 */}
+            <div className={styles.msgContent}>
+              <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>
+                {sanitizeAiPveContent(message.content)}
+              </ReactMarkdown>
+            </div>
             {message.tools?.length > 0 && (
               <div className={styles.toolRow}>
                 <span className={styles.toolLabel}>

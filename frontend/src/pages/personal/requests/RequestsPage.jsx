@@ -414,6 +414,8 @@ export default function RequestsPage() {
   const [error, setError]       = useState(false);
   const [view, setView]         = useState(location.state?.create ? VIEW_CREATE : VIEW_LIST);
   const [returning, setReturning] = useState(false);
+  /* AI 助手談完需求後會把推薦配置一起帶過來 */
+  const [pendingPrefill, setPendingPrefill] = useState(location.state?.prefill ?? null);
 
   /** silent = true 時不觸發 loading / error state，供背景自動刷新使用 */
   const fetchRequests = useCallback(async (silent = false) => {
@@ -439,6 +441,14 @@ export default function RequestsPage() {
     if (view === "list") fetchRequests();
   }, [view, fetchRequests]);
 
+  /* 已經停在本頁時 useState 的初值不會再跑一次，所以導覽助手在這頁按步驟
+     只會換掉 location.state。兩個方向都要跟：帶 create 就開表單，沒帶就回列表
+     （流程裡的「等待審核」指的就是列表，按了不能沒反應）。 */
+  useEffect(() => {
+    setView(location.state?.create ? VIEW_CREATE : VIEW_LIST);
+    if (location.state?.prefill) setPendingPrefill(location.state.prefill);
+  }, [location.key, location.state?.create, location.state?.prefill]);
+
   useAutoRefresh(() => {
     if (view === "list") fetchRequests(true);
   });
@@ -452,7 +462,8 @@ export default function RequestsPage() {
       <RequestFormPage
         key="create"
         className={styles.animSlideInRight}
-        onBack={() => { setReturning(true); setView(VIEW_LIST); }}
+        initialPrefill={pendingPrefill}
+        onBack={() => { setReturning(true); setView(VIEW_LIST); setPendingPrefill(null); }}
       />
     );
   }
