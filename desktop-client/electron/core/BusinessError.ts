@@ -5,7 +5,11 @@ enum ResponseCode {
   LOGIN_TIMEOUT = "B1002;Login timed out.",
   NO_TUNNELS = "B1003;No tunnels available.",
   FRPC_BINARY_MISSING = "B1004;frpc binary not found.",
-  BACKEND_ERROR = "B1005;Backend request failed."
+  BACKEND_ERROR = "B1005;Backend request failed.",
+  WIREGUARD_NOT_INSTALLED = "B1006;WireGuard is not installed.",
+  WIREGUARD_KEY_STORAGE = "B1007;Secure key storage is unavailable.",
+  WIREGUARD_START_FAILED = "B1008;WireGuard tunnel failed to start.",
+  WIREGUARD_INSTALL_FAILED = "B1009;WireGuard could not be installed."
 }
 
 class BusinessError extends Error {

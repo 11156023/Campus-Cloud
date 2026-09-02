@@ -35,6 +35,13 @@
     "category": "public.app-category.utilities"
   },
   "win": {
+    "extraResources": [
+      {
+        "from": "vendor/wireguard",
+        "to": "wireguard",
+        "filter": ["wireguard-amd64-1.1.msi", "THIRD_PARTY_NOTICES.txt"]
+      }
+    ],
     "target": [
       {
         "target": "nsis",
@@ -48,9 +55,10 @@
   },
   "nsis": {
     "oneClick": false,
-    "perMachine": false,
+    "perMachine": true,
     "allowToChangeInstallationDirectory": true,
-    "deleteAppDataOnUninstall": false
+    "deleteAppDataOnUninstall": false,
+    "include": "build/installer.nsh"
   },
   "linux": {
     "target": [

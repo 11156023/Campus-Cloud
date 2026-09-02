@@ -150,7 +150,7 @@ export default function TeacherDashboardPage() {
 
   return <div className={styles.page}>
     <PageHeader title={`${firstName}老師，今天想先看哪個班級？`} subtitle="集中查看學生 checkpoint 完成度、近期課堂與課程準備狀態。">
-      <button type="button" className={styles.btnPrimary} onClick={() => navigate("/class-setup")}><MIcon name="add" size={18} />一鍵建立班級</button>
+      <button type="button" className={styles.btnPrimary} onClick={() => navigate("/class-setup")}><MIcon name="add" size={18} />建立班級</button>
     </PageHeader>
 
     {error && <div className={styles.error}><MIcon name="error_outline" size={18} />{error}</div>}
@@ -179,7 +179,7 @@ export default function TeacherDashboardPage() {
       <div className={styles.classList}>{loading ? <LoadingState text="正在讀取班級…" /> : upcoming.length ? upcoming.map(({ item, session }) => {
         const ready = item.totalMachines ? Math.round(item.readyMachines / item.totalMachines * 100) : 0;
         return <button type="button" key={item.id} className={styles.classRow} onClick={() => navigate(`/class-management/${item.id}`)}><span className={styles.classDate}><strong>{session.toLocaleDateString("zh-TW", { month: "numeric", day: "numeric" })}</strong><small>{String(item.start_time ?? "").slice(0, 5)}</small></span><span className={styles.classMain}><strong>{item.name}</strong><small>{item.students} 位學生 · 每位 {item.nodes.length} 台機器</small></span><span className={styles.classState}><em className={styles[`status_${item.status}`]}>{CLASS_STATUS[item.status] ?? item.status}</em><small>{item.status === "active" ? `${ready}% 機器就緒` : item.status === "planning" ? "繼續完成班級設定" : "查看目前進度"}</small></span><MIcon name="chevron_right" size={19} /></button>;
-      }) : <EmptyState icon="event_available" title="尚無近期班級" action={<button type="button" className={styles.btnPrimary} onClick={() => navigate("/class-setup")}>一鍵建立班級</button>} />}</div>
+      }) : <EmptyState icon="event_available" title="尚無近期班級" action={<button type="button" className={styles.btnPrimary} onClick={() => navigate("/class-setup")}>建立班級</button>} />}</div>
     </section>
   </div>;
 }

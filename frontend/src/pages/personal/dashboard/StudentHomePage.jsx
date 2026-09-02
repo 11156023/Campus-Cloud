@@ -1,0 +1,1321 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { toast } from "sonner";
+import MIcon from "../../../components/MIcon";
+import TerminalDialog from "../resources/TerminalDialog";
+import VncDialog from "../resources/VncDialog";
+import { CoursesService } from "../../../services/courses";
+import { ResourcesService } from "../../../services/resources";
+import { QuickPracticeService } from "../../../services/quickPractice";
+import styles from "./StudentHomePage.module.scss";
+import PageHeader from "../../../components/PageHeader/PageHeader";
+
+const STATUS_META = {
+  running: { label: "環境已就緒", tone: "success", icon: "check_circle" },
+  provisioning: { label: "環境準備中", tone: "info", icon: "hourglass_top" },
+  failed: { label: "環境建立失敗", tone: "danger", icon: "error" },
+  expired: { label: "環境已到期", tone: "muted", icon: "schedule" },
+  stopped: { label: "環境已關機", tone: "muted", icon: "power_settings_new" },
+  no_lab: { label: "不需要實驗機", tone: "success", icon: "menu_book" },
+  not_started: { label: "尚未啟動", tone: "warning", icon: "play_circle" },
+  empty: { label: "目前沒有課程", tone: "muted", icon: "event_busy" },
+};
+
+const TOUR_STEPS = [
+  {
+    selector: '[data-student-tour="class"]',
+    icon: "school",
+    eyebrow: "上課第一步",
+    title: "先看今天要完成什麼",
+    description: "首頁會依你的課程進度，直接整理出最適合接著完成的章節。按主要按鈕就能進入課堂，不必從功能選單尋找。",
+    tip: "課堂機器由老師或課程準備，不需要另外送申請。",
+  },
+  {
+    selector: '[data-student-tour="tasks"]',
+    icon: "checklist",
+    eyebrow: "課堂任務",
+    title: "完成任務後交給 AI 檢查",
+    description: "這裡會列出截至今天老師已發布的任務。展開任務可以先看 AI 整理的要求，完成後直接送出 AI Check。",
+    tip: "AI 回覆會保留在同一列，方便你依照每一項建議修正後再次送檢。",
+  },
+  {
+    selector: '[data-student-tour="practice"]',
+    icon: "history",
+    eyebrow: "下課後練習",
+    title: "沿用原本的課堂環境",
+    description: "下課後想繼續練習時，從這裡回到相同課程與機器，檔案和任務進度都會保留。",
+    tip: "課堂練習不需要建立另一台研究機器。",
+  },
+  {
+    selector: '[data-student-tour="research"]',
+    icon: "science",
+    eyebrow: "自主研究",
+    title: "只有研究需求才需要申請",
+    description: "專題、開發或個人實驗才從這裡前往申請。一般上課與下課練習都不需要填申請單。",
+    tip: "自主研究流程會再持續優化，目前可先查看既有申請。",
+  },
+];
+
+const AI_DETECTABLE_META = {
+  auto: { label: "可自動檢查", icon: "smart_toy", tone: "auto" },
+  partial: { label: "部分自動檢查", icon: "rule", tone: "partial" },
+  manual: { label: "老師人工確認", icon: "person_check", tone: "manual" },
+};
+
+const AI_CHECK_STATUS_META = {
+  pending: { label: "等待 AI Check", icon: "hourglass_top", tone: "pending" },
+  running: { label: "AI 檢查中", icon: "sync", tone: "running" },
+  completed: { label: "已收到 AI 回覆", icon: "task_alt", tone: "completed" },
+  failed: { label: "檢查失敗", icon: "error_outline", tone: "failed" },
+  cancelled: { label: "已取消", icon: "block", tone: "cancelled" },
+};
+
+export function assignmentsUntilToday(assignments, now = new Date()) {
+  const dateKey = (value) => {
+    const parts = new Intl.DateTimeFormat("en", {
+      timeZone: "Asia/Taipei",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(value);
+    const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+    return `${values.year}-${values.month}-${values.day}`;
+  };
+  const todayKey = dateKey(now);
+  return [...(assignments ?? [])]
+    .filter((assignment) => {
+      if (!assignment?.approved_at) return true;
+      const approvedAt = new Date(assignment.approved_at);
+      return !Number.isNaN(approvedAt.getTime()) && dateKey(approvedAt) <= todayKey;
+    })
+    .sort((left, right) => {
+      const leftTime = left.approved_at ? new Date(left.approved_at).getTime() : 0;
+      const rightTime = right.approved_at ? new Date(right.approved_at).getTime() : 0;
+      return leftTime - rightTime;
+    });
+}
+
+function formatAssignmentDate(value) {
+  if (!value) return "已發布";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "已發布";
+  return new Intl.DateTimeFormat("zh-TW", {
+    month: "numeric",
+    day: "numeric",
+  }).format(date);
+}
+
+function getTourStorageKey(user) {
+  return `skylab:student-home-tour:v1:${user?.id ?? user?.email ?? "student"}`;
+}
+
+function TourOverlay({ stepIndex, onBack, onNext, onSkip }) {
+  const [targetRect, setTargetRect] = useState(null);
+  const panelRef = useRef(null);
+  const step = TOUR_STEPS[stepIndex];
+  const isLast = stepIndex === TOUR_STEPS.length - 1;
+
+  useEffect(() => {
+    const target = document.querySelector(step.selector);
+    if (!target) {
+      setTargetRect(null);
+      return undefined;
+    }
+
+    const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    target.scrollIntoView({
+      behavior: reducedMotion ? "auto" : "smooth",
+      block: "center",
+      inline: "nearest",
+    });
+
+    const updateRect = () => {
+      const rect = target.getBoundingClientRect();
+      setTargetRect({
+        top: rect.top,
+        left: rect.left,
+        right: rect.right,
+        bottom: rect.bottom,
+        width: rect.width,
+        height: rect.height,
+      });
+    };
+
+    const timer = window.setTimeout(updateRect, reducedMotion ? 0 : 280);
+    updateRect();
+    window.addEventListener("resize", updateRect);
+    window.addEventListener("scroll", updateRect, true);
+
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("resize", updateRect);
+      window.removeEventListener("scroll", updateRect, true);
+    };
+  }, [step]);
+
+  useEffect(() => {
+    panelRef.current?.focus();
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") onSkip();
+      if (event.key === "ArrowLeft" && stepIndex > 0) onBack();
+      if (event.key === "ArrowRight") onNext();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onBack, onNext, onSkip, stepIndex]);
+
+  const panelStyle = useMemo(() => {
+    if (!targetRect || typeof window === "undefined") return undefined;
+    const panelWidth = Math.min(360, window.innerWidth - 32);
+    const estimatedHeight = 250;
+    const left = Math.min(
+      Math.max(16, targetRect.left),
+      Math.max(16, window.innerWidth - panelWidth - 16),
+    );
+    const hasRoomBelow = window.innerHeight - targetRect.bottom > estimatedHeight + 24;
+    const top = hasRoomBelow
+      ? targetRect.bottom + 12
+      : Math.max(16, targetRect.top - estimatedHeight - 12);
+    return { left, top, width: panelWidth };
+  }, [targetRect]);
+
+  return (
+    <div className={styles.tourLayer}>
+      <div className={styles.tourClickBlocker} aria-hidden="true" />
+      {targetRect && (
+        <div
+          className={styles.tourSpotlight}
+          style={{
+            top: Math.max(8, targetRect.top - 6),
+            left: Math.max(8, targetRect.left - 6),
+            width: Math.min(
+              window.innerWidth - Math.max(8, targetRect.left - 6) - 8,
+              targetRect.width + 12,
+            ),
+            height: targetRect.height + 12,
+          }}
+          aria-hidden="true"
+        />
+      )}
+      <section
+        ref={panelRef}
+        className={styles.tourPanel}
+        style={panelStyle}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="student-tour-title"
+        tabIndex={-1}
+      >
+        <div className={styles.tourPanelTop}>
+          <span className={styles.tourIcon}><MIcon name={step.icon} size={22} /></span>
+          <span className={styles.tourCount}>{stepIndex + 1} / {TOUR_STEPS.length}</span>
+          <button type="button" className={styles.tourClose} onClick={onSkip} aria-label="跳過導覽">
+            <MIcon name="close" size={19} />
+          </button>
+        </div>
+        <p className={styles.tourEyebrow}>{step.eyebrow}</p>
+        <h2 id="student-tour-title">{step.title}</h2>
+        <p className={styles.tourDescription}>{step.description}</p>
+        <div className={styles.tourTip}>
+          <MIcon name="lightbulb" size={17} />
+          <span>{step.tip}</span>
+        </div>
+        <div className={styles.tourProgress} aria-label={`導覽進度 ${stepIndex + 1} / ${TOUR_STEPS.length}`}>
+          {TOUR_STEPS.map((tourStep, index) => (
+            <span
+              key={tourStep.selector}
+              className={index === stepIndex ? styles.tourProgressActive : ""}
+            />
+          ))}
+        </div>
+        <div className={styles.tourActions}>
+          <button type="button" className={styles.tourSkip} onClick={onSkip}>跳過導覽</button>
+          <div>
+            {stepIndex > 0 && (
+              <button type="button" className={styles.tourBack} onClick={onBack}>
+                上一步
+              </button>
+            )}
+            <button type="button" className={styles.tourNext} onClick={onNext}>
+              {isLast ? "完成導覽" : "下一步"}
+              <MIcon name={isLast ? "check" : "arrow_forward"} size={17} />
+            </button>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function toPercent(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return 0;
+  return Math.max(0, Math.min(100, Math.round(number)));
+}
+
+function chooseCurrentPath(paths) {
+  return (
+    paths.find((path) => toPercent(path.progress_percent) > 0 && toPercent(path.progress_percent) < 100)
+    ?? paths.find((path) => toPercent(path.progress_percent) < 100)
+    ?? paths[0]
+    ?? null
+  );
+}
+
+function chooseNextRoom(rooms) {
+  return (
+    rooms.find((room) => toPercent(room.progress_percent) > 0 && toPercent(room.progress_percent) < 100)
+    ?? rooms.find((room) => toPercent(room.progress_percent) < 100)
+    ?? rooms[0]
+    ?? null
+  );
+}
+
+export function buildPracticeMachines(classMachines, resources, deployment, roomTitle) {
+  const machines = (classMachines ?? []).map((machine) => {
+    const resource = (resources ?? []).find(
+      (item) => machine.vmid != null && Number(item.vmid) === Number(machine.vmid),
+    );
+    return {
+      ...machine,
+      ...resource,
+      classMachineName: machine.name,
+      classMachineRole: machine.role,
+      type: resource?.type ?? machine.resource_type,
+      name: resource?.name ?? machine.name,
+    };
+  });
+
+  if (machines.length === 0 && deployment?.vmid) {
+    const fallbackResource = (resources ?? []).find(
+      (resource) => Number(resource.vmid) === Number(deployment.vmid),
+    );
+    machines.push({
+      ...fallbackResource,
+      vmid: deployment.vmid,
+      status: fallbackResource?.status ?? deployment.status,
+      type: fallbackResource?.type ?? "qemu",
+      name: fallbackResource?.name ?? roomTitle ?? "課堂練習機",
+      classMachineName: roomTitle ?? "課堂練習機",
+      classMachineRole: "本章節練習環境",
+    });
+  }
+
+  return machines;
+}
+
+export function practiceMachineActionLabel(machine, openingMachineId = null) {
+  if (machine?.vmid == null) return "環境配置中";
+  if (openingMachineId === machine.vmid) return "正在啟動…";
+  if (machine.status === "running") return "進入機器";
+  return "啟動並進入";
+}
+
+async function waitForPracticeMachine(vmid, attempts = 20) {
+  let resource = null;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    resource = await ResourcesService.get(vmid);
+    if (resource.status === "running") return resource;
+    if (attempt < attempts - 1) {
+      await new Promise((resolve) => window.setTimeout(resolve, 1000));
+    }
+  }
+  return resource;
+}
+
+function StatusBadge({ meta }) {
+  return (
+    <span className={`${styles.statusBadge} ${styles[meta.tone]}`}>
+      <MIcon name={meta.icon} size={16} />
+      {meta.label}
+    </span>
+  );
+}
+
+function LoadingState() {
+  return (
+    <div className={styles.loadingState} aria-label="正在整理你的課堂資訊">
+      <span className={styles.loadingIcon}><MIcon name="school" size={28} /></span>
+      <div>
+        <strong>正在整理你的課堂資訊</strong>
+        <p>確認課程進度與老師分發的實驗環境中…</p>
+      </div>
+    </div>
+  );
+}
+
+function formatScheduleTime(value) {
+  if (!value) return "";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "";
+  return new Intl.DateTimeFormat("zh-TW", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(parsed);
+}
+
+function normalizeSchedule(row) {
+  const sessionDate = row.session_date ? new Date(`${row.session_date}T00:00:00`) : null;
+  const sessionLabel = sessionDate && !Number.isNaN(sessionDate.getTime())
+    ? new Intl.DateTimeFormat("zh-TW", { month: "numeric", day: "numeric", weekday: "short" }).format(sessionDate)
+    : "";
+  return {
+    ...row,
+    schedule: {
+      state: row.state,
+      label: row.label,
+      time: `${row.state === "available" && sessionLabel ? `下次 ${sessionLabel} · ` : ""}${formatScheduleTime(row.start_at)}–${formatScheduleTime(row.end_at)}`,
+      teacher: row.teacher,
+      place: row.location,
+    },
+  };
+}
+
+export default function StudentHomePage({ courseView = false }) {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { pathId } = useParams();
+  const [view, setView] = useState({
+    loading: true,
+    hasError: false,
+    paths: [],
+    resources: [],
+    activePath: null,
+    pathDetail: null,
+    roomDetail: null,
+    aiAssignments: [],
+    weeklyTasks: [],
+    practiceMachines: [],
+  });
+  const [quickTemplates, setQuickTemplates] = useState([]);
+  const [templatesLoading, setTemplatesLoading] = useState(!courseView);
+  const [expandedAssignmentId, setExpandedAssignmentId] = useState(null);
+  const [expandedWeeklyTaskId, setExpandedWeeklyTaskId] = useState(null);
+  const [assignmentChecks, setAssignmentChecks] = useState({});
+  const [checkpointChecks, setCheckpointChecks] = useState({});
+  const [checkingAssignmentId, setCheckingAssignmentId] = useState(null);
+  const [checkingCheckpointKey, setCheckingCheckpointKey] = useState(null);
+  const [activePracticeResource, setActivePracticeResource] = useState(null);
+  const [openingMachineId, setOpeningMachineId] = useState(null);
+  const [documentPreview, setDocumentPreview] = useState(null);
+  const [openingDocumentId, setOpeningDocumentId] = useState(null);
+
+  const todayLabel = useMemo(
+    () => new Intl.DateTimeFormat("zh-TW", {
+      month: "long",
+      day: "numeric",
+      weekday: "long",
+    }).format(new Date()),
+    [],
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadStudentHome() {
+      const [pathsResult, resourcesResult, scheduleResult] = await Promise.allSettled([
+        CoursesService.listPaths(),
+        ResourcesService.list(),
+        CoursesService.listSchedule(),
+      ]);
+
+      if (cancelled) return;
+
+      const catalogPaths = pathsResult.status === "fulfilled" && Array.isArray(pathsResult.value)
+        ? pathsResult.value
+        : [];
+      const schedulePaths = scheduleResult.status === "fulfilled" && Array.isArray(scheduleResult.value)
+        ? scheduleResult.value.map(normalizeSchedule)
+        : [];
+      const paths = courseView ? catalogPaths : schedulePaths;
+      const resources = resourcesResult.status === "fulfilled" && Array.isArray(resourcesResult.value)
+        ? resourcesResult.value
+        : [];
+      let activePath = courseView && pathId
+        ? catalogPaths.find((path) => String(path.id) === String(pathId)) ?? chooseCurrentPath(catalogPaths)
+        : chooseCurrentPath(paths);
+      const scheduledVersion = schedulePaths.find((path) => String(path.id) === String(activePath?.id));
+      if (activePath && scheduledVersion) activePath = { ...activePath, schedule: scheduledVersion.schedule };
+      let pathDetail = null;
+      let roomDetail = null;
+      let aiAssignments = [];
+      let weeklyTasks = [];
+      let practiceMachines = [];
+
+      if (activePath) {
+        const [pathDetailResult, aiAssignmentsResult, weeklyTasksResult, practiceMachinesResult] = await Promise.allSettled([
+          CoursesService.getPath(activePath.id),
+          courseView ? CoursesService.getAiAssignments(activePath.id) : Promise.resolve([]),
+          courseView ? CoursesService.getWeeklyTasks(activePath.id) : Promise.resolve([]),
+          CoursesService.getPracticeMachines(activePath.id),
+        ]);
+        if (pathDetailResult.status === "fulfilled") {
+          pathDetail = pathDetailResult.value;
+          const nextRoom = chooseNextRoom(pathDetail?.rooms ?? []);
+          if (nextRoom) {
+            try {
+              roomDetail = await CoursesService.getRoom(nextRoom.id);
+            } catch {
+              roomDetail = null;
+            }
+          }
+        }
+        aiAssignments = aiAssignmentsResult.status === "fulfilled"
+          && Array.isArray(aiAssignmentsResult.value)
+          ? aiAssignmentsResult.value
+          : [];
+        weeklyTasks = weeklyTasksResult.status === "fulfilled"
+          && Array.isArray(weeklyTasksResult.value)
+          ? weeklyTasksResult.value
+          : [];
+        practiceMachines = practiceMachinesResult.status === "fulfilled"
+          && Array.isArray(practiceMachinesResult.value)
+          ? practiceMachinesResult.value
+          : [];
+      }
+
+      if (!cancelled) {
+        setView({
+          loading: false,
+          hasError: courseView
+            ? pathsResult.status === "rejected" && resourcesResult.status === "rejected"
+            : scheduleResult.status === "rejected",
+          paths,
+          resources,
+          activePath,
+          pathDetail,
+          roomDetail,
+          aiAssignments,
+          weeklyTasks,
+          practiceMachines,
+        });
+      }
+    }
+
+    loadStudentHome();
+    return () => {
+      cancelled = true;
+    };
+  }, [courseView, pathId]);
+
+  useEffect(() => {
+    if (courseView) return undefined;
+    const controller = new AbortController();
+    setTemplatesLoading(true);
+    QuickPracticeService.listTemplates({ signal: controller.signal })
+      .then((available) => setQuickTemplates(available.slice(0, 3)))
+      .catch((error) => {
+        if (!error?.cancelled) setQuickTemplates([]);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setTemplatesLoading(false);
+      });
+    return () => controller.abort();
+  }, [courseView]);
+
+  useEffect(() => {
+    if (!courseView || !view.activePath?.id) return undefined;
+    const activeChecks = assignmentsUntilToday(view.aiAssignments)
+      .map((assignment) => [
+        String(assignment.id),
+        assignmentChecks[assignment.id] ?? assignment.latest_check,
+      ])
+      .filter(([, check]) => check?.status === "pending" || check?.status === "running");
+    if (activeChecks.length === 0) return undefined;
+
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      const updates = await Promise.all(activeChecks.map(async ([assignmentId, check]) => {
+        try {
+          const nextCheck = await CoursesService.getAiCheck(
+            view.activePath.id,
+            assignmentId,
+            check.run_id,
+          );
+          return [assignmentId, nextCheck];
+        } catch {
+          return null;
+        }
+      }));
+      if (cancelled) return;
+      setAssignmentChecks((current) => {
+        const next = { ...current };
+        updates.filter(Boolean).forEach(([assignmentId, check]) => {
+          next[assignmentId] = check;
+        });
+        return next;
+      });
+    }, 2500);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [assignmentChecks, courseView, view.activePath?.id, view.aiAssignments]);
+
+  useEffect(() => {
+    if (!courseView || !view.activePath?.id) return undefined;
+    const activeChecks = Object.entries(checkpointChecks)
+      .filter(([, entry]) => entry.check?.status === "pending" || entry.check?.status === "running");
+    if (activeChecks.length === 0) return undefined;
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      const updates = await Promise.all(activeChecks.map(async ([key, entry]) => {
+        try {
+          const check = await CoursesService.getAiCheck(
+            view.activePath.id,
+            entry.assignmentId,
+            entry.check.run_id,
+          );
+          return [key, { ...entry, check }];
+        } catch {
+          return null;
+        }
+      }));
+      if (cancelled) return;
+      setCheckpointChecks((current) => {
+        const next = { ...current };
+        updates.filter(Boolean).forEach(([key, entry]) => { next[key] = entry; });
+        return next;
+      });
+    }, 2500);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [checkpointChecks, courseView, view.activePath?.id]);
+
+  useEffect(() => () => {
+    if (documentPreview?.url) window.URL.revokeObjectURL(documentPreview.url);
+  }, [documentPreview?.url]);
+
+  useEffect(() => {
+    if (!documentPreview) return undefined;
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") setDocumentPreview(null);
+    };
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [documentPreview]);
+
+  const nextRoom = chooseNextRoom(view.pathDetail?.rooms ?? []);
+  const roomProgress = toPercent(nextRoom?.progress_percent);
+  const deployment = view.roomDetail?.my_deployment;
+  const practiceMachines = buildPracticeMachines(
+    view.practiceMachines,
+    view.resources,
+    deployment,
+    view.roomDetail?.title,
+  );
+  const aiAssignments = assignmentsUntilToday(view.aiAssignments);
+  const weeklyAssignmentIds = new Set(
+    view.weeklyTasks.flatMap((task) => (task.checkpoints ?? [])
+      .map((checkpoint) => checkpoint.assignment_id ? String(checkpoint.assignment_id) : null)
+      .filter(Boolean)),
+  );
+  const standaloneAiAssignments = aiAssignments.filter(
+    (assignment) => !weeklyAssignmentIds.has(String(assignment.id)),
+  );
+  const weeklyCheckpointCount = view.weeklyTasks.reduce(
+    (count, task) => count + (task.checkpoints?.length ?? 0),
+    0,
+  );
+  const aiRequirementCount = aiAssignments.reduce(
+    (count, assignment) => count + (assignment.items?.length ?? 0),
+    0,
+  );
+  const displayedQuickTemplates = quickTemplates;
+  const primaryTarget = nextRoom ? `/courses/rooms/${nextRoom.id}` : "/courses";
+  const primaryLabel = nextRoom ? "開始練習" : "查看可用課程";
+  const currentSchedule = view.activePath?.schedule;
+  const heroStatusMeta = view.activePath
+    ? currentSchedule?.state === "now"
+      ? { label: "正在上課", tone: "success", icon: "sensors" }
+      : { label: "可以開始", tone: "success", icon: "play_circle" }
+    : STATUS_META.empty;
+
+  const openPracticeMachine = async (machine) => {
+    if (!machine?.vmid) {
+      toast.error("這台課堂機器尚未建立完成");
+      return;
+    }
+    setOpeningMachineId(machine.vmid);
+    let resource = machine;
+    try {
+      resource = await ResourcesService.get(resource.vmid);
+      if (resource.status !== "running") {
+        toast.info("正在啟動課堂機器，通常需要一點時間…", {
+          id: `start-class-machine-${machine.vmid}`,
+        });
+        await ResourcesService.start(resource.vmid);
+        resource = await waitForPracticeMachine(resource.vmid);
+        if (resource?.status !== "running") {
+          toast.info("機器仍在啟動中，請稍後再試。", {
+            id: `start-class-machine-${machine.vmid}`,
+          });
+          return;
+        }
+        toast.success("課堂機器已啟動", {
+          id: `start-class-machine-${machine.vmid}`,
+        });
+      }
+      setActivePracticeResource({ ...machine, ...resource });
+    } catch (error) {
+      toast.error(error?.message ?? "無法開啟課堂機器");
+    } finally {
+      setOpeningMachineId(null);
+    }
+  };
+
+  const openMachineInformation = (machine) => {
+    if (!machine?.vmid) {
+      toast.info("這台課堂機器尚未建立完成。");
+      return;
+    }
+    navigate(`/my-resources/${machine.vmid}`);
+  };
+
+  const openCourseOverview = (path = view.activePath) => {
+    if (!path) {
+      navigate("/courses");
+      return;
+    }
+    navigate(`/dashboard/course/${path.id}`, { state: { from: "/dashboard" } });
+  };
+
+  const toggleAssignment = (assignmentId) => {
+    setExpandedAssignmentId((current) => current === assignmentId ? null : assignmentId);
+  };
+
+  const openAssignmentDocument = async (assignment) => {
+    if (!view.activePath?.id || !assignment?.source_document) return;
+    setOpeningDocumentId(assignment.id);
+    try {
+      const blob = await CoursesService.getAiAssignmentDocument(
+        view.activePath.id,
+        assignment.id,
+      );
+      const url = window.URL.createObjectURL(blob);
+      setDocumentPreview({
+        url,
+        filename: assignment.source_document.filename,
+        displayName: assignment.source_document.display_name,
+      });
+    } catch (error) {
+      toast.error(error?.message ?? "目前無法開啟老師上傳的任務 PDF");
+    } finally {
+      setOpeningDocumentId(null);
+    }
+  };
+
+  const openWeeklyTaskDocument = async (task, file) => {
+    if (!view.activePath?.id || !task?.id || !file?.id) return;
+    setOpeningDocumentId(file.id);
+    try {
+      const blob = await CoursesService.getWeeklyTaskDocument(
+        view.activePath.id,
+        task.id,
+        file.id,
+      );
+      const url = window.URL.createObjectURL(blob);
+      setDocumentPreview({ url, filename: file.filename, displayName: file.filename });
+    } catch (error) {
+      toast.error(error?.message ?? "目前無法開啟老師上傳的任務 PDF");
+    } finally {
+      setOpeningDocumentId(null);
+    }
+  };
+
+  const submitAiCheck = async (assignment) => {
+    if (checkingAssignmentId) return;
+    setCheckingAssignmentId(assignment.id);
+    setExpandedAssignmentId(assignment.id);
+    try {
+      const check = await CoursesService.startAiCheck(
+        view.activePath.id,
+        assignment.id,
+      );
+      setAssignmentChecks((current) => ({ ...current, [assignment.id]: check }));
+      toast.success(check.status === "completed" ? "AI Check 已完成" : "已送出，AI 正在檢查你的課堂環境");
+    } catch (error) {
+      toast.error(error?.message ?? "目前無法送出 AI Check");
+    } finally {
+      setCheckingAssignmentId(null);
+    }
+  };
+
+  const submitCheckpointCheck = async (checkpoint) => {
+    if (!view.activePath?.id || checkingCheckpointKey || !checkpoint.assignment_id) return;
+    const key = `${checkpoint.task_id}:${checkpoint.id}`;
+    setCheckingCheckpointKey(key);
+    try {
+      const check = await CoursesService.startAiCheck(
+        view.activePath.id,
+        checkpoint.assignment_id,
+        checkpoint.id,
+      );
+      setCheckpointChecks((current) => ({
+        ...current,
+        [key]: { assignmentId: checkpoint.assignment_id, itemId: checkpoint.id, check },
+      }));
+      toast.success(check.status === "completed" ? "Checkpoint 檢查完成" : "已送出，正在檢查這個 Checkpoint");
+    } catch (error) {
+      toast.error(error?.message ?? "目前無法檢查這個 Checkpoint");
+    } finally {
+      setCheckingCheckpointKey(null);
+    }
+  };
+
+  if (view.loading) {
+    return (
+      <div className={styles.page}>
+        <LoadingState />
+      </div>
+    );
+  }
+
+  return (
+    <div className={styles.page}>
+      {courseView && (
+        <header className={styles.coursePageHeader}>
+          <button
+            type="button"
+            className={styles.courseBackButton}
+            onClick={() => navigate(location.state?.from ?? "/dashboard")}
+          >
+            <MIcon name="arrow_back" size={18} />
+            返回我的課程
+          </button>
+          <div className={styles.coursePageTitle}>
+            <p className={styles.eyebrow}>課程總覽</p>
+            <h1>{view.activePath?.title ?? "課程"}</h1>
+            <p>{view.activePath?.description ?? "查看今天的環境與任務。"}</p>
+          </div>
+        </header>
+      )}
+
+      {view.hasError && (
+        <div className={styles.notice} role="status">
+          <MIcon name="cloud_off" size={20} />
+          <div>
+            <strong>暫時無法取得最新資訊</strong>
+            <span>你仍可直接前往課程或我的資源查看。</span>
+          </div>
+        </div>
+      )}
+
+      {!courseView && (
+        <>
+          <PageHeader
+            title="我的課程"
+            subtitle={view.paths.length > 0 ? `${todayLabel} · ${view.paths.length} 堂進行中課程` : `${todayLabel} · 目前沒有進行中課程`}
+          >
+            {view.paths.some((path) => path.schedule?.state === "now") && (
+              <div className={styles.scheduleActions}>
+                <span>有一堂正在進行</span>
+              </div>
+            )}
+          </PageHeader>
+          <section className={styles.todaySchedule} aria-label="進行中的課程" data-guide="home-schedule">
+            {view.paths.length > 0 ? (
+            <div className={styles.scheduleGrid}>
+              {view.paths.map((path, index) => (
+                <button
+                  type="button"
+                  key={path.id}
+                  className={`${styles.scheduleCard} ${path.schedule?.state === "now" ? styles.scheduleCardNow : ""}`}
+                  onClick={() => openCourseOverview(path)}
+                >
+                  <div className={styles.scheduleOrder}>{index + 1}</div>
+                  <div className={styles.scheduleContent}>
+                    <div className={styles.scheduleTopline}>
+                      <span className={`${styles.scheduleState} ${path.schedule?.state === "now" ? styles.scheduleStateNow : ""}`}>
+                        {path.schedule?.state === "now" && <span className={styles.liveDot} />}
+                        {path.schedule?.label ?? "可繼續學習"}
+                      </span>
+                      {path.schedule?.time && <span>{path.schedule.time}</span>}
+                    </div>
+                    <h3>{path.title}</h3>
+                    <p>{path.description}</p>
+                    {(path.schedule?.teacher || path.schedule?.place) && (
+                      <div className={styles.scheduleMeta}>
+                        {path.schedule?.teacher && <span><MIcon name="person" size={15} />{path.schedule.teacher}</span>}
+                        {path.schedule?.place && <span><MIcon name="location_on" size={15} />{path.schedule.place}</span>}
+                      </div>
+                    )}
+                  </div>
+                  {path.schedule?.state === "now" ? (
+                    <span className={styles.currentCourseArrow}><MIcon name="arrow_forward" size={19} /></span>
+                  ) : (
+                    <span className={styles.laterCourseIcon}><MIcon name="schedule" size={19} /></span>
+                  )}
+                </button>
+              ))}
+            </div>
+            ) : (
+              <div className={styles.courseEmptyState}>
+                <span><MIcon name="school" size={25} /></span>
+                <div>
+                  <strong>老師還沒有發布可使用的課程</strong>
+                  <p>課程發布後會直接出現在這裡，不需要另外申請上課機器。</p>
+                </div>
+              </div>
+            )}
+          </section>
+
+        </>
+      )}
+
+      {courseView && (
+        <>
+      <main className={styles.mainGrid}>
+        <section className={styles.classCard} aria-labelledby="today-class-title" data-student-tour="class" data-guide="home-current-course">
+          <div className={styles.classCardTop}>
+            <div>
+              <p className={styles.eyebrow}>{currentSchedule?.state === "now" ? "現在正在進行" : "接下來可以練習"}</p>
+              <h2 id="today-class-title">
+                {view.activePath?.title ?? "目前沒有可開始的課程"}
+              </h2>
+              <p className={styles.classDescription}>
+                {nextRoom
+                  ? `這堂課要做：${nextRoom.title}`
+                  : view.activePath?.description
+                    ?? "老師發布內容後，這裡會直接告訴你現在要做什麼。"}
+              </p>
+            </div>
+            <StatusBadge meta={heroStatusMeta} />
+          </div>
+
+          {view.activePath ? (
+            <>
+              <div className={styles.courseContext}>
+                {currentSchedule ? (
+                  <>
+                    <span><MIcon name="schedule" size={18} />{currentSchedule.time}</span>
+                    <span><MIcon name="person" size={18} />{currentSchedule.teacher}</span>
+                    <span><MIcon name="location_on" size={18} />{currentSchedule.place}</span>
+                  </>
+                ) : (
+                  <span><MIcon name="task_alt" size={18} />任務進度 {roomProgress}%</span>
+                )}
+              </div>
+
+              <div className={styles.progressTrack} aria-label={`章節進度 ${roomProgress}%`} data-guide="home-progress">
+                <span style={{ width: `${roomProgress}%` }} />
+              </div>
+
+              <div className={styles.simpleCourseHint}>
+                <MIcon name="check_circle" size={18} />
+                <span>
+                  {deployment?.status === "running" || !nextRoom?.has_lab
+                    ? "練習內容已可使用，直接開始即可。"
+                    : "開始後系統會自動準備需要的內容。"}
+                </span>
+              </div>
+            </>
+          ) : (
+            <div className={styles.emptyClass}>
+              <MIcon name="event_available" size={28} />
+              <div>
+                <strong>目前沒有待完成的課程</strong>
+                <p>可以先查看所有課程，或等待老師發布今天的內容。</p>
+              </div>
+            </div>
+          )}
+
+          {practiceMachines.length === 0 && (
+            <div className={styles.primaryActions}>
+              <button type="button" className={styles.primaryButton} onClick={() => navigate(primaryTarget)}>
+                {primaryLabel}
+                <MIcon name="arrow_forward" size={18} />
+              </button>
+            </div>
+          )}
+
+          {practiceMachines.length > 0 && (
+            <section className={styles.machinePicker} aria-label="課堂機器" data-guide="home-start">
+              <header>
+                <div><strong>你的課堂機器</strong><span>直接點擊機器即可進入；右側資訊按鈕可查看完整設定。</span></div>
+              </header>
+              <div className={styles.machineGrid}>
+                {practiceMachines.map((machine) => (
+                  <div
+                    key={machine.machine_node_id ?? `${machine.teaching_class_id ?? "course"}-${machine.vmid}`}
+                    className={styles.machineOption}
+                  >
+                    <button
+                      type="button"
+                      className={styles.machineLaunchButton}
+                      onClick={() => openPracticeMachine(machine)}
+                      disabled={openingMachineId !== null || machine.vmid == null}
+                      aria-label={`${practiceMachineActionLabel(machine, openingMachineId)}：${machine.classMachineName ?? machine.name}`}
+                    >
+                      <span className={styles.machineIcon}><MIcon name={machine.type === "lxc" ? "terminal" : "desktop_windows"} size={22} /></span>
+                      <span className={styles.machineCopy}>
+                        <strong>{machine.classMachineName ?? machine.name}</strong>
+                        <small>
+                          {machine.classMachineRole ?? "課堂練習機"}
+                          {machine.vmid != null ? ` · VMID ${machine.vmid}` : " · 尚未配置"}
+                        </small>
+                      </span>
+                      <span className={`${styles.machineState} ${machine.status === "running" ? styles.machineStateReady : ""}`}>
+                        {practiceMachineActionLabel(machine, openingMachineId)}
+                      </span>
+                      <span className={styles.machineArrow}><MIcon name="arrow_forward" size={20} /></span>
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.machineInfoButton}
+                      onClick={() => openMachineInformation(machine)}
+                      disabled={machine.vmid == null}
+                      aria-label={`查看 ${machine.classMachineName ?? machine.name} 的完整資源資訊`}
+                      title="前往我的資源查看完整設定"
+                    >
+                      <MIcon name="info" size={20} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+        </section>
+
+      </main>
+
+      <section className={styles.taskSection} aria-labelledby="task-title" data-student-tour="tasks" data-guide="home-tasks">
+        <div className={styles.sectionHeading}>
+          <div>
+            <p className={styles.eyebrow}>老師已發布 · 任務與檢查集中在這裡</p>
+            <h2 id="task-title">課程任務</h2>
+          </div>
+          {(view.weeklyTasks.length > 0 || aiRequirementCount > 0) && <span>{view.weeklyTasks.length} 個課堂任務 · {weeklyCheckpointCount + standaloneAiAssignments.reduce((count, assignment) => count + (assignment.items?.length ?? 0), 0)} 個 Checkpoint</span>}
+        </div>
+
+        {view.weeklyTasks.length > 0 && (
+          <div className={styles.weeklyTaskList} aria-label="老師發布的課堂任務">
+            {view.weeklyTasks.map((task, index) => {
+              const expanded = expandedWeeklyTaskId === task.id;
+              const checkpoints = task.checkpoints ?? [];
+              return <article className={`${styles.weeklyTaskRow} ${expanded ? styles.weeklyTaskRowOpen : ""}`} key={task.id}>
+                <button type="button" className={styles.weeklyTaskToggle} onClick={() => setExpandedWeeklyTaskId(expanded ? null : task.id)} aria-expanded={expanded} aria-controls={`weekly-task-${task.id}`}>
+                  <span className={styles.taskNumber}>{index + 1}</span>
+                  <span className={styles.assignmentTitle}>
+                    <strong>{task.title}</strong>
+                    <small>第 {task.week_number} 週 · {task.session_date} · {checkpoints.length} 個 Checkpoint</small>
+                  </span>
+                  <span className={styles.weeklyTaskHint}>{expanded ? "收合" : "展開任務"}</span>
+                  <MIcon name={expanded ? "expand_less" : "expand_more"} size={22} />
+                </button>
+                {expanded && <div className={styles.weeklyTaskDetail} id={`weekly-task-${task.id}`}>
+                  <div className={styles.weeklyTaskFiles}>
+                    {(task.files ?? []).length > 0 ? task.files.map((file) => <button type="button" className={styles.pdfButton} key={file.id} onClick={() => openWeeklyTaskDocument(task, file)} disabled={openingDocumentId !== null} title={file.filename}><MIcon name={openingDocumentId === file.id ? "hourglass_top" : "picture_as_pdf"} size={18} />{openingDocumentId === file.id ? "正在開啟…" : `查看 PDF · ${file.filename}`}</button>) : <span className={styles.noTaskFile}>本週沒有附加 PDF</span>}
+                  </div>
+                  {checkpoints.length > 0 ? <ol className={styles.checkpointList}>
+                    {checkpoints.map((checkpoint, checkpointIndex) => {
+                      const key = `${checkpoint.task_id}:${checkpoint.id}`;
+                      const check = checkpointChecks[key]?.check ?? checkpoint.latest_check;
+                      const checkMeta = check ? AI_CHECK_STATUS_META[check.status] : null;
+                      const running = check?.status === "pending" || check?.status === "running";
+                      const resultItem = check?.items?.[0];
+                      return <li className={styles.checkpointRow} key={key}>
+                        <span className={styles.aiRequirementNumber}>{checkpointIndex + 1}</span>
+                        <div className={styles.checkpointContent}><small className={styles.checkpointSource}>AI 檢查任務 · {checkpoint.assignment_title}</small><strong>{checkpoint.title}</strong>{checkpoint.description && <p>{checkpoint.description}</p>}{check && !running && <div className={`${styles.checkpointResult} ${styles[`checkpointResult_${check.status}`]}`}><MIcon name={check.status === "completed" ? "task_alt" : "error_outline"} size={17} /><span><b>{resultItem?.comment || check.error || check.summary || checkMeta?.label}</b>{typeof resultItem?.score === "number" && <small>得分 {resultItem.score}/{resultItem.max_score ?? 1}</small>}</span></div>}</div>
+                        <button type="button" className={styles.checkpointCheckButton} onClick={() => submitCheckpointCheck(checkpoint)} disabled={Boolean(checkingCheckpointKey) || running || !checkpoint.check_available} title={checkpoint.check_available ? "" : "老師尚未產生並核准這份任務的檢查腳本"}><MIcon name={running ? "sync" : checkpoint.check_available && check?.status === "completed" ? "refresh" : checkpoint.check_available ? "fact_check" : "schedule"} size={17} />{running ? "檢查中…" : checkingCheckpointKey === key ? "送出中…" : !checkpoint.check_available ? "等待老師啟用" : check ? "重新檢查" : "檢查這一項"}</button>
+                      </li>;
+                    })}
+                  </ol> : <div className={styles.checkpointEmpty}><MIcon name="pending_actions" size={20} /><span>老師尚未為這週發布 Checkpoint。</span></div>}
+                </div>}
+              </article>;
+            })}
+          </div>
+        )}
+
+        {standaloneAiAssignments.length > 0 ? (
+          <div className={styles.assignmentList}>
+            {standaloneAiAssignments.map((assignment, index) => {
+              const expanded = expandedAssignmentId === assignment.id;
+              const check = assignmentChecks[assignment.id] ?? assignment.latest_check;
+              const checkMeta = check ? AI_CHECK_STATUS_META[check.status] : null;
+              const checkRunning = check?.status === "pending" || check?.status === "running";
+              return (
+                <article className={`${styles.assignmentRow} ${expanded ? styles.assignmentRowOpen : ""}`} key={assignment.id}>
+                  <button
+                    type="button"
+                    className={styles.assignmentToggle}
+                    onClick={() => toggleAssignment(assignment.id)}
+                    aria-expanded={expanded}
+                    aria-controls={`assignment-detail-${assignment.id}`}
+                  >
+                    <span className={styles.taskNumber}>{index + 1}</span>
+                    <span className={styles.assignmentTitle}>
+                      <strong>{assignment.title}</strong>
+                      <small>{formatAssignmentDate(assignment.approved_at)} · {assignment.teaching_class_name} · {assignment.items?.length ?? 0} 個檢查項目</small>
+                    </span>
+                    {checkMeta ? (
+                      <span className={`${styles.assignmentStatus} ${styles[`assignmentStatus_${checkMeta.tone}`]}`}>
+                        <MIcon name={checkMeta.icon} size={16} />{checkMeta.label}
+                      </span>
+                    ) : (
+                      <span className={`${styles.assignmentStatus} ${styles.assignmentStatus_ready}`}>
+                        <MIcon name="radio_button_unchecked" size={16} />尚未送檢
+                      </span>
+                    )}
+                    <MIcon name={expanded ? "expand_less" : "expand_more"} size={21} />
+                  </button>
+
+                  {expanded && (
+                    <div className={styles.assignmentDetail} id={`assignment-detail-${assignment.id}`}>
+                      <div className={styles.aiBrief}>
+                        <span><MIcon name="auto_awesome" size={19} /></span>
+                        <div>
+                          <strong>AI 整理的任務重點</strong>
+                          <p>{assignment.summary || "依照下面的項目完成操作，完成後再送出 AI Check。"}</p>
+                        </div>
+                      </div>
+
+                      {assignment.source_document && (
+                        <div className={styles.assignmentDocumentMeta}>
+                          <span><MIcon name="picture_as_pdf" size={21} /></span>
+                          <div>
+                            <strong>老師上傳的任務 PDF</strong>
+                            <small>
+                              {assignment.source_document.display_name || assignment.source_document.filename}
+                              {` · 對應下方 ${assignment.items?.length ?? 0} 個檢查項目`}
+                            </small>
+                          </div>
+                        </div>
+                      )}
+
+                      <ol className={styles.aiRequirementList}>
+                        {(assignment.items ?? []).map((item, itemIndex) => {
+                          const detectableMeta = AI_DETECTABLE_META[item.detectable]
+                            ?? AI_DETECTABLE_META.manual;
+                          return (
+                            <li className={styles.aiRequirementItem} key={item.id}>
+                              <span className={styles.aiRequirementNumber}>{itemIndex + 1}</span>
+                              <div className={styles.aiRequirementContent}>
+                                <strong>{item.title}</strong>
+                                {item.description && <p>{item.description}</p>}
+                              </div>
+                              <span className={`${styles.aiCheckBadge} ${styles[detectableMeta.tone]}`}>
+                                <MIcon name={detectableMeta.icon} size={15} />
+                                {detectableMeta.label}
+                              </span>
+                            </li>
+                          );
+                        })}
+                      </ol>
+
+                      {check && (
+                        <section className={`${styles.aiReply} ${styles[`aiReply_${check.status}`]}`} aria-label="AI Check 回覆">
+                          <header>
+                            <span><MIcon name={checkRunning ? "sync" : check.status === "completed" ? "smart_toy" : "error_outline"} size={20} /></span>
+                            <div>
+                              <strong>{checkRunning ? "AI 正在檢查你的課堂環境" : "AI Check 回覆"}</strong>
+                              <small>
+                                {typeof check.score === "number" ? `評分 ${check.score}/${check.max_score ?? 5}` : checkMeta?.label}
+                              </small>
+                            </div>
+                          </header>
+                          {(check.summary || check.error) && <p>{check.error || check.summary}</p>}
+                          {(check.items ?? []).length > 0 && (
+                            <div className={styles.aiReplyItems}>
+                              {check.items.map((item, itemIndex) => (
+                                <div key={`${item.item_id}-${itemIndex}`}>
+                                  <MIcon name={item.status === "passed" ? "check_circle" : "tips_and_updates"} size={17} />
+                                  <span><strong>{item.title || "評分項目"}</strong>{item.comment && <small>{item.comment}</small>}</span>
+                                  {typeof item.score === "number" && <em>{item.score}/{item.max_score ?? 1}</em>}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </section>
+                      )}
+
+                      <footer className={styles.assignmentActions}>
+                        <span><MIcon name="info" size={16} />送出前請先啟動課堂機器，AI 只會檢查你自己的環境。</span>
+                        <div className={styles.assignmentActionButtons}>
+                          {assignment.source_document && (
+                            <button
+                              type="button"
+                              className={styles.pdfButton}
+                              onClick={() => openAssignmentDocument(assignment)}
+                              disabled={openingDocumentId !== null}
+                              title={assignment.source_document.filename}
+                            >
+                              <MIcon name={openingDocumentId === assignment.id ? "hourglass_top" : "picture_as_pdf"} size={18} />
+                              {openingDocumentId === assignment.id ? "正在開啟…" : "查看任務 PDF"}
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            className={styles.aiCheckButton}
+                            onClick={() => submitAiCheck(assignment)}
+                            disabled={checkingAssignmentId !== null || checkRunning}
+                          >
+                            <MIcon name={checkRunning ? "sync" : "fact_check"} size={18} />
+                            {checkRunning
+                              ? "AI 檢查中…"
+                              : checkingAssignmentId === assignment.id
+                                ? "正在送出…"
+                                : check?.status === "completed"
+                                  ? "完成修正，再次 AI Check"
+                                  : "我完成了，送出 AI Check"}
+                          </button>
+                        </div>
+                      </footer>
+                    </div>
+                  )}
+                </article>
+              );
+            })}
+          </div>
+        ) : view.weeklyTasks.length === 0 ? (
+          <div className={styles.taskEmpty}>
+            <MIcon name="checklist" size={24} />
+            <div>
+              <strong>老師尚未發布 AI 檢查任務</strong>
+              <p>老師在 AI 檢查頁建立、綁定週次並核准後，任務與 Checkpoint 就會出現在這裡。</p>
+            </div>
+          </div>
+        ) : null}
+      </section>
+        </>
+      )}
+
+      {!courseView && (
+      <section className={styles.otherNeeds} aria-labelledby="other-needs-title" data-guide="home-other-needs">
+        <div className={styles.sectionHeading}>
+          <div>
+            <p className={styles.eyebrow}>不是現在要上課？</p>
+            <h2 id="other-needs-title">其他使用情境</h2>
+          </div>
+        </div>
+
+        <div className={styles.needGrid}>
+          <article className={styles.needCard} data-student-tour="practice">
+            <span className={`${styles.needIcon} ${styles.needIcon_primary}`}><MIcon name="history" size={22} /></span>
+            <div>
+              <span className={styles.needBadge}>下課後練習 · 沿用原環境</span>
+              <h3>繼續上次的課堂進度</h3>
+              <p>回到相同課程與機器，任務、檔案及作答進度都會保留。</p>
+            </div>
+            <button type="button" className={styles.secondaryButton} onClick={() => openCourseOverview()}>
+              繼續練習
+              <MIcon name="arrow_forward" size={18} />
+            </button>
+          </article>
+
+          <article className={`${styles.needCard} ${styles.researchCard}`} data-student-tour="research">
+            <span className={`${styles.needIcon} ${styles.needIcon_info}`}><MIcon name="science" size={22} /></span>
+            <div>
+              <span className={`${styles.needBadge} ${styles.needBadge_info}`}>自主研究 · 需要申請</span>
+              <h3>建立自己的研究環境</h3>
+              <p>適合專題、開發或實驗需求；這個入口先保留，申請流程將再持續優化。</p>
+            </div>
+            <button type="button" className={styles.secondaryButton} onClick={() => navigate("/my-requests")}>
+              前往我的申請
+              <MIcon name="arrow_forward" size={18} />
+            </button>
+          </article>
+        </div>
+
+        <section className={styles.quickTemplateSection} aria-labelledby="quick-template-title" data-guide="home-quick-templates">
+          <div className={styles.sectionHeading}>
+            <div>
+              <p className={styles.eyebrow}>免等待人工審核</p>
+              <h2 id="quick-template-title">快速練習環境</h2>
+            </div>
+            <span>選擇固定配置的多機環境，整組啟動並受練習時限管理</span>
+          </div>
+
+          {templatesLoading ? (
+            <div className={styles.quickTemplateGrid} aria-label="正在載入快速模板">
+              {[0, 1, 2].map((item) => <div key={item} className={styles.quickTemplateSkeleton} />)}
+            </div>
+          ) : displayedQuickTemplates.length > 0 ? (
+            <div className={styles.quickTemplateGrid}>
+              {displayedQuickTemplates.map((template) => (
+                <button
+                  type="button"
+                  key={template.id}
+                  className={styles.templateCard}
+                  style={{ "--accent-color": "var(--color-primary)" }}
+                  onClick={() => navigate(`/quick-template/${template.id}`, { state: { from: "/dashboard" } })}
+                >
+                  <div className={styles.templateHeader}>
+                    <span className={styles.templateLogo}><MIcon name="layers" size={22} /></span>
+                    <span className={styles.templateCategoryChip}>
+                      免人工審核
+                    </span>
+                  </div>
+                  <div className={styles.templateBody}>
+                    <h4 className={styles.templateName}>{template.name}</h4>
+                    <p className={styles.templateDesc}>
+                      {template.description || `包含 ${template.nodes.length} 台機器，適合臨時練習與課後操作。`}
+                    </p>
+                  </div>
+                  <div className={styles.templateFooter}>
+                    <span className={styles.templateAction}>
+                      立即建立
+                      <MIcon name="arrow_forward" size={14} />
+                    </span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className={styles.quickTemplateEmpty}>
+              <span><MIcon name="inventory_2" size={23} /></span>
+              <div>
+                <strong>目前沒有可快速建立的模板</strong>
+                <p>老師發布可供快速練習的多機環境後，就會顯示在這裡。</p>
+              </div>
+            </div>
+          )}
+        </section>
+      </section>
+      )}
+
+      {activePracticeResource?.type === "lxc" && (
+        <TerminalDialog resource={activePracticeResource} onClose={() => setActivePracticeResource(null)} />
+      )}
+      {activePracticeResource && activePracticeResource.type !== "lxc" && (
+        <VncDialog resource={activePracticeResource} onClose={() => setActivePracticeResource(null)} />
+      )}
+
+      {documentPreview && (
+        <div className={styles.pdfBackdrop} role="presentation" onMouseDown={() => setDocumentPreview(null)}>
+          <section
+            className={styles.pdfDialog}
+            role="dialog"
+            aria-modal="true"
+            aria-label={`任務 PDF：${documentPreview.displayName}`}
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <header>
+              <div>
+                <span><MIcon name="picture_as_pdf" size={22} /></span>
+                <div>
+                  <strong>{documentPreview.displayName}</strong>
+                  <small>{documentPreview.filename}</small>
+                </div>
+              </div>
+              <div className={styles.pdfDialogActions}>
+                <a href={documentPreview.url} target="_blank" rel="noreferrer">
+                  <MIcon name="open_in_new" size={18} />新分頁開啟
+                </a>
+                <button type="button" onClick={() => setDocumentPreview(null)} aria-label="關閉任務 PDF">
+                  <MIcon name="close" size={20} />
+                </button>
+              </div>
+            </header>
+            <iframe src={documentPreview.url} title={documentPreview.displayName} />
+          </section>
+        </div>
+      )}
+
+    </div>
+  );
+}

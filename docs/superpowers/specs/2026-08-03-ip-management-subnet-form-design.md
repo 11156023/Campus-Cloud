@@ -17,7 +17,7 @@
 - `PUT /api/v1/ip-management/subnet`（AdminUser）
 - `DELETE /api/v1/ip-management/subnet`（AdminUser）
 
-舊前端的對應實作可參考 `frontend_old/src/routes/_layout/admin.ip-management.tsx`（唯讀參考，不修改）。
+舊前端的對應實作可參考 git 歷史中的 `frontend_old/src/routes/_layout/admin.ip-management.tsx`（目錄已於 2026-09 移除，`git show 79c8b220:frontend_old/src/routes/_layout/admin.ip-management.tsx` 可查）。
 
 ## 目標
 

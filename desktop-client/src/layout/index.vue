@@ -1,7 +1,6 @@
 <script lang="ts" setup>
 import { defineComponent } from "vue";
 import AppMain from "./compoenets/AppMain.vue";
-import LeftMenu from "./compoenets/LeftMenu.vue";
 import "@/components/IconifyIcon/src/offlineIcon";
 
 defineComponent({
@@ -9,8 +8,7 @@ defineComponent({
 });
 </script>
 <template>
-  <div class="w-full h-full flex">
-    <left-menu />
+  <div class="w-full h-full">
     <app-main />
   </div>
 </template>

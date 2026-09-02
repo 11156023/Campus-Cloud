@@ -10,12 +10,15 @@ const ENABLE_SIGNUP = import.meta.env.ENABLE_SIGNUP !== "false";
 let googleIdentityScriptPromise;
 
 function loadGoogleIdentityScript() {
-  if (typeof window === "undefined") return Promise.reject(new Error("Browser unavailable"));
+  if (typeof window === "undefined")
+    return Promise.reject(new Error("Browser unavailable"));
   if (window.google?.accounts?.id) return Promise.resolve();
 
   if (!googleIdentityScriptPromise) {
     googleIdentityScriptPromise = new Promise((resolve, reject) => {
-      const existingScript = document.getElementById("google-identity-services");
+      const existingScript = document.getElementById(
+        "google-identity-services",
+      );
       if (existingScript) {
         existingScript.addEventListener("load", resolve, { once: true });
         existingScript.addEventListener("error", reject, { once: true });
@@ -40,6 +43,12 @@ function readResetTokenFromUrl() {
   if (typeof window === "undefined") return "";
   const params = new URLSearchParams(window.location.search);
   return params.get("token") ?? "";
+}
+
+function readDeviceCodeFromUrl() {
+  if (typeof window === "undefined") return "";
+  const params = new URLSearchParams(window.location.search);
+  return params.get("device_code") ?? "";
 }
 
 function clearResetTokenFromUrl() {
@@ -126,7 +135,13 @@ function GoogleSignInButton({ onCredential, onError }) {
   }, [onCredential, onError]);
 
   if (!GOOGLE_CLIENT_ID) return null;
-  return <div ref={buttonRef} className={styles.googleButton} aria-label="Google 登入" />;
+  return (
+    <div
+      ref={buttonRef}
+      className={styles.googleButton}
+      aria-label="Google 登入"
+    />
+  );
 }
 
 function formatGoogleLoginError(err) {
@@ -148,7 +163,7 @@ function formatGoogleLoginError(err) {
 
 /* ─── 登入 ──────────────────────────────────────────────── */
 
-function LoginView({ onForgot, onRegister }) {
+function LoginView({ onForgot, onRegister, deviceApproval = false }) {
   const { login, googleLogin, ldapLogin } = useAuth();
   const [mode, setMode] = useState("password"); // "password" | "ldap"
   const [ldapEnabled, setLdapEnabled] = useState(false);
@@ -156,8 +171,8 @@ function LoginView({ onForgot, onRegister }) {
   const [password, setPassword] = useState("");
   const [ldapUsername, setLdapUsername] = useState("");
   const [ldapPassword, setLdapPassword] = useState("");
-  const [error,    setError]    = useState("");
-  const [loading,  setLoading]  = useState(false);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
   // 依後端啟用的登入方式決定是否顯示「校園帳號」分頁（公開端點；取不到就只顯示 Email）
@@ -204,17 +219,20 @@ function LoginView({ onForgot, onRegister }) {
     }
   };
 
-  const handleGoogleCredential = useCallback(async (credential) => {
-    setError("");
-    setGoogleLoading(true);
-    try {
-      await googleLogin(credential);
-    } catch (err) {
-      setError(formatGoogleLoginError(err));
-    } finally {
-      setGoogleLoading(false);
-    }
-  }, [googleLogin]);
+  const handleGoogleCredential = useCallback(
+    async (credential) => {
+      setError("");
+      setGoogleLoading(true);
+      try {
+        await googleLogin(credential);
+      } catch (err) {
+        setError(formatGoogleLoginError(err));
+      } finally {
+        setGoogleLoading(false);
+      }
+    },
+    [googleLogin],
+  );
 
   const handleGoogleError = useCallback((message) => {
     setError(message);
@@ -295,7 +313,16 @@ function LoginView({ onForgot, onRegister }) {
   return (
     <>
       <h1 className={styles.title}>SkyLab</h1>
-      <p className={styles.subtitle}>雲端校園管理平台</p>
+      <p className={styles.subtitle}>
+        {deviceApproval ? "登入後連接 SkyLab Connect" : "雲端校園管理平台"}
+      </p>
+
+      {deviceApproval && (
+        <div className={styles.deviceNotice}>
+          <MIcon name="devices" size={22} />
+          <span>完成登入後，這台電腦將取得您的 SkyLab 連線權限。</span>
+        </div>
+      )}
 
       {ldapEnabled && (
         <div className={styles.loginTabs} role="tablist" aria-label="登入方式">
@@ -349,11 +376,52 @@ function LoginView({ onForgot, onRegister }) {
   );
 }
 
+function DeviceApprovalView({ status, error }) {
+  if (status === "approved") {
+    return (
+      <>
+        <h1 className={styles.title}>連線授權完成</h1>
+        <p className={styles.subtitle}>SkyLab Connect 正在完成登入</p>
+        <div className={styles.successBox}>
+          <MIcon name="check_circle" size={40} />
+          <p>您可以關閉這個頁面，回到桌面 App 繼續使用。</p>
+        </div>
+      </>
+    );
+  }
+
+  if (status === "error") {
+    return (
+      <>
+        <h1 className={styles.title}>無法完成連線授權</h1>
+        <p className={styles.subtitle}>這組登入連結可能已過期</p>
+        <p className={styles.error}>{error}</p>
+        <p className={styles.deviceHelp}>
+          請回到 SkyLab Connect，重新按一次登入取得新的連結。
+        </p>
+        <a className={styles.btnLink} href="/dashboard">
+          回到 SkyLab
+        </a>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <h1 className={styles.title}>正在連接 App</h1>
+      <p className={styles.subtitle}>正在授權 SkyLab Connect，請稍候…</p>
+      <div className={styles.deviceProgress} aria-live="polite">
+        <MIcon name="sync" size={40} className={styles.spin} />
+      </div>
+    </>
+  );
+}
+
 /* ─── 忘記密碼 ──────────────────────────────────────────── */
 
 function ForgotView({ onBack }) {
-  const [email,   setEmail]   = useState("");
-  const [error,   setError]   = useState("");
+  const [email, setEmail] = useState("");
+  const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -362,7 +430,10 @@ function ForgotView({ onBack }) {
     setError("");
     setLoading(true);
     try {
-      await apiPost(`/api/v1/password-recovery/${encodeURIComponent(email)}`, null);
+      await apiPost(
+        `/api/v1/password-recovery/${encodeURIComponent(email)}`,
+        null,
+      );
       setSuccess(true);
     } catch (err) {
       setError(err?.message ?? "發送失敗，請確認電子郵件是否正確");
@@ -416,10 +487,10 @@ function ForgotView({ onBack }) {
 
 function ResetView({ token, onDone }) {
   const [password, setPassword] = useState("");
-  const [confirm,  setConfirm]  = useState("");
-  const [error,    setError]    = useState("");
-  const [success,  setSuccess]  = useState(false);
-  const [loading,  setLoading]  = useState(false);
+  const [confirm, setConfirm] = useState("");
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -457,7 +528,12 @@ function ResetView({ token, onDone }) {
         <div className={styles.successBox}>
           <MIcon name="check_circle" size={32} />
           <p>密碼已更新，請使用新密碼登入</p>
-          <button type="button" className={styles.btn} onClick={onDone} style={{ marginTop: "8px" }}>
+          <button
+            type="button"
+            className={styles.btn}
+            onClick={onDone}
+            style={{ marginTop: "8px" }}
+          >
             前往登入
           </button>
         </div>
@@ -494,13 +570,13 @@ function ResetView({ token, onDone }) {
 /* ─── 註冊 ──────────────────────────────────────────────── */
 
 function RegisterView({ onBack }) {
-  const [fullName,  setFullName]  = useState("");
-  const [email,     setEmail]     = useState("");
-  const [password,  setPassword]  = useState("");
-  const [confirm,   setConfirm]   = useState("");
-  const [error,     setError]     = useState("");
-  const [success,   setSuccess]   = useState(false);
-  const [loading,   setLoading]   = useState(false);
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -544,7 +620,12 @@ function RegisterView({ onBack }) {
         <div className={styles.successBox}>
           <MIcon name="check_circle" size={32} />
           <p>帳號建立成功！請等待管理員審核後即可登入</p>
-          <button type="button" className={styles.btn} onClick={onBack} style={{ marginTop: "8px" }}>
+          <button
+            type="button"
+            className={styles.btn}
+            onClick={onBack}
+            style={{ marginTop: "8px" }}
+          >
             返回登入
           </button>
         </div>
@@ -607,7 +688,14 @@ function RegisterView({ onBack }) {
 /* ─── 主元件 ─────────────────────────────────────────────── */
 
 export default function LoginPage() {
+  const { user } = useAuth();
   const [resetToken, setResetToken] = useState(() => readResetTokenFromUrl());
+  const [deviceCode, setDeviceCode] = useState(() => readDeviceCodeFromUrl());
+  const [deviceApproval, setDeviceApproval] = useState({
+    status: "idle",
+    error: "",
+  });
+  const approvalKeyRef = useRef("");
   const [view, setView] = useState(() =>
     readResetTokenFromUrl() ? "reset" : "login",
   ); // "login" | "forgot" | "register" | "reset"
@@ -615,12 +703,42 @@ export default function LoginPage() {
   useEffect(() => {
     const onPop = () => {
       const token = readResetTokenFromUrl();
+      setDeviceCode(readDeviceCodeFromUrl());
       setResetToken(token);
       setView(token ? "reset" : "login");
     };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
   }, []);
+
+  useEffect(() => {
+    if (!deviceCode || !user) return;
+
+    const approvalKey = `${deviceCode}:${user.id ?? user.email ?? "current"}`;
+    if (approvalKeyRef.current === approvalKey) return;
+    approvalKeyRef.current = approvalKey;
+    let cancelled = false;
+
+    setDeviceApproval({ status: "approving", error: "" });
+    apiPost("/api/v1/desktop-client/auth/approve", {
+      device_code: deviceCode,
+    })
+      .then(() => {
+        if (!cancelled) setDeviceApproval({ status: "approved", error: "" });
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setDeviceApproval({
+            status: "error",
+            error: err?.message ?? "授權失敗，請重新產生登入連結",
+          });
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [deviceCode, user]);
 
   const goLogin = () => {
     clearResetTokenFromUrl();
@@ -630,14 +748,39 @@ export default function LoginPage() {
 
   const showRegister = ENABLE_SIGNUP && view === "register";
 
+  if (deviceCode && user) {
+    return (
+      <div className={styles.page}>
+        <div className={styles.card}>
+          <DeviceApprovalView
+            status={deviceApproval.status}
+            error={deviceApproval.error}
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={styles.page}>
       <div className={styles.card}>
-        {view === "login"    && <LoginView    onForgot={() => setView("forgot")}   onRegister={() => setView("register")} />}
-        {view === "forgot"   && <ForgotView   onBack={() => setView("login")} />}
+        {view === "login" && (
+          <LoginView
+            deviceApproval={Boolean(deviceCode)}
+            onForgot={() => setView("forgot")}
+            onRegister={() => setView("register")}
+          />
+        )}
+        {view === "forgot" && <ForgotView onBack={() => setView("login")} />}
         {showRegister && <RegisterView onBack={() => setView("login")} />}
-        {view === "reset"    && <ResetView    token={resetToken} onDone={goLogin} />}
-        {view === "register" && !ENABLE_SIGNUP && <LoginView onForgot={() => setView("forgot")} onRegister={() => setView("login")} />}
+        {view === "reset" && <ResetView token={resetToken} onDone={goLogin} />}
+        {view === "register" && !ENABLE_SIGNUP && (
+          <LoginView
+            deviceApproval={Boolean(deviceCode)}
+            onForgot={() => setView("forgot")}
+            onRegister={() => setView("login")}
+          />
+        )}
       </div>
     </div>
   );

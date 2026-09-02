@@ -5,6 +5,7 @@
   Menu,
   MenuItem,
   MenuItemConstructorOptions,
+  powerMonitor,
   shell,
   Tray
 } from "electron";
@@ -22,10 +23,10 @@ import Logger from "../core/Logger";
 import SettingsRepository from "../repository/SettingsRepository";
 import AuthService from "../service/AuthService";
 import SkyLabService from "../service/SkyLabService";
-import FrpcProcessService from "../service/FrpcProcessService";
 import LogService from "../service/LogService";
 import SettingsService from "../service/SettingsService";
 import SystemService from "../service/SystemService";
+import WireGuardTunnelService from "../service/WireGuardTunnelService";
 
 process.env.DIST_ELECTRON = join(__dirname, "..");
 process.env.DIST = join(process.env.DIST_ELECTRON, "../dist");
@@ -40,6 +41,8 @@ const indexHtml = join(process.env.DIST, "index.html");
 class SkyLabApp {
   private _win: BrowserWindow | null = null;
   private _quitting = false;
+  private _cleanupInProgress = false;
+  private _cleanupComplete = false;
 
   constructor() {
     this.initializeBeans();
@@ -138,10 +141,7 @@ class SkyLabApp {
       {
         label: "Quit",
         click: () => {
-          that._quitting = true;
-          const frpcProcessService: FrpcProcessService =
-            BeanFactory.getBean("frpcProcessService");
-          frpcProcessService.stopTunnel().finally(() => app.quit());
+          that.quitSafely();
         }
       }
     ];
@@ -163,17 +163,26 @@ class SkyLabApp {
       process.exit(0);
     }
 
-    app.whenReady().then(() => {
-      this.initializeWindow();
+    app.whenReady().then(async () => {
+      const tunnelService: WireGuardTunnelService = BeanFactory.getBean(
+        "wireGuardTunnelService"
+      );
+      try {
+        await tunnelService.cleanupOrphanedTunnel();
+      } catch (error) {
+        Logger.error("SkyLabApp.cleanupOrphanedTunnel", error as Error);
+      }
+      await this.initializeWindow();
       this.initializeTray();
+      powerMonitor.on("resume", () => {
+        void tunnelService.refreshIfRunning("resume");
+      });
     });
 
     app.on("window-all-closed", () => {
       this._win = null;
       if (process.platform !== "darwin") {
-        const frpcProcessService: FrpcProcessService =
-          BeanFactory.getBean("frpcProcessService");
-        frpcProcessService.stopTunnel().finally(() => app.quit());
+        this.quitSafely();
       }
     });
 
@@ -191,17 +200,32 @@ class SkyLabApp {
       else this.initializeWindow();
     });
 
-    app.on("before-quit", () => {
-      this._quitting = true;
-      const frpcProcessService: FrpcProcessService =
-        BeanFactory.getBean("frpcProcessService");
-      frpcProcessService.stopTunnel().finally(() => {});
+    app.on("before-quit", event => {
+      if (this._cleanupComplete) return;
+      event.preventDefault();
+      this.quitSafely();
     });
 
-    Logger.info(
-      "SkyLabApp.initializeElectronApp",
-      "ElectronApp initialized."
+    Logger.info("SkyLabApp.initializeElectronApp", "ElectronApp initialized.");
+  }
+
+  private quitSafely() {
+    if (this._cleanupInProgress || this._cleanupComplete) return;
+    this._quitting = true;
+    this._cleanupInProgress = true;
+    const tunnelService: WireGuardTunnelService = BeanFactory.getBean(
+      "wireGuardTunnelService"
     );
+    tunnelService
+      .stopTunnel()
+      .catch(error => {
+        Logger.error("SkyLabApp.quitSafely", error);
+      })
+      .finally(() => {
+        this._cleanupInProgress = false;
+        this._cleanupComplete = true;
+        app.quit();
+      });
   }
 
   initializeBeans() {
@@ -215,19 +239,19 @@ class SkyLabApp {
       "SkyLabService",
       new SkyLabService(BeanFactory.getBean("settingsService"))
     );
+    BeanFactory.setBean("wireGuardTunnelService", new WireGuardTunnelService());
     BeanFactory.setBean(
       "authService",
       new AuthService(
         BeanFactory.getBean("SkyLabService"),
-        BeanFactory.getBean("settingsService")
+        BeanFactory.getBean("settingsService"),
+        BeanFactory.getBean("wireGuardTunnelService")
       )
     );
     BeanFactory.setBean(
       "logService",
       new LogService(BeanFactory.getBean("systemService"))
     );
-    BeanFactory.setBean("frpcProcessService", new FrpcProcessService());
-
     BeanFactory.setBean(
       "authController",
       new AuthController(BeanFactory.getBean("authService"))
@@ -238,7 +262,7 @@ class SkyLabApp {
     );
     BeanFactory.setBean(
       "tunnelController",
-      new TunnelController(BeanFactory.getBean("frpcProcessService"))
+      new TunnelController(BeanFactory.getBean("wireGuardTunnelService"))
     );
     BeanFactory.setBean(
       "settingsController",
@@ -278,10 +302,7 @@ class SkyLabApp {
           const [beanName, fn] = router.controller.split(".");
           const bean = BeanFactory.getBean<any>(beanName);
           bean[fn].call(bean, req);
-          Logger.debug(
-            "ipcRouter",
-            `path=${router.path} => ${beanName}.${fn}`
-          );
+          Logger.debug("ipcRouter", `path=${router.path} => ${beanName}.${fn}`);
         });
       });
     });

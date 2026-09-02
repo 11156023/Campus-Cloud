@@ -399,7 +399,7 @@ export default function RequestReviewPage() {
 
   return (
     <div className={styles.page}>
-      <PageHeader eyebrow="審核" title="申請審核" subtitle="集中查看建立、規格調整、AI API 金鑰與刪除請求；刪除資源不會扣除原本已通過的審核數量" />
+      <PageHeader title="申請審核" subtitle="集中查看建立、規格調整、AI API 金鑰與刪除請求；刪除資源不會扣除原本已通過的審核數量" />
 
       <div className={styles.statRow}>
         <div className={styles.statCard}>

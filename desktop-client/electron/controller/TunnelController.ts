@@ -1,18 +1,18 @@
 import Logger from "../core/Logger";
-import FrpcProcessService from "../service/FrpcProcessService";
+import WireGuardTunnelService from "../service/WireGuardTunnelService";
 import ResponseUtils from "../utils/ResponseUtils";
 import BaseController from "./BaseController";
 
 class TunnelController extends BaseController {
-  private readonly _frpcProcessService: FrpcProcessService;
+  private readonly _tunnelService: WireGuardTunnelService;
 
-  constructor(frpcProcessService: FrpcProcessService) {
+  constructor(tunnelService: WireGuardTunnelService) {
     super();
-    this._frpcProcessService = frpcProcessService;
+    this._tunnelService = tunnelService;
   }
 
   start(req: ControllerParam) {
-    this._frpcProcessService
+    this._tunnelService
       .startTunnel()
       .then(() => {
         req.event.reply(req.channel, ResponseUtils.success());
@@ -24,7 +24,7 @@ class TunnelController extends BaseController {
   }
 
   stop(req: ControllerParam) {
-    this._frpcProcessService
+    this._tunnelService
       .stopTunnel()
       .then(() => {
         req.event.reply(req.channel, ResponseUtils.success());
@@ -35,18 +35,29 @@ class TunnelController extends BaseController {
       });
   }
 
+  refresh(req: ControllerParam) {
+    this._tunnelService
+      .refreshTunnel()
+      .then(() => this._tunnelService.getStatus())
+      .then(status => {
+        req.event.reply(req.channel, ResponseUtils.success(status));
+      })
+      .catch((err: Error) => {
+        Logger.error("TunnelController.refresh", err);
+        req.event.reply(req.channel, ResponseUtils.fail(err));
+      });
+  }
+
   getStatus(req: ControllerParam) {
-    const running = this._frpcProcessService.isRunning();
-    const connectionError = running
-      ? this._frpcProcessService.readFrpcConnectionError()
-      : null;
-    const status: TunnelStatusInfo = {
-      running,
-      lastStartTime: this._frpcProcessService.frpcLastStartTime,
-      connectionError,
-      tunnels: this._frpcProcessService.tunnels
-    };
-    req.event.reply(req.channel, ResponseUtils.success(status));
+    this._tunnelService
+      .getStatus()
+      .then(status => {
+        req.event.reply(req.channel, ResponseUtils.success(status));
+      })
+      .catch((err: Error) => {
+        Logger.error("TunnelController.getStatus", err);
+        req.event.reply(req.channel, ResponseUtils.fail(err));
+      });
   }
 }
 
