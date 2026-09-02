@@ -3,6 +3,7 @@
 import uuid
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import FileResponse
 from sqlmodel import select
 
 from app.ai.teacher_judge.script_executor_service import execute_script_run
@@ -19,6 +20,7 @@ from app.models.teaching_class import (
 from app.schemas.course import (
     CourseAIAssignmentStudent,
     CourseAICheckStudent,
+    CourseAICheckSubmit,
     CourseAnswerResult,
     CourseAnswerSubmit,
     CourseDeploymentPublic,
@@ -28,6 +30,7 @@ from app.schemas.course import (
     CourseReminderStudent,
     CourseRoomStudentDetail,
     CourseScheduleStudent,
+    CourseWeeklyTaskStudent,
 )
 from app.services.course import (
     ai_assignment_service,
@@ -35,6 +38,7 @@ from app.services.course import (
     deployment_service,
     progress_service,
     reminder_service,
+    weekly_task_service,
 )
 from app.services.course.progress_hub import course_progress_hub
 
@@ -46,7 +50,7 @@ def list_schedule(
     session: SessionDep,
     current_user: CurrentUser,
 ) -> list[CourseScheduleStudent]:
-    """Return today's real classes linked to this student's course paths."""
+    """Return active-term classes linked to this student's course paths."""
 
     return course_service.list_student_schedule(
         session,
@@ -94,6 +98,46 @@ def list_ai_assignments(
         session,
         user_id=current_user.id,
         path_id=path_id,
+    )
+
+
+@router.get(
+    "/paths/{path_id}/weekly-tasks",
+    response_model=list[CourseWeeklyTaskStudent],
+)
+def list_weekly_tasks(
+    session: SessionDep, current_user: CurrentUser, path_id: uuid.UUID
+) -> list[CourseWeeklyTaskStudent]:
+    return weekly_task_service.list_student_weekly_tasks(
+        session,
+        user_id=current_user.id,
+        path_id=path_id,
+    )
+
+
+@router.get(
+    "/paths/{path_id}/weekly-tasks/{week_id}/files/{file_id}",
+    response_class=FileResponse,
+)
+def get_weekly_task_pdf(
+    session: SessionDep,
+    current_user: CurrentUser,
+    path_id: uuid.UUID,
+    week_id: uuid.UUID,
+    file_id: uuid.UUID,
+) -> FileResponse:
+    path, filename = weekly_task_service.get_student_weekly_task_pdf(
+        session,
+        user_id=current_user.id,
+        path_id=path_id,
+        week_id=week_id,
+        file_id=file_id,
+    )
+    return FileResponse(
+        path,
+        media_type="application/pdf",
+        filename=filename,
+        content_disposition_type="inline",
     )
 
 
@@ -156,6 +200,32 @@ def list_practice_machines(
     ]
 
 
+@router.get(
+    "/paths/{path_id}/ai-assignments/{assignment_id}/source-document",
+    response_class=FileResponse,
+)
+def get_ai_assignment_source_document(
+    session: SessionDep,
+    current_user: CurrentUser,
+    path_id: uuid.UUID,
+    assignment_id: uuid.UUID,
+) -> FileResponse:
+    """Preview the uploaded PDF tied to an approved assignment."""
+
+    path, filename = ai_assignment_service.get_student_ai_assignment_source_document(
+        session,
+        user_id=current_user.id,
+        path_id=path_id,
+        assignment_id=assignment_id,
+    )
+    return FileResponse(
+        path,
+        media_type="application/pdf",
+        filename=filename,
+        content_disposition_type="inline",
+    )
+
+
 @router.post(
     "/paths/{path_id}/ai-assignments/{assignment_id}/checks",
     response_model=CourseAICheckStudent,
@@ -165,6 +235,7 @@ def start_ai_check(
     current_user: CurrentUser,
     path_id: uuid.UUID,
     assignment_id: uuid.UUID,
+    body: CourseAICheckSubmit | None = None,
 ) -> CourseAICheckStudent:
     """Run one approved assignment against the current student's own machine."""
 
@@ -174,11 +245,21 @@ def start_ai_check(
         path_id=path_id,
         assignment_id=assignment_id,
     )
-    if assignment.latest_check and assignment.latest_check.status in {
+    requested_item_id = body.item_id if body else None
+    if requested_item_id and requested_item_id not in {
+        item.id for item in assignment.items
+    }:
+        raise HTTPException(status_code=404, detail="Checkpoint not found")
+    latest_check = (
+        assignment.checkpoint_checks.get(requested_item_id)
+        if requested_item_id
+        else assignment.latest_check
+    )
+    if latest_check and latest_check.status in {
         "pending",
         "running",
     }:
-        return assignment.latest_check
+        return latest_check
 
     enrollment = session.exec(
         select(TeachingClassStudent).where(
@@ -225,6 +306,7 @@ def start_ai_check(
         target_scope=TeacherJudgeScriptRunTargetScope.manual,
         target_vmids=[int(machine.vmid)],
         started_by=current_user.id,
+        requested_item_id=requested_item_id,
     )
     run_id = uuid.UUID(run.id)
     submit(

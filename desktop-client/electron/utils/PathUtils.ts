@@ -38,6 +38,28 @@ class PathUtils {
     return path.join(PathUtils.getConfigStoragePath(), "frpc-visitor.toml");
   }
 
+  public static getWireGuardConfigFilePath() {
+    return path.join(PathUtils.getConfigStoragePath(), "SkyLab.conf");
+  }
+
+  public static getWireGuardIdentityFilePath() {
+    return path.join(
+      PathUtils.getConfigStoragePath(),
+      "wireguard-identity.json"
+    );
+  }
+
+  public static getBundledWireGuardInstallerPath() {
+    const filename = "wireguard-amd64-1.1.msi";
+    const packed = path.join(
+      process.resourcesPath || "",
+      "wireguard",
+      filename
+    );
+    if (app.isPackaged || fs.existsSync(packed)) return packed;
+    return path.join(app.getAppPath(), "vendor", "wireguard", filename);
+  }
+
   public static getFrpcBinaryName() {
     return process.platform === "win32" ? "frpc.exe" : "frpc";
   }

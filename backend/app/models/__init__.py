@@ -117,6 +117,7 @@ from .vm_template import (
     VMTemplateStatus,
     VMTemplateVisibility,
 )
+from .wireguard_peer import WireGuardPeer
 
 __all__ = [
     # Base
@@ -233,6 +234,7 @@ __all__ = [
     "TeachingClassTaskFile",
     "TeachingClassStudent",
     "TeachingClassStudentMachine",
+    "WireGuardPeer",
     # Course Lab (互動式實作教學)
     "CoursePath",
     "CoursePathStatus",

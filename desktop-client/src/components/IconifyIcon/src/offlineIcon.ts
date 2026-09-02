@@ -1,12 +1,21 @@
 import { addIcon } from "@iconify/vue/dist/offline";
 
 import Cloud from "@iconify-icons/material-symbols/cloud";
+import CloudOffRounded from "@iconify-icons/material-symbols/cloud-off-rounded";
+import Computer from "@iconify-icons/material-symbols/computer";
+import ContentCopyRounded from "@iconify-icons/material-symbols/content-copy-rounded";
+import DesktopWindowsRounded from "@iconify-icons/material-symbols/desktop-windows-rounded";
 import Download from "@iconify-icons/material-symbols/download-2";
 import FileCopySharp from "@iconify-icons/material-symbols/file-copy-sharp";
 import InfoSharp from "@iconify-icons/material-symbols/info-sharp";
 import refreshRounded from "@iconify-icons/material-symbols/refresh-rounded";
 import RocketLaunchRounded from "@iconify-icons/material-symbols/rocket-launch-rounded";
+import School from "@iconify-icons/material-symbols/school";
 import Settings from "@iconify-icons/material-symbols/settings";
+import SettingsEthernetRounded from "@iconify-icons/material-symbols/settings-ethernet-rounded";
+import StopRounded from "@iconify-icons/material-symbols/stop-rounded";
+import TerminalRounded from "@iconify-icons/material-symbols/terminal-rounded";
+import PlayArrowRounded from "@iconify-icons/material-symbols/play-arrow-rounded";
 
 import Add from "@iconify-icons/material-symbols/add";
 import attachMoneyRounded from "@iconify-icons/material-symbols/attach-money-rounded";
@@ -47,7 +56,16 @@ import uploadRounded from "@iconify-icons/material-symbols/upload-rounded";
 import volunteerActivismSharp from "@iconify-icons/material-symbols/volunteer-activism-sharp";
 
 addIcon("cloud", Cloud);
+addIcon("cloud-off-rounded", CloudOffRounded);
+addIcon("computer", Computer);
+addIcon("content-copy-rounded", ContentCopyRounded);
+addIcon("desktop-windows-rounded", DesktopWindowsRounded);
 addIcon("rocket-launch-rounded", RocketLaunchRounded);
+addIcon("school", School);
+addIcon("settings-ethernet-rounded", SettingsEthernetRounded);
+addIcon("stop-rounded", StopRounded);
+addIcon("terminal-rounded", TerminalRounded);
+addIcon("play-arrow-rounded", PlayArrowRounded);
 addIcon("download", Download);
 addIcon("settings", Settings);
 addIcon("file-copy-sharp", FileCopySharp);

@@ -5,7 +5,7 @@ Flag 明文只在 create/update 進入，經 flag_service 雜湊後入庫；
 """
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlmodel import Session, func, select
@@ -567,7 +567,7 @@ def list_student_schedule(
     user_id: uuid.UUID,
     now: datetime | None = None,
 ) -> list[CourseScheduleStudent]:
-    """Return only today's linked classes in their real timetable order."""
+    """Return every active-term class, highlighting today's real session."""
 
     current = now or datetime.now(UTC)
     rows = session.exec(
@@ -595,22 +595,26 @@ def list_student_schedule(
         timezone = _class_timezone(teaching_class)
         local_now = current.astimezone(timezone)
         local_date = local_now.date()
-        if not (
-            teaching_class.start_date <= local_date <= teaching_class.end_date
-            and local_date.weekday() == teaching_class.weekday
-        ):
+        if not teaching_class.start_date <= local_date <= teaching_class.end_date:
             continue
+        days_until_session = (teaching_class.weekday - local_date.weekday()) % 7
+        session_date = local_date + timedelta(days=days_until_session)
+        if session_date > teaching_class.end_date:
+            days_since_session = (local_date.weekday() - teaching_class.weekday) % 7
+            session_date = local_date - timedelta(days=days_since_session)
         starts_at = datetime.combine(
-            local_date,
+            session_date,
             teaching_class.start_time,
             tzinfo=timezone,
         )
         ends_at = datetime.combine(
-            local_date,
+            session_date,
             teaching_class.end_time,
             tzinfo=timezone,
         )
-        if local_now < starts_at:
+        if session_date != local_date:
+            state, label = "available", "可課後練習"
+        elif local_now < starts_at:
             state, label = "later", "今天稍後"
         elif local_now <= ends_at:
             state, label = "now", "正在上課"
@@ -633,7 +637,7 @@ def list_student_schedule(
                 progress_percent=flag_service.progress_percent(completed, total),
                 teaching_class_id=teaching_class.id,
                 teaching_class_name=teaching_class.name,
-                session_date=local_date,
+                session_date=session_date,
                 start_at=starts_at,
                 end_at=ends_at,
                 teacher=(teacher.full_name or teacher.email) if teacher else "授課老師",
@@ -642,7 +646,8 @@ def list_student_schedule(
                 label=label,
             )
         )
-    return sorted(result, key=lambda row: row.start_at)
+    state_order = {"now": 0, "later": 1, "available": 2, "ended": 3}
+    return sorted(result, key=lambda row: (state_order[row.state], row.start_at))
 
 
 def get_published_path_or_404(

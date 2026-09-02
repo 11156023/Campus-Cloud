@@ -49,7 +49,7 @@ from app.ai.teacher_judge.template_command_service import get_enabled_template_c
 from app.api.deps import InstructorUser, SessionDep
 from app.core.authorizers import require_teaching_access
 from app.infrastructure.worker import submit
-from app.models import TeachingClass
+from app.models import TeachingClass, TeachingClassWeek
 from app.models.teacher_judge_script_artifact import TeacherJudgeScriptArtifact
 from app.models.teacher_judge_script_run import (
     TeacherJudgeScriptRun,
@@ -93,6 +93,16 @@ def _access(db: SessionDep, class_id: uuid.UUID, user: InstructorUser) -> None:
     require_teaching_access(user, teaching_class.owner_id)
 
 
+def _validate_week(
+    db: SessionDep, class_id: uuid.UUID, week_id: uuid.UUID | None
+) -> None:
+    if week_id is None:
+        return
+    week = db.get(TeachingClassWeek, week_id)
+    if week is None or week.class_id != class_id:
+        raise HTTPException(status_code=400, detail="選擇的週次不屬於這個班級。")
+
+
 @router.get("/", response_model=list[TeacherJudgeSessionPublic])
 def list_sessions(
     teaching_class_id: uuid.UUID,
@@ -130,6 +140,7 @@ def create_session(
 ) -> TeacherJudgeSessionPublic:
     _access(session, teaching_class_id, current_user)
     try:
+        _validate_week(session, teaching_class_id, payload.teaching_class_week_id)
         selected_file_id = payload.selected_file_id
         if payload.creation_mode == "blank":
             rubric = create_blank_file(
@@ -146,6 +157,7 @@ def create_session(
                 ensure_selected_file_available(session, selected_file_id)
         item = TeacherJudgeSession(
             teaching_class_id=teaching_class_id,
+            teaching_class_week_id=payload.teaching_class_week_id,
             title=payload.title.strip(),
             selected_file_id=selected_file_id,
             created_by=current_user.id,
@@ -209,6 +221,9 @@ def update_session(
         raise HTTPException(status_code=409, detail="已封存的檢查為唯讀。")
     if "title" in changes and payload.title is not None:
         item.title = payload.title.strip()
+    if "teaching_class_week_id" in changes:
+        _validate_week(session, teaching_class_id, payload.teaching_class_week_id)
+        item.teaching_class_week_id = payload.teaching_class_week_id
     if "selected_file_id" in changes:
         validate_selected_file(session, teaching_class_id, payload.selected_file_id)
         if payload.selected_file_id is not None:

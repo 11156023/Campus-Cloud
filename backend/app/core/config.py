@@ -34,13 +34,26 @@ class Settings(BaseSettings):
     SECRET_KEY: str = secrets.token_urlsafe(32)
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440  # 1 day
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7  # 7 days
-    FRONTEND_HOST: str = "http://localhost:5173"
+    FRONTEND_HOST: str = "http://127.0.0.1:5173"
     # Public base URL of the backend API as seen by desktop clients.
     # Defaults to http://localhost:8000 when unset (override in .env for deploys).
     DESKTOP_CLIENT_BACKEND_URL: str = "http://localhost:8000"
     # External URL for the desktop client zip (e.g. GitHub Releases asset).
     # When set, /desktop-client/download redirects here instead of serving a local file.
     DESKTOP_CLIENT_DOWNLOAD_URL: str = ""
+    # Desktop VPN control plane. The public endpoint host falls back to the
+    # configured Gateway VM host when left empty.
+    DESKTOP_TUNNEL_MODE: Literal["frp", "wireguard"] = "wireguard"
+    WIREGUARD_ENDPOINT_HOST: str = ""
+    WIREGUARD_ENDPOINT_PORT: int = 51821
+    WIREGUARD_INTERFACE: str = "wg0"
+    WIREGUARD_CLIENT_SUBNET: str = "10.250.0.0/16"
+    WIREGUARD_VM_SUBNET: str = "10.10.0.0/16"
+    WIREGUARD_KEEPALIVE_SECONDS: int = 25
+    WIREGUARD_SESSION_TTL_SECONDS: int = 28800
+    WIREGUARD_RECONCILE_ENABLED: bool = True
+    WIREGUARD_RECONCILE_INTERVAL_SECONDS: int = 60
+    WIREGUARD_REVOKED_RETENTION_DAYS: int = 30
     ENVIRONMENT: Literal["local", "staging", "production"] = "local"
     ENABLE_SIGNUP: bool = True
 
@@ -128,7 +141,7 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_SECRET: str | None = None
 
     # frp tunnel settings
-    FRP_SERVER_ADDR: str = ""   # public IP/domain that desktop clients connect to
+    FRP_SERVER_ADDR: str = ""  # public IP/domain that desktop clients connect to
     FRP_SERVER_PORT: int = 7000
     FRP_TOKEN: str = ""
 

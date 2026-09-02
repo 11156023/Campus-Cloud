@@ -228,6 +228,7 @@ def create_script_run(
     target_scope: TeacherJudgeScriptRunTargetScope,
     target_vmids: list[int],
     started_by: uuid.UUID | None,
+    requested_item_id: str | None = None,
 ) -> TeacherJudgeScriptRunPublic:
     if target_scope != TeacherJudgeScriptRunTargetScope.manual:
         raise HTTPException(status_code=400, detail="第一版只支援手動選擇執行機器。")
@@ -262,6 +263,7 @@ def create_script_run(
                 "template_key": artifact.template_key,
             },
             "targets": targets,
+            "requested_item_id": requested_item_id,
         },
         status=TeacherJudgeScriptRunStatus.pending,
         progress_json={

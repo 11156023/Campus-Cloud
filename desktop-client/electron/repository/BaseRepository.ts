@@ -1,4 +1,4 @@
-import Datastore from "nedb";
+import Datastore from "@seald-io/nedb";
 import path from "path";
 import PathUtils from "../utils/PathUtils";
 import IdUtils from "../utils/IdUtils";
@@ -19,15 +19,17 @@ import IdUtils from "../utils/IdUtils";
 //   findById(id: string): Promise<T>;
 // }
 
-class BaseRepository<T> {
-  protected readonly db: Datastore;
+type StoredRecord = Record<string, any> & { _id?: string };
+
+class BaseRepository<T extends StoredRecord> {
+  protected readonly db: Datastore<T>;
 
   constructor(dbName: string) {
     const dbFilename = path.join(
       PathUtils.getDataBaseStoragePath(),
       `${dbName}-v2.db`
     );
-    this.db = new Datastore({
+    this.db = new Datastore<T>({
       autoload: true,
       filename: dbFilename
     });
@@ -46,7 +48,7 @@ class BaseRepository<T> {
   //
   insert(t: T): Promise<T> {
     return new Promise<T>((resolve, reject) => {
-      t["_id"] = this.genId();
+      t._id = this.genId();
       this.db.insert(t, (err, document) => {
         if (err) {
           reject(err);
@@ -59,7 +61,7 @@ class BaseRepository<T> {
   insertMany(ts: Array<T>): Promise<Array<T>> {
     return new Promise<Array<T>>((resolve, reject) => {
       ts.forEach(t => {
-        t["_id"] = this.genId();
+        t._id = this.genId();
       });
       this.db.insert(ts, (err, documents) => {
         if (err) {
@@ -77,11 +79,11 @@ class BaseRepository<T> {
         { _id: id },
         t,
         { upsert: true },
-        (err, numberOfUpdated, upsert) => {
+        (err, _numberOfUpdated, _upsert) => {
           if (err) {
             reject(err);
           } else {
-            t["_id"] = id;
+            t._id = id;
             resolve(t);
             // this.findById(id)
             //   .then(data => {
@@ -138,7 +140,7 @@ class BaseRepository<T> {
 
   truncate() {
     return new Promise<void>((resolve, reject) => {
-      this.db.remove({}, { multi: true }, (err, n) => {
+      this.db.remove({}, { multi: true }, (err, _n) => {
         if (err) {
           reject(err);
         } else {

@@ -1,4 +1,4 @@
-import { apiDelete, apiGet, apiPost, apiPut } from "./api";
+import { apiDelete, apiGet, apiGetBlob, apiPost, apiPut } from "./api";
 
 /**
  * 課程實驗室（Course Lab）：
@@ -32,14 +32,36 @@ export const CoursesService = {
     return apiGet(`/api/v1/courses/paths/${pathId}/ai-assignments`);
   },
 
+  /** 取得老師在班級每週內容中正式發布的任務與 PDF。 */
+  getWeeklyTasks(pathId) {
+    return apiGet(`/api/v1/courses/paths/${pathId}/weekly-tasks`);
+  },
+
+  /** 透過有課程身分驗證的端點預覽每週任務 PDF。 */
+  getWeeklyTaskDocument(pathId, weekId, fileId) {
+    return apiGetBlob(
+      `/api/v1/courses/paths/${pathId}/weekly-tasks/${weekId}/files/${fileId}`,
+    );
+  },
+
+  /** 取得老師上傳、且與已核准任務相連的 PDF。 */
+  getAiAssignmentDocument(pathId, assignmentId) {
+    return apiGetBlob(
+      `/api/v1/courses/paths/${pathId}/ai-assignments/${assignmentId}/source-document`,
+    );
+  },
+
   /** 取得學生在此課程由班級流程分配的所有練習機器。 */
   getPracticeMachines(pathId) {
     return apiGet(`/api/v1/courses/paths/${pathId}/practice-machines`);
   },
 
   /** 學生完成操作後，對自己的班級機器送出 AI Check。 */
-  startAiCheck(pathId, assignmentId) {
-    return apiPost(`/api/v1/courses/paths/${pathId}/ai-assignments/${assignmentId}/checks`, {});
+  startAiCheck(pathId, assignmentId, itemId = null) {
+    return apiPost(
+      `/api/v1/courses/paths/${pathId}/ai-assignments/${assignmentId}/checks`,
+      itemId ? { item_id: itemId } : {},
+    );
   },
 
   /** 查詢自己送出的 AI Check 進度與回饋。 */
