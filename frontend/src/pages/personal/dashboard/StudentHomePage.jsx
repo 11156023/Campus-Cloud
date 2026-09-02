@@ -626,7 +626,6 @@ export default function StudentHomePage({ courseView = false }) {
     0,
   );
   const displayedQuickTemplates = quickTemplates;
-  const primaryTarget = nextRoom ? `/courses/rooms/${nextRoom.id}` : "/courses";
   const primaryLabel = nextRoom ? "開始練習" : "查看可用課程";
   const currentSchedule = view.activePath?.schedule;
   const heroStatusMeta = view.activePath
@@ -926,7 +925,7 @@ export default function StudentHomePage({ courseView = false }) {
 
           {practiceMachines.length === 0 && (
             <div className={styles.primaryActions}>
-              <button type="button" className={styles.primaryButton} onClick={() => navigate(primaryTarget)}>
+              <button type="button" className={styles.primaryButton} onClick={() => openCourseOverview()}>
                 {primaryLabel}
                 <MIcon name="arrow_forward" size={18} />
               </button>

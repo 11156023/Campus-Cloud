@@ -29,8 +29,19 @@ _ROUTES: tuple[NavigationRoute, ...] = (
     NavigationRoute(
         path="/dashboard",
         title="首頁",
-        summary="依身分顯示的總覽與快速入口。",
-        keywords=("首頁", "儀表板", "dashboard", "總覽", "主頁"),
+        summary="依身分顯示課程總覽與快速入口。",
+        keywords=(
+            "首頁",
+            "儀表板",
+            "dashboard",
+            "總覽",
+            "主頁",
+            "課程",
+            "關卡",
+            "course",
+            "學習",
+            "練習",
+        ),
     ),
     NavigationRoute(
         path="/my-resources",
@@ -49,12 +60,6 @@ _ROUTES: tuple[NavigationRoute, ...] = (
         title="帳號設定",
         summary="修改個人資料與密碼。",
         keywords=("帳號", "個人設定", "改密碼", "account", "profile"),
-    ),
-    NavigationRoute(
-        path="/courses",
-        title="課程",
-        summary="瀏覽課程與練習關卡。",
-        keywords=("課程", "關卡", "course", "學習", "練習"),
     ),
     NavigationRoute(
         path="/jobs",
