@@ -18,7 +18,7 @@ SkyLab 是一個面向校園資源管理的全端 Proxmox VE（PVE）虛擬化�
 | Gateway 安裝腳本 | `gateway/` | 校內出口閘道安裝腳本 |
 | Docs | `docs/` | 補充文件 |
 
-完整架構/部署指引請見 `development.md`、`deployment.md`、`placement.md`。
+完整架構/部署指引請見 `docs/development.md`、`docs/deployment.md`。
 
 ## 技術棧概覽
 
@@ -185,8 +185,8 @@ python resource_ssh_ls.py --vmid 101 --ssh-user ubuntu --path /etc
 ## 文件索引
 
 - [`docs/multi-machine-environment-sop.md`](docs/multi-machine-environment-sop.md) — 多機教學環境建構、發布與學生使用的正式 SOP
-- [`development.md`](development.md) — 完整開發環境設置
-- [`deployment.md`](deployment.md) — 生產部署指引
+- [`docs/development.md`](docs/development.md) — 完整開發環境設置
+- [`docs/deployment.md`](docs/deployment.md) — 生產部署指引
 - [`placement.md`](placement.md) — VM placement 演算法說明
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) — 貢獻指引
 - [`SECURITY.md`](SECURITY.md) — 安全政策

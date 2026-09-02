@@ -15,7 +15,7 @@ For small, straightforward changes, you can go directly to a Pull Request withou
 
 ## Developing
 
-For detailed instructions on setting up your development environment, running the stack, linting, pre-commit hooks, and more, see the [Development Guide](development.md).
+For detailed instructions on setting up your development environment, running the stack, linting, pre-commit hooks, and more, see the [Development Guide](docs/development.md).
 
 ## Pull Requests
 
