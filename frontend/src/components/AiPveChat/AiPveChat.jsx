@@ -160,11 +160,6 @@ export default function AiPveChat({ initialPrompt = "", compact = false }) {
 
   return (
     <div className={`${styles.chatCard} ${compact ? styles.compact : ""}`}>
-      <div className={styles.chatCardHead}>
-        <MIcon name="comment" size={18} />
-        對話記錄
-      </div>
-
       <div className={styles.chatLog} aria-live="polite">
         {messages.map((message, index) => (
           <div

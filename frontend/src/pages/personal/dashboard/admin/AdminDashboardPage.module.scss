@@ -114,12 +114,12 @@
 }
 .assistantInput {
   display: grid;
-  min-height: 104px;
-  padding: $spacing-16;
-  /* 圖示與輸入區頂端對齊：多行輸入時圖示不要跟著跑到中間 */
-  grid-template-columns: 24px minmax(0, 1fr) auto;
-  align-items: start;
-  gap: $spacing-16;
+  min-height: 76px;
+  padding: 12px 12px 12px $spacing-16;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  /* 三個元素同一條中線：之前讓按鈕沉到底，中間會空出一塊 */
+  align-items: center;
+  gap: 12px;
   border: 1px solid var(--color-border);
   border-radius: $radius-12;
   color: var(--color-primary);
@@ -134,7 +134,7 @@
 }
 .assistantInput textarea {
   width: 100%;
-  min-height: 72px;
+  min-height: 46px;
   padding: 2px 0;
   border: 0;
   outline: 0;
@@ -151,10 +151,8 @@
 }
 .assistantInput button {
   display: inline-flex;
-  /* 送出鍵沉在右下角，跟多行輸入的視線終點對齊 */
-  align-self: end;
-  min-height: 52px;
-  padding: 0 $spacing-24;
+  min-height: 46px;
+  padding: 0 $spacing-16;
   align-items: center;
   justify-content: center;
   gap: $spacing-8;
