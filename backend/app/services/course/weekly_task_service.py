@@ -163,7 +163,7 @@ def list_student_weekly_tasks(
             ),
         )
         for week in weeks
-        if checkpoints_by_week.get(week.id)
+        if files_by_week.get(week.id) or checkpoints_by_week.get(week.id)
     ]
 
 
