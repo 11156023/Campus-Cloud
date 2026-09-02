@@ -38,6 +38,10 @@ export const ipcRouters: IpcRouters = {
       path: "tunnel/stop",
       controller: "tunnelController.stop"
     },
+    refresh: {
+      path: "tunnel/refresh",
+      controller: "tunnelController.refresh"
+    },
     getStatus: {
       path: "tunnel/getStatus",
       controller: "tunnelController.getStatus"
@@ -105,7 +109,7 @@ export const ipcRouters: IpcRouters = {
 
 export const listeners: Listeners = {
   watchTunnel: {
-    listenerMethod: "frpcProcessService.watchTunnel",
+    listenerMethod: "wireGuardTunnelService.watchTunnel",
     channel: "tunnel:watch"
   }
 };

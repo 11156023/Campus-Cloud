@@ -8,8 +8,8 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  ssh: [port: number];
-  rdp: [port: number];
+  ssh: [target: { host: string; port: number }];
+  rdp: [target: { host: string; port: number }];
 }>();
 
 const { t, locale } = useI18n();
@@ -43,13 +43,13 @@ const tunnelFor = (resource: SkyLabResource, service: string) =>
       String(tunnel.service).toLowerCase() === service
   );
 
-const validPort = (tunnel?: SkyLabTunnelInfo) => {
-  const port = Number(tunnel?.visitor_port);
-  return Number.isInteger(port) && port > 0 && port <= 65535;
+const validTarget = (tunnel?: SkyLabTunnelInfo) => {
+  const port = Number(tunnel?.port);
+  return !!tunnel?.host && Number.isInteger(port) && port > 0 && port <= 65535;
 };
 
 const canConnect = (resource: SkyLabResource, tunnel?: SkyLabTunnelInfo) =>
-  resource.status === "running" && validPort(tunnel);
+  resource.status === "running" && validTarget(tunnel);
 
 const formatExpiry = (value?: string | null) => {
   if (!value) return "—";
@@ -63,10 +63,10 @@ const formatExpiry = (value?: string | null) => {
 };
 
 const connect = (service: "ssh" | "rdp", tunnel?: SkyLabTunnelInfo) => {
-  if (!validPort(tunnel)) return;
-  const port = Number(tunnel?.visitor_port);
-  if (service === "ssh") emit("ssh", port);
-  else emit("rdp", port);
+  if (!validTarget(tunnel)) return;
+  const target = { host: String(tunnel?.host), port: Number(tunnel?.port) };
+  if (service === "ssh") emit("ssh", target);
+  else emit("rdp", target);
 };
 </script>
 

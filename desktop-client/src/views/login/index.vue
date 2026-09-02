@@ -3,7 +3,6 @@ import router from "@/router";
 import { useAppStore } from "@/store/app";
 import { on, removeRouterListeners, send } from "@/utils/ipcUtils";
 import { ElMessage } from "element-plus";
-import { ipcRenderer } from "electron";
 import { defineComponent, onMounted, onUnmounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { ipcRouters } from "../../../electron/core/IpcRouter";
@@ -46,12 +45,12 @@ onMounted(() => {
   on(ipcRouters.AUTH.startLogin, () => {
     waiting.value = true;
   });
-  ipcRenderer.on("auth:event", authEventHandler);
+  window.electronIpcRenderer.on("auth:event", authEventHandler);
 });
 
 onUnmounted(() => {
   removeRouterListeners(ipcRouters.AUTH.startLogin);
-  ipcRenderer.removeListener("auth:event", authEventHandler);
+  window.electronIpcRenderer.removeListener("auth:event", authEventHandler);
 });
 </script>
 

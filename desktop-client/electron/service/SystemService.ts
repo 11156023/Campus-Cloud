@@ -40,7 +40,7 @@ class SystemService {
     user = "root",
     host = "127.0.0.1"
   ): Promise<void> {
-    const sshCmd = `ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p ${port} ${user}@${host}`;
+    const sshCmd = `ssh -o StrictHostKeyChecking=accept-new -p ${port} ${user}@${host}`;
     if (process.platform === "win32") {
       const batPath = path.join(
         os.tmpdir(),

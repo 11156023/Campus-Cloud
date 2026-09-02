@@ -33,7 +33,7 @@ class SkyLabService {
           if (options.auth && token) {
             req.setHeader("Authorization", `Bearer ${token}`);
           }
-          let chunks: Buffer[] = [];
+          const chunks: Buffer[] = [];
           req.on("response", response => {
             response.on("data", chunk => chunks.push(chunk));
             response.on("end", () => {
@@ -77,10 +77,7 @@ class SkyLabService {
       "GET",
       `/api/v1/desktop-client/auth/poll?code=${encodeURIComponent(code)}`
     );
-    Logger.info(
-      "SkyLabService.pollDeviceCode",
-      `status=${res.status} body=${res.body}`
-    );
+    Logger.info("SkyLabService.pollDeviceCode", `status=${res.status}`);
     if (res.status === 404) {
       throw new BusinessError(
         ResponseCode.LOGIN_TIMEOUT,
@@ -95,6 +92,16 @@ class SkyLabService {
       status: data.status,
       accessToken: data.access_token || null
     };
+  }
+
+  async logout(): Promise<void> {
+    const res = await this.request("POST", "/api/v1/login/logout", {
+      auth: true,
+      body: {}
+    });
+    if (res.status !== 200 && res.status !== 401) {
+      throw new BusinessError(ResponseCode.BACKEND_ERROR, res.body);
+    }
   }
 
   async listResources(): Promise<SkyLabResource[]> {
@@ -151,6 +158,56 @@ class SkyLabService {
       throw new BusinessError(ResponseCode.BACKEND_ERROR, res.body);
     }
     return JSON.parse(res.body) as SkyLabTunnelConfig;
+  }
+
+  async connectWireGuard(
+    deviceId: string,
+    publicKey: string
+  ): Promise<SkyLabWireGuardConfig> {
+    const res = await this.request(
+      "POST",
+      "/api/v1/desktop-client/wireguard/connect",
+      {
+        auth: true,
+        body: { device_id: deviceId, public_key: publicKey }
+      }
+    );
+    if (res.status === 401) {
+      throw new BusinessError(ResponseCode.NOT_LOGGED_IN);
+    }
+    if (res.status !== 200) {
+      throw new BusinessError(ResponseCode.BACKEND_ERROR, res.body);
+    }
+    return JSON.parse(res.body) as SkyLabWireGuardConfig;
+  }
+
+  async refreshWireGuard(deviceId: string): Promise<SkyLabWireGuardConfig> {
+    const res = await this.request(
+      "POST",
+      "/api/v1/desktop-client/wireguard/refresh",
+      { auth: true, body: { device_id: deviceId } }
+    );
+    if (res.status === 401) {
+      throw new BusinessError(ResponseCode.NOT_LOGGED_IN);
+    }
+    if (res.status !== 200) {
+      throw new BusinessError(ResponseCode.BACKEND_ERROR, res.body);
+    }
+    return JSON.parse(res.body) as SkyLabWireGuardConfig;
+  }
+
+  async disconnectWireGuard(deviceId: string): Promise<void> {
+    const res = await this.request(
+      "POST",
+      "/api/v1/desktop-client/wireguard/disconnect",
+      { auth: true, body: { device_id: deviceId } }
+    );
+    if (res.status === 401) {
+      throw new BusinessError(ResponseCode.NOT_LOGGED_IN);
+    }
+    if (res.status !== 200) {
+      throw new BusinessError(ResponseCode.BACKEND_ERROR, res.body);
+    }
   }
 }
 

@@ -168,11 +168,10 @@
   },
   about: {
     name: "SkyLab Connect",
-    description:
-      "Securely reach your SkyLab virtual machines via frp reverse tunnels.",
+    description: "Securely reach your SkyLab virtual machines over WireGuard.",
     features: {
       oneClick: "One-click connect",
-      bundled: "Bundled frpc",
+      bundled: "WireGuard encrypted tunnel",
       secure: "Authorized VMs only"
     },
     version: "Version",

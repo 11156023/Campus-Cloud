@@ -10,6 +10,10 @@ interface ControllerParam {
   args: any;
 }
 
+interface Window {
+  electronIpcRenderer: Electron.IpcRenderer;
+}
+
 interface ListenerParam {
   channel: string;
   args: any[];
@@ -87,6 +91,8 @@ interface SkyLabTunnelInfo {
   proxy_name?: string;
   service?: string;
   visitor_port?: number;
+  host?: string;
+  port?: number;
   [key: string]: any;
 }
 
@@ -100,6 +106,27 @@ interface TunnelStatusInfo {
   lastStartTime: number;
   connectionError: string | null;
   tunnels: SkyLabTunnelInfo[];
+  mode?: "frp" | "wireguard";
+  interfaceName?: string | null;
+  latestHandshakeAt?: number | null;
+}
+
+interface SkyLabWireGuardConfig {
+  mode: "wireguard";
+  interface_name: string;
+  interface_address: string;
+  gateway_public_key: string;
+  endpoint: string;
+  allowed_ips: string[];
+  persistent_keepalive: number;
+  expires_in: number;
+  connections: Array<{
+    vmid: number;
+    name: string;
+    service: "ssh" | "rdp";
+    host: string;
+    port: number;
+  }>;
 }
 
 interface SkyLabSessionStatus {

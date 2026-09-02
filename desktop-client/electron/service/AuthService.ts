@@ -3,24 +3,50 @@ import { BusinessError, ResponseCode } from "../core/BusinessError";
 import Logger from "../core/Logger";
 import SkyLabService from "./SkyLabService";
 import SettingsService from "./SettingsService";
+import WireGuardTunnelService from "./WireGuardTunnelService";
 
 class AuthService {
   private readonly _SkyLabService: SkyLabService;
   private readonly _settingsService: SettingsService;
+  private readonly _tunnelService: WireGuardTunnelService;
   private _pollTimer: NodeJS.Timeout | null = null;
   private _loginInProgress = false;
 
   constructor(
     SkyLabService: SkyLabService,
-    settingsService: SettingsService
+    settingsService: SettingsService,
+    tunnelService: WireGuardTunnelService
   ) {
     this._SkyLabService = SkyLabService;
     this._settingsService = settingsService;
+    this._tunnelService = tunnelService;
+  }
+
+  private _tokenIsUsable(token: string): boolean {
+    try {
+      const parts = token.split(".");
+      if (parts.length !== 3) return false;
+      const payload = JSON.parse(
+        Buffer.from(parts[1], "base64url").toString("utf-8")
+      ) as { exp?: unknown };
+      return (
+        typeof payload.exp === "number" &&
+        Number.isFinite(payload.exp) &&
+        payload.exp > Math.floor(Date.now() / 1000) + 30
+      );
+    } catch {
+      return false;
+    }
   }
 
   async isLoggedIn(): Promise<boolean> {
     const token = await this._settingsService.getToken();
-    return !!token;
+    if (!token) return false;
+    if (!this._tokenIsUsable(token)) {
+      await this._settingsService.setToken("");
+      return false;
+    }
+    return true;
   }
 
   isLoginInProgress(): boolean {
@@ -68,10 +94,7 @@ class AuthService {
           }
           this._pollTimer = setTimeout(poll, 2000);
         } catch (err) {
-          Logger.warn(
-            "AuthService.startLogin.poll",
-            (err as Error).message
-          );
+          Logger.warn("AuthService.startLogin.poll", (err as Error).message);
           this._loginInProgress = false;
           this._pollTimer = null;
           onResult(false, (err as Error).message);
@@ -95,6 +118,19 @@ class AuthService {
 
   async logout(): Promise<void> {
     this.cancelLogin();
+    const token = await this._settingsService.getToken();
+    if (token) {
+      try {
+        await this._tunnelService.stopTunnel();
+      } catch (error) {
+        Logger.error("AuthService.logout.stopTunnel", error as Error);
+      }
+      try {
+        await this._SkyLabService.logout();
+      } catch (error) {
+        Logger.error("AuthService.logout.revokeToken", error as Error);
+      }
+    }
     await this._settingsService.setToken("");
   }
 }

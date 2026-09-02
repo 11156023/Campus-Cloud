@@ -24,12 +24,13 @@ defineComponent({ name: "Home" });
 const { t } = useI18n();
 const appStore = useAppStore();
 const loading = ref(false);
+const refreshing = ref(false);
 const operationError = ref("");
 const expandedCourses = ref<string[]>([]);
 
 const status = computed(() => {
-  if (!appStore.tunnelStatus.running) return "stopped";
   if (appStore.tunnelStatus.connectionError) return "error";
+  if (!appStore.tunnelStatus.running) return "stopped";
   return "running";
 });
 
@@ -59,6 +60,19 @@ const groupedResources = computed(() =>
   groupResourcesByCourse(visibleResources.value)
 );
 const machineCount = computed(() => visibleResources.value.length);
+const resourceAclSignature = computed(() =>
+  appStore.resources
+    .map(resource =>
+      [
+        resource.vmid,
+        resource.status,
+        resource.ip_address,
+        resource.can_control
+      ].join(":")
+    )
+    .sort()
+    .join("|")
+);
 
 watch(
   () => groupedResources.value.courseGroups.map(group => group.id),
@@ -72,6 +86,16 @@ watch(
   },
   { immediate: true }
 );
+
+watch(resourceAclSignature, (next, previous) => {
+  if (
+    appStore.tunnelStatus.running &&
+    previous !== undefined &&
+    next !== previous
+  ) {
+    send(ipcRouters.TUNNEL.refresh);
+  }
+});
 
 watch(
   () => appStore.tunnelStatus.running,
@@ -98,17 +122,26 @@ const handleDisconnect = () => {
 
 const refresh = () => {
   appStore.refreshResources();
-  send(ipcRouters.TUNNEL.getStatus);
+  if (appStore.tunnelStatus.running) {
+    refreshing.value = true;
+    send(ipcRouters.TUNNEL.refresh);
+  } else {
+    send(ipcRouters.TUNNEL.getStatus);
+  }
+};
+
+const refreshAfterNetworkRecovery = () => {
+  if (appStore.tunnelStatus.running) refresh();
 };
 
 const goSettings = () => router.push({ name: "Config" });
 
-const openSsh = (port: number) => {
-  send(ipcRouters.SYSTEM.openSsh, { port });
+const openSsh = (target: { host: string; port: number }) => {
+  send(ipcRouters.SYSTEM.openSsh, target);
 };
 
-const openRdp = (port: number) => {
-  send(ipcRouters.SYSTEM.openRdp, { port });
+const openRdp = (target: { host: string; port: number }) => {
+  send(ipcRouters.SYSTEM.openRdp, target);
 };
 
 onMounted(() => {
@@ -121,6 +154,19 @@ onMounted(() => {
     (_code, message) => {
       loading.value = false;
       operationError.value = message;
+    }
+  );
+  on(
+    ipcRouters.TUNNEL.refresh,
+    (data: TunnelStatusInfo) => {
+      refreshing.value = false;
+      if (data) appStore.tunnelStatus = data;
+      appStore.refreshResources();
+    },
+    (_code, message) => {
+      refreshing.value = false;
+      operationError.value = message;
+      ElMessage.error(message);
     }
   );
   on(
@@ -139,6 +185,7 @@ onMounted(() => {
   });
 
   refresh();
+  window.addEventListener("online", refreshAfterNetworkRecovery);
   if (router.currentRoute.value.query.connect === "1") {
     handleConnect();
     router.replace({ name: "Home" });
@@ -148,7 +195,9 @@ onMounted(() => {
 onUnmounted(() => {
   removeRouterListeners(ipcRouters.TUNNEL.start);
   removeRouterListeners(ipcRouters.TUNNEL.stop);
+  removeRouterListeners(ipcRouters.TUNNEL.refresh);
   removeRouterListeners(ipcRouters.TUNNEL.getStatus);
+  window.removeEventListener("online", refreshAfterNetworkRecovery);
 });
 </script>
 
@@ -215,7 +264,7 @@ onUnmounted(() => {
             <p>{{ t("resources.webSubtitle") }}</p>
           </div>
           <div class="resource-actions">
-            <el-button size="small" @click="refresh">
+            <el-button size="small" :loading="refreshing" @click="refresh">
               <IconifyIconOffline icon="refresh-rounded" />
               {{ t("common.refresh") }}
             </el-button>

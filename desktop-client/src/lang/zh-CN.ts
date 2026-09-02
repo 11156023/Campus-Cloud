@@ -163,10 +163,10 @@
   },
   about: {
     name: "SkyLab Connect",
-    description: "透過 frp 反向代理安全連線至您的 SkyLab 虛擬機。",
+    description: "透過 WireGuard 加密網路安全連線至您的 SkyLab 虛擬機。",
     features: {
       oneClick: "一鍵連線",
-      bundled: "免安裝 frpc",
+      bundled: "WireGuard 加密通道",
       secure: "僅對已授權的虛擬機開放"
     },
     version: "版本",
