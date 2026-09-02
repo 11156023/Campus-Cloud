@@ -222,32 +222,29 @@ export function RubricStats({
           </button>
         )}
       </div>
-      <div className={styles.statsGrid}>
-        <div className={styles.statBox}>
-          <p className={styles.statValue}>{total}</p>
-          <p className={styles.statLabel}>共幾題</p>
-        </div>
-        <div className={`${styles.statBox} ${styles.statBox_success}`}>
-          <p className={styles.statValue}>
-            <MIcon name="check_circle" size={16} />
-            {autoCount}
-          </p>
-          <p className={styles.statLabel}>可自動偵測（{pct(autoCount)}%）</p>
-        </div>
-        <div className={`${styles.statBox} ${styles.statBox_info}`}>
-          <p className={styles.statValue}>
-            <MIcon name="info" size={16} />
-            {partialCount}
-          </p>
-          <p className={styles.statLabel}>部分可偵測（{pct(partialCount)}%）</p>
-        </div>
-        <div className={`${styles.statBox} ${styles.statBox_danger}`}>
-          <p className={styles.statValue}>
-            <MIcon name="schedule" size={16} />
-            {manualCount}
-          </p>
-          <p className={styles.statLabel}>需人工評閱（{pct(manualCount)}%）</p>
-        </div>
+      <div
+        className={styles.statsBar}
+        role="img"
+        aria-label={`共 ${total} 題：可自動偵測 ${pct(autoCount)}%、部分可偵測 ${pct(partialCount)}%、需人工評閱 ${pct(manualCount)}%`}
+      >
+        {autoCount > 0 && <span className={styles.statsSeg_auto} style={{ flexGrow: autoCount }} />}
+        {partialCount > 0 && <span className={styles.statsSeg_partial} style={{ flexGrow: partialCount }} />}
+        {manualCount > 0 && <span className={styles.statsSeg_manual} style={{ flexGrow: manualCount }} />}
+      </div>
+      <div className={styles.statsLegend}>
+        <span className={styles.legendItem}>
+          <i className={styles.legendDot_auto} />
+          可自動偵測 {autoCount}（{pct(autoCount)}%）
+        </span>
+        <span className={styles.legendItem}>
+          <i className={styles.legendDot_partial} />
+          部分可偵測 {partialCount}（{pct(partialCount)}%）
+        </span>
+        <span className={styles.legendItem}>
+          <i className={styles.legendDot_manual} />
+          需人工評閱 {manualCount}（{pct(manualCount)}%）
+        </span>
+        <span className={styles.legendTotal}>共 {total} 題</span>
       </div>
     </div>
   );
@@ -1437,35 +1434,29 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
 
   return (
     <div className={styles.tabBody}>
-      <div className={styles.sectionHead}>
-        <div>
-          <h3 className={styles.sectionTitle}>評分表</h3>
-          <p className={styles.sectionDesc}>上傳評分文件，查看 AI 偵測判斷並調整評分項目</p>
+      {analysis && (
+        <div className={styles.tabToolbar}>
+          <button
+            type="button"
+            className={styles.btnSecondary}
+            onClick={handleExport}
+            disabled={isExporting}
+          >
+            {isExporting ? <Spinner /> : <MIcon name="download" size={16} />}
+            {isExporting ? "匯出中..." : "匯出 Excel"}
+          </button>
+          <button
+            type="button"
+            className={styles.btnPrimary}
+            onClick={handleCreateScript}
+            disabled={isCreatingScript || isChatting || readOnly || items.length === 0}
+            title={items.length === 0 ? "請先新增至少一個評估項目" : undefined}
+          >
+            {isCreatingScript ? <Spinner /> : <MIcon name="auto_fix_high" size={16} />}
+            {isCreatingScript ? "製作中..." : "製作檢查腳本"}
+          </button>
         </div>
-        {analysis && (
-          <div className={styles.sectionActions}>
-            <button
-              type="button"
-              className={styles.btnPrimary}
-              onClick={handleCreateScript}
-              disabled={isCreatingScript || isChatting || readOnly || items.length === 0}
-              title={items.length === 0 ? "請先新增至少一個評估項目" : undefined}
-            >
-              {isCreatingScript ? <Spinner /> : <MIcon name="auto_fix_high" size={16} />}
-              {isCreatingScript ? "製作中..." : "製作檢查腳本"}
-            </button>
-            <button
-              type="button"
-              className={styles.btnSecondary}
-              onClick={handleExport}
-              disabled={isExporting}
-            >
-              {isExporting ? <Spinner /> : <MIcon name="download" size={16} />}
-              {isExporting ? "匯出中..." : "匯出 Excel"}
-            </button>
-          </div>
-        )}
-      </div>
+      )}
 
       {isCreatingScript && (
         <div className={styles.noticeInfo}>
@@ -1609,7 +1600,12 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
                 <p className={styles.mutedText}>
                   主要評分情境：{getTemplateLabel(analysisTemplateKey)}
                 </p>
-                {analysis.summary && <p className={styles.summaryBox}>{analysis.summary}</p>}
+                {analysis.summary && (
+                  <details className={styles.summaryDetails}>
+                    <summary>AI 評估摘要</summary>
+                    <p>{analysis.summary}</p>
+                  </details>
+                )}
               </div>
 
               <div className={styles.card}>
@@ -1643,6 +1639,15 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
         </div>
 
         <div className={styles.analysisAside}>
+          {judgeSession?.id && onAddSource && (
+            <RubricSourceRail
+              classId={classId}
+              judgeSession={judgeSession}
+              readOnly={readOnly}
+              onSessionUpdated={onSessionUpdated}
+              onAddSource={onAddSource}
+            />
+          )}
           <div className={`${styles.card} ${styles.chatCard}`}>
             <h4 className={styles.cardTitle}>
               <MIcon name="smart_toy" size={18} />
@@ -1676,15 +1681,6 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
               disabled={readOnly || isChatting || isClearingMessages}
             />}
           </div>
-          {judgeSession?.id && onAddSource && (
-            <RubricSourceRail
-              classId={classId}
-              judgeSession={judgeSession}
-              readOnly={readOnly}
-              onSessionUpdated={onSessionUpdated}
-              onAddSource={onAddSource}
-            />
-          )}
         </div>
       </div>
 
@@ -1883,13 +1879,6 @@ function ScriptsTab({ classId, sessionId, readOnly = false, onScriptApproved }) 
 
   return (
     <div className={styles.tabBody}>
-      <div className={styles.sectionHead}>
-        <div>
-          <h3 className={styles.sectionTitle}>收集腳本</h3>
-          <p className={styles.sectionDesc}>管理班級內由評分表產生的受管收集腳本。</p>
-        </div>
-      </div>
-
       {loading ? (
         <LoadingState text="載入腳本中..." />
       ) : error ? (
@@ -2229,26 +2218,6 @@ function ExecutionTab({ classId, sessionId, readOnly = false, members }) {
 
   return (
     <div className={styles.tabBody}>
-      <div className={styles.sectionHead}>
-        <div>
-          <h3 className={styles.sectionTitle}>執行與結果</h3>
-          <p className={styles.sectionDesc}>
-            選擇班級內運行中的 VM/LXC，套用已核准的檢查腳本。
-          </p>
-        </div>
-        <button
-          type="button"
-          className={styles.btnPrimary}
-          onClick={() => setDialogOpen(true)}
-          disabled={
-            readOnly || selectedVmids.length === 0 || approvedScripts.length === 0
-          }
-        >
-          <MIcon name="play_circle_outline" size={16} />
-          執行腳本
-        </button>
-      </div>
-
       <div className={styles.execToolbar}>
         <span className={styles.mutedText}>
           可執行 {runningMembers.length} / 全部 {members.length} 台，已選{" "}
@@ -2270,6 +2239,17 @@ function ExecutionTab({ classId, sessionId, readOnly = false, members }) {
             disabled={selectedVmids.length === 0}
           >
             清除
+          </button>
+          <button
+            type="button"
+            className={styles.btnPrimary}
+            onClick={() => setDialogOpen(true)}
+            disabled={
+              readOnly || selectedVmids.length === 0 || approvedScripts.length === 0
+            }
+          >
+            <MIcon name="play_circle_outline" size={16} />
+            執行腳本
           </button>
         </div>
       </div>
@@ -2588,6 +2568,12 @@ function TeacherWorkspacePanel({ classId, members }) {
     () => sessions.find((item) => item.id === openMenuId) ?? null,
     [openMenuId, sessions],
   );
+  // 檢查名稱多半直接沿用評分表檔名；相同時 meta 列不再重複顯示一次
+  const activeSessionFilePrefix = useMemo(() => {
+    if (!activeSession) return "";
+    const fileLabel = getRubricDisplayName(activeSession.selected_file_name, "尚未選擇評分表");
+    return fileLabel === getRubricDisplayName(activeSession.title) ? "" : `${fileLabel} · `;
+  }, [activeSession]);
   const sessionMenuItemKeep = useDialogPresence(openSessionMenuItem, 130);
 
   const loadSessions = useCallback(async () => {
@@ -2871,7 +2857,7 @@ function TeacherWorkspacePanel({ classId, members }) {
 
         <section className={styles.sessionMain}>
           {creationView === "choose" ? <CreateCheckChooser onChoose={handleCreationChoice} onCancel={() => setCreationView(null)} /> : creationView ? <CreateCheckForm key={creationView} classId={classId} embedded initialMode={creationView} onClose={() => setCreationView("choose")} onCreated={handleCreated} /> : !activeSession ? <div className={styles.card}><div className={styles.mainEmpty}><MIcon name="checklist" size={30} /><p>{statusFilter === "active" ? "請從左側選擇一項檢查，或新增檢查。" : "請選擇已封存的檢查查看內容與結果。"}</p><button type="button" className={styles.btnPrimary} onClick={() => statusFilter === "active" ? (setSourceOnly(false), setCreationView("choose")) : setStatusFilter("active")}>{statusFilter === "active" ? "新增檢查" : "查看進行中"}</button></div></div> : <>
-            <div className={styles.sessionHeader}><div><h3>{activeSession.title}</h3><p>{getRubricDisplayName(activeSession.selected_file_name, "尚未選擇評分表")} · 對話 {activeSession.message_count ?? 0} · 腳本 {activeSession.script_count ?? 0} · 執行 {activeSession.run_count ?? 0}</p></div>{activeSession.status === "archived" && <span className={styles.archivedNotice}><MIcon name="lock" size={14} />這項檢查已封存，只能查看或複製</span>}</div>
+            <div className={styles.sessionHeader}><div><h3>{activeSession.title}</h3><p>{activeSessionFilePrefix}對話 {activeSession.message_count ?? 0} · 腳本 {activeSession.script_count ?? 0} · 執行 {activeSession.run_count ?? 0}</p></div>{activeSession.status === "archived" && <span className={styles.archivedNotice}><MIcon name="lock" size={14} />這項檢查已封存，只能查看或複製</span>}</div>
             <div className={styles.subTabs} role="tablist" aria-label="檢查工作頁籤">{TEACHER_JUDGE_TABS.map((tab) => <button key={tab.key} type="button" role="tab" aria-selected={activeTab === tab.key} className={activeTab === tab.key ? styles.subTabActive : styles.subTab} onClick={() => setActiveTab(tab.key)}><MIcon name={tab.icon} size={16} />{tab.label}</button>)}</div>
             {activeTab === "rubrics" && <RubricsTab key={activeSession.id} classId={classId} judgeSession={activeSession} onSessionUpdated={updateSessionInList} onAddSource={() => { setSourceOnly(true); setCreateOpen(true); }} onScriptCreated={() => { loadSessions(); setActiveTab("scripts"); }} showFileLibrary={false} />}
             {activeTab === "scripts" && <ScriptsTab classId={classId} sessionId={activeSession.id} readOnly={activeSession.status === "archived"} onScriptApproved={() => setActiveTab("execution")} />}

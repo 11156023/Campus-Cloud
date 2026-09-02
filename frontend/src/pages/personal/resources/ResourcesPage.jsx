@@ -169,7 +169,6 @@ function CreatingRow({ request, onCancelled }) {
     <tr className={`${styles.tr} ${styles.pendingRow}`}>
       <td className={styles.td}>
         <div className={styles.nameCell}>
-          <span className={styles.nameIcon}><MIcon name={type.icon} size={18} /></span>
           <div><strong>{request.hostname}</strong><small>{type.label} · {specs || "規格處理中"}</small></div>
         </div>
       </td>
@@ -263,7 +262,6 @@ function ResourceRow({ resource, onUpdated, onDeleted }) {
     <tr className={styles.tr} data-guide="resource-card">
       <td className={styles.td}>
         <div className={styles.nameCell}>
-          <span className={styles.nameIcon}><MIcon name={type.icon} size={18} /></span>
           <div>
             {resource.vmid > 0
               ? <button type="button" className={styles.nameLink} onClick={() => navigate(`/my-resources/${resource.vmid}`)}>{resource.name}</button>
@@ -327,7 +325,7 @@ function EnvironmentMachineRow({ machine, groupStatus, onUpdated }) {
 
   return <>
     <tr className={`${styles.tr} ${styles.environmentMachineRow}`}>
-    <td className={styles.td}><div className={`${styles.nameCell} ${styles.environmentMachineName}`}><span className={styles.machineBranch}>└</span><span className={styles.nameIcon}><MIcon name={type.icon} size={18} /></span><div><strong>{machine.name}</strong><small>{machine.role} · {type.label}</small></div></div></td>
+    <td className={styles.td}><div className={`${styles.nameCell} ${styles.environmentMachineName}`}><span className={styles.machineBranch}>└</span><div><strong>{machine.name}</strong><small>{machine.role} · {type.label}</small></div></div></td>
     <td className={styles.td}><div className={styles.envPrimary}>{machine.os}</div><div className={styles.envSub}>{machine.resource ? "已連接實際資源" : "建立中"}</div></td>
     <td className={styles.td}><StatusBadge status={machine.status} /></td>
     <td className={styles.td}><span className={styles.mono}>{machine.ip}</span></td>
@@ -362,16 +360,24 @@ function EnvironmentGroupRows({ group, onUpdated, onEnded }) {
   }
 
   return <>
-    <tr className={`${styles.tr} ${styles.environmentGroupRow}`}>
-      <td className={styles.td}><button type="button" className={styles.environmentToggle} aria-expanded={expanded} onClick={() => setExpanded((value) => !value)}><MIcon name={expanded ? "expand_more" : "chevron_right"} size={20} /><span className={styles.environmentIcon}><MIcon name={group.kind === "course" ? "school" : "bolt"} size={19} /></span><span><strong>{group.kindLabel}｜{group.title}</strong><small>{group.machines.length} 台機器 · 整組管理</small></span></button></td>
-      <td className={styles.td}><div className={styles.envPrimary}>{group.kind === "course" ? "課程多機環境" : "快速練習環境"}</div><div className={styles.envSub}>整組檢視、逐台操作</div></td>
+    <tr
+      className={`${styles.tr} ${styles.environmentGroupRow}`}
+      onClick={(event) => {
+        /* 整列都可以開合，但列內的按鈕（結束練習、名稱區的 toggle）各自處理自己的點擊 */
+        if (event.target.closest("button")) return;
+        setExpanded((value) => !value);
+      }}
+    >
+      <td className={styles.td}><button type="button" className={styles.environmentToggle} aria-expanded={expanded} onClick={() => setExpanded((value) => !value)}><MIcon name={expanded ? "expand_more" : "chevron_right"} size={20} /><span><strong>{group.kindLabel}｜{group.title}</strong><small>{group.machines.length} 台機器 · 整組管理</small></span></button></td>
+      <td className={styles.td}><div className={styles.envPrimary}>{group.kind === "course" ? "課程多機環境" : "快速練習環境"}</div><div className={styles.envSub}>整組檢視</div></td>
       <td className={styles.td}><StatusBadge status={group.status} /></td>
       <td className={styles.td}><span className={styles.muted}>展開查看</span></td>
       <td className={styles.td}><strong className={styles.environmentTiming}>{group.timingLabel}</strong></td>
       <td className={styles.td}>{group.nodeLabel}</td>
       <td className={styles.td}><div className={styles.groupActions}>
-        <button type="button" className={styles.terminalBtn} onClick={() => setExpanded((value) => !value)}><MIcon name="dns" size={14} />{expanded ? "收合機器" : "使用機器"}</button>
-        {canEnd && <button type="button" className={styles.terminalBtn} disabled={ending} onClick={() => setEndConfirm(true)}><MIcon name="stop_circle" size={14} />{ending ? "結束中…" : "結束練習"}</button>}
+        {canEnd
+          ? <button type="button" className={styles.terminalBtn} disabled={ending} onClick={() => setEndConfirm(true)}><MIcon name="stop_circle" size={14} />{ending ? "結束中…" : "結束練習"}</button>
+          : <span className={styles.muted}>展開查看</span>}
       </div></td>
     </tr>
     {expanded && group.machines.map((machine) => <EnvironmentMachineRow key={machine.id} machine={machine} groupStatus={group.status} onUpdated={onUpdated} />)}
@@ -510,6 +516,15 @@ export default function ResourcesPage() {
         ) : (
           <div className={styles.tableWrap}>
             <table className={styles.table}>
+              <colgroup>
+                <col />
+                <col className={styles.colEnv} />
+                <col className={styles.colStatus} />
+                <col className={styles.colIp} />
+                <col className={styles.colExpiry} />
+                <col className={styles.colNode} />
+                <col className={styles.colActions} />
+              </colgroup>
               <thead>
                 <tr><th className={styles.th}>名稱</th><th className={styles.th}>環境／系統</th><th className={styles.th}>狀態</th><th className={styles.th}>IP 位址</th><th className={styles.th}>到期日</th><th className={styles.th}>節點</th><th className={styles.th}>動作</th></tr>
               </thead>

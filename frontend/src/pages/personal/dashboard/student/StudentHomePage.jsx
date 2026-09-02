@@ -106,7 +106,7 @@ export default function StudentHomePage() {
 
       <PageHeader
         title={`今日課表 · ${todayLabel}`}
-        subtitle={view.paths.length > 0 ? `目前有 ${view.paths.length} 堂課` : "目前沒有課程"}
+        subtitle={view.paths.length > 0 ? `目前有 ${view.paths.length} 堂課` : undefined}
       >
         {view.paths.some((path) => path.schedule?.state === "now") && (
           <div className={styles.scheduleActions}>
@@ -177,29 +177,33 @@ export default function StudentHomePage() {
         </div>
 
         <div className={styles.needGrid}>
-          <article className={styles.needCard}>
+          <button type="button" className={styles.needCard} onClick={() => openCourseOverview()}>
             <div>
               <span className={styles.needBadge}>下課後練習 · 沿用原環境</span>
               <h3>繼續上次的課堂進度</h3>
               <p>回到相同課程與機器，任務、檔案及作答進度都會保留。</p>
             </div>
-            <button type="button" className={styles.secondaryButton} onClick={() => openCourseOverview()}>
+            <span className={styles.secondaryButton}>
               繼續練習
               <MIcon name="arrow_forward" size={18} />
-            </button>
-          </article>
+            </span>
+          </button>
 
-          <article className={`${styles.needCard} ${styles.researchCard}`}>
+          <button
+            type="button"
+            className={`${styles.needCard} ${styles.researchCard}`}
+            onClick={() => navigate("/my-requests")}
+          >
             <div>
               <span className={`${styles.needBadge} ${styles.needBadge_info}`}>自主研究 · 需要申請</span>
               <h3>建立自己的研究環境</h3>
               <p>適合專題、開發或實驗需求；這個入口先保留，申請流程將再持續優化。</p>
             </div>
-            <button type="button" className={styles.secondaryButton} onClick={() => navigate("/my-requests")}>
+            <span className={styles.secondaryButton}>
               前往我的申請
               <MIcon name="arrow_forward" size={18} />
-            </button>
-          </article>
+            </span>
+          </button>
         </div>
       </section>
 

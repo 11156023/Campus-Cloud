@@ -75,10 +75,21 @@
   @include table-wrap;
 }
 
+/* 欄寬由 <colgroup> 固定。auto layout 會依內容重算每一欄，
+   展開群組時多出的動作按鈕（終端機／啟動）會讓整張表的欄寬跳動，
+   所以改成 fixed；名稱欄不指定寬度，吸收剩下的空間。 */
 .table {
   @include table-base;
-  min-width: 980px;
+  table-layout: fixed;
+  min-width: 1080px;
 }
+
+.colEnv     { width: 160px; }
+.colStatus  { width: 100px; }
+.colIp      { width: 130px; }
+.colExpiry  { width: 150px; }
+.colNode    { width: 80px; }
+.colActions { width: 220px; }
 
 .th {
   @include table-th;
@@ -98,9 +109,9 @@
 
 .nameCell {
   display: flex;
-  min-width: 220px;
+  min-width: 0;
   align-items: center;
-  gap: $spacing-8;
+  gap: $spacing-16;
 
   > div {
     display: flex;
@@ -124,16 +135,6 @@
   }
 }
 
-.nameIcon {
-  width: 34px;
-  height: 34px;
-  border-radius: $radius-8;
-  color: var(--color-primary);
-  background: var(--color-hover);
-  @include flex-center;
-  flex: 0 0 auto;
-}
-
 .nameLink {
   padding: 0;
   border: 0;
@@ -150,21 +151,28 @@
 .envPrimary { color: var(--color-text-primary); font-size: $font-size-14; }
 .envSub, .muted { color: var(--color-text-muted); font-size: $font-size-12; }
 .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: $font-size-12; }
-.rowActions { display: flex; align-items: center; gap: $spacing-8; }
+/* 動作欄寬度固定，按鈕不換行也不壓縮，避免內容多寡影響版面。 */
+.rowActions { display: flex; align-items: center; gap: $spacing-8; flex-wrap: nowrap; > * { flex-shrink: 0; } }
 .pendingRow { background: color-mix(in srgb, var(--color-info) 4%, var(--color-surface)); }
 
+/* 群組列整列可開合，是這張表唯一可點的列。
+   hover 用比自身底色更深的主色調，和不可點的一般列（完全沒有 hover）明確區分；
+   游標與 hover 一起給，兩者不會各自漂移。 */
 .environmentGroupRow {
   background: color-mix(in srgb, var(--color-primary) 5%, var(--color-surface));
+  cursor: pointer;
 
-  &:hover { background: color-mix(in srgb, var(--color-primary) 8%, var(--color-surface)); }
+  &:hover {
+    background: color-mix(in srgb, var(--color-primary) 13%, var(--color-surface));
+  }
 }
 
-.environmentMachineRow { background: color-mix(in srgb, var(--color-hover) 30%, var(--color-surface)); }
+.environmentMachineRow { background: var(--color-surface); }
 
 .environmentToggle {
   display: flex;
   width: 100%;
-  min-width: 250px;
+  min-width: 0;
   align-items: center;
   gap: $spacing-8;
   padding: 0;
@@ -180,18 +188,9 @@
   small { color: var(--color-text-muted); font-size: $font-size-12; }
 }
 
-.environmentIcon {
-  width: 34px;
-  height: 34px;
-  border-radius: $radius-8;
-  color: var(--color-primary);
-  background: color-mix(in srgb, var(--color-primary) 11%, var(--color-surface));
-  @include flex-center;
-  flex: 0 0 auto;
-}
-
 .environmentMachineName { padding-left: $spacing-24; }
-.machineBranch { color: var(--color-border); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: $font-size-18; }
+/* 拿掉機器列圖示後，階層全靠這個字元表達，顏色要看得見。 */
+.machineBranch { color: var(--color-text-muted); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: $font-size-18; }
 .environmentTiming { color: var(--color-primary); font-size: $font-size-12; font-weight: $font-weight-500; white-space: nowrap; }
 
 /* ── Resource card ── */
@@ -321,7 +320,7 @@
 .badge_success { background: color-mix(in srgb, var(--color-success) 12%, transparent); color: var(--color-success); }
 .badge_danger  { background: color-mix(in srgb, var(--color-danger)  12%, transparent); color: var(--color-danger); }
 .badge_info    { background: color-mix(in srgb, var(--color-info)    12%, transparent); color: var(--color-info); }
-.badge_muted   { background: color-mix(in srgb, var(--color-status-neutral) 12%, transparent); color: var(--color-status-neutral); }
+.badge_muted   { background: var(--color-hover); color: var(--color-status-neutral); }
 
 /* ── Type / VMID chips ── */
 .cardChips {

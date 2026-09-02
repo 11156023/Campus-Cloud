@@ -210,6 +210,7 @@ function RequestRow({ req, onUpdated }) {
   const hasDetail =
     formItems.length > 0 || req.reason || startFmt || showRejection ||
     showFailure || showWaiting;
+  const hasAction = canRetry(req) || canCancel(req) || isProvisionedButFailed(req);
 
   async function handleCancel() {
     setCancelling(true);
@@ -242,13 +243,27 @@ function RequestRow({ req, onUpdated }) {
     <>
       <tr
         className={`${styles.tr} ${hasDetail ? styles.trClickable : ""} ${expanded ? styles.trExpanded : ""}`}
-        onClick={hasDetail ? () => setExpanded((v) => !v) : undefined}
+        onClick={hasDetail ? (event) => {
+          /* 整列都可以開合，列內的按鈕（重試、撤銷…）各自處理自己的點擊 */
+          if (event.target.closest("button")) return;
+          setExpanded((v) => !v);
+        } : undefined}
       >
         <td className={styles.td}>
           <div className={styles.nameCell}>
-            <div className={styles.nameIcon}>
-              <MIcon name={type.icon} size={18} />
-            </div>
+            {hasDetail ? (
+              <button
+                type="button"
+                className={styles.expandBtn}
+                aria-expanded={expanded}
+                aria-label={expanded ? "收合詳細資訊" : "展開詳細資訊"}
+                onClick={() => setExpanded((v) => !v)}
+              >
+                <MIcon name={expanded ? "expand_more" : "chevron_right"} size={16} />
+              </button>
+            ) : (
+              <span className={styles.expandPlaceholder} aria-hidden="true" />
+            )}
             <div className={styles.nameMeta}>
               <span className={styles.namePrimary}>{req.hostname}</span>
               <span className={styles.nameSub}>
@@ -266,8 +281,9 @@ function RequestRow({ req, onUpdated }) {
         </td>
         <td className={styles.td}>{formatDate(req.created_at)}</td>
         <td className={styles.td}><StatusBadge req={req} /></td>
-        <td className={styles.td} onClick={(e) => e.stopPropagation()}>
+        <td className={styles.td}>
           <div className={styles.rowActions}>
+            {!hasAction && <span className={styles.emptyAction}>—</span>}
             {canRetry(req) && (
               <button type="button" className={styles.retryBtn} disabled={retrying} onClick={handleRetry}>
                 <MIcon name="refresh" size={13} />
@@ -284,15 +300,6 @@ function RequestRow({ req, onUpdated }) {
               <button type="button" className={styles.retryBtn} onClick={() => navigate("/my-resources")}>
                 <MIcon name="inventory_2" size={13} />
                 前往我的資源
-              </button>
-            )}            {hasDetail && (
-              <button
-                type="button"
-                className={`${styles.expandBtn} ${expanded ? styles.expandBtnOpen : ""}`}
-                aria-label={expanded ? "收合詳細資訊" : "展開詳細資訊"}
-                onClick={() => setExpanded((v) => !v)}
-              >
-                <MIcon name="expand_more" size={16} />
               </button>
             )}
           </div>
@@ -360,7 +367,7 @@ function SkeletonRow() {
     <tr className={styles.tr} aria-hidden>
       <td className={styles.td}>
         <div className={styles.nameCell}>
-          <div className={`${styles.nameIcon} ${styles.skeleton}`} />
+          <span className={styles.expandPlaceholder} aria-hidden="true" />
           <div className={styles.nameMeta}>
             <div className={`${styles.skeleton} ${styles.skRow}`} style={{ width: 110, height: 13 }} />
             <div className={`${styles.skeleton} ${styles.skRow}`} style={{ width: 70, height: 10 }} />

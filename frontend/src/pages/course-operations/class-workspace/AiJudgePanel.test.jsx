@@ -27,8 +27,9 @@ describe("RubricStats", () => {
       <RubricStats items={items} onReassess={() => {}} />,
     );
 
-    expect(html).toContain("可自動偵測（25%）");
-    expect(html).toContain("部分可偵測（25%）");
+    expect(html).toContain("可自動偵測 1（25%）");
+    expect(html).toContain("部分可偵測 1（25%）");
+    expect(html).toContain("共 4 題");
     expect(html).toContain("評估結果已更新");
     expect(html).toContain("重新評估");
   });

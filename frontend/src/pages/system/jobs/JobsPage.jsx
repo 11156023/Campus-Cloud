@@ -190,13 +190,9 @@ export default function JobsPage() {
                     key={j.id}
                     className={styles.tr}
                     onClick={() => setFocusJobId(j.id)}
-                    style={{ cursor: "pointer" }}
                   >
                     <td className={styles.td}>
                       <div className={styles.nameCell}>
-                        <div className={styles.nameIcon}>
-                          <MIcon name="task" size={18} />
-                        </div>
                         <div>
                           <div className={styles.namePrimary}>{j.title ?? j.id}</div>
                           <div className={styles.nameSub}>{j.id}</div>
