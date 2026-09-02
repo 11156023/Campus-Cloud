@@ -206,7 +206,7 @@ const MSG = {
   scheduleOutOfRange: "租借時段需在未來三個月內",
 };
 
-export default function RequestFormPage({ onBack, className }) {
+export default function RequestFormPage({ onBack, className, initialPrefill = null }) {
   const { user }  = useAuth();
   const toast     = useToast();
   const isPrivileged = user?.is_superuser || user?.role === "admin" || user?.role === "teacher";
@@ -632,6 +632,15 @@ export default function RequestFormPage({ onBack, className }) {
     );
   }
 
+  /* AI 助手在別的頁面談完需求後，會帶著推薦配置導到這裡。等候選清單載入完再套用，
+     否則 LXC 應用範本會對不到目錄項目而退回成映像檔。 */
+  const [aiPrefilled, setAiPrefilled] = useState(false);
+  useEffect(() => {
+    if (!initialPrefill || aiPrefilled || sysTplLoading) return;
+    applyAiPrefill(initialPrefill);
+    setAiPrefilled(true);
+  }, [initialPrefill, aiPrefilled, sysTplLoading]); // eslint-disable-line react-hooks/exhaustive-deps
+
   function handleBack() {
     setClosing(true);
     setTimeout(onBack, 180);
@@ -848,6 +857,14 @@ export default function RequestFormPage({ onBack, className }) {
           返回
         </button>
       </PageHeader>
+
+      {/* AI 代填一定要說出來：使用者要知道哪些值不是自己填的 */}
+      {aiPrefilled && (
+        <p className={styles.adviceBox}>
+          <MIcon name="auto_awesome" size={15} />
+          {" "}以下欄位由 AI 依你的描述預填，送出前請逐項確認；帳號與密碼一律由你自己輸入。
+        </p>
+      )}
 
       {/* ── 主體：表單 + AI 側欄 ── */}
       <div className={styles.formPageBody}>

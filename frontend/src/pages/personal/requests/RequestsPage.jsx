@@ -414,6 +414,8 @@ export default function RequestsPage() {
   const [error, setError]       = useState(false);
   const [view, setView]         = useState(location.state?.create ? VIEW_CREATE : VIEW_LIST);
   const [returning, setReturning] = useState(false);
+  /* AI 助手談完需求後會把推薦配置一起帶過來 */
+  const [pendingPrefill, setPendingPrefill] = useState(location.state?.prefill ?? null);
 
   /** silent = true 時不觸發 loading / error state，供背景自動刷新使用 */
   const fetchRequests = useCallback(async (silent = false) => {
@@ -443,7 +445,8 @@ export default function RequestsPage() {
      只會換掉 location.state。這裡補上反應，讓表單照樣打開。 */
   useEffect(() => {
     if (location.state?.create) setView(VIEW_CREATE);
-  }, [location.key, location.state?.create]);
+    if (location.state?.prefill) setPendingPrefill(location.state.prefill);
+  }, [location.key, location.state?.create, location.state?.prefill]);
 
   useAutoRefresh(() => {
     if (view === "list") fetchRequests(true);
@@ -458,7 +461,8 @@ export default function RequestsPage() {
       <RequestFormPage
         key="create"
         className={styles.animSlideInRight}
-        onBack={() => { setReturning(true); setView(VIEW_LIST); }}
+        initialPrefill={pendingPrefill}
+        onBack={() => { setReturning(true); setView(VIEW_LIST); setPendingPrefill(null); }}
       />
     );
   }

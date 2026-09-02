@@ -257,6 +257,73 @@
   }
 }
 
+/* 開場的能力說明：三種能力共用一個對話框，這裡是唯一會講出來的地方 */
+.capabilities {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-8;
+  width: 100%;
+  margin: 4px 0 16px;
+  padding: 0;
+  text-align: left;
+
+  li {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--color-border);
+    border-radius: $radius-12;
+    background: var(--color-surface);
+  }
+
+  span { display: flex; flex-direction: column; gap: 2px; }
+  strong { font-size: $font-size-14; }
+  small { color: var(--color-text-muted); font-size: $font-size-12; }
+}
+
+/* 推薦出來的配置 + 一鍵帶去填好的申請單 */
+.planCard {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--color-primary);
+  border-radius: $radius-12;
+  background: var(--color-surface);
+
+  button {
+    width: 100%;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-top: 10px;
+    padding: 10px 12px;
+    border: none;
+    border-radius: $radius-8;
+    background: var(--color-primary);
+    color: var(--color-text-on-primary);
+    text-align: left;
+    cursor: pointer;
+
+    &:hover { filter: brightness(1.05); }
+
+    span { display: flex; flex-direction: column; gap: 2px; }
+    strong { font-size: $font-size-14; }
+    small { opacity: 0.85; font-size: $font-size-12; }
+  }
+}
+
+.planSpec {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  font-size: $font-size-14;
+  color: var(--color-text-secondary);
+}
+
 /* 流程導覽：目前這一步高亮，已經過的那幾步壓低對比 */
 .stepList {
   list-style: none;
