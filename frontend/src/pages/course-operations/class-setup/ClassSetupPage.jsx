@@ -223,7 +223,7 @@ export default function ClassSetupPage() {
   if (loading) return <LoadingState fullPage text="正在恢復班級設定…" />;
 
   return <div className={styles.page}>
-    <PageHeader title={item?.name || "建立完整課程班級"} subtitle="依序完成課表、學生、環境與每週任務；每一步都會保存到正式班級。">
+    <PageHeader title={item?.name || "一鍵建立班級"} subtitle="依序完成課表、學生、環境與每週任務；每一步都會保存到正式班級。">
       <button type="button" className={styles.backBtn} onClick={() => navigate("/class-management")}><MIcon name="arrow_back" size={18} />返回班級管理</button>
     </PageHeader>
 

@@ -200,7 +200,7 @@ export default function AiApiReviewPage() {
 
   return (
     <div className={styles.page}>
-      <PageHeader title="AI API 申請審核" subtitle="審核申請並核發 API 存取參數。" />
+      <PageHeader eyebrow="AI 服務" title="申請審核" subtitle="審核申請並核發 API 存取參數。" />
 
       <div className={styles.tabs}>
         {TABS.map((tab) => (

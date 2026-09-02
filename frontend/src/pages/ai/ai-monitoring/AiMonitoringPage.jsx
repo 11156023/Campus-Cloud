@@ -199,7 +199,7 @@ export default function AiMonitoringPage() {
 
   return (
     <div className={styles.page}>
-      <PageHeader title="AI API 使用監控" subtitle="檢視 AI Proxy 與 Template 服務的呼叫紀錄與用量統計">
+      <PageHeader title="使用監控" subtitle="檢視 AI Proxy 與 Template 服務的呼叫紀錄與用量統計">
         <div className={styles.pageActions}>
           <div className={styles.segment}>
             {PRESETS.map((p) => (

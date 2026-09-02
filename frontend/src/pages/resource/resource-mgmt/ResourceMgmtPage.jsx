@@ -590,7 +590,7 @@ export default function ResourceMgmtPage() {
   return (
     <div className={styles.page}>
       {/* ── 頁首 ── */}
-      <PageHeader title="虛擬機與容器" subtitle="查看與管理系統中所有虛擬機與 LXC 容器">
+      <PageHeader title="資源管理" subtitle="查看與管理系統中所有虛擬機與 LXC 容器">
         <div className={styles.pageActions}>
           <button type="button" className={styles.btnPrimary} onClick={() => navigate("/my-requests")}>
             <MIcon name="add" size={16} />

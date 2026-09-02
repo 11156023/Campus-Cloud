@@ -458,7 +458,7 @@ export default function GatewayPage() {
 
   return (
     <div className={styles.page}>
-      <PageHeader title="Gateway VM 管理" subtitle="管理 haproxy、Traefik、frp 服務設定與狀態">
+      <PageHeader title="閘道 VM" subtitle="管理 haproxy、Traefik、frp 服務設定與狀態">
 
         <div className={styles.tabs}>
           {TABS.map((tab) => (

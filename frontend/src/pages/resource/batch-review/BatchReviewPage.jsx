@@ -184,7 +184,7 @@ export default function BatchReviewPage() {
 
   return (
     <div className={styles.page}>
-      <PageHeader title="批量建立審核" subtitle="審核教師提交的批次 VM 配置申請" />
+      <PageHeader title="批量審核" subtitle="審核教師提交的批次 VM 配置申請" />
 
       <div className={styles.statRow}>
         <div className={styles.statCard}>

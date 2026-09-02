@@ -53,7 +53,7 @@ export default function CoursePathsPage() {
   return (
     <div className={styles.page}>
       <PageHeader
-        title="我的課程"
+        title="課程學習（非正式）"
         subtitle="選擇課程後，直接查看截至今天的任務與老師分配的練習機器。"
       />
 
