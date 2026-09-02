@@ -35,7 +35,7 @@ function sentBody() {
 }
 
 describe("AiNavigationService.resolve", () => {
-  test("帶上前文、目前頁面與會話 id", async () => {
+  test("帶上前文與目前頁面", async () => {
     fetchMock.mockResolvedValueOnce(jsonRes(200, { action: "clarify" }));
 
     await AiNavigationService.resolve("然後呢？", {
@@ -44,7 +44,6 @@ describe("AiNavigationService.resolve", () => {
         { role: "assistant", content: "先去填申請單" },
       ],
       currentPath: "/my-requests",
-      sessionId: "nav-1",
     });
 
     expect(sentBody()).toEqual({
@@ -54,7 +53,6 @@ describe("AiNavigationService.resolve", () => {
         { role: "assistant", content: "先去填申請單" },
       ],
       current_path: "/my-requests",
-      session_id: "nav-1",
     });
   });
 
@@ -113,7 +111,6 @@ describe("AiNavigationService.resolve", () => {
       query: "帶我到我的資源",
       history: [],
       current_path: null,
-      session_id: null,
     });
   });
 });

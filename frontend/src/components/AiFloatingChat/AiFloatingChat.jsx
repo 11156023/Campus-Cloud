@@ -91,10 +91,6 @@ function pageContextFor(pathname) {
   return PAGE_CONTEXTS.find((item) => item.match.test(pathname)) ?? DEFAULT_CONTEXT;
 }
 
-function newSessionId() {
-  return globalThis.crypto?.randomUUID?.() ?? `nav-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
-
 function displayName(user) {
   return user?.full_name?.trim() || user?.email?.split("@")[0] || "你好";
 }
@@ -262,8 +258,6 @@ export default function AiFloatingChat({ open = false, onOpenChange = () => {} }
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef(null);
   const inputRef = useRef(null);
-  // 只用來把同一段對話的用量記錄串起來；按「建立新對話」就換一個
-  const sessionIdRef = useRef(newSessionId());
   // 配置模式：{ answered, total }，null 代表沒在配置模式
   const [intake, setIntake] = useState(null);
   // 問過哪幾格。問句由推薦 AI 生成，字面對不上，只能自己記
@@ -291,7 +285,6 @@ export default function AiFloatingChat({ open = false, onOpenChange = () => {} }
     setIntake(null);
     askedRef.current = [];
     flowRef.current = null;
-    sessionIdRef.current = newSessionId();
     inputRef.current?.focus();
   }
 
@@ -306,7 +299,6 @@ export default function AiFloatingChat({ open = false, onOpenChange = () => {} }
       // 送出前的前文（不含這一輪），讓「然後呢」這種追問有東西可以指
       history: nextHistory.slice(0, -1),
       currentPath: location.pathname,
-      sessionId: sessionIdRef.current,
     });
     const steps = data.steps ?? [];
 

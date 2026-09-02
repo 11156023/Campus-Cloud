@@ -6,7 +6,7 @@ export const AiNavigationService = {
    *
    * @param {string} query 這一輪的問題
    * @param {{history?: {role: "user"|"assistant", content: string}[],
-   *          currentPath?: string, sessionId?: string}} options
+   *          currentPath?: string}} options
    *   history 是同一段對話的前文（伺服器端沒有會話表，由前端保存），
    *   currentPath 讓後端判斷流程已經走到哪一步。
    *
@@ -14,7 +14,7 @@ export const AiNavigationService = {
    *        primary?: { title, path, reason, state? }, suggestions: [...],
    *        clarification_question?, flow_id?, flow_title?, steps: [...], active_step? }
    */
-  resolve(query, { history = [], currentPath = null, sessionId = null } = {}) {
+  resolve(query, { history = [], currentPath = null } = {}) {
     return apiPost("/api/v1/ai/navigation/resolve", {
       query,
       history: history
@@ -25,7 +25,6 @@ export const AiNavigationService = {
           content: String(message.content ?? "").slice(0, 2000),
         })),
       current_path: currentPath,
-      session_id: sessionId,
     });
   },
 

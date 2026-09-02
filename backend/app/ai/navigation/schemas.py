@@ -27,8 +27,6 @@ class NavigationResolveRequest(BaseModel):
     )
     # 使用者目前所在的頁面路徑，用來判斷流程走到哪一步。
     current_path: str | None = Field(default=None, max_length=200)
-    # 只用於把同一段對話的用量記錄串起來，不影響回覆內容。
-    session_id: str | None = Field(default=None, max_length=64)
 
 
 class NavigationStepPublic(BaseModel):
