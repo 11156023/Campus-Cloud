@@ -141,7 +141,8 @@ function StepList({ steps, currentPath, floor = 0, onNavigate, onRecommend }) {
             />
             <span>
               <strong>{index + 1}. {step.title}</strong>
-              {step.detail && <small>{step.detail}</small>}
+              {/* 做完的步驟只留標題，說明文字佔掉的版面留給還沒做的 */}
+              {step.detail && statuses[index] !== "done" && <small>{step.detail}</small>}
             </span>
           </button>
         </li>
@@ -173,16 +174,18 @@ function PlanCard({ plan, onNavigate }) {
 /* 配置模式的答案晶片：點一下就等於打了那句話 */
 function ChoiceRow({ choices, progress, onAnswer, onPlanNow }) {
   return (
-    <div className={styles.choiceRow}>
-      {choices.map((choice) => (
-        <button key={choice} type="button" onClick={() => onAnswer(choice)}>
-          {choice}
-        </button>
-      ))}
-      <button type="button" className={styles.choiceSkip} onClick={onPlanNow}>
-        直接產生配置
-      </button>
+    <div className={styles.choiceBlock}>
       {progress && <span className={styles.choiceProgress}>{progress}</span>}
+      <div className={styles.choiceRow}>
+        {choices.map((choice) => (
+          <button key={choice} type="button" onClick={() => onAnswer(choice)}>
+            {choice}
+          </button>
+        ))}
+        <button type="button" className={styles.choiceSkip} onClick={onPlanNow}>
+          直接產生配置
+        </button>
+      </div>
     </div>
   );
 }
@@ -205,6 +208,8 @@ function Message({ message, currentPath, onNavigate, onRecommend, onAnswer, onPl
             <ReactMarkdown rehypePlugins={[rehypeSanitize]}>{message.content}</ReactMarkdown>
           </div>
         )}
+        {/* 先給結果（配置），再給接下來要做的事（流程），最後才是選項 */}
+        {message.plan && <PlanCard plan={message.plan} onNavigate={onNavigate} />}
         {message.steps?.length > 0 && (
           <StepList
             steps={message.steps}
@@ -222,7 +227,6 @@ function Message({ message, currentPath, onNavigate, onRecommend, onAnswer, onPl
             onPlanNow={onPlanNow}
           />
         )}
-        {message.plan && <PlanCard plan={message.plan} onNavigate={onNavigate} />}
         {message.targets?.length > 0 && (
           <div className={styles.actionList}>
             {message.targets.map((target) => (

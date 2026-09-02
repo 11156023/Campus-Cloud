@@ -184,7 +184,7 @@
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
   animation: messageIn 150ms ease both;
 }
 
@@ -343,28 +343,34 @@
   li {
     display: flex;
     align-items: flex-start;
-    gap: 10px;
-    padding: 10px 12px;
+    gap: 11px;
+    padding: 12px 14px;
     border: 1px solid var(--color-border);
     border-radius: $radius-12;
     background: var(--color-surface);
   }
 
-  span { display: flex; flex-direction: column; gap: 2px; }
+  span { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
   strong { font-size: $font-size-14; }
   small { color: var(--color-text-muted); font-size: $font-size-12; }
 }
 
 /* 配置模式的答案晶片：點一下就等於回答，不用打字 */
+.choiceBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 14px;
+}
+
 .choiceRow {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
-  margin-top: 10px;
+  gap: 8px;
 
   button {
-    padding: 6px 12px;
+    padding: 8px 14px;
     border: 1px solid var(--color-border);
     border-radius: $radius-pill;
     background: var(--color-surface);
@@ -385,15 +391,14 @@
 }
 
 .choiceProgress {
-  margin-left: auto;
   color: var(--color-text-muted);
   font-size: $font-size-12;
 }
 
 /* 推薦出來的配置 + 一鍵帶去填好的申請單 */
 .planCard {
-  margin-top: 12px;
-  padding: 12px;
+  margin-top: 14px;
+  padding: 14px;
   border: 1px solid var(--color-primary);
   border-radius: $radius-12;
   background: var(--color-surface);
@@ -403,8 +408,8 @@
     display: flex;
     align-items: flex-start;
     gap: 10px;
-    margin-top: 10px;
-    padding: 10px 12px;
+    margin-top: 12px;
+    padding: 12px 14px;
     border: none;
     border-radius: $radius-8;
     background: var(--color-primary);
@@ -424,10 +429,11 @@
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
   margin: 0;
   padding: 0;
   font-size: $font-size-14;
+  line-height: 1.6;
   color: var(--color-text-secondary);
 }
 
@@ -436,16 +442,16 @@
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: $spacing-8;
-  margin: 12px 0 0;
+  gap: 10px;
+  margin: 14px 0 0;
   padding: 0;
 
   button {
     width: 100%;
     display: flex;
     align-items: flex-start;
-    gap: 10px;
-    padding: 10px 12px;
+    gap: 11px;
+    padding: 13px 14px;
     border: 1px solid var(--color-border);
     border-radius: $radius-12;
     background: var(--color-surface);
@@ -455,9 +461,13 @@
 
     &:hover { border-color: var(--color-primary); }
 
-    span { display: flex; flex-direction: column; gap: 2px; }
-    strong { font-size: $font-size-14; }
-    small { color: var(--color-text-muted); font-size: $font-size-12; }
+    span { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+    strong { font-size: $font-size-14; line-height: 1.45; }
+    small {
+      color: var(--color-text-muted);
+      font-size: $font-size-12;
+      line-height: 1.7;
+    }
   }
 }
 
@@ -467,9 +477,9 @@
 }
 
 .step_done button {
-  opacity: 0.62;
-
-  strong { text-decoration: line-through; }
+  opacity: 0.55;
+  padding-top: 10px;
+  padding-bottom: 10px;
 }
 
 .step_todo button {

@@ -441,10 +441,11 @@ export default function RequestsPage() {
     if (view === "list") fetchRequests();
   }, [view, fetchRequests]);
 
-  /* 已經停在本頁時 useState 的初值不會再跑一次，所以導覽助手在這頁按「填寫申請單」
-     只會換掉 location.state。這裡補上反應，讓表單照樣打開。 */
+  /* 已經停在本頁時 useState 的初值不會再跑一次，所以導覽助手在這頁按步驟
+     只會換掉 location.state。兩個方向都要跟：帶 create 就開表單，沒帶就回列表
+     （流程裡的「等待審核」指的就是列表，按了不能沒反應）。 */
   useEffect(() => {
-    if (location.state?.create) setView(VIEW_CREATE);
+    setView(location.state?.create ? VIEW_CREATE : VIEW_LIST);
     if (location.state?.prefill) setPendingPrefill(location.state.prefill);
   }, [location.key, location.state?.create, location.state?.prefill]);
 

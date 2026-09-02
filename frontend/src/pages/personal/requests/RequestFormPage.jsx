@@ -1,4 +1,4 @@
-import { useContext, useEffect, useMemo, useState } from "react";
+import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import styles from "./RequestFormPage.module.scss";
 import { LayoutContext } from "../../../layout/DashboardLayout";
 import { useAuth } from "../../../contexts/AuthContext";
@@ -599,11 +599,15 @@ export default function RequestFormPage({ onBack, className, initialPrefill = nu
   /* AI 助手在別的頁面談完需求後，會帶著推薦配置導到這裡。等候選清單載入完再套用，
      否則 LXC 應用範本會對不到目錄項目而退回成映像檔。 */
   const [aiPrefilled, setAiPrefilled] = useState(false);
+  const appliedPrefillRef = useRef(null);
   useEffect(() => {
-    if (!initialPrefill || aiPrefilled || sysTplLoading) return;
+    if (!initialPrefill || sysTplLoading) return;
+    // 比對物件本身而不是布林旗標：助手再規劃一次帶新的配置過來時要能重新套用
+    if (appliedPrefillRef.current === initialPrefill) return;
+    appliedPrefillRef.current = initialPrefill;
     applyAiPrefill(initialPrefill);
     setAiPrefilled(true);
-  }, [initialPrefill, aiPrefilled, sysTplLoading]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [initialPrefill, sysTplLoading]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleBack() {
     setClosing(true);
