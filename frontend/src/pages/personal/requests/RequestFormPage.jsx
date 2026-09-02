@@ -228,6 +228,8 @@ export default function RequestFormPage({ onBack, className, initialPrefill = nu
   const [vmTemplates, setVmTemplates]   = useState([]);
   const [vmLoading, setVmLoading]       = useState(false);
   const [gpuOptions, setGpuOptions]     = useState([]);
+  /* AI 建議的 GPU：等可用清單就緒才敢寫進表單（見下方 effect） */
+  const [pendingGpu, setPendingGpu]     = useState(null);
   const [gpuLoading, setGpuLoading]     = useState(false);
   const [gpuOptionsKey, setGpuOptionsKey] = useState("");
 
@@ -497,6 +499,11 @@ export default function RequestFormPage({ onBack, className, initialPrefill = nu
     if (!prefill) return;
     const nextResourceType = prefill.resource_type === "vm" ? "vm" : "lxc";
     setResourceType(nextResourceType);
+    setPendingGpu(
+      nextResourceType === "vm" && prefill.gpu_mapping_id
+        ? String(prefill.gpu_mapping_id)
+        : null,
+    );
     /* AI 選了容器應用範本時給的是 PVE VMID，要換回目錄項目的 id */
     const lxcCatalogPick = nextResourceType === "lxc" && prefill.lxc_template_id
       ? catalogChoices.find((item) => (
@@ -539,9 +546,9 @@ export default function RequestFormPage({ onBack, className, initialPrefill = nu
         disk_size: nextResourceType === "vm" && disk
           ? Math.max(20, disk)
           : prev.disk_size,
-        gpu_mapping_id: nextResourceType === "vm" && prefill.gpu_mapping_id
-          ? prefill.gpu_mapping_id
-          : "",
+        /* GPU 由 pendingGpu 那支 effect 在可用清單就緒後才寫入；這裡先留空，
+           免得寫進去又被清單檢查清掉，使用者以為填好了其實沒有。 */
+        gpu_mapping_id: "",
         start_at: prefill.start_at
           ? fromDateInputValue(toDateInputValue(prefill.start_at))
           : prev.start_at,
@@ -561,6 +568,33 @@ export default function RequestFormPage({ onBack, className, initialPrefill = nu
         : "已匯入 AI 推薦配置；LXC Root 密碼不會由 AI 填入，請自行輸入。",
     );
   }
+
+  /* GPU 不能跟其他欄位一起寫進去：可用清單要等「作業系統確定是 GPU 版」加上
+     「時段選好」之後才非同步載入，先寫會被清單載入後的檢查清掉。所以先記著，
+     等清單就緒再套；真的套不上就講出來，不要安靜地把它丟掉。 */
+  useEffect(() => {
+    if (!pendingGpu) return;
+    if (resourceType !== "vm") { setPendingGpu(null); return; }
+    if (!selectedOsNeedsGpu) {
+      setPendingGpu(null);
+      toast.error("AI 建議搭配 GPU，但所選作業系統不是 GPU 版本，請改選標示「需 GPU」的作業系統。");
+      return;
+    }
+    if (mode === "scheduled" && !gpuWindowReady) return;   // 等使用者把時段選完
+    if (gpuLoading) return;
+    if (gpuOptionsKey !== gpuOptionsRequestKey) return;    // 等這個時段的清單回來
+
+    const match = gpuOptions.find((gpu) => gpu.mapping_id === pendingGpu);
+    if (match && match.available_count > 0) {
+      setForm((prev) => ({ ...prev, gpu_mapping_id: pendingGpu }));
+    } else {
+      toast.error("AI 建議的 GPU 在這個時段沒有可用的，請改選其他 GPU 或調整時段。");
+    }
+    setPendingGpu(null);
+  }, [
+    pendingGpu, resourceType, selectedOsNeedsGpu, mode, gpuWindowReady,
+    gpuLoading, gpuOptions, gpuOptionsKey, gpuOptionsRequestKey, toast,
+  ]);
 
   /* AI 助手在別的頁面談完需求後，會帶著推薦配置導到這裡。等候選清單載入完再套用，
      否則 LXC 應用範本會對不到目錄項目而退回成映像檔。 */

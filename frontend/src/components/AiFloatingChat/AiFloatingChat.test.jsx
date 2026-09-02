@@ -70,6 +70,18 @@ describe("stepStatuses", () => {
     expect(stepStatuses(STEPS, "/account")).toEqual(["current", "todo", "todo"]);
   });
 
+  test("配置產生後不會倒退回規劃那一步", () => {
+    const flow = [
+      { path: "/my-requests", status: "current", action: "recommend" },
+      { path: "/my-requests", status: "todo" },
+      { path: "/my-resources", status: "todo" },
+    ];
+    // 人還停在 /my-requests，但規劃已經做完了：目前進度應該是「填申請單」
+    expect(stepStatuses(flow, "/my-requests", 1)).toEqual(["done", "current", "todo"]);
+    // 還沒規劃時，同一頁的進度就是第一步
+    expect(stepStatuses(flow, "/my-requests")).toEqual(["current", "todo", "todo"]);
+  });
+
   test("後端也沒標記時，原樣顯示而不是全部歸零", () => {
     const noCurrent = [
       { path: "/a", status: "todo" },

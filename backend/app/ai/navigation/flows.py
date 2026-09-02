@@ -16,7 +16,11 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from app.ai.navigation.catalog import RouteAccess, can_access, resolve_user_role
+from app.ai.navigation.schemas import NavigationStepPublic
 from app.models import User
+
+# 配置模式問完之後要接回這條流程：規劃配置本來就是「申請一台機器」的其中一步。
+INTAKE_FLOW_ID = "request_machine"
 
 
 @dataclass(frozen=True)
@@ -186,6 +190,24 @@ def get_flows_for_user(user: User) -> tuple[NavigationFlow, ...]:
 
 def all_flows() -> tuple[NavigationFlow, ...]:
     return _FLOWS
+
+
+def public_steps(flow: NavigationFlow, active: int = 0) -> list[NavigationStepPublic]:
+    """把流程步驟轉成回給前端的形狀，並標出走到哪一步。"""
+    return [
+        NavigationStepPublic(
+            index=index,
+            title=step.title,
+            path=step.path,
+            detail=step.detail,
+            status=(
+                "done" if index < active else "current" if index == active else "todo"
+            ),
+            state=step.state,
+            action=step.action,
+        )
+        for index, step in enumerate(flow.steps)
+    ]
 
 
 def find_flow_by_id(

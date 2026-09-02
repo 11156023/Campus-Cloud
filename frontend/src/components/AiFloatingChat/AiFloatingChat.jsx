@@ -109,15 +109,19 @@ const STEP_ICON = { done: "check_circle", current: "play_circle", todo: "radio_b
 
 /* 步驟狀態以「使用者現在在哪一頁」為準，所以他一邊照做、清單就一邊往前推。
    找不到對應頁面時才退回後端算好的狀態。 */
-export function stepStatuses(steps, currentPath) {
-  const byPath = steps.findIndex((step) => step.path === currentPath);
-  const active = byPath >= 0 ? byPath : steps.findIndex((step) => step.status === "current");
+export function stepStatuses(steps, currentPath, floor = 0) {
+  // floor 之前的步驟已經做完（例如配置已經產生），不能因為還停在同一頁就倒退回去
+  const byPath = steps.findIndex((step, index) => index >= floor && step.path === currentPath);
+  const marked = steps.findIndex((step) => step.status === "current");
+  // 沒有 floor 也沒人標記時就原樣顯示，不要憑空發明一個進度
+  const fallback = marked >= 0 ? Math.max(floor, marked) : (floor > 0 ? floor : -1);
+  const active = byPath >= 0 ? byPath : fallback;
   if (active < 0) return steps.map((step) => step.status);
   return steps.map((_, index) => (index < active ? "done" : index === active ? "current" : "todo"));
 }
 
-function StepList({ steps, currentPath, onNavigate, onRecommend }) {
-  const statuses = stepStatuses(steps, currentPath);
+function StepList({ steps, currentPath, floor = 0, onNavigate, onRecommend }) {
+  const statuses = stepStatuses(steps, currentPath, floor);
   return (
     <ol className={styles.stepList}>
       {steps.map((step, index) => (
@@ -205,6 +209,7 @@ function Message({ message, currentPath, onNavigate, onRecommend, onAnswer, onPl
           <StepList
             steps={message.steps}
             currentPath={currentPath}
+            floor={message.stepsFloor ?? 0}
             onNavigate={onNavigate}
             onRecommend={onRecommend}
           />
@@ -254,6 +259,8 @@ export default function AiFloatingChat({ open = false, onOpenChange = () => {} }
   const [intake, setIntake] = useState(null);
   // 問過哪幾格。問句由推薦 AI 生成，字面對不上，只能自己記
   const askedRef = useRef([]);
+  // 正在進行的流程，配置產生後要接回它的下一步，不能斷在配置卡片
+  const flowRef = useRef(null);
   const pageContext = useMemo(() => pageContextFor(location.pathname), [location.pathname]);
 
   useEffect(() => {
@@ -274,6 +281,7 @@ export default function AiFloatingChat({ open = false, onOpenChange = () => {} }
     setInput("");
     setIntake(null);
     askedRef.current = [];
+    flowRef.current = null;
     sessionIdRef.current = newSessionId();
     inputRef.current?.focus();
   }
@@ -294,6 +302,7 @@ export default function AiFloatingChat({ open = false, onOpenChange = () => {} }
     const steps = data.steps ?? [];
 
     if (data.action === "guide" && steps.length) {
+      flowRef.current = { title: data.flow_title, steps };
       const content = `${data.flow_title ?? "操作流程"}：照著下面的步驟走，我會跟著你目前的頁面標記進度。`;
       const assistantMessage = { role: "assistant", content, steps };
       setMessages((previous) => [...previous, assistantMessage]);
@@ -339,7 +348,18 @@ export default function AiFloatingChat({ open = false, onOpenChange = () => {} }
     if (!prefill?.resource_type) return false;
 
     const content = stripThinkTags(plan.summary) || "依你的需求，我建議這樣的配置：";
-    const assistantMessage = { role: "assistant", content, plan: { prefill } };
+
+    /* 配置只是流程的一步，產生完要把剩下的步驟接回來，不能停在配置卡片。
+       規劃那一步標記為完成，下一步（填申請單）變成目前進度。 */
+    const flow = flowRef.current;
+    const recommendIndex = flow
+      ? flow.steps.findIndex((step) => step.action === "recommend")
+      : -1;
+    const followUp = flow && recommendIndex >= 0
+      ? { steps: flow.steps, stepsFloor: recommendIndex + 1 }
+      : {};
+
+    const assistantMessage = { role: "assistant", content, plan: { prefill }, ...followUp };
     setMessages((previous) => [...previous, assistantMessage]);
     setHistory((previous) => [...previous, {
       role: "assistant",
@@ -352,6 +372,11 @@ export default function AiFloatingChat({ open = false, onOpenChange = () => {} }
      問齊了才規劃。這樣使用者是被一題一題帶著走，而不是一句話就收到一份猜的配置。 */
   async function advanceIntake(nextHistory) {
     const state = await AiNavigationService.intake(nextHistory, askedRef.current);
+    /* 直接問「推薦規格」進來的人沒有走過流程，這裡把流程補上，
+       配置產生後才有下一步可以接。 */
+    if (state.steps?.length && !flowRef.current) {
+      flowRef.current = { title: state.flow_title, steps: state.steps };
+    }
 
     if (state.ready || !state.question) {
       setIntake(null);

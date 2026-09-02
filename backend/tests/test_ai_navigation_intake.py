@@ -103,6 +103,24 @@ def test_all_answered_is_ready_to_plan() -> None:
     assert state.answered == state.total
 
 
+def test_the_flow_comes_along_so_planning_does_not_dead_end() -> None:
+    """不管從哪裡進配置模式，配置產生後都要接得回申請流程。"""
+    asking = read_intake(_history("我要架網站"))
+    assert asking.flow_id == "request_machine"
+    # 還在問的時候，進度停在「規劃配置」那一步
+    current = [step.index for step in asking.steps if step.status == "current"]
+    assert current == [0]
+    assert asking.steps[0].action == "recommend"
+
+    done = read_intake(
+        _history("我要架網站", "不需要 GPU", "Linux 指令列就好", "整個學期")
+    )
+    assert done.ready is True
+    # 問完了，下一步是填申請單
+    assert [step.status for step in done.steps][:2] == ["done", "current"]
+    assert done.steps[1].state == {"create": True}
+
+
 def test_a_single_rich_sentence_can_answer_several_questions_at_once() -> None:
     """講得夠清楚的人不該被問四次。"""
     state = read_intake(

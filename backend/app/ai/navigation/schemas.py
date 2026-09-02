@@ -31,6 +31,17 @@ class NavigationResolveRequest(BaseModel):
     session_id: str | None = Field(default=None, max_length=64)
 
 
+class NavigationStepPublic(BaseModel):
+    index: int
+    title: str
+    path: str
+    detail: str = ""
+    status: StepStatus = "todo"
+    state: dict[str, Any] | None = None
+    # "recommend" 代表這一步由助手就地完成（規劃配置），而不是導到某一頁
+    action: str | None = None
+
+
 class IntakeRequest(BaseModel):
     """配置模式的每一輪：把到目前為止的對話送回來，問下一個問題。"""
 
@@ -57,6 +68,11 @@ class IntakeState(BaseModel):
     known: list[str] = Field(default_factory=list)
     question: IntakeQuestion | None = None
     hint: str = ""
+    # 配置只是「申請一台機器」的其中一步，附上整條流程，配置產生後才接得回去。
+    # 這是固定的策展流程，不需要模型判斷。
+    flow_id: str | None = None
+    flow_title: str | None = None
+    steps: list[NavigationStepPublic] = Field(default_factory=list)
 
 
 class NavigationTarget(BaseModel):
@@ -66,17 +82,6 @@ class NavigationTarget(BaseModel):
     # 交給 react-router 的 location state，例如 {"create": true} 會讓
     # /my-requests 直接開啟申請表單，而不是只停在列表。
     state: dict[str, Any] | None = None
-
-
-class NavigationStepPublic(BaseModel):
-    index: int
-    title: str
-    path: str
-    detail: str = ""
-    status: StepStatus = "todo"
-    state: dict[str, Any] | None = None
-    # "recommend" 代表這一步由助手就地完成（規劃配置），而不是導到某一頁
-    action: str | None = None
 
 
 class NavigationResolveResponse(BaseModel):

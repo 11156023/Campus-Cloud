@@ -17,6 +17,7 @@ from app.ai.navigation.flows import (
     NavigationFlow,
     find_flow_by_id,
     get_flows_for_user,
+    public_steps,
 )
 from app.ai.navigation.prompt import build_navigation_system_prompt
 from app.ai.navigation.schemas import (
@@ -24,7 +25,6 @@ from app.ai.navigation.schemas import (
     NavigationAction,
     NavigationMessage,
     NavigationResolveResponse,
-    NavigationStepPublic,
     NavigationTarget,
 )
 from app.ai.system_config import system_ai_env
@@ -108,20 +108,7 @@ def _flow_response(
     reason: str = "",
 ) -> NavigationResolveResponse:
     active = _active_step_index(flow, current_path)
-    steps = [
-        NavigationStepPublic(
-            index=index,
-            title=step.title,
-            path=step.path,
-            detail=step.detail,
-            status=(
-                "done" if index < active else "current" if index == active else "todo"
-            ),
-            state=step.state,
-            action=step.action,
-        )
-        for index, step in enumerate(flow.steps)
-    ]
+    steps = public_steps(flow, active)
     current = flow.steps[active]
     return NavigationResolveResponse(
         intent=intent,

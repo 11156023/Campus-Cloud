@@ -11,6 +11,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from app.ai.navigation.flows import (
+    INTAKE_FLOW_ID,
+    all_flows,
+    find_flow_by_id,
+    public_steps,
+)
 from app.ai.navigation.schemas import (
     IntakeQuestion,
     IntakeState,
@@ -139,6 +145,20 @@ def read_intake(
     answered = [slot.key for slot in SLOTS if _slot_is_answered(slot, texts, replied)]
     missing = [slot for slot in SLOTS if slot.key not in answered]
 
+    # 配置產生後要接回「申請一台機器」的後續步驟，所以每一輪都把流程帶著，
+    # 不管使用者是從流程進來的還是直接問「推薦規格」。
+    flow = find_flow_by_id(INTAKE_FLOW_ID, all_flows())
+    recommend_index = next(
+        (index for index, step in enumerate(flow.steps) if step.action == "recommend"),
+        0,
+    ) if flow else 0
+    flow_fields = {
+        "flow_id": flow.flow_id,
+        "flow_title": flow.title,
+        # 問答進行中就停在規劃那一步，問完換下一步（填申請單）
+        "steps": public_steps(flow, recommend_index if missing else recommend_index + 1),
+    } if flow else {}
+
     if not missing:
         return IntakeState(
             ready=True,
@@ -147,6 +167,7 @@ def read_intake(
             known=answered,
             question=None,
             hint="需求問齊了，我來規劃配置。",
+            **flow_fields,
         )
 
     nxt = missing[0]
@@ -161,4 +182,5 @@ def read_intake(
             options=list(nxt.options),
         ),
         hint="我先問幾個問題，再依你的答案產生配置。",
+        **flow_fields,
     )
