@@ -31,6 +31,34 @@ class NavigationResolveRequest(BaseModel):
     session_id: str | None = Field(default=None, max_length=64)
 
 
+class IntakeRequest(BaseModel):
+    """配置模式的每一輪：把到目前為止的對話送回來，問下一個問題。"""
+
+    history: list[NavigationMessage] = Field(
+        default_factory=list, max_length=MAX_HISTORY_MESSAGES
+    )
+    # 已經問過的欄位（問句由推薦 AI 生成，字面對不上，所以由前端記住問過什麼）
+    asked: list[str] = Field(default_factory=list, max_length=20)
+
+
+class IntakeQuestion(BaseModel):
+    key: str
+    # 這一格要問到的東西。實際問句交給推薦 AI 用對話語氣講，
+    # 這裡的文字是給它的指示，模型不可用時也能直接顯示。
+    text: str
+    # 可以直接點的答案，讓使用者不用打字
+    options: list[str] = Field(default_factory=list)
+
+
+class IntakeState(BaseModel):
+    ready: bool
+    answered: int
+    total: int
+    known: list[str] = Field(default_factory=list)
+    question: IntakeQuestion | None = None
+    hint: str = ""
+
+
 class NavigationTarget(BaseModel):
     title: str
     path: str

@@ -355,6 +355,41 @@
   small { color: var(--color-text-muted); font-size: $font-size-12; }
 }
 
+/* 配置模式的答案晶片：點一下就等於回答，不用打字 */
+.choiceRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+
+  button {
+    padding: 6px 12px;
+    border: 1px solid var(--color-border);
+    border-radius: $radius-pill;
+    background: var(--color-surface);
+    color: var(--color-text-primary);
+    font-size: $font-size-12;
+    cursor: pointer;
+
+    &:hover {
+      border-color: var(--color-primary);
+      color: var(--color-primary);
+    }
+  }
+}
+
+.choiceSkip {
+  color: var(--color-text-muted) !important;
+  border-style: dashed !important;
+}
+
+.choiceProgress {
+  margin-left: auto;
+  color: var(--color-text-muted);
+  font-size: $font-size-12;
+}
+
 /* 推薦出來的配置 + 一鍵帶去填好的申請單 */
 .planCard {
   margin-top: 12px;

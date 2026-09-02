@@ -56,7 +56,7 @@ _FLOWS: tuple[NavigationFlow, ...] = (
             NavigationStep(
                 title="讓 AI 依用途規劃配置",
                 path="/my-requests",
-                detail="說明你要跑什麼，我會挑作業系統與規格，並把申請單填好；不需要的話可以跳過這步。",
+                detail="我會先問幾個問題（用途、要不要 GPU、要不要圖形桌面、用多久），再挑規格並把申請單填好；不需要的話可以跳過這步。",
                 action="recommend",
             ),
             NavigationStep(

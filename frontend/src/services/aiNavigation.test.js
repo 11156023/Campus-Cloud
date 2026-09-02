@@ -87,6 +87,23 @@ describe("AiNavigationService.resolve", () => {
     expect(body.history[0].content).toHaveLength(2000);
   });
 
+  test("配置模式帶上對話與問過的欄位", async () => {
+    fetchMock.mockResolvedValueOnce(jsonRes(200, { ready: false }));
+
+    await AiNavigationService.intake(
+      [{ role: "user", content: "我要架網站" }, { role: "system", content: "略過" }],
+      ["purpose", "gpu"],
+    );
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toContain("/api/v1/ai/navigation/intake");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body)).toEqual({
+      history: [{ role: "user", content: "我要架網站" }],
+      asked: ["purpose", "gpu"],
+    });
+  });
+
   test("沒給選項時也能單獨呼叫", async () => {
     fetchMock.mockResolvedValueOnce(jsonRes(200, {}));
 

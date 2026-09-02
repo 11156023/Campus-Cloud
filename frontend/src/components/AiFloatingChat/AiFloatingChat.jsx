@@ -166,7 +166,24 @@ function PlanCard({ plan, onNavigate }) {
   );
 }
 
-function Message({ message, currentPath, onNavigate, onRecommend }) {
+/* 配置模式的答案晶片：點一下就等於打了那句話 */
+function ChoiceRow({ choices, progress, onAnswer, onPlanNow }) {
+  return (
+    <div className={styles.choiceRow}>
+      {choices.map((choice) => (
+        <button key={choice} type="button" onClick={() => onAnswer(choice)}>
+          {choice}
+        </button>
+      ))}
+      <button type="button" className={styles.choiceSkip} onClick={onPlanNow}>
+        直接產生配置
+      </button>
+      {progress && <span className={styles.choiceProgress}>{progress}</span>}
+    </div>
+  );
+}
+
+function Message({ message, currentPath, onNavigate, onRecommend, onAnswer, onPlanNow }) {
   const isUser = message.role === "user";
   return (
     <div className={`${styles.message} ${isUser ? styles.messageUser : styles.messageAssistant}`}>
@@ -190,6 +207,14 @@ function Message({ message, currentPath, onNavigate, onRecommend }) {
             currentPath={currentPath}
             onNavigate={onNavigate}
             onRecommend={onRecommend}
+          />
+        )}
+        {message.choices?.length > 0 && (
+          <ChoiceRow
+            choices={message.choices}
+            progress={message.progress}
+            onAnswer={onAnswer}
+            onPlanNow={onPlanNow}
           />
         )}
         {message.plan && <PlanCard plan={message.plan} onNavigate={onNavigate} />}
@@ -225,6 +250,10 @@ export default function AiFloatingChat({ open = false, onOpenChange = () => {} }
   const inputRef = useRef(null);
   // 只用來把同一段對話的用量記錄串起來；按「建立新對話」就換一個
   const sessionIdRef = useRef(newSessionId());
+  // 配置模式：{ answered, total }，null 代表沒在配置模式
+  const [intake, setIntake] = useState(null);
+  // 問過哪幾格。問句由推薦 AI 生成，字面對不上，只能自己記
+  const askedRef = useRef([]);
   const pageContext = useMemo(() => pageContextFor(location.pathname), [location.pathname]);
 
   useEffect(() => {
@@ -243,6 +272,8 @@ export default function AiFloatingChat({ open = false, onOpenChange = () => {} }
     setMessages([]);
     setHistory([]);
     setInput("");
+    setIntake(null);
+    askedRef.current = [];
     sessionIdRef.current = newSessionId();
     inputRef.current?.focus();
   }
@@ -317,15 +348,74 @@ export default function AiFloatingChat({ open = false, onOpenChange = () => {} }
     return true;
   }
 
-  /* 流程裡的「讓 AI 規劃配置」那一步：沿用前面談過的需求，就地產出配置，不換頁。 */
+  /* 配置模式的一輪：先看還缺什麼，缺就問（問句交給推薦 AI 用顧問語氣講），
+     問齊了才規劃。這樣使用者是被一題一題帶著走，而不是一句話就收到一份猜的配置。 */
+  async function advanceIntake(nextHistory) {
+    const state = await AiNavigationService.intake(nextHistory, askedRef.current);
+
+    if (state.ready || !state.question) {
+      setIntake(null);
+      askedRef.current = [];
+      return await sendRecommendation("", nextHistory);
+    }
+
+    askedRef.current = [...new Set([...askedRef.current, state.question.key])];
+    setIntake({ answered: state.answered, total: state.total });
+
+    // 問句由推薦 AI 產生；它掛掉時就用伺服器端那句制式問法，不要卡住對話。
+    let question = state.question.text;
+    try {
+      const reply = await AiTemplateRecommendationApi.chat({
+        messages: nextHistory,
+        top_k: 5,
+        device_nodes: [],
+        form_context: null,
+        focus_hint: state.question.text,
+      });
+      question = stripThinkTags(reply.reply) || question;
+    } catch {
+      /* 用制式問法 */
+    }
+
+    const assistantMessage = {
+      role: "assistant",
+      content: question,
+      choices: state.question.options,
+      progress: `已掌握 ${state.answered}/${state.total}`,
+    };
+    setMessages((previous) => [...previous, assistantMessage]);
+    setHistory((previous) => [...previous, { role: "assistant", content: question }]);
+    return true;
+  }
+
+  /* 流程裡的「讓 AI 規劃配置」那一步：從這裡進配置模式。 */
   async function runRecommendation() {
     if (loading) return;
     const nextHistory = history.length
       ? history
-      : [{ role: "user", content: "請依我的需求規劃一台機器的配置。" }];
+      : [{ role: "user", content: "我想申請一台機器，請幫我規劃配置。" }];
     setLoading(true);
     try {
-      const planned = await sendRecommendation("", nextHistory);
+      await advanceIntake(nextHistory);
+    } catch {
+      setMessages((previous) => [...previous, {
+        role: "assistant",
+        content: "我還需要知道這台機器要做什麼，例如「跑深度學習訓練」或「架一個網站」。",
+      }]);
+    } finally {
+      setLoading(false);
+      inputRef.current?.focus();
+    }
+  }
+
+  /* 不想被問完的人可以直接跳到結果 */
+  async function planNow() {
+    if (loading) return;
+    setIntake(null);
+    askedRef.current = [];
+    setLoading(true);
+    try {
+      const planned = await sendRecommendation("", history);
       if (!planned) {
         setMessages((previous) => [...previous, {
           role: "assistant",
@@ -374,8 +464,15 @@ export default function AiFloatingChat({ open = false, onOpenChange = () => {} }
     try {
       // 每個能力答不出來就往下一個退，最後一定有一般問答接住。
       const route = routeQuestion(text);
+      // 配置模式進行中就繼續問，除非使用者明講要去別的地方
+      const stayInIntake = intake && !NAVIGATION_PATTERN.test(text);
+      if (!stayInIntake && intake) {
+        setIntake(null);
+        askedRef.current = [];
+      }
+
       let handled = false;
-      if (route === "recommend") handled = await sendRecommendation(text, nextHistory);
+      if (stayInIntake || route === "recommend") handled = await advanceIntake(nextHistory);
       else if (route === "navigate") handled = await sendNavigation(text, nextHistory);
       if (!handled) await sendChat(text, nextHistory);
     } catch (error) {
@@ -424,8 +521,17 @@ export default function AiFloatingChat({ open = false, onOpenChange = () => {} }
           </header>
 
           <div className={styles.contextBar}>
-            <MIcon name="web_asset" size={16} />
-            <span>正在查看「{pageContext.title}」</span>
+            {intake ? (
+              <>
+                <MIcon name="auto_fix_high" size={16} />
+                <span>配置模式 · 已掌握 {intake.answered}/{intake.total}，問完就產生配置</span>
+              </>
+            ) : (
+              <>
+                <MIcon name="web_asset" size={16} />
+                <span>正在查看「{pageContext.title}」</span>
+              </>
+            )}
           </div>
 
           <div className={styles.messages} ref={scrollRef}>
@@ -462,6 +568,8 @@ export default function AiFloatingChat({ open = false, onOpenChange = () => {} }
                   currentPath={location.pathname}
                   onNavigate={handleNavigate}
                   onRecommend={runRecommendation}
+                  onAnswer={(choice) => send(choice)}
+                  onPlanNow={planNow}
                 />
               ))
             )}
