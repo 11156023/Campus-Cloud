@@ -13,9 +13,17 @@ from app.ai.navigation.catalog import (
     find_route_by_path,
     get_routes_for_user,
 )
+from app.ai.navigation.flows import (
+    NavigationFlow,
+    find_flow_by_id,
+    get_flows_for_user,
+    public_steps,
+)
 from app.ai.navigation.prompt import build_navigation_system_prompt
 from app.ai.navigation.schemas import (
+    MAX_HISTORY_MESSAGES,
     NavigationAction,
+    NavigationMessage,
     NavigationResolveResponse,
     NavigationTarget,
 )
@@ -64,9 +72,11 @@ def _mk_target(route: NavigationRoute, reason: str) -> NavigationTarget:
     )
 
 
-def _normalize_action(value: Any, confidence: float, has_primary: bool) -> NavigationAction:
+def _normalize_action(
+    value: Any, confidence: float, has_primary: bool
+) -> NavigationAction:
     action = str(value or "").strip().lower()
-    if action in {"navigate", "suggest", "clarify"}:
+    if action in {"navigate", "suggest", "clarify", "guide"}:
         return action  # type: ignore[return-value]
     if has_primary and confidence >= 0.85:
         return "navigate"
@@ -75,26 +85,102 @@ def _normalize_action(value: Any, confidence: float, has_primary: bool) -> Navig
     return "clarify"
 
 
-def _keyword_fallback(query: str, routes: list[NavigationRoute]) -> NavigationResolveResponse:
-    text = query.lower()
-    scored: list[tuple[int, NavigationRoute]] = []
-    for route in routes:
-        score = sum(1 for kw in route.keywords if kw.lower() in text)
-        if score > 0:
-            scored.append((score, route))
+# ---------------------------------------------------------------- 流程
 
-    scored.sort(key=lambda item: item[0], reverse=True)
-    if not scored:
+
+def _active_step_index(flow: NavigationFlow, current_path: str | None) -> int:
+    """使用者已經走到流程的哪一步，讓導覽是接續而不是從頭再來。"""
+    if not current_path:
+        return 0
+    clean = current_path.split("?")[0].rstrip("/") or "/"
+    for index, step in enumerate(flow.steps):
+        if step.path == clean:
+            return index
+    return 0
+
+
+def _flow_response(
+    flow: NavigationFlow,
+    *,
+    intent: str,
+    confidence: float,
+    current_path: str | None,
+    reason: str = "",
+) -> NavigationResolveResponse:
+    active = _active_step_index(flow, current_path)
+    steps = public_steps(flow, active)
+    current = flow.steps[active]
+    return NavigationResolveResponse(
+        intent=intent,
+        confidence=confidence,
+        action="guide",
+        primary=NavigationTarget(
+            title=current.title,
+            path=current.path,
+            reason=reason.strip() or current.detail,
+            state=current.state,
+        ),
+        flow_id=flow.flow_id,
+        flow_title=flow.title,
+        steps=steps,
+        active_step=active,
+    )
+
+
+# ------------------------------------------------------------ 關鍵字後備
+
+
+def _score_keywords(text: str, keywords: tuple[str, ...]) -> int:
+    return sum(1 for keyword in keywords if keyword.lower() in text)
+
+
+def _keyword_fallback(
+    query: str,
+    routes: list[NavigationRoute],
+    flows: list[NavigationFlow] | None = None,
+    current_path: str | None = None,
+) -> NavigationResolveResponse:
+    """模型離線或回出垃圾時的確定性答案。
+
+    先比對流程：像「我要申請一台機器」這種整件事的描述，應該帶著走完，
+    而不是把人丟在某一頁。
+    """
+    text = query.lower()
+    flows = flows or []
+
+    scored_flows = sorted(
+        ((_score_keywords(text, flow.keywords), flow) for flow in flows),
+        key=lambda item: item[0],
+        reverse=True,
+    )
+    scored_routes = sorted(
+        ((_score_keywords(text, route.keywords), route) for route in routes),
+        key=lambda item: item[0],
+        reverse=True,
+    )
+    best_flow_score = scored_flows[0][0] if scored_flows else 0
+    best_route_score = scored_routes[0][0] if scored_routes else 0
+
+    if best_flow_score > 0 and best_flow_score >= best_route_score:
+        return _flow_response(
+            scored_flows[0][1],
+            intent=query.strip(),
+            confidence=0.8,
+            current_path=current_path,
+        )
+
+    hits = [(score, route) for score, route in scored_routes if score > 0]
+    if not hits:
         return NavigationResolveResponse(
             intent=query.strip(),
             confidence=0.25,
             action="clarify",
             suggestions=[],
-            clarification_question="你想管理的是資源、申請流程、網路設定，還是 AI 用量？",
+            clarification_question="你想處理的是機器、申請流程、網路設定，還是課堂？",
         )
 
-    primary_score, primary_route = scored[0]
-    suggestions = [_mk_target(route, route.summary) for _, route in scored[1:4]]
+    primary_score, primary_route = hits[0]
+    suggestions = [_mk_target(route, route.summary) for _, route in hits[1:4]]
     if primary_score >= 2:
         return NavigationResolveResponse(
             intent=query.strip(),
@@ -135,6 +221,8 @@ def _build_response_from_payload(
     *,
     user_query: str,
     allowed_routes: list[NavigationRoute],
+    allowed_flows: list[NavigationFlow],
+    current_path: str | None,
 ) -> NavigationResolveResponse:
     intent = str(payload.get("intent") or user_query).strip() or user_query
     confidence = _clamp_confidence(payload.get("confidence"))
@@ -143,7 +231,30 @@ def _build_response_from_payload(
     suggested_paths = payload.get("suggested_paths") or []
     clarification_question = str(payload.get("clarification_question") or "").strip()
 
-    primary_route = find_route_by_path(primary_path, allowed_routes) if primary_path else None
+    action = _normalize_action(
+        payload.get("action"),
+        confidence=confidence,
+        has_primary=bool(primary_path),
+    )
+
+    # 流程優先：模型只負責挑 flow_id，步驟內容一律以伺服器端定義為準，
+    # 免得它自己編出一套不存在的操作順序。
+    flow = find_flow_by_id(str(payload.get("flow_id") or ""), allowed_flows)
+    if flow is not None and action == "guide":
+        return _flow_response(
+            flow,
+            intent=intent,
+            confidence=confidence or 0.8,
+            current_path=current_path,
+            reason=reason,
+        )
+    if action == "guide" and flow is None:
+        # 指到不存在或沒權限的流程：退回單頁判斷，不要憑空生步驟。
+        action = "suggest" if primary_path else "clarify"
+
+    primary_route = (
+        find_route_by_path(primary_path, allowed_routes) if primary_path else None
+    )
     primary_target = _mk_target(primary_route, reason) if primary_route else None
 
     suggestions: list[NavigationTarget] = []
@@ -160,12 +271,6 @@ def _build_response_from_payload(
             seen_paths.add(path)
             if len(suggestions) >= 4:
                 break
-
-    action = _normalize_action(
-        payload.get("action"),
-        confidence=confidence,
-        has_primary=primary_target is not None,
-    )
 
     if action == "navigate" and confidence < 0.85:
         action = "suggest"
@@ -189,13 +294,31 @@ def _build_response_from_payload(
     )
 
 
+def _history_messages(
+    history: list[NavigationMessage] | None,
+) -> list[dict[str, str]]:
+    """把前文接進 prompt，讓「然後呢」「第二個」這種追問有東西可以指。"""
+    if not history:
+        return []
+    trimmed = history[-MAX_HISTORY_MESSAGES:]
+    return [
+        {"role": message.role, "content": message.content.strip()}
+        for message in trimmed
+        if message.content.strip()
+    ]
+
+
 async def resolve_navigation(
     query: str,
     current_user: User,
     session: Session | None = None,
+    *,
+    history: list[NavigationMessage] | None = None,
+    current_path: str | None = None,
 ) -> NavigationResolveResponse:
     clean_query = query.strip()
     allowed_routes = list(get_routes_for_user(current_user))
+    allowed_flows = list(get_flows_for_user(current_user))
     if not clean_query:
         return NavigationResolveResponse(
             intent="",
@@ -214,19 +337,40 @@ async def resolve_navigation(
     model_name = system_ai_env.vllm_model_name.strip()
     if not model_name:
         logger.warning("VLLM_MODEL_NAME is empty, using keyword fallback for navigation")
-        return _keyword_fallback(clean_query, allowed_routes)
+        return _keyword_fallback(
+            clean_query, allowed_routes, allowed_flows, current_path
+        )
 
-    prompt = build_navigation_system_prompt(allowed_routes)
+    prompt = build_navigation_system_prompt(allowed_routes, allowed_flows, current_path)
     payload = {
         "model": model_name,
         "messages": [
             {"role": "system", "content": prompt},
+            *_history_messages(history),
             {"role": "user", "content": clean_query},
         ],
         "max_tokens": _DEFAULT_MAX_TOKENS,
         "temperature": _DEFAULT_TEMPERATURE,
         "top_p": 0.9,
     }
+
+    def _log(
+        metrics: dict[str, Any] | None = None,
+        *,
+        status: str = "success",
+        error_message: str | None = None,
+    ) -> None:
+        if session is None:
+            return
+        record_ai_template_call(
+            session=session,
+            user_id=current_user.id,
+            call_type=CALL_AI_NAVIGATION,
+            model_name=model_name,
+            metrics=metrics,
+            status=status,
+            error_message=error_message,
+        )
 
     try:
         started = perf_counter()
@@ -239,57 +383,46 @@ async def resolve_navigation(
         normalized_text = strip_think_tags(content)
         raw_json = _extract_first_json_object(normalized_text)
         if not raw_json:
-            logger.warning("Navigation model returned non-JSON text, using keyword fallback")
-            if session is not None:
-                record_ai_template_call(
-                    session=session,
-                    user_id=current_user.id,
-                    call_type=CALL_AI_NAVIGATION,
-                    model_name=model_name,
-                    metrics=metrics,
-                    status="error",
-                    error_message="Navigation model returned non-JSON text.",
-                )
-            return _keyword_fallback(clean_query, allowed_routes)
+            logger.warning(
+                "Navigation model returned non-JSON text, using keyword fallback"
+            )
+            _log(
+                metrics,
+                status="error",
+                error_message="Navigation model returned non-JSON text.",
+            )
+            return _keyword_fallback(
+                clean_query, allowed_routes, allowed_flows, current_path
+            )
 
         parsed = json.loads(raw_json)
         if not isinstance(parsed, dict):
-            logger.warning("Navigation model returned non-object JSON, using keyword fallback")
-            if session is not None:
-                record_ai_template_call(
-                    session=session,
-                    user_id=current_user.id,
-                    call_type=CALL_AI_NAVIGATION,
-                    model_name=model_name,
-                    metrics=metrics,
-                    status="error",
-                    error_message="Navigation model returned non-object JSON.",
-                )
-            return _keyword_fallback(clean_query, allowed_routes)
+            logger.warning(
+                "Navigation model returned non-object JSON, using keyword fallback"
+            )
+            _log(
+                metrics,
+                status="error",
+                error_message="Navigation model returned non-object JSON.",
+            )
+            return _keyword_fallback(
+                clean_query, allowed_routes, allowed_flows, current_path
+            )
 
         result = _build_response_from_payload(
             parsed,
             user_query=clean_query,
             allowed_routes=allowed_routes,
+            allowed_flows=allowed_flows,
+            current_path=current_path,
         )
-        if session is not None:
-            record_ai_template_call(
-                session=session,
-                user_id=current_user.id,
-                call_type=CALL_AI_NAVIGATION,
-                model_name=model_name,
-                metrics=metrics,
-            )
+        _log(metrics)
         return result
     except Exception as exc:  # pragma: no cover - defensive fallback
-        logger.exception("Navigation resolve failed, fallback to keyword strategy: %s", exc)
-        if session is not None:
-            record_ai_template_call(
-                session=session,
-                user_id=current_user.id,
-                call_type=CALL_AI_NAVIGATION,
-                model_name=model_name,
-                status="error",
-                error_message=str(exc),
-            )
-        return _keyword_fallback(clean_query, allowed_routes)
+        logger.exception(
+            "Navigation resolve failed, fallback to keyword strategy: %s", exc
+        )
+        _log(status="error", error_message=str(exc))
+        return _keyword_fallback(
+            clean_query, allowed_routes, allowed_flows, current_path
+        )

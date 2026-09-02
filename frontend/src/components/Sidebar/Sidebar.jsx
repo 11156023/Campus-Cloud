@@ -50,7 +50,7 @@ const navGroups = [
       { key: "ai-api-review", label: "申請審核", icon: "rate_review", adminOnly: true },
       { key: "ai-api-keys",   label: "金鑰管理", icon: "vpn_key", adminOnly: true },
       { key: "ai-monitoring", label: "使用監控", icon: "monitor_heart", adminOnly: true },
-      { key: "ai-pve",        label: "PVE 維運助手", icon: "dns", adminOnly: true },
+      /* PVE 維運助手不放側欄：管理者首頁就是它的入口，那裡同時看得到待處理的問題 */
     ],
   },
   {
