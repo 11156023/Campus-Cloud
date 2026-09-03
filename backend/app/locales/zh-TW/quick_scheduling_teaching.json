@@ -24,6 +24,8 @@
   "class_capacity.cpu_insufficient": "{node} CPU 不足：需要 {required}，可用 {available}",
   "class_capacity.ram_insufficient": "{node} RAM 不足：需要 {required} GB，可用 {available} GB",
   "class_capacity.disk_insufficient": "{node} Disk 不足：需要 {required} GB，可用 {available} GB",
+  "class_capacity.cross_cluster": "課堂機器無法放在同一個叢集：{detail}。同一堂課的機器必須在同一叢集，否則彼此網路不通。",
+  "class_capacity.no_node_in_cluster": "課程機器「{name}」在本堂課所屬叢集內沒有可用的建機節點",
   "access.resource_not_found": "Resource {vmid} not found",
   "access.class_assignment_lost": "This teaching-class resource has lost its class assignment",
   "access.teaching_class_not_found": "Teaching class not found for this resource",

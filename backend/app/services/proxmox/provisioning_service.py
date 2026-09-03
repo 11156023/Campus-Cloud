@@ -410,9 +410,15 @@ def create_lxc(
     user_id: uuid.UUID,
     batch_job_id: uuid.UUID | None = None,
     ip_reservation_key: str | None = None,
+    target_node: str | None = None,
 ) -> LXCCreateResponse:
+    """建立 LXC。
+
+    ``target_node`` 由呼叫端指定時優先採用 —— 課堂機器以此把整班鎖在同一個
+    叢集內（預設的 pick_target_node 會在所有連線間自由挑選）。
+    """
     vmid = proxmox_service.next_vmid()
-    target_node = _get_lxc_target_node()
+    target_node = target_node or _get_lxc_target_node()
     target_storage = _resolve_managed_storage(
         session=session,
         node=target_node,

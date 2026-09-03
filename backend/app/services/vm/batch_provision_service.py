@@ -308,6 +308,7 @@ def _process_task(*, job_id: uuid.UUID, task_id: uuid.UUID) -> None:
                 start=start_on_create,
                 batch_job_id=job_id,
                 teaching_class_id=teaching_class_id,
+                target_node=_class_target_node(session=session, job_id=job_id),
             )
 
         # E1：批量建立完成點也建初始快照（best-effort）
@@ -383,6 +384,37 @@ def _process_task(*, job_id: uuid.UUID, task_id: uuid.UUID) -> None:
             bp_repo.increment_job_failed(session=session, job_id=job_id)
 
 
+def _class_target_node(*, session: Session, job_id: uuid.UUID) -> str | None:
+    """這個批次對應的課程機器該建在哪個節點。
+
+    與容量預留共用 class_capacity_service 的同一份計算，確保建機落點與預留
+    時算的一致，也確保同一堂課的機器都在同一個叢集內 —— 自訂 LXC 原本走
+    pick_target_node，會在所有連線之間自由挑選。
+
+    解析不出來時回 None，沿用既有的預設節點行為（不讓建機因此中斷）。
+    """
+    from app.services.teaching import class_capacity_service  # noqa: PLC0415
+
+    machine_node = session.exec(
+        select(TeachingClassMachineNode).where(
+            TeachingClassMachineNode.batch_job_id == job_id
+        )
+    ).first()
+    if machine_node is None:
+        return None
+    try:
+        return class_capacity_service.target_node_for_machine(
+            session, machine_node=machine_node
+        )
+    except Exception:
+        logger.warning(
+            "Failed to resolve class target node for job=%s; falling back to default",
+            job_id,
+            exc_info=True,
+        )
+        return None
+
+
 def _sync_class_machine_mapping(
     *,
     session: Session,
@@ -439,6 +471,7 @@ def _provision_one(
     start: bool = True,
     batch_job_id: uuid.UUID | None = None,
     teaching_class_id: uuid.UUID | None = None,
+    target_node: str | None = None,
 ) -> int:
     """建立單一資源，回傳 vmid。
 
@@ -519,6 +552,7 @@ def _provision_one(
             user_id=user_id,
             batch_job_id=batch_job_id,
             ip_reservation_key=reservation_key,
+            target_node=target_node,
         )
     else:
         reservation_key = (

@@ -24,6 +24,8 @@
   "class_capacity.cpu_insufficient": "{node} のCPUが不足しています：必要 {required}、利用可能 {available}",
   "class_capacity.ram_insufficient": "{node} のRAMが不足しています：必要 {required} GB、利用可能 {available} GB",
   "class_capacity.disk_insufficient": "{node} のディスクが不足しています：必要 {required} GB、利用可能 {available} GB",
+  "class_capacity.cross_cluster": "クラスのマシンを同一クラスタに配置できません：{detail}。同じクラスのマシンは同一クラスタ内に配置する必要があります（そうでないと相互に通信できません）。",
+  "class_capacity.no_node_in_cluster": "クラスマシン「{name}」は、このクラスのクラスタ内に利用可能なノードがありません",
   "access.resource_not_found": "リソース {vmid} が見つかりません",
   "access.class_assignment_lost": "この授業クラスのリソースはクラスの割り当てを失っています",
   "access.teaching_class_not_found": "このリソースに対応する授業クラスが見つかりません",
