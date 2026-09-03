@@ -697,6 +697,9 @@ def launch(
             session=session,
             request_in=request_in,
             user=user,
+            # 整組共用 Session id 當群組鍵：placement 會把後續機器釘在
+            # 第一台選中的節點上，拓樸 edge 才有實際連通性可言。
+            placement_group_id=practice.id,
         )
         session.add(
             QuickPracticeSessionMachine(

@@ -124,6 +124,7 @@ def _build_node_capacities(
                 node=node.node,
                 status=node.status,
                 gpu_count=node.gpu_count,
+                allocatable_gpu_slots=node.gpu_count,
                 running_resources=running_resources,
                 guest_soft_limit=guest_soft_limit,
                 guest_pressure_ratio=guest_pressure_ratio,

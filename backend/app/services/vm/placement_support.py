@@ -7,7 +7,7 @@ import time
 import uuid
 from datetime import UTC, datetime, timedelta
 
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from app.domain.placement import advisor as placement_advisor
 from app.domain.placement import policy as placement_policy
@@ -69,6 +69,11 @@ def request_capacity_tuple(db_request: VMRequest) -> tuple[float, int, int]:
     if disk_gb <= 0:
         disk_gb = 20 if db_request.resource_type == "vm" else 8
     return cpu_cores, memory_bytes, disk_gb * GIB
+
+
+def request_gpu_slots(db_request: VMRequest) -> int:
+    """這張申請會佔用幾個 GPU 槽。目前一台機器最多掛一張卡。"""
+    return 1 if str(getattr(db_request, "gpu_mapping_id", "") or "").strip() else 0
 
 
 def build_storage_pool_state(
@@ -194,15 +199,24 @@ def node_can_host_request(
     has_managed_storage: bool,
     allowed_gpu_nodes: set[str] | None = None,
     allowed_nodes: set[str] | None = None,
+    allowed_affinity_nodes: set[str] | None = None,
 ) -> bool:
     # 模板節點白名單（None = 不受限；空集合 = 模板在任何節點都拿不到）
     if allowed_nodes is not None and node.node not in allowed_nodes:
+        return False
+    # 群組 affinity 白名單（None = 群組尚無錨點或不屬於任何群組）
+    if allowed_affinity_nodes is not None and node.node not in allowed_affinity_nodes:
         return False
     if gpu_required > 0:
         if allowed_gpu_nodes is not None:
             if node.node not in allowed_gpu_nodes:
                 return False
         elif node.gpu_count < gpu_required:
+            return False
+        # 白名單只回答「這個節點有沒有這張卡」，額度是否還有剩要另外算 ——
+        # 否則同一張卡在同一時段可被多張申請排入並全部核准，直到建機時
+        # 才由 _build_gpu_hostpci 發現額度用盡而失敗。
+        if node.allocatable_gpu_slots < gpu_required:
             return False
     if (
         node.status != "online"
@@ -218,6 +232,60 @@ def node_can_host_request(
 
 def node_disk_bytes_for_capacity(*, disk_bytes: int, has_managed_storage: bool) -> int:
     return 0 if has_managed_storage else disk_bytes
+
+
+def group_anchor_node(
+    *,
+    session: Session,
+    placement_group_id: uuid.UUID | None,
+    exclude_request_id: uuid.UUID | None = None,
+) -> str | None:
+    """同群組中已經定下落點的那個節點；None = 群組還沒有錨點。
+
+    取最早建立的一台為錨點，讓同一組的每次查詢都得到同一個答案（後建的
+    機器不會因為查詢順序不同而跟到不同節點）。
+    """
+    if placement_group_id is None:
+        return None
+
+    statement = (
+        select(VMRequest)
+        .where(VMRequest.placement_group_id == placement_group_id)
+        .order_by(VMRequest.created_at, VMRequest.id)
+    )
+    for peer in session.exec(statement).all():
+        if exclude_request_id is not None and peer.id == exclude_request_id:
+            continue
+        node = str(
+            peer.actual_node or peer.assigned_node or peer.desired_node or ""
+        ).strip()
+        if node:
+            return node
+    return None
+
+
+def allowed_affinity_nodes_for_request(
+    *,
+    session: Session,
+    request: PlacementRequest,
+    exclude_request_id: uuid.UUID | None = None,
+) -> set[str] | None:
+    """同群組已有落點時的節點白名單；None = 不受群組限制。
+
+    連貫環境的機器必須彼此互通。同一叢集內靠同一個 bridge 加 PVE firewall
+    還能通，跨叢集則 L2 不通、firewall 規則各自獨立、IP 由全域單例網段配發
+    但 gateway 是每個連線各自設定 —— 拓樸 edge 會形同虛設。
+
+    因此同群組一律釘在同一節點，這同時也保證了同一叢集。群組第一台自由
+    選點，之後的機器跟隨；整組放不下時明確失敗，不會出現半組在 A 節點、
+    半組在 B 節點的壞環境。
+    """
+    anchor = group_anchor_node(
+        session=session,
+        placement_group_id=request.placement_group_id,
+        exclude_request_id=exclude_request_id,
+    )
+    return {anchor} if anchor else None
 
 
 def allowed_gpu_nodes_for_request(request: PlacementRequest) -> set[str] | None:
@@ -364,6 +432,10 @@ def release_request_from_capacities(
         int(node.total_disk_bytes),
     )
     node.running_resources = max(int(node.running_resources) - 1, 0)
+    node.allocatable_gpu_slots = min(
+        int(node.allocatable_gpu_slots) + request_gpu_slots(db_request),
+        int(node.gpu_count),
+    )
     refresh_node_candidate_fn(node)
 
 
@@ -384,6 +456,9 @@ def reserve_request_on_capacities(
     node.allocatable_memory_bytes = max(node.allocatable_memory_bytes - memory_bytes, 0)
     node.allocatable_disk_bytes = max(node.allocatable_disk_bytes - disk_bytes, 0)
     node.running_resources = int(node.running_resources) + 1
+    node.allocatable_gpu_slots = max(
+        int(node.allocatable_gpu_slots) - request_gpu_slots(db_request), 0
+    )
     refresh_node_candidate_fn(node)
 
 
@@ -428,6 +503,9 @@ def apply_reserved_requests_to_capacities(
         node.allocatable_cpu_cores = max(node.allocatable_cpu_cores - reserved_cpu, 0.0)
         node.allocatable_memory_bytes = max(node.allocatable_memory_bytes - reserved_memory, 0)
         node.allocatable_disk_bytes = max(node.allocatable_disk_bytes - reserved_disk, 0)
+        node.allocatable_gpu_slots = max(
+            int(node.allocatable_gpu_slots) - request_gpu_slots(reserved), 0
+        )
         node.candidate = (
             node.status == "online"
             and node.allocatable_cpu_cores > 0
@@ -472,6 +550,9 @@ def build_plan(
     )
     allowed_gpu_nodes = allowed_gpu_nodes_for_request(request)
     allowed_nodes = allowed_template_nodes_for_request(request)
+    allowed_affinity_nodes = allowed_affinity_nodes_for_request(
+        session=session, request=request
+    )
     placements: dict[str, int] = {item.node: 0 for item in working_nodes}
     remaining = request.instance_count
 
@@ -487,6 +568,7 @@ def build_plan(
                 has_managed_storage=has_managed_storage,
                 allowed_gpu_nodes=allowed_gpu_nodes,
                 allowed_nodes=allowed_nodes,
+                allowed_affinity_nodes=allowed_affinity_nodes,
             ):
                 continue
             storage_selection: StorageSelection | None = None
@@ -524,6 +606,9 @@ def build_plan(
         chosen.allocatable_memory_bytes = max(chosen.allocatable_memory_bytes - required_memory, 0)
         chosen.allocatable_disk_bytes = max(chosen.allocatable_disk_bytes - node_disk_bytes, 0)
         chosen.running_resources += 1
+        chosen.allocatable_gpu_slots = max(
+            int(chosen.allocatable_gpu_slots) - request.gpu_required, 0
+        )
         refresh_node_candidate(chosen)
         if chosen_storage is not None:
             reserve_storage_pool(
@@ -767,4 +852,5 @@ def to_placement_request(db_request: VMRequest) -> PlacementRequest:
         gpu_mapping_id=getattr(db_request, "gpu_mapping_id", None),
         ostemplate=ostemplate,
         template_vmid=template_vmid,
+        placement_group_id=getattr(db_request, "placement_group_id", None),
     )

@@ -301,6 +301,9 @@ def select_reserved_target_node_for_request(
     allowed_template_nodes = placement_support.allowed_template_nodes_for_request(
         request
     )
+    allowed_affinity_nodes = placement_support.allowed_affinity_nodes_for_request(
+        session=session, request=request
+    )
     if reserved_requests is None:
         reserved_requests = vm_request_repo.get_approved_vm_requests_overlapping_window(
             session=session,
@@ -341,6 +344,7 @@ def select_reserved_target_node_for_request(
                 has_managed_storage=has_managed_storage,
                 allowed_gpu_nodes=allowed_gpu_nodes,
                 allowed_nodes=allowed_template_nodes,
+                allowed_affinity_nodes=allowed_affinity_nodes,
             )
             and (
                 not has_managed_storage
@@ -578,6 +582,9 @@ def get_preview_node_scores(
     allowed_template_nodes = placement_support.allowed_template_nodes_for_request(
         request
     )
+    allowed_affinity_nodes = placement_support.allowed_affinity_nodes_for_request(
+        session=session, request=request
+    )
     for checkpoint in checkpoints:
         adjusted = _apply_reserved_requests_to_capacities(
             baseline_capacities=baseline_capacities,
@@ -595,6 +602,7 @@ def get_preview_node_scores(
                 has_managed_storage=has_managed_storage,
                 allowed_gpu_nodes=allowed_gpu_nodes,
                 allowed_nodes=allowed_template_nodes,
+                allowed_affinity_nodes=allowed_affinity_nodes,
             )
             and (
                 not has_managed_storage

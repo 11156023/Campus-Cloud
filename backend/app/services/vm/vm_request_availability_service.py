@@ -286,6 +286,9 @@ def _build_availability_response(
     placement_strategy = vm_request_placement_service.get_placement_strategy(session)
     node_priorities = vm_request_placement_service.get_node_priorities(session)
     allowed_gpu_nodes = placement_support.allowed_gpu_nodes_for_request(placement_request)
+    allowed_affinity_nodes = placement_support.allowed_affinity_nodes_for_request(
+        session=session, request=placement_request
+    )
 
     now_local = datetime.now(tz)
     start_anchor = now_local.replace(minute=0, second=0, microsecond=0)
@@ -433,6 +436,7 @@ def _build_availability_response(
                         disk_overcommit_ratio=disk_overcommit_ratio,
                         tuning=lite_tuning,
                         allowed_gpu_nodes=allowed_gpu_nodes,
+                        allowed_affinity_nodes=allowed_affinity_nodes,
                         slot_start=slot_start,
                         slot_end=slot_end,
                         demand_ratio=demand_ratio,
@@ -699,6 +703,7 @@ def _lightweight_fit_nodes(
     disk_overcommit_ratio: float,
     tuning,
     allowed_gpu_nodes: set[str] | None = None,
+    allowed_affinity_nodes: set[str] | None = None,
 ) -> list[str]:
     required_cpu = placement_advisor._effective_cpu_cores(request, effective_resource_type)
     required_memory = placement_advisor._effective_memory_bytes(
@@ -729,6 +734,7 @@ def _lightweight_fit_nodes(
                 has_managed_storage=has_managed_storage,
                 allowed_gpu_nodes=allowed_gpu_nodes,
                 allowed_nodes=allowed_template_nodes,
+                allowed_affinity_nodes=allowed_affinity_nodes,
             ):
                 continue
 
@@ -769,6 +775,9 @@ def _lightweight_fit_nodes(
         )
         chosen.allocatable_disk_bytes = max(chosen.allocatable_disk_bytes - node_disk_bytes, 0)
         chosen.running_resources += 1
+        chosen.allocatable_gpu_slots = max(
+            int(chosen.allocatable_gpu_slots) - request.gpu_required, 0
+        )
         chosen.candidate = placement_support.node_can_host_request(
             chosen,
             cores=required_cpu,
@@ -778,6 +787,7 @@ def _lightweight_fit_nodes(
             has_managed_storage=has_managed_storage,
             allowed_gpu_nodes=allowed_gpu_nodes,
             allowed_nodes=allowed_template_nodes,
+            allowed_affinity_nodes=allowed_affinity_nodes,
         )
         if chosen_storage is not None:
             reserve_storage_pool(
@@ -800,6 +810,7 @@ def _lite_slot_from_capacities(
     disk_overcommit_ratio: float,
     tuning,
     allowed_gpu_nodes: set[str] | None = None,
+    allowed_affinity_nodes: set[str] | None = None,
     slot_start: datetime,
     slot_end: datetime,
     demand_ratio: float,
@@ -821,6 +832,7 @@ def _lite_slot_from_capacities(
             disk_overcommit_ratio=disk_overcommit_ratio,
             tuning=tuning,
             allowed_gpu_nodes=allowed_gpu_nodes,
+            allowed_affinity_nodes=allowed_affinity_nodes,
         )
         if fit_cache is not None and fit_key is not None:
             fit_cache[fit_key] = placed_nodes
