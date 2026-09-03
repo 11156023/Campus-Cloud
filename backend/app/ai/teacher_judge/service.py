@@ -30,6 +30,7 @@ from app.ai.teacher_judge.template_command_service import (
     validate_check_steps,
 )
 from app.ai.utils import apply_thinking_control, safe_bool, strip_think_tags
+from app.core.i18n import t
 from app.infrastructure.ai.teacher_judge import client as teacher_judge_client
 from app.models.teacher_judge_template_command import TeacherJudgeTemplateCommand
 
@@ -203,17 +204,19 @@ async def _call_vllm(
     except httpx.TimeoutException as exc:
         logger.error(f"vLLM API timeout after {timeout}s")
         raise HTTPException(
-            status_code=504, detail="AI 服務回應超時，請稍後再試。"
+            status_code=504, detail=t("service.vllm_timeout")
         ) from exc
     except httpx.HTTPStatusError as exc:
         status = exc.response.status_code
         logger.error(f"vLLM API returned status {status}")
         raise HTTPException(
-            status_code=502, detail=f"AI 服務異常（狀態碼 {status}）"
+            status_code=502, detail=t("service.vllm_error_status", status=status)
         ) from exc
     except Exception as exc:
         logger.error(f"vLLM API call failed: {exc}", exc_info=True)
-        raise HTTPException(status_code=502, detail=f"AI 呼叫失敗：{exc}") from exc
+        raise HTTPException(
+            status_code=502, detail=t("service.vllm_call_failed", exc=exc)
+        ) from exc
 
 
 async def analyze_rubric(
@@ -224,7 +227,7 @@ async def analyze_rubric(
 ) -> tuple[TeacherJudgeRubricAnalysis, VLLMMetrics]:
     """Send raw document text to AI, return structured rubric analysis."""
     if not settings.VLLM_MODEL_NAME:
-        raise HTTPException(status_code=503, detail="VLLM_MODEL_NAME 未設定。")
+        raise HTTPException(status_code=503, detail=t("service.model_not_configured"))
 
     logger.info(f"Starting rubric analysis, text length: {len(raw_text)} characters")
 
@@ -263,7 +266,7 @@ async def analyze_rubric(
     except json.JSONDecodeError as exc:
         logger.error(f"Failed to parse AI response as JSON: {exc}")
         raise HTTPException(
-            status_code=502, detail=f"AI 回傳 JSON 解析失敗：{exc}"
+            status_code=502, detail=t("service.json_parse_failed", exc=exc)
         ) from exc
 
     items_raw = data.get("items") or []
@@ -313,7 +316,7 @@ async def chat_with_rubric(
       None when AI only answered a question without changes.
     """
     if not settings.VLLM_MODEL_NAME:
-        raise HTTPException(status_code=503, detail="VLLM_MODEL_NAME 未設定。")
+        raise HTTPException(status_code=503, detail=t("service.model_not_configured"))
 
     context_item_count = _extract_context_item_count(rubric_context)
     situation = SITUATION_REFINE if is_refine else SITUATION_NORMAL

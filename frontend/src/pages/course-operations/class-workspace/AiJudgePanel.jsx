@@ -12,6 +12,7 @@ import { createRubricAnalysisAutosave } from "./rubricAnalysisAutosave";
 import {
   AiJudgeService,
   RUBRIC_POLISH_PROMPT,
+  RUBRIC_REASSESS_PROMPT,
   TEMPLATE_OPTIONS,
   getTemplateLabel,
   rubricToContext,
@@ -137,14 +138,14 @@ export function buildProposalDiff(currentItems, proposedItems) {
   return changes;
 }
 
-function ProposalPanel({ proposal, selectedIds, onToggle, onApply, onSkip, disabled }) {
+function ProposalPanel({ proposal, selectedIds, onToggle, onApply, onSkip, disabled, isReassessment = false }) {
   if (!proposal?.length) return null;
   return (
     <div className={styles.proposalCard}>
       <div className={styles.proposalHeading}>
         <div>
-          <strong>AI 評分表提案</strong>
-          <p>逐項確認後才會套用到目前的評分表。</p>
+          <strong>{isReassessment ? `重新評估完成，共 ${proposal.length} 個評分項目` : "AI 評分表提案"}</strong>
+          <p>{isReassessment ? "套用後才會更新可自動偵測比例與班級評分表。" : "逐項確認後才會套用到目前的評分表。"}</p>
         </div>
         <span>{selectedIds.size}/{proposal.length} 項</span>
       </div>
@@ -170,6 +171,48 @@ function ProposalPanel({ proposal, selectedIds, onToggle, onApply, onSkip, disab
       <div className={styles.proposalActions}>
         <button type="button" className={styles.btnSecondary} disabled={disabled} onClick={onSkip}>略過</button>
         <button type="button" className={styles.btnPrimary} disabled={disabled || selectedIds.size === 0} onClick={onApply}>套用選取</button>
+      </div>
+    </div>
+  );
+}
+
+/* ── 評分表統計 ─────────────────────────────────────────── */
+
+export function RubricStats({ items, needsReview = false, isReassessing = false, onReassess, readOnly = false }) {
+  const total = items.length;
+  const autoCount = items.filter((item) => item.detectable === "auto").length;
+  const partialCount = items.filter((item) => item.detectable === "partial").length;
+  const manualCount = items.filter((item) => item.detectable === "manual").length;
+  const pct = (count) => (total > 0 ? Math.round((count / total) * 100) : 0);
+  return (
+    <div className={styles.assessmentSummary}>
+      <div className={styles.assessmentHead}>
+        <div>
+          <div className={styles.assessmentTitleRow}>
+            <h4>自動偵測可用性</h4>
+            <span className={needsReview ? styles.assessmentStatus_stale : styles.assessmentStatus_current}>
+              {needsReview ? "待重新評估" : "結果已更新"}
+            </span>
+          </div>
+          <p aria-live="polite">{needsReview ? "評分項目已變更，請重新評估自動檢查適用程度。" : "依目前評分項目的 AI 偵測判斷，協助確認自動檢查的適用程度。"}</p>
+        </div>
+        {!readOnly && onReassess && (
+          <button type="button" className={needsReview ? styles.btnPrimary : styles.btnSecondary} onClick={onReassess} disabled={isReassessing || total === 0} title={total === 0 ? "至少需要一個評估項目" : undefined}>
+            {isReassessing ? <Spinner size={15} /> : <MIcon name="refresh" size={16} />}
+            {isReassessing ? "重新評估中..." : "重新評估"}
+          </button>
+        )}
+      </div>
+      <div className={styles.statsBar} role="img" aria-label={`共 ${total} 題：可自動偵測 ${pct(autoCount)}%、部分可偵測 ${pct(partialCount)}%、需人工評閱 ${pct(manualCount)}%`}>
+        {autoCount > 0 && <span className={styles.statsSeg_auto} style={{ flexGrow: autoCount }} />}
+        {partialCount > 0 && <span className={styles.statsSeg_partial} style={{ flexGrow: partialCount }} />}
+        {manualCount > 0 && <span className={styles.statsSeg_manual} style={{ flexGrow: manualCount }} />}
+      </div>
+      <div className={styles.statsLegend}>
+        <span className={styles.legendItem}><i className={styles.legendDot_auto} />可自動偵測 {autoCount}（{pct(autoCount)}%）</span>
+        <span className={styles.legendItem}><i className={styles.legendDot_partial} />部分可偵測 {partialCount}（{pct(partialCount)}%）</span>
+        <span className={styles.legendItem}><i className={styles.legendDot_manual} />需人工評閱 {manualCount}（{pct(manualCount)}%）</span>
+        <span className={styles.legendTotal}>共 {total} 題</span>
       </div>
     </div>
   );
@@ -979,7 +1022,10 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
   const [selectedProposalIds, setSelectedProposalIds] = useState(() => new Set());
   const [isAssistantOpen, setIsAssistantOpen] = useState(true);
   const [pendingProposalMeta, setPendingProposalMeta] = useState(null);
+  const [isReassessing, setIsReassessing] = useState(false);
+  const [pendingProposalIsReassessment, setPendingProposalIsReassessment] = useState(false);
   const [rubricName, setRubricName] = useState("");
+  const [environmentKeys, setEnvironmentKeys] = useState([]);
   const [isSavingMetadata, setIsSavingMetadata] = useState(false);
   const analysisRevisionsRef = useRef(new Map());
   const autosaveRef = useRef(null);
@@ -1044,6 +1090,7 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
     setPendingProposal(null);
     setSelectedProposalIds(new Set());
     setPendingProposalMeta(null);
+    setPendingProposalIsReassessment(false);
     if (!judgeSession?.id) return undefined;
     AiJudgeService.listSessionMessages(classId, judgeSession.id)
       .then((rows) => {
@@ -1066,20 +1113,26 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
     setUploadedFileName(file.original_filename || "rubric");
     setSourceFileId(file.id);
     setRubricName(getRubricDisplayName(file));
+    setEnvironmentKeys(file.environment_keys?.length ? file.environment_keys : [file.template_key]);
     analysisRevisionsRef.current.set(file.id, file.analysis_revision);
     setAnalysisTemplateKey(file.template_key);
     setSelectedTemplateKey(file.template_key);
   }, [files, judgeSession?.selected_file_id, sourceFileId]);
 
   async function saveRubricMetadata() {
-    if (!sourceFileId || readOnly || !rubricName.trim() || isSavingMetadata) return;
+    if (!sourceFileId || readOnly || !rubricName.trim() || !environmentKeys.length || isSavingMetadata) return;
     setIsSavingMetadata(true);
     try {
       const updated = await AiJudgeService.updateFileMetadata(classId, sourceFileId, {
         display_name: rubricName.trim(),
+        environment_keys: environmentKeys,
+        template_key: environmentKeys[0],
       });
       setFiles((current) => current.map((entry) => entry.id === updated.id ? updated : entry));
       setRubricName(updated.display_name ?? rubricName.trim());
+      setEnvironmentKeys(updated.environment_keys?.length ? updated.environment_keys : environmentKeys);
+      setAnalysisTemplateKey(updated.template_key ?? environmentKeys[0]);
+      setSelectedTemplateKey(updated.template_key ?? environmentKeys[0]);
       toast.success("評分表設定已儲存");
     } catch (error) {
       toast.error(error?.message ?? "評分表設定儲存失敗");
@@ -1127,6 +1180,7 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
           file,
           selectedTemplateKey,
           conflictStrategy,
+          environmentKeys,
         );
       } catch (err) {
         if (err?.status === 409) {
@@ -1157,8 +1211,10 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
       setUploadedFileName(file.name || "rubric");
       setSourceFileId(uploadedFile.id);
       setRubricName(getRubricDisplayName(uploadedFile, getRubricDisplayName(file)));
+      setEnvironmentKeys(uploadedFile.environment_keys?.length ? uploadedFile.environment_keys : [uploadedFile.template_key]);
       analysisRevisionsRef.current.set(uploadedFile.id, uploadedFile.analysis_revision);
       setAnalysisTemplateKey(response.template_key ?? selectedTemplateKey);
+      setSelectedTemplateKey(response.template_key ?? selectedTemplateKey);
       setFiles((current) => [
         uploadedFile,
         ...current.filter((item) => item.id !== uploadedFile.id),
@@ -1192,6 +1248,7 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
     setUploadedFileName(file.original_filename || "rubric");
     setSourceFileId(file.id);
     setRubricName(getRubricDisplayName(file));
+    setEnvironmentKeys(file.environment_keys?.length ? file.environment_keys : [file.template_key]);
     analysisRevisionsRef.current.set(file.id, file.analysis_revision);
     setAnalysisTemplateKey(file.template_key);
     setSelectedTemplateKey(file.template_key);
@@ -1225,7 +1282,7 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
     }
   }
 
-  async function handleSendMessage(content, isRefine = false) {
+  async function handleSendMessage(content, isRefine = false, isReassessment = false) {
     if (!judgeSession?.id && !analysis) return;
     if (judgeSession?.status === "archived") return;
     if (autosaveRef.current && !(await autosaveRef.current.flush())) return;
@@ -1255,6 +1312,10 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
         setSelectedProposalIds(new Set(proposal.map((item, index) => item.id ?? `proposal-${index}`)));
         setPendingProposalMeta(proposal.length ? { baseRevision: response.base_revision ?? analysisRevisionsRef.current.get(sourceFileId) } : null);
         if (proposal.length) setIsAssistantOpen(true);
+        setPendingProposalIsReassessment(Boolean(proposal.length && isReassessment));
+        if (isReassessment && !response.rubric_proposal) {
+          toast.error("AI 未回傳可套用的重新評估結果，原有百分比尚未更新，請稍後再試");
+        }
         return;
       }
       const response = await AiJudgeService.chat({
@@ -1271,7 +1332,9 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
           detectabilityNeedsReview: false,
         });
         if (!saved) return;
-        toast.success("評估表已更新");
+        toast.success(isReassessment ? "重新評估完成" : "評估表已更新");
+      } else if (isReassessment) {
+        toast.error("AI 未回傳可套用的重新評估結果，原有百分比尚未更新，請稍後再試");
       }
     } catch (err) {
       toast.error(err?.message ?? "對話失敗");
@@ -1289,6 +1352,7 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
       setPendingProposal(null);
       setSelectedProposalIds(new Set());
       setPendingProposalMeta(null);
+      setPendingProposalIsReassessment(false);
       toast.error("評分表已經有新的修改，請重新請 AI 產生提案。");
       return;
     }
@@ -1317,6 +1381,7 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
     setPendingProposal(null);
     setSelectedProposalIds(new Set());
     setPendingProposalMeta(null);
+    setPendingProposalIsReassessment(false);
     toast.success("已套用 AI 提出的評分項目修改");
   }
 
@@ -1354,6 +1419,15 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
     });
   }
 
+  async function handleReassess() {
+    setIsReassessing(true);
+    try {
+      await handleSendMessage(RUBRIC_REASSESS_PROMPT, true, true);
+    } finally {
+      setIsReassessing(false);
+    }
+  }
+
   async function handleClearMessages() {
     if (isClearingMessages || isChatting || !messages.length || readOnly) return;
     setIsClearingMessages(true);
@@ -1366,6 +1440,7 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
       setPendingProposal(null);
       setSelectedProposalIds(new Set());
       setPendingProposalMeta(null);
+      setPendingProposalIsReassessment(false);
       toast.success("對話內容已清除");
     } catch (err) {
       toast.error(err?.message ?? "清除對話內容失敗");
@@ -1568,18 +1643,34 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
                <div className={styles.settingsBody}>
                  <div className={styles.cardHead}>
                    <h4 className={styles.cardTitle}><MIcon name="tune" size={18} />評分表設定</h4>
-                   <button type="button" className={styles.btnSecondary} onClick={saveRubricMetadata} disabled={readOnly || isSavingMetadata || !rubricName.trim()}>
+                    <button type="button" className={styles.btnSecondary} onClick={saveRubricMetadata} disabled={readOnly || isSavingMetadata || !rubricName.trim() || !environmentKeys.length}>
                      {isSavingMetadata ? <Spinner size={14} /> : <MIcon name="save" size={14} />}
                      {isSavingMetadata ? "儲存中…" : "儲存設定"}
                    </button>
-                 </div>
-                 <label className={styles.rubricField}><span>評分表名稱</span><input value={rubricName} maxLength={255} disabled={readOnly || isSavingMetadata} onChange={(event) => setRubricName(event.target.value)} /></label>
+                  </div>
+                  <label className={styles.rubricField}><span>評分表名稱</span><input value={rubricName} maxLength={255} disabled={readOnly || isSavingMetadata} onChange={(event) => setRubricName(event.target.value)} /></label>
+                  <div className={styles.templateRow}>
+                    <span className={styles.fieldLabel}>評分環境（可複選）</span>
+                    <div className={styles.chipBtns}>
+                      {TEMPLATE_OPTIONS.map((option) => <button key={option.key} type="button" className={environmentKeys.includes(option.key) ? styles.chipBtnActive : styles.chipBtn} disabled={readOnly || isSavingMetadata} onClick={() => setEnvironmentKeys((current) => current.includes(option.key) ? current.filter((entry) => entry !== option.key) : [...current, option.key])}>{option.label}</button>)}
+                    </div>
+                  </div>
                </div>
              </div>
            )}
 
            {analysis && (
             <>
+              <div className={styles.card}>
+                <RubricStats
+                  items={items}
+                  needsReview={Boolean(analysis.detectability_needs_review)}
+                  isReassessing={isReassessing}
+                  onReassess={handleReassess}
+                  readOnly={readOnly}
+                />
+                <p className={styles.mutedText}>主要評分情境：{getTemplateLabel(analysisTemplateKey)}</p>
+              </div>
               {analysis.summary && (
                 <div className={styles.summaryDetails}>
                   <strong>AI 評估摘要</strong>
@@ -1636,10 +1727,12 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
               })}
               onApply={applyPendingProposal}
               onSkip={() => {
-                setPendingProposal(null);
-                setSelectedProposalIds(new Set());
-                setPendingProposalMeta(null);
+               setPendingProposal(null);
+               setSelectedProposalIds(new Set());
+               setPendingProposalMeta(null);
+                setPendingProposalIsReassessment(false);
               }}
+              isReassessment={pendingProposalIsReassessment}
               disabled={readOnly || isChatting || isClearingMessages}
             />}
           </div>

@@ -41,12 +41,14 @@ def parse_pdf(file_bytes: bytes) -> str:
     """用 pdfplumber 解析純文字型 PDF，表格轉為 Markdown，其餘為純文字（排除表格區域）。"""
     from fastapi import HTTPException
 
+    from app.core.i18n import t
+
     try:
         import pdfplumber  # type: ignore
     except ImportError as exc:
         raise HTTPException(
             status_code=503,
-            detail="pdfplumber is required to parse PDF files. Please install pdfplumber.",
+            detail=t("rubric_parser.pdfplumber_missing"),
         ) from exc
 
     lines: list[str] = []
@@ -124,7 +126,9 @@ def parse_document(filename: str, file_bytes: bytes) -> str:
     elif suffix == ".pdf":
         return parse_pdf(file_bytes)
     else:
-        raise ValueError(f"不支援的文件格式：{suffix}（目前支援 .docx / .pdf）")
+        from app.core.i18n import t
+
+        raise ValueError(t("rubric_parser.unsupported_format", suffix=suffix))
 
 
 # ──────────────────────────────────────────────────────

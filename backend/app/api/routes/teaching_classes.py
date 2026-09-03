@@ -14,6 +14,7 @@ from sqlmodel import delete, select
 
 from app.api.deps import InstructorUser, SessionDep
 from app.core.authorizers import require_teaching_access
+from app.core.i18n import t
 from app.exceptions import BadRequestError, NotFoundError
 from app.models import (
     BatchProvisionJob,
@@ -156,7 +157,7 @@ class ClassResourceUsageResponse(BaseModel):
 def _get_class(session: SessionDep, current_user, class_id: uuid.UUID) -> TeachingClass:
     item = session.get(TeachingClass, class_id)
     if not item:
-        raise NotFoundError("Teaching class not found")
+        raise NotFoundError(t("teachingClasses.notFound"))
     require_teaching_access(current_user, item.owner_id)
     return item
 
@@ -367,7 +368,7 @@ def _serialize(session: SessionDep, item: TeachingClass) -> dict:
 
 def _validate_schedule(item) -> None:
     if item.end_date < item.start_date or item.end_time <= item.start_time:
-        raise BadRequestError("結束日期與時間必須晚於開始時間")
+        raise BadRequestError(t("teachingClasses.scheduleInvalid"))
 
 
 @router.post("")
@@ -438,7 +439,7 @@ def update_class(
 ):
     item = _get_class(session, current_user, class_id)
     if item.status != TeachingClassStatus.planning:
-        raise BadRequestError("已送出建機後不可修改固定課表")
+        raise BadRequestError(t("teachingClasses.fixedScheduleLocked"))
     for key, value in body.model_dump(exclude_none=True).items():
         setattr(item, key, value)
     _validate_schedule(item)
@@ -458,9 +459,9 @@ def extend_class(
 ):
     item = _get_class(session, current_user, class_id)
     if item.status == TeachingClassStatus.archived:
-        raise BadRequestError("Archived teaching classes cannot be extended")
+        raise BadRequestError(t("teachingClasses.archivedCannotExtend"))
     if body.end_date <= item.end_date:
-        raise BadRequestError("The new end date must be later than the current end date")
+        raise BadRequestError(t("teachingClasses.extendDateMustBeLater"))
     item.end_date = body.end_date
     item.updated_at = get_datetime_utc()
     item.resources_reclaimed_at = None
@@ -505,7 +506,7 @@ def reclaim_class_resources(
 ):
     item = _get_class(session, current_user, class_id)
     if item.status != TeachingClassStatus.archived:
-        raise BadRequestError("Teaching class must be archived before reclaim")
+        raise BadRequestError(t("teachingClasses.mustBeArchivedBeforeReclaim"))
     return class_lifecycle_service.queue_reclaim(
         session=session,
         item=item,
@@ -523,7 +524,7 @@ def add_students(
 ):
     item = _get_class(session, current_user, class_id)
     if item.status != TeachingClassStatus.planning:
-        raise BadRequestError("已送出建機後不可變更學生名單")
+        raise BadRequestError(t("teachingClasses.studentsLocked"))
     existing = {row.user_id for row in _students(session, class_id)}
     added, not_found, invalid_role = 0, [], []
     for raw in body.emails:
@@ -555,10 +556,10 @@ def remove_student(
 ):
     item = _get_class(session, current_user, class_id)
     if item.status != TeachingClassStatus.planning:
-        raise BadRequestError("已送出建機後不可變更學生名單")
+        raise BadRequestError(t("teachingClasses.studentsLocked"))
     row = session.get(TeachingClassStudent, student_id)
     if not row or row.class_id != class_id:
-        raise NotFoundError("Class student not found")
+        raise NotFoundError(t("teachingClasses.studentNotFound"))
     session.delete(row)
     session.commit()
     return _serialize(session, item)
@@ -573,7 +574,7 @@ async def import_students(
 ):
     item = _get_class(session, current_user, class_id)
     if item.status != TeachingClassStatus.planning:
-        raise BadRequestError("已送出建機後不可變更學生名單")
+        raise BadRequestError(t("teachingClasses.studentsLocked"))
     raw = await file.read()
     content = None
     for encoding in ("cp950", "utf-8-sig", "utf-8"):
@@ -583,7 +584,7 @@ async def import_students(
         except UnicodeDecodeError:
             continue
     if content is None:
-        raise BadRequestError("無法解析 CSV 檔案編碼")
+        raise BadRequestError(t("teachingClasses.csvDecodeFailed"))
     emails = []
     for index, row in enumerate(csv.reader(io.StringIO(content))):
         if not row:
@@ -653,7 +654,7 @@ def replace_machines(
     current_user: InstructorUser,
 ):
     _get_class(session, current_user, class_id)
-    raise BadRequestError("請從課程環境發布版本，並在班級管理選擇課程環境")
+    raise BadRequestError(t("teachingClasses.machinesManagedByCourseEnvironment"))
 
 
 @router.put("/{class_id}/course")
@@ -665,15 +666,15 @@ def select_course(
 ):
     item = _get_class(session, current_user, class_id)
     if item.status != TeachingClassStatus.planning or item.locked_at is not None:
-        raise BadRequestError("班級已鎖定，不能更換課程")
+        raise BadRequestError(t("teachingClasses.courseLockedCannotChange"))
     version = session.get(CourseEnvironmentVersion, body.course_version_id)
     if version is None or version.status != CourseEnvironmentVersionStatus.published:
-        raise BadRequestError("只能選擇已發布的課程版本")
+        raise BadRequestError(t("teachingClasses.onlyPublishedCourseVersion"))
     environment = session.get(CourseEnvironment, version.environment_id)
     if environment is None:
-        raise NotFoundError("Course environment not found")
+        raise NotFoundError(t("teachingClasses.courseEnvironmentNotFound"))
     if environment.usage_scope not in {"course", "both"}:
-        raise BadRequestError("此環境僅供快速練習，不能套用到正式課程")
+        raise BadRequestError(t("teachingClasses.environmentNotForFormalCourse"))
     require_teaching_access(current_user, environment.owner_id)
     source_nodes = list(
         session.exec(
@@ -683,7 +684,7 @@ def select_course(
         ).all()
     )
     if not source_nodes:
-        raise BadRequestError("課程版本沒有可派發的機器")
+        raise BadRequestError(t("teachingClasses.courseVersionNoMachines"))
     session.exec(
         delete(TeachingClassMachineNode).where(
             TeachingClassMachineNode.class_id == class_id
@@ -726,7 +727,7 @@ def replace_weeks(
 ):
     item = _get_class(session, current_user, class_id)
     if item.status == TeachingClassStatus.archived:
-        raise BadRequestError("已結束的班級不可修改每週內容")
+        raise BadRequestError(t("teachingClasses.archivedCannotEditWeeklyContent"))
     expected = {
         row.session_date
         for row in session.exec(
@@ -735,7 +736,7 @@ def replace_weeks(
     }
     received = {row.session_date for row in body}
     if expected != received:
-        raise BadRequestError("週次日期必須由班級固定課表產生，不可手動新增或刪除")
+        raise BadRequestError(t("teachingClasses.weekDatesMustMatchSchedule"))
     session.exec(
         delete(TeachingClassWeek).where(TeachingClassWeek.class_id == class_id)
     )
@@ -760,16 +761,16 @@ async def upload_week_file(
 ):
     item = _get_class(session, current_user, class_id)
     if item.status == TeachingClassStatus.archived:
-        raise BadRequestError("已結束的班級不可修改每週內容")
+        raise BadRequestError(t("teachingClasses.archivedCannotEditWeeklyContent"))
     week = session.get(TeachingClassWeek, week_id)
     if not week or week.class_id != class_id:
-        raise NotFoundError("找不到指定週次")
+        raise NotFoundError(t("teachingClasses.weekNotFound"))
 
     filename = (file.filename or "task-file").replace("\\", "/").split("/")[-1].strip()
     if not filename or filename in {".", ".."}:
-        raise BadRequestError("檔案名稱無效")
+        raise BadRequestError(t("teachingClasses.invalidFileName"))
     if len(filename) > 255:
-        raise BadRequestError("Task file name must be 255 characters or fewer")
+        raise BadRequestError(t("teachingClasses.taskFileNameTooLong"))
 
     file_id = uuid.uuid4()
     storage_key = f"{file_id.hex}.task"
@@ -781,7 +782,7 @@ async def upload_week_file(
             while chunk := await file.read(1024 * 1024):
                 written += len(chunk)
                 if written > MAX_TASK_FILE_BYTES:
-                    raise BadRequestError("任務檔案不可超過 100 MB")
+                    raise BadRequestError(t("teachingClasses.taskFileTooLarge"))
                 output.write(chunk)
     except Exception:
         destination.unlink(missing_ok=True)
@@ -811,7 +812,7 @@ def delete_week_file(
 ):
     item = _get_class(session, current_user, class_id)
     if item.status == TeachingClassStatus.archived:
-        raise BadRequestError("已結束的班級不可修改每週內容")
+        raise BadRequestError(t("teachingClasses.archivedCannotEditWeeklyContent"))
     week = session.get(TeachingClassWeek, week_id)
     task_file = session.get(TeachingClassTaskFile, file_id)
     if (
@@ -820,7 +821,7 @@ def delete_week_file(
         or not task_file
         or task_file.week_id != week_id
     ):
-        raise NotFoundError("找不到指定任務檔案")
+        raise NotFoundError(t("teachingClasses.taskFileNotFound"))
 
     storage_key = task_file.storage_key
     session.delete(task_file)
@@ -915,7 +916,7 @@ def capacity_preview(
 ):
     item = _get_class(session, current_user, class_id)
     if item.status != TeachingClassStatus.planning:
-        raise BadRequestError("只有準備中的班級可以重新執行容量預檢")
+        raise BadRequestError(t("teachingClasses.onlyPlanningCanRecheckCapacity"))
     nodes = list(
         session.exec(
             select(TeachingClassMachineNode)
@@ -946,11 +947,11 @@ def provision_class(
     )
     students = _students(session, class_id)
     if not nodes or not students:
-        raise BadRequestError("學生名單與課程機器必須完成")
+        raise BadRequestError(t("teachingClasses.studentsAndMachinesRequired"))
     if item.status != TeachingClassStatus.planning or item.locked_at is not None:
-        raise BadRequestError("班級已鎖定或已送出建機")
+        raise BadRequestError(t("teachingClasses.classLockedOrSubmitted"))
     if item.course_version_id is None:
-        raise BadRequestError("請先選擇已發布的課程版本")
+        raise BadRequestError(t("teachingClasses.selectPublishedCourseFirst"))
     class_capacity_service.reserve(
         session,
         class_id=item.id,
@@ -990,7 +991,7 @@ def retry_failed_class(
         TeachingClassStatus.partial_failed,
         TeachingClassStatus.provisioning,
     }:
-        raise BadRequestError("只有建立失敗的班級可以重試")
+        raise BadRequestError(t("teachingClasses.onlyFailedCanRetry"))
     nodes = list(
         session.exec(
             select(TeachingClassMachineNode)
@@ -1104,7 +1105,7 @@ def retry_failed_class(
     if submitted:
         item.status = TeachingClassStatus.pending_review
     elif item.status == TeachingClassStatus.provisioning and not recovered:
-        raise BadRequestError("No failed or stale provisioning tasks to retry")
+        raise BadRequestError(t("teachingClasses.noFailedOrStaleTasksToRetry"))
     elif not all_jobs_ready:
         item.status = TeachingClassStatus.provisioning
     else:
@@ -1112,7 +1113,12 @@ def retry_failed_class(
             session, class_id=class_id
         )
         if topology_errors:
-            raise BadRequestError("網路拓撲重試失敗：" + "；".join(topology_errors))
+            raise BadRequestError(
+                t(
+                    "teachingClasses.topologyRetryFailed",
+                    details="；".join(topology_errors),
+                )
+            )
         item.status = TeachingClassStatus.active
         course_service.ensure_class_path(
             session,
@@ -1165,7 +1171,9 @@ def _recover_existing_task_resource(
             item.id,
             resource.vmid,
         )
-        raise BadRequestError("Cannot verify existing resource; retry later") from None
+        raise BadRequestError(
+            t("teachingClasses.cannotVerifyResourceRetryLater")
+        ) from None
 
     resource_repo.assign_to_teaching_class(
         session=session,
@@ -1180,7 +1188,7 @@ def _recover_existing_task_resource(
         )
     ).first()
     if enrollment is None:
-        raise BadRequestError("Provisioned resource user is no longer in the class")
+        raise BadRequestError(t("teachingClasses.provisionedUserNoLongerInClass"))
     mapping = session.exec(
         select(TeachingClassStudentMachine).where(
             TeachingClassStudentMachine.class_student_id == enrollment.id,
@@ -1215,7 +1223,7 @@ def reset_failed_class(
 ):
     item = _get_class(session, current_user, class_id)
     if item.status != TeachingClassStatus.partial_failed:
-        raise BadRequestError("只有建立失敗的班級可以返回編輯")
+        raise BadRequestError(t("teachingClasses.onlyFailedCanResetToEdit"))
     enrollment_ids = [row.id for row in _students(session, class_id)]
     machine_rows = (
         list(
@@ -1229,7 +1237,7 @@ def reset_failed_class(
         else []
     )
     if any(row.vmid is not None for row in machine_rows):
-        raise BadRequestError("已有部分機器建立完成，請使用「重試失敗機器」")
+        raise BadRequestError(t("teachingClasses.partialMachinesUseRetry"))
     for row in machine_rows:
         session.delete(row)
     nodes = session.exec(

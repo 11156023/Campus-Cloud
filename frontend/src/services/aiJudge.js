@@ -7,6 +7,7 @@ import {
   apiPostBlob,
   apiPostMultipart,
 } from "./api";
+import i18n from "../i18n";
 
 // 腳本產生會依序執行 generation、policy/quality 修正與 AI reviewer，
 // 不能沿用一般 API 的 15 秒 request budget。後端每次 vLLM 呼叫仍有自己的 timeout。
@@ -17,7 +18,7 @@ export const TEMPLATE_OPTIONS = [
   { key: "n8n", label: "n8n" },
   { key: "python", label: "Python" },
   { key: "postgresql", label: "PostgreSQL" },
-  { key: "linux", label: "一般 Linux/LXC" },
+  { key: "linux", label: i18n.t("aiJudge.linuxTemplateLabel", { ns: "services" }) },
 ];
 
 /** 正式工作區與獨立編輯頁共用的整表潤飾動作。 */
@@ -31,7 +32,7 @@ export const RUBRIC_REASSESS_PROMPT =
 export function getTemplateLabel(templateKey) {
   return (
     TEMPLATE_OPTIONS.find((option) => option.key === templateKey)?.label ??
-    "一般 Linux/LXC"
+    i18n.t("aiJudge.linuxTemplateLabel", { ns: "services" })
   );
 }
 
@@ -82,8 +83,8 @@ export const AiJudgeService = {
   },
 
   createBlankSession(classId, {
-    title = "未命名檢查",
-    rubricName = "空白評分表",
+    title = i18n.t("aiJudge.defaultBlankSessionTitle", { ns: "services" }),
+    rubricName = i18n.t("aiJudge.defaultBlankRubricName", { ns: "services" }),
     environmentKeys = ["n8n"],
   } = {}) {
     return this.createSession(classId, {

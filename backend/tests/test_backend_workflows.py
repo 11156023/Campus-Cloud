@@ -326,7 +326,6 @@ def _seed_lxc_template(
     *,
     pve_vmid: int = 9100,
     status: VMTemplateStatus = VMTemplateStatus.ready,
-    student_requestable: bool = True,
 ) -> VMTemplate:
     template = VMTemplate(
         pve_vmid=pve_vmid,
@@ -335,7 +334,6 @@ def _seed_lxc_template(
         resource_type="lxc",
         status=status,
         visibility=VMTemplateVisibility.global_,
-        student_requestable=student_requestable,
     )
     session.add(template)
     session.commit()
@@ -1764,8 +1762,6 @@ def test_storage_selection_penalizes_high_contention_even_with_better_priority()
         disk_contention_warn_share=0.7,
         disk_contention_high_share=0.9,
         disk_penalty_weight=0.75,
-        search_max_reassignments=2,
-        search_depth=3,
     )
 
     chosen = vm_request_placement_service._select_best_storage_for_request(

@@ -98,11 +98,24 @@
   letter-spacing: 0.05em;
 }
 
-.arrowIcon {
-  color: var(--color-text-secondary);
+/* 來源 ⇄ 目標交換按鈕 */
+.swapBtn {
   @include flex-center;
-  padding-bottom: 6px;
   flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  margin-bottom: 4px;
+  border: 1px solid var(--color-border);
+  border-radius: $radius-8;
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: color $transition-base, border-color $transition-base;
+
+  &:hover {
+    color: var(--color-primary);
+    border-color: var(--color-primary);
+  }
 }
 
 .select {
