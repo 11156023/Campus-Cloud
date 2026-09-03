@@ -151,6 +151,7 @@
   "ResourcesPage.title": "マイリソース",
   "ResourcesPage.subtitle": "承認済みの仮想マシンとコンテナを表示・管理します",
   "ResourcesPage.requestResource": "リソースを申請",
+  "ResourcesPage.downloadDesktopClient": "接続アプリをダウンロード",
   "ResourcesPage.colName": "名前",
   "ResourcesPage.colEnvironment": "環境／OS",
   "ResourcesPage.colStatus": "状態",

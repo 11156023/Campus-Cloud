@@ -12,7 +12,7 @@ const emit = defineEmits<{
   rdp: [target: { host: string; port: number }];
 }>();
 
-const { t, locale } = useI18n();
+const { t } = useI18n();
 const rows = computed(() => props.resources);
 
 const statusTagType = (status: string) => {
@@ -51,17 +51,6 @@ const validTarget = (tunnel?: SkyLabTunnelInfo) => {
 const canConnect = (resource: SkyLabResource, tunnel?: SkyLabTunnelInfo) =>
   resource.status === "running" && validTarget(tunnel);
 
-const formatExpiry = (value?: string | null) => {
-  if (!value) return "—";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString(locale.value === "zh-CN" ? "zh-TW" : "en-US", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit"
-  });
-};
-
 const connect = (service: "ssh" | "rdp", tunnel?: SkyLabTunnelInfo) => {
   if (!validTarget(tunnel)) return;
   const target = { host: String(tunnel?.host), port: Number(tunnel?.port) };
@@ -72,7 +61,7 @@ const connect = (service: "ssh" | "rdp", tunnel?: SkyLabTunnelInfo) => {
 
 <template>
   <el-table :data="rows" size="small" class="machine-table">
-    <el-table-column :label="t('resources.table.name')" min-width="210">
+    <el-table-column :label="t('resources.table.name')" min-width="300">
       <template #default="{ row }">
         <div class="name-cell">
           <span class="name-icon">
@@ -82,24 +71,19 @@ const connect = (service: "ssh" | "rdp", tunnel?: SkyLabTunnelInfo) => {
           </span>
           <span class="name-copy">
             <strong>{{ row.name }}</strong>
-            <small>{{ typeLabel(row.type) }} · VMID {{ row.vmid }}</small>
+            <small>
+              {{ typeLabel(row.type) }} · VMID {{ row.vmid }}
+              <template v-if="row.environment_type">
+                · {{ row.environment_type }}
+              </template>
+              <template v-if="row.os_info"> · {{ row.os_info }} </template>
+            </small>
           </span>
         </div>
       </template>
     </el-table-column>
 
-    <el-table-column :label="t('resources.table.environment')" min-width="155">
-      <template #default="{ row }">
-        <div class="cell-stack">
-          <span>{{
-            row.environment_type || t("resources.customEnvironment")
-          }}</span>
-          <small>{{ row.os_info || "—" }}</small>
-        </div>
-      </template>
-    </el-table-column>
-
-    <el-table-column :label="t('resources.table.status')" width="100">
+    <el-table-column :label="t('resources.table.status')" width="92">
       <template #default="{ row }">
         <el-tag size="small" :type="statusTagType(row.status)">
           {{ statusLabel(row.status) }}
@@ -107,27 +91,16 @@ const connect = (service: "ssh" | "rdp", tunnel?: SkyLabTunnelInfo) => {
       </template>
     </el-table-column>
 
-    <el-table-column :label="t('resources.table.ip')" min-width="130">
+    <el-table-column :label="t('resources.table.ip')" width="125">
       <template #default="{ row }">
         <span class="mono">{{ row.ip_address || "—" }}</span>
       </template>
     </el-table-column>
 
-    <el-table-column :label="t('resources.table.expiry')" width="120">
-      <template #default="{ row }">
-        <span class="muted">{{ formatExpiry(row.expiry_date) }}</span>
-      </template>
-    </el-table-column>
-
-    <el-table-column :label="t('resources.table.node')" width="95">
-      <template #default="{ row }">
-        <span class="muted">{{ row.node || "—" }}</span>
-      </template>
-    </el-table-column>
-
     <el-table-column
       :label="t('home.tunnels.action')"
-      min-width="175"
+      width="210"
+      fixed="right"
       align="right"
     >
       <template #default="{ row }">
@@ -143,10 +116,13 @@ const connect = (service: "ssh" | "rdp", tunnel?: SkyLabTunnelInfo) => {
                 tunnelFor(row as SkyLabResource, 'ssh')
               )
             "
-            @click="connect('ssh', tunnelFor(row as SkyLabResource, 'ssh'))"
+            class="quick-connect quick-connect--ssh"
+            @click.stop="
+              connect('ssh', tunnelFor(row as SkyLabResource, 'ssh'))
+            "
           >
             <IconifyIconOffline icon="terminal-rounded" />
-            SSH
+            {{ t("home.tunnels.connectSsh") }}
           </el-button>
           <el-button
             v-if="tunnelFor(row as SkyLabResource, 'rdp')"
@@ -159,10 +135,13 @@ const connect = (service: "ssh" | "rdp", tunnel?: SkyLabTunnelInfo) => {
                 tunnelFor(row as SkyLabResource, 'rdp')
               )
             "
-            @click="connect('rdp', tunnelFor(row as SkyLabResource, 'rdp'))"
+            class="quick-connect"
+            @click.stop="
+              connect('rdp', tunnelFor(row as SkyLabResource, 'rdp'))
+            "
           >
             <IconifyIconOffline icon="desktop-windows-rounded" />
-            RDP
+            {{ t("home.tunnels.connectRdp") }}
           </el-button>
           <span
             v-if="
@@ -171,7 +150,11 @@ const connect = (service: "ssh" | "rdp", tunnel?: SkyLabTunnelInfo) => {
             "
             class="action-empty"
           >
-            {{ t("home.machines.unavailable") }}
+            {{
+              row.status === "running"
+                ? t("home.machines.unavailable")
+                : t("home.tunnels.machineStopped")
+            }}
           </span>
         </div>
       </template>
@@ -240,6 +223,13 @@ const connect = (service: "ssh" | "rdp", tunnel?: SkyLabTunnelInfo) => {
   font-size: 11px;
 }
 
+.name-copy small {
+  max-width: 270px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .mono {
   color: var(--color-text-secondary);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -258,5 +248,22 @@ const connect = (service: "ssh" | "rdp", tunnel?: SkyLabTunnelInfo) => {
   gap: 4px;
   align-items: center;
   margin-left: 0;
+}
+
+.row-actions :deep(.quick-connect) {
+  min-width: 82px;
+  height: 30px;
+  padding-inline: 10px;
+  font-weight: 650;
+  border-radius: 8px;
+}
+
+.row-actions :deep(.quick-connect--ssh) {
+  box-shadow: 0 4px 10px
+    color-mix(in srgb, var(--color-primary) 22%, transparent);
+}
+
+.machine-table :deep(.el-table__fixed-right) {
+  box-shadow: -8px 0 18px rgba(67, 90, 149, 0.05);
 }
 </style>

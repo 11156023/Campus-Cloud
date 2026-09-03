@@ -121,9 +121,19 @@ def _get_or_create_peer(
                 session=session, public_key=public_key
             )
             if conflict is not None and (peer is None or conflict.id != peer.id):
-                raise ConflictError(
-                    t("wireguard.publicKeyBelongsToAnotherDevice")
+                can_transfer = (
+                    settings.WIREGUARD_ALLOW_INACTIVE_PEER_TRANSFER
+                    and peer is None
+                    and not conflict.active
+                    and conflict.device_id == device_id
                 )
+                if not can_transfer:
+                    raise ConflictError(
+                        t("wireguard.publicKeyBelongsToAnotherDevice")
+                    )
+                conflict.user_id = user_id
+                conflict.updated_at = _now()
+                return peer_repo.save(session=session, peer=conflict)
             if peer is not None:
                 return peer
             peer = WireGuardPeer(
