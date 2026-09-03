@@ -43,6 +43,15 @@ function isDraftReady(draft) {
   return draft.resource_type === "vm" ? Boolean(draft.disk_size) : Boolean(draft.rootfs_size);
 }
 
+/* 依失敗原因給主訊息；api.js 逾時丟 {status:408, timeout:true}、
+   Proxmox 全斷後端回 502、連不上後端則沒有 status */
+function availabilityErrorTitle(error) {
+  if (error?.timeout) return "伺服器回應較慢，時段月曆載入逾時";
+  if (error?.status === 502) return "運算主機暫時沒有回應，查不到可用時段";
+  if (error && !error.status) return "無法連線到伺服器，時段月曆暫時無法載入";
+  return "時段月曆暫時載入失敗";
+}
+
 function cacheAvailability(key, data) {
   availabilityCache.set(key, { data, ts: Date.now() });
   while (availabilityCache.size > AVAILABILITY_CACHE_MAX) {
@@ -53,7 +62,8 @@ function cacheAvailability(key, data) {
 export default function AvailabilityPanel({ draft, startAt, endAt, onChange, onHintChange, onDataChange }) {
   const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState(false);
+  const [error, setError]     = useState(null);
+  const [retryToken, setRetryToken] = useState(0);
 
   const today = useMemo(() => new Date(), []);
   const todayStr = useMemo(() => toDateStr(today), [today]);
@@ -111,7 +121,7 @@ export default function AvailabilityPanel({ draft, startAt, endAt, onChange, onH
     const cached = availabilityCache.get(draftKey);
     if (cached && Date.now() - cached.ts < AVAILABILITY_CACHE_TTL_MS) {
       setData(cached.data);
-      setError(false);
+      setError(null);
       setLoading(false);
       return;
     }
@@ -119,7 +129,7 @@ export default function AvailabilityPanel({ draft, startAt, endAt, onChange, onH
     const controller = new AbortController();
     setData(null);
     setLoading(true);
-    setError(false);
+    setError(null);
     const timeoutId = window.setTimeout(() => {
       if (cancelled) return;
       VmRequestAvailabilityService.preview(draft, { signal: controller.signal })
@@ -130,7 +140,7 @@ export default function AvailabilityPanel({ draft, startAt, endAt, onChange, onH
         })
         .catch((err) => {
           if (cancelled || err?.name === "AbortError") return;
-          setError(true);
+          setError({ status: err?.status, timeout: Boolean(err?.timeout) });
         })
         .finally(() => {
           if (!cancelled) setLoading(false);
@@ -142,7 +152,7 @@ export default function AvailabilityPanel({ draft, startAt, endAt, onChange, onH
       window.clearTimeout(timeoutId);
       controller.abort();
     };
-  }, [draftKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [draftKey, retryToken]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ── Day map ── */
   const dayMap = useMemo(() => {
@@ -201,36 +211,42 @@ export default function AvailabilityPanel({ draft, startAt, endAt, onChange, onH
   const canGoNext = viewYear < maxDate.getFullYear()
     || (viewYear === maxDate.getFullYear() && viewMonth < maxDate.getMonth());
 
+  /* ── Notify parent ── */
+  /* 只在使用者「點擊月曆」時通知表單。不能用 effect 監聽 startDate/endDate：
+     那會把表單 prop 同步進來的變化也回推出去（拍平成 00:00–23:59 的回聲），
+     蓋掉使用者在 datetime-local 輸入框選的時間。 */
+  function notifyRange(nextStart, nextEnd) {
+    if (!nextStart || !nextEnd) {
+      onChangeRef.current?.({ start_at: null, end_at: null });
+      return;
+    }
+    const start = nextStart === todayStr ? new Date() : localDateAt(nextStart, 0);
+    const end = localDateAt(nextEnd, 23, 59, 59);
+    onChangeRef.current?.({
+      start_at: start?.toISOString() ?? null,
+      end_at: end?.toISOString() ?? null,
+    });
+  }
+
   /* ── Day click ── */
   function handleDayClick(dateStr, level) {
     if (!level || level === "none") return;
     if (picking === PICK_IDLE || !startDate) {
       setStartDate(dateStr); setEndDate(dateStr);
       setPicking(PICK_EXTEND);
+      notifyRange(dateStr, dateStr);
     } else {
       if (dateStr > startDate) {
         setEndDate(dateStr);
         setPicking(PICK_IDLE);
+        notifyRange(startDate, dateStr);
       } else {
         // Same or earlier date: restart as single-day
         setStartDate(dateStr); setEndDate(dateStr);
+        notifyRange(dateStr, dateStr);
       }
     }
   }
-
-  /* ── Notify parent ── */
-  useEffect(() => {
-    if (!startDate || !endDate) {
-      onChangeRef.current?.({ start_at: null, end_at: null });
-      return;
-    }
-    const start = startDate === todayStr ? new Date() : localDateAt(startDate, 0);
-    const end = localDateAt(endDate, 23, 59, 59);
-    onChangeRef.current?.({
-      start_at: start?.toISOString() ?? null,
-      end_at: end?.toISOString() ?? null,
-    });
-  }, [startDate, endDate, todayStr]);
 
   useEffect(() => {
     let hint = null;
@@ -256,7 +272,22 @@ export default function AvailabilityPanel({ draft, startAt, endAt, onChange, onH
   );
   if (error || !data) return (
     <div className={styles.root}>
-      <p className={`${styles.hint} ${styles.hintError}`}>目前無法取得時段資料，請稍後再試。</p>
+      <div className={styles.errorBox}>
+        <div className={styles.errorText}>
+          <span className={styles.errorTitle}>{availabilityErrorTitle(error)}</span>
+          <span className={styles.errorDesc}>
+            不影響申請送出——可直接在上方欄位填寫開始與結束時間。
+          </span>
+        </div>
+        <button
+          type="button"
+          className={styles.retryBtn}
+          onClick={() => setRetryToken((t) => t + 1)}
+        >
+          <MIcon name="refresh" size={13} />
+          重新載入
+        </button>
+      </div>
     </div>
   );
 

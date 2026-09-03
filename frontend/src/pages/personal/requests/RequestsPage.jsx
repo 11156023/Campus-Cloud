@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../../contexts/AuthContext";
 import styles from "./RequestsPage.module.scss";
@@ -68,7 +69,7 @@ function getDisplayStatus(req) {
 const VIEW_LIST   = "list";
 const VIEW_CREATE = "create";
 
-const LIST_COLUMNS = ["資源", "系統", "規格", "申請時間", "狀態", "操作"];
+const LIST_COLUMNS = ["資源", "系統", "規格", "申請原因", "申請時間", "預約期間", "狀態", "操作"];
 
 /* ── Helpers ── */
 function formatDatetime(isoStr) {
@@ -147,7 +148,9 @@ function ConfirmModal({ title, desc, confirmLabel = "確定", danger = false, lo
     if (closing) onClose();
   }
 
-  return (
+  /* portal 到 body：祖先（.tableWrap）的 backdrop-filter 會讓 fixed 定位以它為
+     containing block，overlay 蓋不到全畫面還被 overflow 裁切 */
+  return createPortal(
     <div
       className={`${styles.modalOverlay} ${closing ? styles.modalOverlayOut : ""}`}
       onClick={close}
@@ -170,7 +173,62 @@ function ConfirmModal({ title, desc, confirmLabel = "確定", danger = false, lo
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
+  );
+}
+
+/* ── Error Log Modal ── */
+/* 管理員限定：原始開通錯誤 log 太長，不進表格也不進展開列，點狀態旁圖示開窗看 */
+function ErrorLogModal({ req, onClose }) {
+  const toast = useToast();
+  const [closing, setClosing] = useState(false);
+
+  function close() {
+    if (closing) return;
+    setClosing(true);
+  }
+
+  function handleAnimationEnd() {
+    if (closing) onClose();
+  }
+
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(req.provisioning_error);
+      toast.success("已複製錯誤記錄");
+    } catch {
+      toast.error("複製失敗，請手動選取文字。");
+    }
+  }
+
+  /* 同 ConfirmModal：portal 到 body 逃離 .tableWrap 的 backdrop-filter containing block */
+  return createPortal(
+    <div
+      className={`${styles.modalOverlay} ${closing ? styles.modalOverlayOut : ""}`}
+      onClick={close}
+      onAnimationEnd={handleAnimationEnd}
+    >
+      <div className={`${styles.modal} ${styles.logModal}`} onClick={(e) => e.stopPropagation()}>
+        <span className={styles.modalTitle}>錯誤記錄 — {req.hostname}</span>
+        {isProvisionedButFailed(req) && (
+          <p className={styles.modalDesc}>
+            機器已建立，此申請無法重試；請到「我的資源」開機或刪除這台機器。
+          </p>
+        )}
+        <pre className={styles.logText}>{req.provisioning_error}</pre>
+        <div className={styles.modalActions}>
+          <button type="button" className={styles.btnSecondary} onClick={handleCopy}>
+            <MIcon name="content_copy" size={14} />
+            複製
+          </button>
+          <button type="button" className={styles.btnPrimary} onClick={close}>
+            關閉
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
   );
 }
 
@@ -181,10 +239,13 @@ function RequestRow({ req, onUpdated }) {
   const { user } = useAuth();
   /* VMID 是系統內部編號，僅管理員／老師看得到 */
   const showVmid = user?.is_superuser || user?.role === "admin" || user?.role === "teacher";
+  /* 原始開通錯誤 log 是給管理員除錯用的，學生／老師只看狀態與操作 */
+  const isAdmin = user?.is_superuser || user?.role === "admin";
   const [expanded, setExpanded]           = useState(false);
   const [cancelConfirm, setCancelConfirm] = useState(false);
   const [cancelling, setCancelling]       = useState(false);
   const [retrying, setRetrying]           = useState(false);
+  const [logOpen, setLogOpen]             = useState(false);
 
   const type      = RESOURCE_TYPE_MAP[req.resource_type] ?? { label: req.resource_type, icon: "computer" };
   const osDisplay = getOsDisplay(req);
@@ -193,10 +254,9 @@ function RequestRow({ req, onUpdated }) {
   const endFmt    = formatDatetime(req.end_at);
 
   const showRejection = req.status === "rejected" && req.review_comment;
-  const showFailure =
-    (canRetry(req) || isProvisionedButFailed(req)) && req.provisioning_error;
-  const hasDetail =
-    formItems.length > 0 || req.reason || startFmt || showRejection || showFailure;
+  const showFailureLog =
+    isAdmin && (canRetry(req) || isProvisionedButFailed(req)) && req.provisioning_error;
+  const hasDetail = formItems.length > 0 || showRejection;
   const hasAction = canRetry(req) || canCancel(req) || isProvisionedButFailed(req);
 
   async function handleCancel() {
@@ -252,7 +312,7 @@ function RequestRow({ req, onUpdated }) {
               <span className={styles.expandPlaceholder} aria-hidden="true" />
             )}
             <div className={styles.nameMeta}>
-              <span className={styles.namePrimary}>{req.hostname}</span>
+              <span className={styles.namePrimary} title={req.hostname}>{req.hostname}</span>
               <span className={styles.nameSub}>
                 {type.label}
                 {showVmid && req.vmid != null && ` · 編號 ${req.vmid}`}
@@ -261,13 +321,43 @@ function RequestRow({ req, onUpdated }) {
           </div>
         </td>
         <td className={styles.td}>
-          <span className={styles.osCell}>{osDisplay ?? "—"}</span>
+          <span className={styles.osCell} title={osDisplay ?? undefined}>{osDisplay ?? "—"}</span>
         </td>
         <td className={styles.td}>
           <span className={styles.specCell}>{getSpecDisplay(req)}</span>
         </td>
+        <td className={styles.td}>
+          <span className={styles.reasonCell} title={req.reason || undefined}>
+            {req.reason || "—"}
+          </span>
+        </td>
         <td className={styles.td}>{formatDate(req.created_at)}</td>
-        <td className={styles.td}><StatusBadge req={req} /></td>
+        <td className={styles.td}>
+          {startFmt ? (
+            <div className={styles.periodCell}>
+              <span>{startFmt}</span>
+              {endFmt && <span>~ {endFmt}</span>}
+            </div>
+          ) : (
+            <span className={styles.periodCell}>—</span>
+          )}
+        </td>
+        <td className={styles.td}>
+          <div className={styles.statusCell}>
+            <StatusBadge req={req} />
+            {showFailureLog && (
+              <button
+                type="button"
+                className={styles.logBtn}
+                title="查看錯誤記錄"
+                aria-label="查看錯誤記錄"
+                onClick={() => setLogOpen(true)}
+              >
+                <MIcon name="receipt_long" size={14} />
+              </button>
+            )}
+          </div>
+        </td>
         <td className={styles.td}>
           <div className={styles.rowActions}>
             {!hasAction && <span className={styles.emptyAction}>—</span>}
@@ -300,32 +390,18 @@ function RequestRow({ req, onUpdated }) {
               {formItems.map(({ label, value }) => (
                 <InfoRow key={label} icon="tune" label={label} value={value} />
               ))}
-              <InfoRow icon="chat_bubble_outline" label="申請原因" value={req.reason} />
-              <InfoRow
-                icon="calendar_month"
-                label="預約期間"
-                value={startFmt ? `${startFmt}${endFmt ? ` ~ ${endFmt}` : ""}` : null}
-              />
               {showRejection && (
                 <div className={styles.reviewComment}>
                   <MIcon name="comment" size={13} />
                   <span>{req.review_comment}</span>
                 </div>
               )}
-              {showFailure && (
-                <div className={styles.reviewComment}>
-                  <MIcon name="error_outline" size={13} />
-                  <span>
-                    {req.provisioning_error}
-                    {isProvisionedButFailed(req) &&
-                      "（機器已建立，此申請無法重試；請到「我的資源」開機或刪除這台機器。）"}
-                  </span>
-                </div>
-              )}
             </div>
           </td>
         </tr>
       )}
+
+      {logOpen && <ErrorLogModal req={req} onClose={() => setLogOpen(false)} />}
 
       {cancelConfirm && (
         <ConfirmModal
@@ -362,7 +438,13 @@ function SkeletonRow() {
         <div className={`${styles.skeleton} ${styles.skRow}`} style={{ width: 130, height: 12 }} />
       </td>
       <td className={styles.td}>
+        <div className={`${styles.skeleton} ${styles.skRow}`} style={{ width: 100, height: 12 }} />
+      </td>
+      <td className={styles.td}>
         <div className={`${styles.skeleton} ${styles.skRow}`} style={{ width: 80, height: 12 }} />
+      </td>
+      <td className={styles.td}>
+        <div className={`${styles.skeleton} ${styles.skRow}`} style={{ width: 120, height: 12 }} />
       </td>
       <td className={styles.td}>
         <div className={`${styles.skeleton} ${styles.skBadge}`} />
