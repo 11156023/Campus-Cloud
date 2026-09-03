@@ -8,7 +8,7 @@
 
 | 項目 | 內容 |
 | --- | --- |
-| 文件版本 | v1.2 |
+| 文件版本 | v1.3 |
 | 建立日期 | 2026-09-03（Asia/Taipei） |
 | 分析基準提交 | `8e2316e9` |
 | 實作基準提交 | `629e0e57`（i18n PR 合併後） |
@@ -384,6 +384,13 @@ sed -n '98,100p' backend/app/domain/placement/policy.py
 
 容量計算仍是每台機器對應單一節點（不分散），與建機行為一致。
 
+### 重構後的清場
+
+移除 local search 與 `build_placement_baseline_nodes` 之後留下的孤兒一併清除：
+`_is_quick_template_request`、`_fixed_node_for_quick_template`（原本只服務 local search 的初始解，核准路徑從未使用）、`_release_request_from_capacities` 與 `placement_support` 的本體。
+
+同時把「已定案的群組會被凍結」這個原本隱含的行為寫明並測試：研究申請核准時 `rebuild_reserved_assignments` 會重新求解整個時窗，其中包含尚未建機的群組成員；此時每個成員都已有 `assigned_node`，而 `group_anchor_node` 不排除呼叫者自己，因此每台都以自己為錨點留在原地 —— 整組被凍結成一個單位，不會在重解過程中被拆散。要讓某台真的重新自由選點時，才傳入 `exclude_request_id`。
+
 ### 未完成：G5 正式課程分散到多節點
 
 **未實作，且刻意不做半套。** 原因：
@@ -399,12 +406,12 @@ sed -n '98,100p' backend/app/domain/placement/policy.py
 | 檔案 | 案例數 | 覆蓋 |
 | --- | --- | --- |
 | `tests/services/test_gpu_clone_fallback.py` | 5 | T0.3 GPU 退回把關 |
-| `tests/services/test_placement_group_affinity.py` | 23 | G1、G2、G3 |
+| `tests/services/test_placement_group_affinity.py` | 26 | G1、G2、G3、群組凍結 |
 | `tests/services/test_class_cluster_constraint.py` | 12 | 課堂叢集約束 |
 
 三個檔案都含**對照組**，確認約束確實載重而非空測：同一組節點在有／無群組鍵下選出不同節點；GPU 在 0 槽／1 槽下拒絕／接受；預設節點在別的叢集時改選同叢集節點、合格時維持不變。
 
-**全套件**：`998 passed, 3 skipped, 57 errors`。57 個 error 全為環境性（43 個 DB fixture 守門拒絕連非測試資料庫、14 個 redis 連線失敗），改動前後一致。
+**全套件**：`1001 passed, 3 skipped, 57 errors`；`ruff check` all checks passed。57 個 error 全為環境性（43 個 DB fixture 守門拒絕連非測試資料庫、14 個 redis 連線失敗），改動前後一致。
 
 **T4.2（壓測加節點維度）未做** —— 現有壓測需要可用的資料庫與 PVE，本環境無法執行。
 
