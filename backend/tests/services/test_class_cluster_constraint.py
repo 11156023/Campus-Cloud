@@ -9,13 +9,23 @@ default_node → nodes[0]），可以挑到與範本機器不同的叢集 ——
 「整班同叢集」的行為。
 """
 
+import json
 import uuid
+from collections import Counter
 
 import pytest
 from sqlmodel import Session, SQLModel, create_engine
 
-from app.models import TeachingClassMachineNode, VMTemplate, VMTemplateStatus
+from app.domain.placement.schemas import NodeCapacity
+from app.models import (
+    ClassCapacityReservation,
+    TeachingClassMachineNode,
+    VMTemplate,
+    VMTemplateStatus,
+)
 from app.services.teaching import class_capacity_service
+
+GIB = 1024**3
 
 # 兩個叢集：clusterA = 連線 1，clusterB = 連線 2
 _NODE_CONNECTIONS = {
@@ -330,4 +340,237 @@ class TestProvisioningUsesTheSamePlan:
         assert (
             class_capacity_service.target_node_for_machine(session, machine_node=m2)
             is None
+        )
+
+
+# ---------------------------------------------------------------------------
+# 學生分配：一位學生不跨叢集，學生之間可分屬不同叢集
+# ---------------------------------------------------------------------------
+
+def _capacity(name: str, *, cores: float, memory_gb: int, disk_gb: int):
+    return NodeCapacity(
+        node=name,
+        status="online",
+        total_cpu_cores=cores,
+        allocatable_cpu_cores=cores,
+        total_memory_bytes=memory_gb * GIB,
+        allocatable_memory_bytes=memory_gb * GIB,
+        total_disk_bytes=disk_gb * GIB,
+        allocatable_disk_bytes=disk_gb * GIB,
+        guest_soft_limit=1000,
+    )
+
+
+class TestStudentAllocation:
+    """每位學生 1 台機器：2 vCPU / 4 GB / 20 GB。"""
+
+    @pytest.fixture(autouse=True)
+    def _spanning_image(self, monkeypatch):
+        # 同一個 vztmpl 同時存在於兩個叢集 —— 這是跨叢集分配的前提
+        monkeypatch.setattr(
+            class_capacity_service.proxmox_service,
+            "get_lxc_template_node_map",
+            lambda: {"local:vztmpl/deb.tar.zst": {"a1", "b1"}},
+        )
+        monkeypatch.setattr(
+            class_capacity_service.provisioning_service,
+            "_get_lxc_target_node",
+            lambda: "a1",
+        )
+
+    def _setup(self, session):
+        machine = _machine(
+            session,
+            class_id=uuid.uuid4(),
+            name="lab",
+            source_type="custom",
+            custom_image_ref="local:vztmpl/deb.tar.zst",
+        )
+        machine.cpu = 2
+        machine.memory_mb = 4096
+        machine.disk_gb = 20
+        session.flush()
+        eligibility, clusters, issues = class_capacity_service.class_eligibility(
+            session, nodes=[machine]
+        )
+        assert issues == []
+        return machine, eligibility, clusters
+
+    def test_whole_class_stays_together_when_one_cluster_fits(self, session):
+        """能整班放同一個叢集就不拆 —— 教室功能與故障範圍都集中。"""
+        machine, eligibility, clusters = self._setup(session)
+        students = [uuid.uuid4() for _ in range(35)]
+        capacities = {
+            "a1": _capacity("a1", cores=200, memory_gb=400, disk_gb=4000),
+            "b1": _capacity("b1", cores=200, memory_gb=400, disk_gb=4000),
+        }
+        allocation, issues = class_capacity_service.allocate_students(
+            nodes=[machine],
+            student_ids=students,
+            clusters=clusters,
+            eligibility=eligibility,
+            capacities=capacities,
+        )
+        assert issues == []
+        assert len(set(allocation.values())) == 1
+
+    def test_overflow_splits_25_and_10(self, session):
+        """A 只夠 25 位時，35 位的結果是 25 位在 A、10 位溢出到 B。"""
+        machine, eligibility, clusters = self._setup(session)
+        students = [uuid.uuid4() for _ in range(35)]
+        capacities = {
+            # 恰好 25 位：50 vCPU / 100 GB RAM / 500 GB disk
+            "a1": _capacity("a1", cores=50, memory_gb=100, disk_gb=500),
+            "b1": _capacity("b1", cores=40, memory_gb=80, disk_gb=400),
+        }
+        allocation, issues = class_capacity_service.allocate_students(
+            nodes=[machine],
+            student_ids=students,
+            clusters=clusters,
+            eligibility=eligibility,
+            capacities=capacities,
+        )
+        assert issues == []
+        counts = Counter(allocation.values())
+        assert sorted(counts.values()) == [10, 25]
+        # 容量大的先被填滿
+        assert counts[1] == 25 and counts[2] == 10
+
+    def test_every_student_gets_exactly_one_cluster(self, session):
+        machine, eligibility, clusters = self._setup(session)
+        students = [uuid.uuid4() for _ in range(35)]
+        capacities = {
+            "a1": _capacity("a1", cores=50, memory_gb=100, disk_gb=500),
+            "b1": _capacity("b1", cores=40, memory_gb=80, disk_gb=400),
+        }
+        allocation, _ = class_capacity_service.allocate_students(
+            nodes=[machine],
+            student_ids=students,
+            clusters=clusters,
+            eligibility=eligibility,
+            capacities=capacities,
+        )
+        assert set(allocation) == set(students)
+        assert all(cid in clusters for cid in allocation.values())
+
+    def test_single_cluster_class_puts_everyone_there(self, session, monkeypatch):
+        """映像檔只存在於一個叢集時，分配退化成過去的單一叢集行為。"""
+        monkeypatch.setattr(
+            class_capacity_service.proxmox_service,
+            "get_lxc_template_node_map",
+            lambda: {"local:vztmpl/deb.tar.zst": {"a1", "a2"}},
+        )
+        machine, eligibility, clusters = self._setup(session)
+        students = [uuid.uuid4() for _ in range(35)]
+        allocation, issues = class_capacity_service.allocate_students(
+            nodes=[machine],
+            student_ids=students,
+            clusters=clusters,
+            eligibility=eligibility,
+            capacities={
+                "a1": _capacity("a1", cores=20, memory_gb=40, disk_gb=200),
+                "a2": _capacity("a2", cores=20, memory_gb=40, disk_gb=200),
+            },
+        )
+        assert issues == []
+        assert set(allocation.values()) == {1}
+
+    def test_students_beyond_total_capacity_still_get_a_cluster(self, session):
+        """全部叢集都塞不下時不無聲失敗，交由節點容量檢查明確回報不足。"""
+        machine, eligibility, clusters = self._setup(session)
+        students = [uuid.uuid4() for _ in range(50)]
+        capacities = {
+            "a1": _capacity("a1", cores=4, memory_gb=8, disk_gb=40),
+            "b1": _capacity("b1", cores=4, memory_gb=8, disk_gb=40),
+        }
+        allocation, issues = class_capacity_service.allocate_students(
+            nodes=[machine],
+            student_ids=students,
+            clusters=clusters,
+            eligibility=eligibility,
+            capacities=capacities,
+        )
+        assert issues == []
+        assert len(allocation) == 50
+
+
+class TestProvisioningFollowsTheStudentAllocation:
+    def test_machine_lands_in_the_students_own_cluster(self, session, monkeypatch):
+        """建機端必須照預留時存下的學生分配走，而不是重算。"""
+        monkeypatch.setattr(
+            class_capacity_service.proxmox_service,
+            "get_lxc_template_node_map",
+            lambda: {"local:vztmpl/deb.tar.zst": {"a1", "b1"}},
+        )
+        monkeypatch.setattr(
+            class_capacity_service.provisioning_service,
+            "_get_lxc_target_node",
+            lambda: "a1",
+        )
+        class_id = uuid.uuid4()
+        machine = _machine(
+            session,
+            class_id=class_id,
+            name="lab",
+            source_type="custom",
+            custom_image_ref="local:vztmpl/deb.tar.zst",
+        )
+        alice, bob = uuid.uuid4(), uuid.uuid4()
+        session.add(
+            ClassCapacityReservation(
+                class_id=class_id,
+                course_version_id=uuid.uuid4(),
+                student_count=2,
+                machine_count=2,
+                cpu_cores=4,
+                memory_mb=8192,
+                disk_gb=40,
+                ip_count=2,
+                network_count=1,
+                placement_plan="{}",
+                student_clusters=json.dumps({str(alice): 1, str(bob): 2}),
+            )
+        )
+        session.flush()
+
+        assert (
+            class_capacity_service.target_node_for_machine(
+                session, machine_node=machine, user_id=alice
+            )
+            == "a1"
+        )
+        assert (
+            class_capacity_service.target_node_for_machine(
+                session, machine_node=machine, user_id=bob
+            )
+            == "b1"
+        )
+
+    def test_unknown_student_falls_back_to_the_default_cluster(
+        self, session, monkeypatch
+    ):
+        monkeypatch.setattr(
+            class_capacity_service.proxmox_service,
+            "get_lxc_template_node_map",
+            lambda: {"local:vztmpl/deb.tar.zst": {"a1", "b1"}},
+        )
+        monkeypatch.setattr(
+            class_capacity_service.provisioning_service,
+            "_get_lxc_target_node",
+            lambda: "a1",
+        )
+        class_id = uuid.uuid4()
+        machine = _machine(
+            session,
+            class_id=class_id,
+            name="lab",
+            source_type="custom",
+            custom_image_ref="local:vztmpl/deb.tar.zst",
+        )
+        # 沒有預留紀錄 → 沿用既有的單一叢集行為，不讓建機中斷
+        assert (
+            class_capacity_service.target_node_for_machine(
+                session, machine_node=machine, user_id=uuid.uuid4()
+            )
+            == "a1"
         )

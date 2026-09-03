@@ -139,6 +139,7 @@ def test_full_capacity_preview_checks_cluster_and_ip(monkeypatch):
                     "machines": 3,
                 }
             },
+            {},
             [],
         ),
     )
@@ -175,7 +176,7 @@ def test_full_capacity_preview_reports_cluster_issue(monkeypatch):
     monkeypatch.setattr(
         class_capacity_service,
         "_evaluate_cluster_capacity",
-        lambda *_args, **_kwargs: ({}, ["pve1 RAM 不足"]),
+        lambda *_args, **_kwargs: ({}, {}, ["pve1 RAM 不足"]),
     )
 
     result = class_capacity_service.preview(

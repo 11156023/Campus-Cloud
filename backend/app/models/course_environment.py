@@ -276,6 +276,13 @@ class ClassCapacityReservation(SQLModel, table=True):
         default="{}",
         sa_column=Column(sa.Text, nullable=False),
     )
+    # {user_id: connection_id} —— 一位學生的所有機器必須同叢集，但不同學生
+    # 可分屬不同叢集（例如 25 位在 A、10 位在 B）。預留時定案並存下，建機時
+    # 查表，避免兩個時間點各自重算而讓同一位學生的機器散開。
+    student_clusters: str = Field(
+        default="{}",
+        sa_column=Column(sa.Text, nullable=False, server_default="{}"),
+    )
     status: str = Field(default="reserved", max_length=24)
     created_at: datetime = Field(
         default_factory=get_datetime_utc,
