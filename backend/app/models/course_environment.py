@@ -276,10 +276,10 @@ class ClassCapacityReservation(SQLModel, table=True):
         default="{}",
         sa_column=Column(sa.Text, nullable=False),
     )
-    # {user_id: connection_id} —— 一位學生的所有機器必須同叢集，但不同學生
-    # 可分屬不同叢集（例如 25 位在 A、10 位在 B）。預留時定案並存下，建機時
-    # 查表，避免兩個時間點各自重算而讓同一位學生的機器散開。
-    student_clusters: str = Field(
+    # {machine_node_id: {user_id: 節點名}} —— 整班固定在同一個叢集，但叢集內
+    # 依容量把學生分散到不同節點（同一個叢集不代表同一台 server）。預留時
+    # 定案並存下，建機時查表，避免兩個時間點各自重算而與預留不一致。
+    student_placements: str = Field(
         default="{}",
         sa_column=Column(sa.Text, nullable=False, server_default="{}"),
     )
