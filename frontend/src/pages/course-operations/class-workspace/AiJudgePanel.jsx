@@ -9,6 +9,7 @@ import { useToast } from "../../../hooks/useToast";
 import useAutoRefresh from "../../../hooks/useAutoRefresh";
 import useDialogPresence from "../../../hooks/useDialogPresence";
 import { downloadBlob } from "../../../services/api";
+import { focusInvalidField } from "../../../utils/focusField";
 import { createRubricAnalysisAutosave } from "./rubricAnalysisAutosave";
 import i18n from "../../../i18n";
 import {
@@ -643,6 +644,12 @@ function CreateCheckForm({
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
   const [conflictFile, setConflictFile] = useState(null);
+  const [invalid, setInvalid] = useState({});
+  const weekSelectRef = useRef(null);
+  const modeGroupRef = useRef(null);
+  const rubricNameRef = useRef(null);
+  const envGroupRef = useRef(null);
+  const existingListRef = useRef(null);
 
   useEffect(() => {
     const requestVersion = ++requestVersionRef.current;
@@ -667,10 +674,12 @@ function CreateCheckForm({
     setEnvironmentKeys((current) => current.includes(key)
       ? current.filter((item) => item !== key)
       : [...current, key]);
+    setInvalid((v) => ({ ...v, envKeys: false }));
   }
 
   function handleModeChange(nextMode) {
     setMode(nextMode);
+    setInvalid((v) => ({ ...v, mode: false }));
     if (nextMode === "existing") {
       setEnvironmentKeys((current) => current.length ? current : ["linux"]);
     }
@@ -680,6 +689,8 @@ function CreateCheckForm({
     if (!file) return;
     if (!sourceOnly && !selectedWeekId) {
       setError(t("AiJudgePanel.selectWeekFirst"));
+      setInvalid((v) => ({ ...v, week: true }));
+      focusInvalidField(weekSelectRef.current);
       return;
     }
     const requestVersion = requestVersionRef.current;
@@ -734,9 +745,22 @@ function CreateCheckForm({
 
   async function submit(event) {
     event.preventDefault();
-    if (!mode) return;
-    if (mode === "blank" && (!rubricName.trim() || !environmentKeys.length)) return;
-    if (mode === "existing" && !selectedFileId) return;
+    const missing = {
+      week: !sourceOnly && !selectedWeekId,
+      mode: !mode,
+      rubricName: mode === "blank" && !rubricName.trim(),
+      envKeys: mode === "blank" && !environmentKeys.length,
+      file: mode === "existing" && !selectedFileId,
+    };
+    if (Object.values(missing).some(Boolean)) {
+      setInvalid(missing);
+      if (missing.week) focusInvalidField(weekSelectRef.current);
+      else if (missing.mode) focusInvalidField(modeGroupRef.current?.querySelector("input"));
+      else if (missing.rubricName) focusInvalidField(rubricNameRef.current);
+      else if (missing.envKeys) focusInvalidField(envGroupRef.current?.querySelector("input"));
+      else focusInvalidField(existingListRef.current?.querySelector("input"));
+      return;
+    }
     setCreating(true);
     setError("");
     try {
@@ -770,9 +794,9 @@ function CreateCheckForm({
       <section className={embedded ? styles.createCheckPanel : `${styles.confirm} ${styles.createCheckDialog}`} role={embedded ? undefined : "dialog"} aria-modal={embedded ? undefined : "true"} aria-labelledby="create-check-title">
         <div className={styles.modalHeader}><div>{embedded && <button type="button" className={styles.inlineBackButton} disabled={creating || uploading} onClick={onClose}><MIcon name="arrow_back" size={17} />{t("AiJudgePanel.backToCreateMode")}</button>}<h2 id="create-check-title">{sourceOnly ? t("AiJudgePanel.addSourceTitle") : mode === "blank" ? t("AiJudgePanel.fromScratchTitle") : t("AiJudgePanel.useExistingFileTitle")}</h2><p>{sourceOnly ? t("AiJudgePanel.addSourceDesc") : mode === "blank" ? t("AiJudgePanel.blankCreatedDesc") : t("AiJudgePanel.existingFileDesc")}</p></div>{!embedded && <button type="button" className={styles.iconBtn} aria-label={t("AiJudgePanel.closeAria")} disabled={creating || uploading} onClick={onClose}><MIcon name="close" size={18} /></button>}</div>
         <form onSubmit={submit}>
-          {!sourceOnly && <label className={styles.dialogField}><span>{t("AiJudgePanel.whichWeekLabel")}</span><select value={selectedWeekId} onChange={(event) => setSelectedWeekId(event.target.value)} required><option value="" disabled>{availableWeeks.length ? t("AiJudgePanel.selectWeekOption") : t("AiJudgePanel.needNamedWeekFirst")}</option>{availableWeeks.map((week) => <option key={week.id} value={week.id}>{t("AiJudgePanel.weekOptionLabel", { week: week.week ?? week.week_number, title: week.title })}{["published", "completed"].includes(week.status) ? "" : t("AiJudgePanel.draftSuffix")}</option>)}</select><small>{t("AiJudgePanel.checkpointVisibilityHint")}</small></label>}
-          {!embedded && <fieldset className={styles.modeFieldset}><legend>{t("AiJudgePanel.howToCreateRubricLegend")}</legend><div className={styles.modeChoices}><label className={mode === "blank" ? styles.modeChoiceActive : styles.modeChoice}><input type="radio" name="creation-mode" checked={mode === "blank"} onChange={() => handleModeChange("blank")} /><span><b>{t("AiJudgePanel.fromScratchTitle")}</b><small>{t("AiJudgePanel.fromScratchDesc")}</small></span></label><label className={mode === "existing" ? styles.modeChoiceActive : styles.modeChoice}><input type="radio" name="creation-mode" checked={mode === "existing"} onChange={() => handleModeChange("existing")} /><span><b>{t("AiJudgePanel.useExistingFileTitle")}</b><small>{t("AiJudgePanel.useExistingFileDesc")}</small></span></label></div></fieldset>}
-           {mode === "blank" && <div className={styles.modeFields}><label className={styles.dialogField}><span>{t("AiJudgePanel.rubricNameLabel")}</span><input autoFocus={sourceOnly} value={rubricName} maxLength={255} placeholder={t("AiJudgePanel.rubricNamePlaceholder")} onChange={(event) => setRubricName(event.target.value)} /></label><fieldset className={styles.modeFieldset}><legend>{t("AiJudgePanel.envMultiSelectLegend")}</legend><div className={styles.dialogChips}>{TEMPLATE_OPTIONS.map((option) => <label key={option.key} className={environmentKeys.includes(option.key) ? styles.dialogChipActive : styles.dialogChip}><input type="checkbox" checked={environmentKeys.includes(option.key)} onChange={() => toggleEnvironment(option.key)} />{option.label}</label>)}</div></fieldset></div>}
+          {!sourceOnly && <label className={styles.dialogField}><span>{t("AiJudgePanel.whichWeekLabel")}</span><select ref={weekSelectRef} className={invalid.week ? styles.fieldInvalid : undefined} value={selectedWeekId} onChange={(event) => { setSelectedWeekId(event.target.value); setInvalid((v) => ({ ...v, week: false })); }}><option value="" disabled>{availableWeeks.length ? t("AiJudgePanel.selectWeekOption") : t("AiJudgePanel.needNamedWeekFirst")}</option>{availableWeeks.map((week) => <option key={week.id} value={week.id}>{t("AiJudgePanel.weekOptionLabel", { week: week.week ?? week.week_number, title: week.title })}{["published", "completed"].includes(week.status) ? "" : t("AiJudgePanel.draftSuffix")}</option>)}</select><small>{t("AiJudgePanel.checkpointVisibilityHint")}</small></label>}
+          {!embedded && <fieldset className={styles.modeFieldset}><legend>{t("AiJudgePanel.howToCreateRubricLegend")}</legend><div ref={modeGroupRef} className={`${styles.modeChoices} ${invalid.mode ? styles.groupInvalid : ""}`}><label className={mode === "blank" ? styles.modeChoiceActive : styles.modeChoice}><input type="radio" name="creation-mode" checked={mode === "blank"} onChange={() => handleModeChange("blank")} /><span><b>{t("AiJudgePanel.fromScratchTitle")}</b><small>{t("AiJudgePanel.fromScratchDesc")}</small></span></label><label className={mode === "existing" ? styles.modeChoiceActive : styles.modeChoice}><input type="radio" name="creation-mode" checked={mode === "existing"} onChange={() => handleModeChange("existing")} /><span><b>{t("AiJudgePanel.useExistingFileTitle")}</b><small>{t("AiJudgePanel.useExistingFileDesc")}</small></span></label></div></fieldset>}
+           {mode === "blank" && <div className={styles.modeFields}><label className={styles.dialogField}><span>{t("AiJudgePanel.rubricNameLabel")}</span><input ref={rubricNameRef} className={invalid.rubricName ? styles.fieldInvalid : undefined} autoFocus={sourceOnly} value={rubricName} maxLength={255} placeholder={t("AiJudgePanel.rubricNamePlaceholder")} onChange={(event) => { setRubricName(event.target.value); setInvalid((v) => ({ ...v, rubricName: false })); }} /></label><fieldset className={styles.modeFieldset}><legend>{t("AiJudgePanel.envMultiSelectLegend")}</legend><div ref={envGroupRef} className={`${styles.dialogChips} ${invalid.envKeys ? styles.groupInvalid : ""}`}>{TEMPLATE_OPTIONS.map((option) => <label key={option.key} className={environmentKeys.includes(option.key) ? styles.dialogChipActive : styles.dialogChip}><input type="checkbox" checked={environmentKeys.includes(option.key)} onChange={() => toggleEnvironment(option.key)} />{option.label}</label>)}</div></fieldset></div>}
            {mode === "existing" && <div className={styles.existingPicker}>
              <div className={styles.uploadSourceBlock}>
                <div className={styles.existingPickerHead}><div><span>{t("AiJudgePanel.uploadNewFileLabel")}</span><small>{t("AiJudgePanel.uploadNewFileHint")}</small></div></div>
@@ -783,11 +807,11 @@ function CreateCheckForm({
                </fieldset>
                <RubricUploader onUpload={(file) => uploadFile(file)} onInvalidFile={setError} isLoading={uploading || creating || (!sourceOnly && !selectedWeekId)} />
              </div>
-              <div className={styles.savedRubricBlock}><div className={styles.existingPickerHead}><div><span>{t("AiJudgePanel.orSelectSavedLabel")}</span><small>{t("AiJudgePanel.oneSourcePerCheckHint")}</small></div></div>{files.length ? <div className={styles.existingList}>{files.map((file) => <label key={file.id} className={selectedFileId === file.id ? styles.existingRowActive : styles.existingRow}><input type="radio" name="saved-rubric" checked={selectedFileId === file.id} onChange={() => setSelectedFileId(file.id)} /><span><b>{getRubricDisplayName(file, t("AiJudgePanel.unnamedRubricFallback"))}</b><small>{(file.environment_keys?.length ? file.environment_keys : [file.template_key]).map(getTemplateLabel).join("、")} · {t("AiJudgePanel.itemsCountUnit", { count: file.analysis_json?.items?.length ?? 0 })} · {formatDateTime(file.updated_at)}</small></span></label>)}</div> : <p className={styles.mutedText}>{t("AiJudgePanel.noSavedRubricsText")}</p>}</div>
+              <div className={styles.savedRubricBlock}><div className={styles.existingPickerHead}><div><span>{t("AiJudgePanel.orSelectSavedLabel")}</span><small>{t("AiJudgePanel.oneSourcePerCheckHint")}</small></div></div>{files.length ? <div ref={existingListRef} className={`${styles.existingList} ${invalid.file ? styles.groupInvalid : ""}`}>{files.map((file) => <label key={file.id} className={selectedFileId === file.id ? styles.existingRowActive : styles.existingRow}><input type="radio" name="saved-rubric" checked={selectedFileId === file.id} onChange={() => { setSelectedFileId(file.id); setInvalid((v) => ({ ...v, file: false })); }} /><span><b>{getRubricDisplayName(file, t("AiJudgePanel.unnamedRubricFallback"))}</b><small>{(file.environment_keys?.length ? file.environment_keys : [file.template_key]).map(getTemplateLabel).join("、")} · {t("AiJudgePanel.itemsCountUnit", { count: file.analysis_json?.items?.length ?? 0 })} · {formatDateTime(file.updated_at)}</small></span></label>)}</div> : <p className={styles.mutedText}>{t("AiJudgePanel.noSavedRubricsText")}</p>}</div>
              {conflictFile && <div className={styles.conflictActions} role="alert"><span>{t("AiJudgePanel.alreadyExistsLabel", { name: conflictFile.name })}</span><button type="button" className={styles.btnSecondary} disabled={uploading || creating} onClick={() => uploadFile(conflictFile, "copy")}>{t("AiJudgePanel.createCopyBtn")}</button><button type="button" className={styles.btnDanger} disabled={uploading || creating} onClick={() => uploadFile(conflictFile, "overwrite")}>{t("AiJudgePanel.overwriteBtn")}</button><button type="button" className={styles.iconBtn} aria-label={t("AiJudgePanel.cancelConflictAria")} onClick={() => setConflictFile(null)}><MIcon name="close" size={16} /></button></div>}
            </div>}
           {error && <p className={styles.dialogError} role="alert">{error}</p>}
-          <div className={styles.modalActions}>{!embedded && <button type="button" className={styles.btnSecondary} disabled={creating || uploading} onClick={onClose}>{t("AiJudgePanel.cancelBtn")}</button>}{mode !== "existing" || sourceOnly ? <button type="submit" className={styles.btnPrimary} disabled={!mode || (!sourceOnly && !selectedWeekId) || (mode === "blank" ? !rubricName.trim() || !environmentKeys.length : !selectedFileId) || creating || uploading}>{creating ? <><Spinner size={15} />{t("AiJudgePanel.creatingEllipsis2")}</> : sourceOnly ? t("AiJudgePanel.addSourceBtn") : mode === "blank" ? t("AiJudgePanel.createCheckBtn") : t("AiJudgePanel.useThisRubricBtn")}</button> : <p className={styles.uploadAutoHint}>{t("AiJudgePanel.selectFileThenUploadHint")}</p>}</div>
+          <div className={styles.modalActions}>{!embedded && <button type="button" className={styles.btnSecondary} disabled={creating || uploading} onClick={onClose}>{t("AiJudgePanel.cancelBtn")}</button>}{mode !== "existing" || sourceOnly ? <button type="submit" className={styles.btnPrimary} disabled={creating || uploading}>{creating ? <><Spinner size={15} />{t("AiJudgePanel.creatingEllipsis2")}</> : sourceOnly ? t("AiJudgePanel.addSourceBtn") : mode === "blank" ? t("AiJudgePanel.createCheckBtn") : t("AiJudgePanel.useThisRubricBtn")}</button> : <p className={styles.uploadAutoHint}>{t("AiJudgePanel.selectFileThenUploadHint")}</p>}</div>
         </form>
       </section>
   );
@@ -996,6 +1020,9 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
   const [rubricName, setRubricName] = useState("");
   const [environmentKeys, setEnvironmentKeys] = useState([]);
   const [isSavingMetadata, setIsSavingMetadata] = useState(false);
+  const [metaInvalid, setMetaInvalid] = useState({});
+  const metaNameRef = useRef(null);
+  const metaEnvRef = useRef(null);
   const analysisRevisionsRef = useRef(new Map());
   const autosaveRef = useRef(null);
   const classIdRef = useRef(classId);
@@ -1089,7 +1116,13 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
   }, [files, judgeSession?.selected_file_id, sourceFileId]);
 
   async function saveRubricMetadata() {
-    if (!sourceFileId || readOnly || !rubricName.trim() || !environmentKeys.length || isSavingMetadata) return;
+    if (!sourceFileId || readOnly || isSavingMetadata) return;
+    const missing = { name: !rubricName.trim(), envKeys: !environmentKeys.length };
+    if (missing.name || missing.envKeys) {
+      setMetaInvalid(missing);
+      focusInvalidField(missing.name ? metaNameRef.current : metaEnvRef.current?.querySelector("button"));
+      return;
+    }
     setIsSavingMetadata(true);
     try {
       const updated = await AiJudgeService.updateFileMetadata(classId, sourceFileId, {
@@ -1593,17 +1626,17 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
              <div className={styles.card}>
                <div className={styles.cardHead}>
                  <h4 className={styles.cardTitle}><MIcon name="tune" size={18} />{t("AiJudgePanel.rubricSettingsHeader")}</h4>
-                 <button type="button" className={styles.btnSecondary} onClick={saveRubricMetadata} disabled={readOnly || isSavingMetadata || !rubricName.trim() || !environmentKeys.length}>
+                 <button type="button" className={styles.btnSecondary} onClick={saveRubricMetadata} disabled={readOnly || isSavingMetadata}>
                    {isSavingMetadata ? <Spinner size={14} /> : <MIcon name="save" size={14} />}
                    {isSavingMetadata ? t("AiJudgePanel.savingEllipsis") : t("AiJudgePanel.saveSettingsBtn")}
                  </button>
                </div>
                <div className={styles.metadataGrid}>
-                 <label className={styles.rubricField}><span>{t("AiJudgePanel.rubricNameLabel")}</span><input value={rubricName} maxLength={255} disabled={readOnly || isSavingMetadata} onChange={(event) => setRubricName(event.target.value)} /></label>
+                 <label className={styles.rubricField}><span>{t("AiJudgePanel.rubricNameLabel")}</span><input ref={metaNameRef} className={metaInvalid.name ? styles.fieldInvalid : undefined} value={rubricName} maxLength={255} disabled={readOnly || isSavingMetadata} onChange={(event) => { setRubricName(event.target.value); setMetaInvalid((v) => ({ ...v, name: false })); }} /></label>
                  <div className={styles.templateRow}>
                    <span className={styles.fieldLabel}>{t("AiJudgePanel.envMultiSelectLegend")}</span>
-                   <div className={styles.chipBtns}>
-                     {TEMPLATE_OPTIONS.map((option) => <button key={option.key} type="button" className={environmentKeys.includes(option.key) ? styles.chipBtnActive : styles.chipBtn} disabled={readOnly || isSavingMetadata} onClick={() => setEnvironmentKeys((current) => current.includes(option.key) ? current.filter((entry) => entry !== option.key) : [...current, option.key])}>{option.label}</button>)}
+                   <div ref={metaEnvRef} className={`${styles.chipBtns} ${metaInvalid.envKeys ? styles.groupInvalid : ""}`}>
+                     {TEMPLATE_OPTIONS.map((option) => <button key={option.key} type="button" className={environmentKeys.includes(option.key) ? styles.chipBtnActive : styles.chipBtn} disabled={readOnly || isSavingMetadata} onClick={() => { setEnvironmentKeys((current) => current.includes(option.key) ? current.filter((entry) => entry !== option.key) : [...current, option.key]); setMetaInvalid((v) => ({ ...v, envKeys: false })); }}>{option.label}</button>)}
                    </div>
                  </div>
                </div>
@@ -2577,6 +2610,8 @@ function TeacherWorkspacePanel({ classId, members, weeks = [] }) {
   const [renameTarget, setRenameTarget] = useState(null);
   const renameDialog = useDialogPresence(renameTarget);
   const [renameTitle, setRenameTitle] = useState("");
+  const [renameInvalid, setRenameInvalid] = useState(false);
+  const renameInputRef = useRef(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const deleteCheckDialog = useDialogPresence(deleteTarget);
@@ -2789,7 +2824,12 @@ function TeacherWorkspacePanel({ classId, members, weeks = [] }) {
 
   async function renameSession(event) {
     event.preventDefault();
-    if (!renameTarget || !renameTitle.trim()) return;
+    if (!renameTarget) return;
+    if (!renameTitle.trim()) {
+      setRenameInvalid(true);
+      focusInvalidField(renameInputRef.current);
+      return;
+    }
     const target = renameTarget;
     setRenameTarget(null);
     await runSessionAction(target, (entry) => AiJudgeService.updateSession(classId, entry.id, { title: renameTitle.trim() }));
@@ -2839,7 +2879,7 @@ function TeacherWorkspacePanel({ classId, members, weeks = [] }) {
         style={{ top: `${menuPos.top}px`, left: `${menuPos.left}px` }}
       >
         {item.status === "active" && <>
-          <button type="button" role="menuitem" disabled={busy} onClick={() => { setRenameTarget(item); setRenameTitle(item.title); closeSessionMenu(); }}><MIcon name="edit" size={16} />{t("AiJudgePanel.renameLabel")}</button>
+          <button type="button" role="menuitem" disabled={busy} onClick={() => { setRenameTarget(item); setRenameTitle(item.title); setRenameInvalid(false); closeSessionMenu(); }}><MIcon name="edit" size={16} />{t("AiJudgePanel.renameLabel")}</button>
           <button type="button" role="menuitem" disabled={busy} onClick={() => pinSession(item)}><MIcon name="push_pin" filled={Boolean(item.pinned_at)} size={16} />{item.pinned_at ? t("AiJudgePanel.unpinLabel") : t("AiJudgePanel.pinLabel")}</button>
         </>}
         <button type="button" role="menuitem" disabled={busy} onClick={() => forkSession(item)}><MIcon name="fork_right" size={16} />{t("AiJudgePanel.forkLabel")}</button>
@@ -2896,7 +2936,7 @@ function TeacherWorkspacePanel({ classId, members, weeks = [] }) {
       {typeof document !== "undefined" && sessionMenuItemKeep.open && sessionMenuPos.item && createPortal(renderSessionMenu(sessionMenuItemKeep.item), document.body)}
 
       {createDialog.open && <CreateCheckForm classId={classId} weeks={weeks} sourceOnly={sourceOnly} closing={createDialog.closing} onClose={() => { setCreateOpen(false); setSourceOnly(false); }} onCreated={handleCreated} />}
-       {renameDialog.open && <div className={`${styles.modalOverlay} ${renameDialog.closing ? styles.modalOverlayOut : ""}`} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setRenameTarget(null); }}><form className={`${styles.confirm} ${styles.renameDialog}`} role="dialog" aria-modal="true" aria-labelledby="rename-check-title" onSubmit={renameSession}><div className={styles.modalHeader}><h2 id="rename-check-title">{t("AiJudgePanel.renameCheckTitle")}</h2><button type="button" className={styles.iconBtn} aria-label={t("AiJudgePanel.closeAria")} onClick={() => setRenameTarget(null)}><MIcon name="close" size={18} /></button></div><label className={styles.dialogField}><span>{t("AiJudgePanel.checkNameLabel")}</span><input autoFocus value={renameTitle} maxLength={255} onChange={(event) => setRenameTitle(event.target.value)} /></label><div className={styles.modalActions}><button type="button" className={styles.btnSecondary} onClick={() => setRenameTarget(null)}>{t("AiJudgePanel.cancelBtn")}</button><button type="submit" className={styles.btnPrimary} disabled={!renameTitle.trim() || busySessionIds.has(renameDialog.item.id)}>{t("AiJudgePanel.saveBtn")}</button></div></form></div>}
+       {renameDialog.open && <div className={`${styles.modalOverlay} ${renameDialog.closing ? styles.modalOverlayOut : ""}`} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setRenameTarget(null); }}><form className={`${styles.confirm} ${styles.renameDialog}`} role="dialog" aria-modal="true" aria-labelledby="rename-check-title" onSubmit={renameSession}><div className={styles.modalHeader}><h2 id="rename-check-title">{t("AiJudgePanel.renameCheckTitle")}</h2><button type="button" className={styles.iconBtn} aria-label={t("AiJudgePanel.closeAria")} onClick={() => setRenameTarget(null)}><MIcon name="close" size={18} /></button></div><label className={styles.dialogField}><span>{t("AiJudgePanel.checkNameLabel")}</span><input ref={renameInputRef} className={renameInvalid ? styles.fieldInvalid : undefined} autoFocus value={renameTitle} maxLength={255} onChange={(event) => { setRenameTitle(event.target.value); setRenameInvalid(false); }} /></label><div className={styles.modalActions}><button type="button" className={styles.btnSecondary} onClick={() => setRenameTarget(null)}>{t("AiJudgePanel.cancelBtn")}</button><button type="submit" className={styles.btnPrimary} disabled={busySessionIds.has(renameDialog.item.id)}>{t("AiJudgePanel.saveBtn")}</button></div></form></div>}
       {deleteCheckDialog.open && <ConfirmModal title={t("AiJudgePanel.confirmDeleteCheckTitle")} description={t("AiJudgePanel.confirmDeleteCheckDesc", { title: deleteCheckDialog.item.title })} closing={deleteCheckDialog.closing} onClose={() => { if (!deleting) setDeleteTarget(null); }} actions={<><button type="button" className={styles.btnSecondary} disabled={deleting} onClick={() => setDeleteTarget(null)}>{t("AiJudgePanel.cancelBtn")}</button><button type="button" className={styles.btnDanger} disabled={deleting} onClick={deleteSession}>{deleting ? t("AiJudgePanel.deletingEllipsis2") : t("AiJudgePanel.confirmDeleteBtn")}</button></>} />}
     </div>
   );
