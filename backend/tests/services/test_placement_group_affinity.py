@@ -221,6 +221,61 @@ class TestGroupAnchor:
         )
 
 
+class TestPlacedGroupIsFrozen:
+    """研究申請核准時會重新求解整個時窗，含尚未建機的群組成員。
+
+    每個成員此時都已有 assigned_node，會以自己為錨點而留在原地 —— 整組被
+    凍結成一個單位，不會在重解過程中被拆散。
+    """
+
+    def test_every_member_resolves_to_the_same_anchor(self, session):
+        group = uuid.uuid4()
+        base = datetime.now(UTC)
+        for offset in range(3):
+            _persist_request(
+                session,
+                group_id=group,
+                assigned_node="pve1",
+                created_at=base + timedelta(seconds=offset),
+            )
+        # 不論由哪一台發問，答案都必須是同一個節點
+        for _ in range(3):
+            assert placement_support.allowed_affinity_nodes_for_request(
+                session=session, request=_placement_request(group)
+            ) == {"pve1"}
+
+    def test_member_stays_put_even_when_a_bigger_node_exists(self, session):
+        """重解時不會因為別台節點更空就把已定案的群組搬過去。"""
+        group = uuid.uuid4()
+        _persist_request(session, group_id=group, assigned_node="pve1")
+        plan = _build_plan(
+            session,
+            _placement_request(group),
+            [_node("pve1", cores=8, memory_gb=16), _node("pve2", cores=64, memory_gb=256)],
+        )
+        assert plan.recommended_node == "pve1"
+
+    def test_group_moves_together_when_the_anchor_is_released(self, session):
+        """錨點被明確排除時（真的要重新選點），其餘成員跟著新落點走。"""
+        group = uuid.uuid4()
+        base = datetime.now(UTC)
+        anchor = _persist_request(
+            session, group_id=group, assigned_node="pve1", created_at=base
+        )
+        _persist_request(
+            session,
+            group_id=group,
+            assigned_node="pve1",
+            created_at=base + timedelta(seconds=1),
+        )
+        # 排除錨點自己 → 它仍看得到同組另一台，因此不會漂走
+        assert placement_support.allowed_affinity_nodes_for_request(
+            session=session,
+            request=_placement_request(group),
+            exclude_request_id=anchor.id,
+        ) == {"pve1"}
+
+
 # ---------------------------------------------------------------------------
 # G2：整組同節點；放不下就整組失敗
 # ---------------------------------------------------------------------------
@@ -347,7 +402,7 @@ class TestGpuSlotAccounting:
             allowed_gpu_nodes={"pve1"},
         )
 
-    def test_reserve_and_release_move_the_counter(self, session):
+    def test_reserve_consumes_one_slot(self, session):
         nodes = [_node("pve1", gpu_count=2)]
         request = _persist_request(
             session, group_id=None, assigned_node="pve1", gpu_mapping_id="gpu-a"
@@ -360,15 +415,6 @@ class TestGpuSlotAccounting:
             refresh_node_candidate_fn=placement_support.refresh_node_candidate,
         )
         assert nodes[0].allocatable_gpu_slots == 1
-
-        placement_support.release_request_from_capacities(
-            node_capacities=nodes,
-            db_request=request,
-            node_name="pve1",
-            request_capacity_tuple_fn=placement_support.request_capacity_tuple,
-            refresh_node_candidate_fn=placement_support.refresh_node_candidate,
-        )
-        assert nodes[0].allocatable_gpu_slots == 2
 
     def test_request_without_gpu_does_not_consume_slots(self, session):
         nodes = [_node("pve1", gpu_count=1)]

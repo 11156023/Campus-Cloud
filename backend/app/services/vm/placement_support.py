@@ -244,6 +244,12 @@ def group_anchor_node(
 
     取最早建立的一台為錨點，讓同一組的每次查詢都得到同一個答案（後建的
     機器不會因為查詢順序不同而跟到不同節點）。
+
+    預設不排除呼叫者自己，這點是刻意的：研究申請核准時
+    rebuild_reserved_assignments 會重新求解整個時窗，其中包含尚未建機的
+    群組成員。此時每個成員都已經有 assigned_node，會以自己為錨點而留在
+    原地，整組因此被凍結成一個單位，不會在重解過程中被拆散到不同節點。
+    要讓某台真的重新自由選點時，才傳入 exclude_request_id。
     """
     if placement_group_id is None:
         return None
@@ -402,41 +408,6 @@ def allowed_template_nodes_for_request(request: PlacementRequest) -> set[str] | 
             allowed = gpu_nodes if allowed is None else (allowed & gpu_nodes)
 
     return set(allowed) if allowed is not None else None
-
-
-def release_request_from_capacities(
-    *,
-    node_capacities: list[NodeCapacity],
-    db_request: VMRequest,
-    node_name: str | None,
-    request_capacity_tuple_fn,
-    refresh_node_candidate_fn,
-) -> None:
-    if not node_name:
-        return
-    node = next((item for item in node_capacities if item.node == node_name), None)
-    if node is None:
-        return
-
-    cpu_cores, memory_bytes, disk_bytes = request_capacity_tuple_fn(db_request)
-    node.allocatable_cpu_cores = min(
-        round(node.allocatable_cpu_cores + cpu_cores, 2),
-        round(float(node.total_cpu_cores), 2),
-    )
-    node.allocatable_memory_bytes = min(
-        node.allocatable_memory_bytes + memory_bytes,
-        int(node.total_memory_bytes),
-    )
-    node.allocatable_disk_bytes = min(
-        node.allocatable_disk_bytes + disk_bytes,
-        int(node.total_disk_bytes),
-    )
-    node.running_resources = max(int(node.running_resources) - 1, 0)
-    node.allocatable_gpu_slots = min(
-        int(node.allocatable_gpu_slots) + request_gpu_slots(db_request),
-        int(node.gpu_count),
-    )
-    refresh_node_candidate_fn(node)
 
 
 def reserve_request_on_capacities(

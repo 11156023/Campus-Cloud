@@ -87,25 +87,6 @@ def _provisioned_current_node(request: VMRequest) -> str | None:
     return placement_support.provisioned_current_node(request)
 
 
-def _is_quick_template_request(request: VMRequest) -> bool:
-    # course（課程實驗機）與 quick_template 同屬短 TTL 快速通道：
-    # 一樣釘住節點、不參與 cohort optimization。
-    return getattr(request, "request_kind", "research") in {
-        "quick_template",
-        "course",
-    }
-
-
-def _fixed_node_for_quick_template(request: VMRequest) -> str | None:
-    if not _is_quick_template_request(request):
-        return None
-    return (
-        _provisioned_current_node(request)
-        or request.desired_node
-        or request.assigned_node
-    )
-
-
 def _build_preview_vm_request(
     *,
     request: PlacementRequest,
@@ -121,21 +102,6 @@ def _build_preview_vm_request(
 
 def _refresh_node_candidate(node: NodeCapacity) -> None:
     placement_support.refresh_node_candidate(node)
-
-
-def _release_request_from_capacities(
-    *,
-    node_capacities: list[NodeCapacity],
-    db_request: VMRequest,
-    node_name: str | None,
-) -> None:
-    placement_support.release_request_from_capacities(
-        node_capacities=node_capacities,
-        db_request=db_request,
-        node_name=node_name,
-        request_capacity_tuple_fn=_request_capacity_tuple,
-        refresh_node_candidate_fn=_refresh_node_candidate,
-    )
 
 
 def _reserve_request_on_capacities(
