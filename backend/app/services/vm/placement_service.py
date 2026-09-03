@@ -28,9 +28,6 @@ from app.domain.placement.schemas import (
     ResourceType,
 )
 from app.domain.placement.storage import (
-    reserve_storage_pool as _reserve_storage_pool,
-)
-from app.domain.placement.storage import (
     select_best_storage_for_request as _select_best_storage_for_request,
 )
 from app.models import VMRequest

@@ -10,15 +10,15 @@ from sqlmodel import Session, select
 from app.core.i18n import t
 from app.domain.placement import advisor as placement_advisor
 from app.exceptions import BadRequestError
+from app.infrastructure.proxmox import (
+    get_connection_id_for_node,
+    get_nodes_for_connection,
+)
 from app.models import (
     ClassCapacityReservation,
     TeachingClassMachineNode,
     TeachingClassStudent,
     VMTemplate,
-)
-from app.infrastructure.proxmox import (
-    get_connection_id_for_node,
-    get_nodes_for_connection,
 )
 from app.services.network import ip_management_service
 from app.services.proxmox import provisioning_service, proxmox_service
