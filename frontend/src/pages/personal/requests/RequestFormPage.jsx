@@ -60,11 +60,6 @@ function SelectField({ value, onChange, disabled, children, placeholder }) {
 /* ── Helpers ── */
 const DT_FMT = { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" };
 const formatDT = (iso) => new Date(iso).toLocaleString("zh-TW", DT_FMT);
-const formatDateOnly = (iso) => new Date(iso).toLocaleDateString("zh-TW", {
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-});
 const OS_DISPLAY_NAMES = {
   ubuntu: "Ubuntu",
   debian: "Debian",
@@ -1288,22 +1283,22 @@ export default function RequestFormPage({ onBack, className, initialPrefill = nu
                   <div className={styles.scheduleInputGrid}>
                     <FieldGroup label={t("RequestFormPage.startDateLabel")} required error={errors.start_at} name="start_at">
                       <input
-                        type="date"
+                        type="datetime-local"
                         className={styles.input}
-                        min={scheduleBounds.min.slice(0, 10)}
-                        max={scheduleBounds.max.slice(0, 10)}
-                        value={toDateInputValue(form.start_at)}
-                        onChange={(e) => set("start_at", fromDateInputValue(e.target.value))}
+                        min={scheduleBounds.min}
+                        max={scheduleBounds.max}
+                        value={toDateTimeLocalValue(form.start_at)}
+                        onChange={(e) => set("start_at", fromDateTimeLocalValue(e.target.value))}
                       />
                     </FieldGroup>
                     <FieldGroup label={t("RequestFormPage.endDateLabel")} required error={errors.end_at} name="end_at">
                       <input
-                        type="date"
+                        type="datetime-local"
                         className={styles.input}
-                        min={toDateInputValue(form.start_at) || scheduleBounds.min.slice(0, 10)}
-                        max={scheduleBounds.max.slice(0, 10)}
-                        value={toDateInputValue(form.end_at)}
-                        onChange={(e) => set("end_at", fromDateInputValue(e.target.value, true))}
+                        min={toDateTimeLocalValue(form.start_at) || scheduleBounds.min}
+                        max={scheduleBounds.max}
+                        value={toDateTimeLocalValue(form.end_at)}
+                        onChange={(e) => set("end_at", fromDateTimeLocalValue(e.target.value))}
                       />
                     </FieldGroup>
                   </div>
@@ -1478,11 +1473,11 @@ export default function RequestFormPage({ onBack, className, initialPrefill = nu
                 <>
                   <div className={styles.summaryRow}>
                     <span className={styles.summaryLabel}>{t("RequestFormPage.summaryStart")}</span>
-                    <span className={styles.summaryTimeValue}>{formatDateOnly(form.start_at)}</span>
+                    <span className={styles.summaryTimeValue}>{formatDT(form.start_at)}</span>
                   </div>
                   <div className={styles.summaryRow}>
                     <span className={styles.summaryLabel}>{t("RequestFormPage.summaryEnd")}</span>
-                    <span className={styles.summaryTimeValue}>{formatDateOnly(form.end_at)}</span>
+                    <span className={styles.summaryTimeValue}>{formatDT(form.end_at)}</span>
                   </div>
                 </>
               ) : (
