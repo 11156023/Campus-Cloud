@@ -51,11 +51,6 @@ def _stub_topology(monkeypatch):
         "get_connection_id_for_node",
         lambda name: _NODE_CONNECTIONS.get(name),
     )
-    monkeypatch.setattr(
-        class_capacity_service,
-        "get_nodes_for_connection",
-        lambda cid: {n for n, c in _NODE_CONNECTIONS.items() if c == cid},
-    )
 
 
 def _template(session, *, node: str, resource_type: str) -> VMTemplate:
@@ -118,7 +113,10 @@ class TestEligibleNodes:
             session, machine_node=machine
         ) == {"a1"}
 
-    def test_vm_template_can_use_the_whole_connection(self, session):
+    def test_vm_template_is_pinned_to_the_template_node(self, session):
+        """批次建機的 create_vm 與 clone_service 一律在範本節點 clone，不接受
+        指定節點 —— eligibility 必須反映這件事，否則容量計畫會規劃出建機不會
+        遵守的落點。"""
         template = _template(session, node="a1", resource_type="qemu")
         machine = _machine(
             session,
@@ -129,7 +127,7 @@ class TestEligibleNodes:
         )
         assert class_capacity_service.eligible_nodes_for_machine(
             session, machine_node=machine
-        ) == {"a1", "a2"}
+        ) == {"a1"}
 
     def test_custom_lxc_is_limited_to_nodes_that_see_the_image(
         self, session, monkeypatch

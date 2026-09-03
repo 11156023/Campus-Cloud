@@ -3,7 +3,10 @@
 對應目標：
 
 - G1 同一組機器絕不跨叢集（connection）
-- G2 同一組機器落在同一節點；同節點放不下時整組失敗，不半組落地
+- G2 同一組機器落在同一個叢集內；該叢集放不下時整組失敗，不半組落到別的叢集
+  （約束是同叢集而非同節點：叢集內跨節點靠同一個 bridge 加 PVE firewall 是
+  通的，而且 LXC linked clone 不能離開自己的範本節點，釘成同節點會讓一組
+  「範本分屬同叢集不同節點」的環境變成無解）
 - G3 GPU 額度在核准階段就擋下，不留到建機才失敗
 - G4 審核預覽標示的選定節點與核准結果同源
 
@@ -28,6 +31,24 @@ GIB = 1024**3
 # ---------------------------------------------------------------------------
 # 測試骨架
 # ---------------------------------------------------------------------------
+
+# 叢集拓樸：pve1/pve2 屬連線 1，pve3 屬連線 2
+_NODE_CONNECTIONS = {"pve1": 1, "pve2": 1, "pve3": 2}
+
+
+@pytest.fixture(autouse=True)
+def _stub_topology(monkeypatch):
+    monkeypatch.setattr(
+        placement_support,
+        "get_connection_id_for_node",
+        lambda name: _NODE_CONNECTIONS.get(name),
+    )
+    monkeypatch.setattr(
+        placement_support,
+        "get_nodes_for_connection",
+        lambda cid: {n for n, c in _NODE_CONNECTIONS.items() if c == cid},
+    )
+
 
 @pytest.fixture(name="session")
 def _session():
@@ -155,12 +176,21 @@ class TestGroupAnchor:
             is None
         )
 
-    def test_second_machine_is_pinned_to_anchor(self, session):
+    def test_second_machine_is_limited_to_the_anchor_cluster(self, session):
+        """約束是同叢集而非同節點：叢集內跨節點是通的，不必擠在同一台。"""
         group = uuid.uuid4()
         _persist_request(session, group_id=group, assigned_node="pve2")
         assert placement_support.allowed_affinity_nodes_for_request(
             session=session, request=_placement_request(group)
-        ) == {"pve2"}
+        ) == {"pve1", "pve2"}
+
+    def test_other_cluster_is_excluded(self, session):
+        group = uuid.uuid4()
+        _persist_request(session, group_id=group, assigned_node="pve2")
+        allowed = placement_support.allowed_affinity_nodes_for_request(
+            session=session, request=_placement_request(group)
+        )
+        assert "pve3" not in allowed
 
     def test_other_groups_do_not_leak(self, session):
         _persist_request(session, group_id=uuid.uuid4(), assigned_node="pve2")
@@ -174,6 +204,7 @@ class TestGroupAnchor:
     def test_anchor_is_the_earliest_created_peer(self, session):
         group = uuid.uuid4()
         base = datetime.now(UTC)
+        # 先建的在叢集 1，後建的在叢集 2 —— 錨點必須是前者
         _persist_request(
             session,
             group_id=group,
@@ -183,20 +214,20 @@ class TestGroupAnchor:
         _persist_request(
             session, group_id=group, assigned_node="pve1", created_at=base
         )
-        # 錨點必須穩定，否則後建的機器會依查詢順序跟到不同節點
         assert placement_support.allowed_affinity_nodes_for_request(
             session=session, request=_placement_request(group)
-        ) == {"pve1"}
+        ) == {"pve1", "pve2"}
 
     def test_actual_node_wins_over_assigned(self, session):
-        """建機時退回別的節點後，同組後續機器要跟著實際落點走。"""
+        """建機時退回別的節點後，錨點要跟著實際落點走。"""
         group = uuid.uuid4()
         _persist_request(
-            session, group_id=group, assigned_node="pve1", actual_node="pve2"
+            session, group_id=group, assigned_node="pve1", actual_node="pve3"
         )
+        # pve3 屬另一個叢集 → 白名單換成該叢集
         assert placement_support.allowed_affinity_nodes_for_request(
             session=session, request=_placement_request(group)
-        ) == {"pve2"}
+        ) == {"pve3"}
 
     def test_peer_without_any_node_is_not_an_anchor(self, session):
         group = uuid.uuid4()
@@ -221,42 +252,46 @@ class TestGroupAnchor:
         )
 
 
-class TestPlacedGroupIsFrozen:
+class TestPlacedGroupStaysInItsCluster:
     """研究申請核准時會重新求解整個時窗，含尚未建機的群組成員。
 
-    每個成員此時都已有 assigned_node，會以自己為錨點而留在原地 —— 整組被
-    凍結成一個單位，不會在重解過程中被拆散。
+    每個成員此時都已有 assigned_node，會以自己（或同組最早那台）為錨點，
+    因此整組始終留在同一個叢集裡，不會在重解過程中被拆到別的叢集。
     """
 
-    def test_every_member_resolves_to_the_same_anchor(self, session):
+    def test_every_member_resolves_to_the_same_cluster(self, session):
         group = uuid.uuid4()
         base = datetime.now(UTC)
-        for offset in range(3):
+        for offset, node in enumerate(["pve1", "pve2", "pve1"]):
             _persist_request(
                 session,
                 group_id=group,
-                assigned_node="pve1",
+                assigned_node=node,
                 created_at=base + timedelta(seconds=offset),
             )
-        # 不論由哪一台發問，答案都必須是同一個節點
+        # 成員散在叢集 1 的不同節點上，白名單仍是同一個叢集
         for _ in range(3):
             assert placement_support.allowed_affinity_nodes_for_request(
                 session=session, request=_placement_request(group)
-            ) == {"pve1"}
+            ) == {"pve1", "pve2"}
 
-    def test_member_stays_put_even_when_a_bigger_node_exists(self, session):
-        """重解時不會因為別台節點更空就把已定案的群組搬過去。"""
+    def test_group_never_drifts_to_another_cluster(self, session):
+        """重解時就算別的叢集更空，也不會把已定案的群組搬過去。"""
         group = uuid.uuid4()
         _persist_request(session, group_id=group, assigned_node="pve1")
         plan = _build_plan(
             session,
             _placement_request(group),
-            [_node("pve1", cores=8, memory_gb=16), _node("pve2", cores=64, memory_gb=256)],
+            [
+                _node("pve1", cores=8, memory_gb=16),
+                _node("pve2", cores=8, memory_gb=16),
+                _node("pve3", cores=64, memory_gb=256),
+            ],
         )
-        assert plan.recommended_node == "pve1"
+        assert plan.feasible
+        assert plan.recommended_node in {"pve1", "pve2"}
 
-    def test_group_moves_together_when_the_anchor_is_released(self, session):
-        """錨點被明確排除時（真的要重新選點），其餘成員跟著新落點走。"""
+    def test_excluding_the_anchor_still_follows_the_group(self, session):
         group = uuid.uuid4()
         base = datetime.now(UTC)
         anchor = _persist_request(
@@ -265,105 +300,111 @@ class TestPlacedGroupIsFrozen:
         _persist_request(
             session,
             group_id=group,
-            assigned_node="pve1",
+            assigned_node="pve2",
             created_at=base + timedelta(seconds=1),
         )
-        # 排除錨點自己 → 它仍看得到同組另一台，因此不會漂走
+        # 排除錨點自己 → 它仍看得到同組另一台，因此不會漂到別的叢集
         assert placement_support.allowed_affinity_nodes_for_request(
             session=session,
             request=_placement_request(group),
             exclude_request_id=anchor.id,
-        ) == {"pve1"}
+        ) == {"pve1", "pve2"}
 
 
 # ---------------------------------------------------------------------------
-# G2：整組同節點；放不下就整組失敗
+# G2：整組同叢集；該叢集放不下就整組失敗
 # ---------------------------------------------------------------------------
 
-class TestGroupLandsTogether:
-    def test_group_follows_anchor_even_when_another_node_is_emptier(self, session):
+class TestGroupLandsInOneCluster:
+    def test_group_may_use_another_node_of_the_same_cluster(self, session):
+        """同叢集內換節點是允許的 —— 它們仍然連得到。"""
         group = uuid.uuid4()
         _persist_request(session, group_id=group, assigned_node="pve1")
-        # pve2 資源多很多，沒有 affinity 的話一定會選它
         plan = _build_plan(
             session,
             _placement_request(group),
             [_node("pve1", cores=8, memory_gb=16), _node("pve2", cores=64, memory_gb=256)],
         )
         assert plan.feasible
+        assert plan.recommended_node == "pve2"
+
+    def test_group_never_uses_another_cluster(self, session):
+        group = uuid.uuid4()
+        _persist_request(session, group_id=group, assigned_node="pve1")
+        plan = _build_plan(
+            session,
+            _placement_request(group),
+            [_node("pve1", cores=8, memory_gb=16), _node("pve3", cores=64, memory_gb=256)],
+        )
+        assert plan.feasible
         assert plan.recommended_node == "pve1"
 
-    def test_without_group_the_emptier_node_wins(self, session):
-        """對照組：沒有群組鍵時本來就會選資源多的那台。"""
+    def test_without_group_the_emptier_cluster_wins(self, session):
+        """對照組：沒有群組鍵時本來就會選資源多的那台，跨叢集也無妨。"""
         plan = _build_plan(
             session,
             _placement_request(None),
-            [_node("pve1", cores=8, memory_gb=16), _node("pve2", cores=64, memory_gb=256)],
+            [_node("pve1", cores=8, memory_gb=16), _node("pve3", cores=64, memory_gb=256)],
         )
-        assert plan.recommended_node == "pve2"
+        assert plan.recommended_node == "pve3"
 
-    def test_group_fails_when_anchor_cannot_fit(self, session):
-        """錨點放不下時整組失敗，不會溢出到別的節點半組落地。"""
+    def test_group_fails_when_its_cluster_cannot_fit(self, session):
+        """所屬叢集放不下時整組失敗，不會溢出到別的叢集半組落地。"""
         group = uuid.uuid4()
         _persist_request(session, group_id=group, assigned_node="pve1")
         plan = _build_plan(
             session,
             _placement_request(group, cpu_cores=32, memory_mb=64 * 1024),
-            [_node("pve1", cores=4, memory_gb=8), _node("pve2", cores=64, memory_gb=256)],
+            [
+                _node("pve1", cores=4, memory_gb=8),
+                _node("pve2", cores=4, memory_gb=8),
+                _node("pve3", cores=64, memory_gb=256),
+            ],
         )
         assert not plan.feasible
         assert plan.recommended_node is None
 
-    def test_multi_instance_group_stays_on_anchor(self, session):
+    def test_multi_instance_group_stays_inside_the_cluster(self, session):
         group = uuid.uuid4()
         _persist_request(session, group_id=group, assigned_node="pve1")
         plan = _build_plan(
             session,
             _placement_request(group, instance_count=3),
-            [_node("pve1"), _node("pve2")],
+            [_node("pve1"), _node("pve2"), _node("pve3")],
         )
         assert plan.feasible
-        assert {item.node for item in plan.placements} == {"pve1"}
+        assert {item.node for item in plan.placements} <= {"pve1", "pve2"}
 
 
 # ---------------------------------------------------------------------------
 # G1：絕不跨叢集
 # ---------------------------------------------------------------------------
 
-class TestGroupNeverCrossesConnection:
-    def test_anchor_excludes_nodes_of_other_connections(self, session):
-        """錨點釘住單一節點，跨叢集的節點自然全部出局。
-
-        同節點是比同叢集更強的約束，因此 G1 由 G2 的機制一併保證。
-        """
+class TestGroupNeverCrossesCluster:
+    def test_nodes_of_other_clusters_are_rejected(self, session):
         group = uuid.uuid4()
-        _persist_request(session, group_id=group, assigned_node="clusterA-n1")
+        _persist_request(session, group_id=group, assigned_node="pve1")
         allowed = placement_support.allowed_affinity_nodes_for_request(
             session=session, request=_placement_request(group)
         )
-        assert allowed == {"clusterA-n1"}
-        for foreign in ("clusterB-n1", "clusterB-n2"):
-            assert not placement_support.node_can_host_request(
-                _node(foreign),
-                cores=2,
-                memory_bytes=2 * GIB,
-                disk_bytes=8 * GIB,
-                gpu_required=0,
-                has_managed_storage=False,
-                allowed_affinity_nodes=allowed,
-            )
-
-    def test_plan_never_picks_a_node_outside_the_group(self, session):
-        group = uuid.uuid4()
-        _persist_request(session, group_id=group, assigned_node="clusterA-n1")
-        plan = _build_plan(
-            session,
-            _placement_request(group),
-            [_node("clusterA-n1"), _node("clusterB-n1"), _node("clusterB-n2")],
+        assert not placement_support.node_can_host_request(
+            _node("pve3"),
+            cores=2,
+            memory_bytes=2 * GIB,
+            disk_bytes=8 * GIB,
+            gpu_required=0,
+            has_managed_storage=False,
+            allowed_affinity_nodes=allowed,
         )
-        assert plan.feasible
-        assert plan.recommended_node == "clusterA-n1"
-        assert {item.node for item in plan.placements} == {"clusterA-n1"}
+        assert placement_support.node_can_host_request(
+            _node("pve2"),
+            cores=2,
+            memory_bytes=2 * GIB,
+            disk_bytes=8 * GIB,
+            gpu_required=0,
+            has_managed_storage=False,
+            allowed_affinity_nodes=allowed,
+        )
 
 
 # ---------------------------------------------------------------------------

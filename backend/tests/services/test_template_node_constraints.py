@@ -97,13 +97,14 @@ class TestToPlacementRequestTemplateFields:
         )
         assert request.template_vmid is None
 
-    def test_lxc_clone_skips_ostemplate(self):
-        # 克隆路徑節點由範本釘死，不帶 ostemplate 約束
+    def test_lxc_clone_carries_template_vmid_not_ostemplate(self):
+        # 克隆路徑不帶 ostemplate，改以 template_vmid 表示「必須在範本節點」——
+        # 少了這個約束，placement 會選出一個之後被建機端覆寫掉的節點
         request = placement_support.to_placement_request(
             self._db_request(template_id=9001)
         )
         assert request.ostemplate is None
-        assert request.template_vmid is None
+        assert request.template_vmid == 9001
 
     def test_vm_carries_template_vmid(self):
         request = placement_support.to_placement_request(

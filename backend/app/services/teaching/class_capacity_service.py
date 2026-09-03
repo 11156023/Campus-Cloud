@@ -12,7 +12,6 @@ from app.domain.placement import advisor as placement_advisor
 from app.exceptions import BadRequestError
 from app.infrastructure.proxmox import (
     get_connection_id_for_node,
-    get_nodes_for_connection,
 )
 from app.models import (
     ClassCapacityReservation,
@@ -188,18 +187,22 @@ def eligible_nodes_for_machine(
     「LXC + 範本克隆」回傳不受限（節點由 provisioning 稍後以範本節點覆寫），
     容量計畫若照它算，就會出現「檢查說可行、建機卻落在別處」的落差。
 
+    這裡只列出**建機端今天真的做得到**的節點，不是理論上可行的節點。多列一個
+    就會讓容量計畫規劃出建機不會遵守的落點（檢查說可行、機器卻建在別處）。
+
     - LXC 範本克隆：linked clone 必須與範本同節點同 storage（PVE 限制），
       只有範本節點一個選擇。
-    - VM 範本／自訂 VM：clone 不可跨連線，限制在範本所屬連線的節點。
-    - 自訂 LXC：只有 iso_storage 看得到該 vztmpl 的節點。
+    - VM（範本與自訂）：批次建機的 create_vm 與 clone_service 一律在範本節點
+      上 clone，不接受指定節點。要放寬成整個連線，得先讓那兩條路徑支援跨節點
+      full clone 與失敗退回。
+    - 自訂 LXC：只有 iso_storage 看得到該 vztmpl 的節點；create_lxc 接受指定
+      節點，所以這是目前唯一能在叢集內分散的來源。
     """
     if machine_node.source_type == "template":
         template = session.get(VMTemplate, machine_node.source_template_id)
         if template is None:
             raise LookupError("template not found")
-        if str(template.resource_type) == "lxc":
-            return {template.node}
-        return _connection_nodes(template.node)
+        return {template.node}
 
     if machine_node.resource_type == "lxc":
         node_map = proxmox_service.get_lxc_template_node_map()
@@ -208,17 +211,10 @@ def eligible_nodes_for_machine(
             return {provisioning_service._get_lxc_target_node()}
         return set(node_map.get(str(machine_node.custom_image_ref or ""), set()))
 
-    return _connection_nodes(
+    return {
         provisioning_service._get_vm_target_node(
             int(machine_node.custom_image_ref or "0")
         )
-    )
-
-
-def _connection_nodes(node_name: str) -> set[str]:
-    """節點所屬連線的全部節點；查不到時退回該節點本身（clone 不可跨連線）。"""
-    return get_nodes_for_connection(get_connection_id_for_node(node_name)) or {
-        node_name
     }
 
 

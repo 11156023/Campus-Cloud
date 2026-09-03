@@ -278,20 +278,25 @@ def allowed_affinity_nodes_for_request(
 ) -> set[str] | None:
     """同群組已有落點時的節點白名單；None = 不受群組限制。
 
-    連貫環境的機器必須彼此互通。同一叢集內靠同一個 bridge 加 PVE firewall
-    還能通，跨叢集則 L2 不通、firewall 規則各自獨立、IP 由全域單例網段配發
-    但 gateway 是每個連線各自設定 —— 拓樸 edge 會形同虛設。
+    約束是「同一個叢集」而不是「同一台節點」：叢集內跨節點靠同一個 bridge
+    加 PVE firewall 是通的，機器不必擠在同一台。跨叢集才是真正的問題 ——
+    L2 不通、firewall 規則各自獨立、IP 由全域單例網段配發但 gateway 是每個
+    連線各自設定，拓樸 edge 會形同虛設。
 
-    因此同群組一律釘在同一節點，這同時也保證了同一叢集。群組第一台自由
-    選點，之後的機器跟隨；整組放不下時明確失敗，不會出現半組在 A 節點、
-    半組在 B 節點的壞環境。
+    釘成同節點還會讓一組「範本分屬同叢集不同節點」的環境變成無解：LXC
+    linked clone 不能離開自己的範本節點，兩台機器本來就不可能同節點。
+
+    群組第一台自由選點，之後的機器限制在同一叢集；整組放不下時明確失敗，
+    不會出現半組在 A 叢集、半組在 B 叢集的壞環境。
     """
     anchor = group_anchor_node(
         session=session,
         placement_group_id=request.placement_group_id,
         exclude_request_id=exclude_request_id,
     )
-    return {anchor} if anchor else None
+    if not anchor:
+        return None
+    return get_nodes_for_connection(get_connection_id_for_node(anchor)) or {anchor}
 
 
 def allowed_gpu_nodes_for_request(request: PlacementRequest) -> set[str] | None:
@@ -330,6 +335,8 @@ def allowed_template_nodes_for_request(request: PlacementRequest) -> set[str] | 
     """模板決定的候選節點白名單；None = 不受模板限制。
 
     - LXC + ostemplate：只有 iso_storage 看得到該 vztmpl 的節點可選。
+    - LXC + template_vmid（範本克隆）：linked clone 必須與範本同節點同
+      storage，只有範本節點一個選擇。
     - VM + template_vmid：clone 不可跨連線，限制在範本所屬連線的節點；
       範本已不存在時回空集合（無可行節點，讓 placement 明確失敗）。
     - 名稱標記 -GPU 的模板且未指定 GPU mapping 時，再縮限到有 GPU 的
@@ -340,6 +347,8 @@ def allowed_template_nodes_for_request(request: PlacementRequest) -> set[str] | 
     resource_type = str(request.resource_type)
     if resource_type == "lxc" and request.ostemplate:
         cache_key = ("lxc", str(request.ostemplate))
+    elif resource_type == "lxc" and request.template_vmid:
+        cache_key = ("lxc_clone", str(request.template_vmid))
     elif resource_type == "vm" and request.template_vmid:
         cache_key = ("vm", str(request.template_vmid))
     else:
@@ -363,6 +372,18 @@ def allowed_template_nodes_for_request(request: PlacementRequest) -> set[str] | 
                 # 整張映射為空多半是所有節點查詢都失敗，視同不受限
                 allowed = node_map.get(cache_key[1], set()) if node_map else None
                 needs_gpu = _template_needs_gpu(cache_key[1])
+            elif cache_key[0] == "lxc_clone":
+                try:
+                    source = proxmox_service.find_resource(int(cache_key[1]))
+                except NotFoundError:
+                    allowed = set()
+                    source = None
+                else:
+                    node = str(source.get("node") or "")
+                    allowed = {node} if node else None
+                needs_gpu = _template_needs_gpu(
+                    str((source or {}).get("name") or "")
+                )
             else:
                 try:
                     template = proxmox_service.find_vm_template(int(cache_key[1]))
@@ -801,18 +822,17 @@ def to_placement_request(db_request: VMRequest) -> PlacementRequest:
     )
     if disk_gb <= 0:
         disk_gb = 20 if db_request.resource_type == "vm" else 8
-    # LXC 帶 template_id 時走克隆路徑（節點由範本釘死），不帶 ostemplate 約束
+    # LXC 帶 template_id 時走克隆路徑：不帶 ostemplate 約束，改以 template_vmid
+    # 表示「必須落在範本所在節點」（linked clone 不能離開它，建機端也會強制
+    # 覆寫成範本節點）。不帶這個約束的話，placement 會選出一個之後被覆寫掉的
+    # 節點，群組 affinity 與容量計算都會跟著失準。
     ostemplate = (
         getattr(db_request, "ostemplate", None)
         if db_request.resource_type == "lxc"
         and not getattr(db_request, "template_id", None)
         else None
     )
-    template_vmid = (
-        getattr(db_request, "template_id", None)
-        if db_request.resource_type == "vm"
-        else None
-    )
+    template_vmid = getattr(db_request, "template_id", None)
     return PlacementRequest(
         resource_type=db_request.resource_type,
         cpu_cores=int(db_request.cores or 1),
