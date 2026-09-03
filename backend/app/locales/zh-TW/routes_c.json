@@ -3,10 +3,6 @@
   "desktop.device_code_expired": "Device code expired",
   "desktop.installer_not_found": "Desktop client installer not found. Build desktop-client or set DESKTOP_CLIENT_DOWNLOAD_URL.",
 
-  "course.checkpoint_not_found": "Checkpoint not found",
-  "course.enrollment_not_found": "Class enrollment not found",
-  "course.machine_not_ready": "你的課堂機器尚未建立完成，請先確認環境已就緒。",
-
   "course_admin.class_not_found": "Teaching class not found",
   "course_admin.owner_mismatch": "Course path and teaching class must have the same owner",
 

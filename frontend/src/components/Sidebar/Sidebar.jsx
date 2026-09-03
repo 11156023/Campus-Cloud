@@ -60,10 +60,8 @@ const navGroups = [
     labelKey: "Sidebar.groupTeaching",
     icon: "school",
     items: [
-      { key: "class-setup", labelKey: "Sidebar.itemClassSetup", icon: "add_circle", instructorOnly: true },
       { key: "class-management", labelKey: "Sidebar.itemClassManagement", icon: "groups_2", instructorOnly: true },
       { key: "course-template-management", labelKey: "Sidebar.itemCourseTemplateManagement", icon: "view_quilt", instructorOnly: true },
-      { key: "courses",    labelKey: "Sidebar.itemCourses", icon: "flag" },
     ],
   },
   {

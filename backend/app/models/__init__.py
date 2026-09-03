@@ -91,6 +91,7 @@ from .teacher_judge_session import (
     TeacherJudgeSessionMessage,
     TeacherJudgeSessionStatus,
 )
+from .teacher_judge_student_submission import TeacherJudgeStudentSubmission
 from .teacher_judge_template_command import TeacherJudgeTemplateCommand
 from .teaching_class import (
     TeachingClass,
@@ -215,6 +216,7 @@ __all__ = [
     "TeacherJudgeScriptRunTargetScope",
     "TeacherJudgeScriptSource",
     "TeacherJudgeScriptStatus",
+    "TeacherJudgeStudentSubmission",
     "TeacherJudgeTemplateCommand",
     # Deletion Request
     "DeletionRequest",

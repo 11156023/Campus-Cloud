@@ -3,10 +3,6 @@
   "desktop.device_code_expired": "デバイスコードの有効期限が切れました",
   "desktop.installer_not_found": "デスクトップクライアントのインストーラーが見つかりません。desktop-client をビルドするか、DESKTOP_CLIENT_DOWNLOAD_URL を設定してください。",
 
-  "course.checkpoint_not_found": "チェックポイントが見つかりません",
-  "course.enrollment_not_found": "クラスの履修登録が見つかりません",
-  "course.machine_not_ready": "あなたの授業用マシンはまだ作成が完了していません。環境が準備できているか先にご確認ください。",
-
   "course_admin.class_not_found": "クラスが見つかりません",
   "course_admin.owner_mismatch": "コースパスとクラスの所有者が一致している必要があります",
 
