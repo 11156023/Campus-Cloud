@@ -4,11 +4,11 @@
 >
 > 所有結論皆附 `檔案:行號` 佐證，可逐條複驗（見第九節）。
 >
-> **2026-09-03 更新**：階段 0（T0.1、T0.2、T0.3）已實作完成，見第十節。分析當時的 HEAD 為 `8e2316e9`；實作期間 repo 合併了 i18n PR（`629e0e57`），部分行號因此位移，函式名與檔案位置不受影響。
+> **2026-09-03 更新**：階段 0、階段 1、階段 2 與課堂叢集約束已實作完成，見第十節。分析當時的 HEAD 為 `8e2316e9`；實作期間 repo 合併了 i18n PR（`629e0e57`），部分行號因此位移，函式名與檔案位置不受影響。
 
 | 項目 | 內容 |
 | --- | --- |
-| 文件版本 | v1.1 |
+| 文件版本 | v1.2 |
 | 建立日期 | 2026-09-03（Asia/Taipei） |
 | 分析基準提交 | `8e2316e9` |
 | 實作基準提交 | `629e0e57`（i18n PR 合併後） |
@@ -26,10 +26,10 @@
 | --- | --- |
 | 判斷單台機器能否開在某節點 | ✅ 完整。四道硬約束：範本可見節點、GPU mapping 節點、CPU/RAM/guest 上限、disk |
 | GPU 必須在特定節點 | ✅ 已實作，三層把關（placement 過濾、範本名稱推導、建機前二次驗證），有測試覆蓋 |
-| 在多節點間做選擇 | ⚠️ 僅 VM 範本申請真正生效；LXC 課程路徑的決策結果會被覆寫丟棄 |
-| 同一組機器必須在同節點 | ❌ 完全沒有。無群組鍵、無 affinity 規則 |
-| 同一組機器必須在同叢集 | ❌ 完全沒有。候選節點池本身就跨叢集混合 |
-| GPU 額度（同卡同時段被搶） | ❌ 未進排程模型，核准階段不擋，建機才失敗 |
+| 在多節點間做選擇 | ⚠️ 僅 VM 範本申請真正生效；LXC 課程路徑的決策結果仍會被範本節點覆寫（PVE linked clone 限制） |
+| 同一組機器必須在同節點 | ✅ 已實作。VMRequest.placement_group_id + allowed_affinity_nodes 硬約束（快速練習整組） |
+| 同一組機器必須在同叢集 | ✅ 已實作。快速練習由同節點約束涵蓋；正式課堂由 resolve_class_targets 在預留階段擋下跨叢集 |
+| GPU 額度（同卡同時段被搶） | ✅ 已實作。allocatable_gpu_slots 進入容量模型，核准階段即擋下 |
 
 **兩個結構性問題**：
 
@@ -138,28 +138,28 @@ total_score = dominant_share            # CPU/RAM/Disk 加權後的最大占比
 
 嚴重度定義：**S1** = 正確性問題，會產生壞掉的環境或錯誤拒絕；**S2** = 功能缺失或不一致，影響可用性與可維運性；**S3** = 冗餘、誤導或效能，不影響正確性。
 
-### P-1〔S1〕同一組機器可被分到不同叢集
+### P-1〔S1〕同一組機器可被分到不同叢集 — ✅ 已於 T2.2 與課堂叢集約束修正
 
 - **現象**：`list_nodes()` 明確「Return all nodes across all connections」（`operations.py:124-125`），`_load_cluster_state()`（`advisor.py:50-91`）直接以此建候選池。placement 從第一步就把不同叢集的節點放在同一個池子裡比分數。
 - **唯一防線是 per-request 而非 per-group**：只有 VM 範本那條用 `get_nodes_for_connection(get_connection_id_for_node(template_node))` 限制在範本所屬連線（`placement_support.py:322-330`、`client.py:122-142`）。這只保證單台不跨叢集，不保證 A 機與 B 機同叢集。
 - **LXC 更寬鬆**：`get_lxc_template_node_map()` docstring 自述「跨連線彙總」（`operations.py:596-601`）。同名 volid 若兩叢集都有，白名單會同時包含兩邊節點。
 - **後果**：網路設定分層矛盾。`SubnetConfig` 是全域單例（cidr、gateway、bridge_name，`subnet_config.py:11-24`），但 `gateway_ip`、`local_subnet` 是每連線各自設定（`proxmox_config.py:84-85`）。跨叢集後 L2 不通、同 bridge 名稱指向不同實體網路、`allow_one_way` 兩邊各自下規則都成功但封包不通（`class_network_service.py:58-98`），拓樸 edge 形同虛設。
 
-### P-2〔S1〕沒有任何群組 affinity 概念
+### P-2〔S1〕沒有任何群組 affinity 概念 — ✅ 已於 T2.1／T2.3 修正
 
 - 全 codebase grep `affinity`、`group_key`、`same_node`、`placement_group` 零結果。`cohort` 一詞指的是「時間窗內的申請集合」，不是機器群組。
 - `VMRequest` 無群組鍵（`models/vm_request.py:84-175`），只有 `batch_job_id`。
 - 快速練習多台機器是**一台一張申請單**逐台送（`vm_request_service.py:527-560`），各自 `_approve_and_place` 各自選節點。先建的搶好節點，後建的被推去別台，無任何檢查。
 - **群組資訊其實已存在但排程看不到**：`QuickPracticeSessionMachine.session_id` 已把同環境機器綁在一起（`quick_practice.py:169-180`），拓樸 edge 也知道誰要連誰（`quick_practice.py:182-253`）。這條資訊完全沒有傳進 placement。
 
-### P-3〔S1〕GPU 額度未進排程模型
+### P-3〔S1〕GPU 額度未進排程模型 — ✅ 已於 T2.4 修正
 
 - `reserve_request_on_capacities`（`placement_support.py:395-412`）只扣 CPU、RAM、disk，**從不扣 `gpu_count`**。
 - 指定 mapping 時，`node_can_host_request` 只判斷「節點在不在白名單」，連 `gpu_count` 都不看（`placement_support.py:226-230`）。
 - **後果**：同一張卡在同一時段可被 N 張申請同時排入並全部核准，直到建機時才由 `_build_gpu_hostpci` 發現 `available_count <= 0` 而失敗（`provisioning_service.py:126-176`）。「核准通過、建機才失敗」是最差的失敗時機。
 - `/gpu/options` 有做時窗扣減（`api/routes/gpu.py:74-83`），但那只是表單顯示，排程不使用。
 
-### P-4〔S2〕優化器沒接在決策上，預覽與核准是兩套演算法
+### P-4〔S2〕優化器沒接在決策上，預覽與核准是兩套演算法 — ✅ 已於 T1.1 修正
 
 - `_solve_placement_assignments`（`placement_service.py:944-990`）等於貪婪初始解（`:580`）加 local search 單移與對調（`:739-853`）加 relief reassignment（`:856-943`）。
 - **唯一呼叫者是 `get_preview_node_scores`（`placement_service.py:1244`）**，即審核畫面的評分條。
@@ -172,7 +172,7 @@ total_score = dominant_share            # CPU/RAM/Disk 加權後的最大占比
 - 原因是 linked clone 必須同節點同 storage（PVE 限制，見第三節界線）。
 - **後果**：這條路徑的排程實質退化為純能力檢查，只驗「有沒有能力開」，開在哪由範本節點決定。
 
-### P-6〔S2〕正式課程完全繞過 placement，容量檢查不會分散
+### P-6〔S2〕正式課程完全繞過 placement，容量檢查不會分散 — ⚠️ 部分處理（已加叢集約束，分散未做）
 
 - `batch_provision_service.py:430-545` 不呼叫任何 placement 函式。
 - `class_capacity_service._evaluate_cluster_capacity`（`class_capacity_service.py:164-200`）以 `defaultdict` 依 `target_node` 累加 `× student_count`，全班需求全部堆到範本節點，只會回報「該節點不夠」，不會分配到其他節點。其他節點閒置也用不到。
@@ -195,7 +195,7 @@ total_score = dominant_share            # CPU/RAM/Disk 加權後的最大占比
 - 隨後 `:1015` 直接把 `hostpci0` 套到這個 fallback 節點，未重新驗證該節點是否有此 mapping。
 - 前面 `_select_request_placement` 做過的相容性檢查在此被繞過。
 
-### P-10〔S3〕審核預覽的資料庫往返次數過高
+### P-10〔S3〕審核預覽的資料庫往返次數過高 — ✅ 已隨 T1.1 消除
 
 - `_evaluate_active_assignment_map`（`placement_service.py:414-441`）**每次呼叫都重跑兩個 DB query**：`get_all_storages` 與 `get_overcommit_ratios`，無任何快取。
 - 預覽的呼叫次數約為 `候選節點數 N × search_depth D × (R×N 單移 + R²/2 對調) × 2 queries`。
@@ -349,9 +349,68 @@ sed -n '98,100p' backend/app/domain/placement/policy.py
 
 **已知限制**：前端無法執行 `vite build` 驗證（rolldown 原生 binding 缺失，屬既有環境問題，與本次改動無關）。JSX 改動為單一自包含區塊的純刪除，已逐行檢視 diff 確認標籤平衡。
 
+### 階段 1 — 已完成（2026-09-03）
+
+| 編號 | 狀態 | 實際改動 |
+| --- | --- | --- |
+| T1.1 | ✅ 完成 | 移除 local search 整套機制（`_evaluate_active_assignment_map`、`_initial_active_assignment_map`、`_run_local_placement_search`、`_try_relief_reassignment`、`_solve_placement_assignments`）共 **639 行**。`get_preview_node_scores` 新增 `selected_node` 參數，由審核畫面直接傳入 `rebuild_reserved_assignments` 算出的投影落點 —— **G4 因此是結構性保證**，不是靠兩套演算法碰巧一致。候選節點評分改為單節點投影，順帶把原本硬編為 0 的 memory_share、disk_share、peak_penalty、loadavg_penalty 填上真實值 |
+| T1.2 | ✅ 完成 | `PlacementTuning` 移除只服務 local search 的 `search_depth`、`search_max_reassignments`。保留 DB 欄位，不做 migration |
+
+另移除隨之孤立的 `AssignmentEvaluation`、`compute_node_score_breakdown`、`build_placement_baseline_nodes`、`build_preview_selection_reasons`（後者在 placement_service 與 placement_support 各有一份，均無呼叫者）。
+
+**G8 效能**：審核畫面原本每次評估固定 2 次 DB query，總量約「節點數 × depth × (申請×節點 + 申請²/2) × 2」；現為每個候選節點一次投影。
+
+### 階段 2 — 已完成（2026-09-03）
+
+| 編號 | 狀態 | 實際改動 |
+| --- | --- | --- |
+| T2.1 | ✅ 完成 | `VMRequest.placement_group_id` + 複合索引（migration `pgrp01`）。NULL = 不屬於任何群組，行為與過去完全相同 |
+| T2.2 | ✅ 完成 | 由 T2.3 的同節點硬約束涵蓋（同節點必然同叢集）。正式課堂另有獨立機制，見下 |
+| T2.3 | ✅ 完成 | `node_can_host_request` 新增 `allowed_affinity_nodes` 維度，與既有的範本節點、GPU 節點白名單同層取交集。群組第一台自由選點成為錨點（取最早建立者，確保穩定），之後的機器一律跟隨；錨點放不下時整組失敗。快速練習以 `QuickPracticeSession.id` 作為群組鍵 |
+| T2.4 | ✅ 完成 | `NodeCapacity.allocatable_gpu_slots` 於 reserve／release／apply_reserved 與 build_plan 的多台迴圈一併增減；`node_can_host_request` 在白名單之外再檢查剩餘額度 |
+
+**T2.4 已知限制**：`gpu_count` 是節點上所有 mapping 的總槽數，因此額度計算也是總量，同節點不同卡之間會互相排擠。屬保守誤差（寧可拒絕也不超賣）。若要精確到 per-mapping，需讓 `NodeCapacity` 帶 mapping 維度。
+
+### 課堂叢集約束 — 已完成（2026-09-03）
+
+原 T3.2 的目標是「正式課程分散到多節點」。實作過程中確認了更優先且更關鍵的需求：**同一堂課的機器必須在同一個叢集**。
+
+問題：自訂 LXC 走 `provisioning_service._get_lxc_target_node()`（各連線 default_node → nodes[0]），會在所有連線之間自由挑選，可以落到與範本機器不同的叢集；而且它從不檢查該節點看不看得到 vztmpl，要等到建機才失敗。
+
+- `eligible_nodes_for_machine`：每台課程機器實際能建在哪些節點（LXC 範本釘範本節點、VM 限制在範本所屬連線、自訂 LXC 限制在看得到該 vztmpl 的節點）。
+- `resolve_class_targets`：取各機器可落腳連線的交集決定班級叢集，再於該叢集內挑節點；無交集時在容量預留階段就擋下並列出各機器的可用節點。
+- 節點選擇沿用各連線 default_node 的既有偏好，僅在它不合格時才改挑其他節點。
+- 建機端 `_process_task` 以同一個函式解出節點傳給 `create_lxc`，確保建機落點與預留時算的一致。
+
+容量計算仍是每台機器對應單一節點（不分散），與建機行為一致。
+
+### 未完成：G5 正式課程分散到多節點
+
+**未實作，且刻意不做半套。** 原因：
+
+1. 容量檢查一旦開始分散，建機端必須同步遵守，否則會核准出建不起來的班級 —— 比現況更糟。
+2. 建機端要真正支援分散，需要 `ClassCapacityReservation` 存「每台機器 → 各節點台數」的細粒度計畫（現行 JSON 是全班加總，還原不出來）、`create_vm`／`clone_service` 支援跨節點 full clone 與失敗退回。
+3. 其中最有價值的範本式課程機器正好需要跨節點 clone，而該路徑無法在沒有多節點 PVE 的環境中驗證。
+
+實作到一半的分配邏輯已完整撤回，未在 codebase 留下未接線的程式碼。若要接續，`eligible_nodes_for_machine` 已是現成的可建節點來源。
+
+### 測試（G7）
+
+| 檔案 | 案例數 | 覆蓋 |
+| --- | --- | --- |
+| `tests/services/test_gpu_clone_fallback.py` | 5 | T0.3 GPU 退回把關 |
+| `tests/services/test_placement_group_affinity.py` | 23 | G1、G2、G3 |
+| `tests/services/test_class_cluster_constraint.py` | 12 | 課堂叢集約束 |
+
+三個檔案都含**對照組**，確認約束確實載重而非空測：同一組節點在有／無群組鍵下選出不同節點；GPU 在 0 槽／1 槽下拒絕／接受；預設節點在別的叢集時改選同叢集節點、合格時維持不變。
+
+**全套件**：`998 passed, 3 skipped, 57 errors`。57 個 error 全為環境性（43 個 DB fixture 守門拒絕連非測試資料庫、14 個 redis 連線失敗），改動前後一致。
+
+**T4.2（壓測加節點維度）未做** —— 現有壓測需要可用的資料庫與 PVE，本環境無法執行。
+
 ### 後續
 
-1. 依第七節順序逐階段建立 PR，一個階段一個 PR，避免混合清場與功能改動。
-2. 下一步為階段 1（`T1.1` local search 去留）—— 該項需先確認方向，見 T1.1 的取捨說明。
-3. 階段 2 的 `T2.1` 動 schema，需先確認 migration 於既有環境的執行時間。
-4. 每完成一階段回頭更新本節與第一節的「現況」表，保留日期標記。
+1. `pgrp01` migration 需在既有環境執行；`vm_requests` 資料量大時先確認 `add_column` + `create_index` 的耗時。
+2. 課堂叢集約束會讓「機器分屬不同叢集」的既有班級在下次容量預留時被擋下 —— 上線前先掃一次現有班級，確認沒有跨叢集組合。
+3. GPU 額度改為總量計算，同節點多張不同卡的環境會比過去保守。若造成誤拒，再推進 per-mapping 維度。
+4. G5（正式課程分散）若要接續，先決定 `ClassCapacityReservation` 的細粒度計畫格式，再處理 `clone_service` 的跨節點 full clone；該路徑需在多節點 PVE 上實測。
