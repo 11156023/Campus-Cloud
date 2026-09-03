@@ -303,8 +303,8 @@ export default function GpuMgmtPage() {
             <table className={styles.table}>
               <thead>
                 <tr>
-                  {columns.map((col) => (
-                    <th key={col} className={styles.th}>{col}</th>
+                  {columns.map((col, idx) => (
+                    <th key={col} className={idx === 0 ? `${styles.th} ${styles.thName}` : styles.th}>{col}</th>
                   ))}
                 </tr>
               </thead>

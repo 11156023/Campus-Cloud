@@ -256,8 +256,8 @@ export default function IpManagementPage() {
             <table className={styles.table}>
               <thead>
                 <tr>
-                  {[t("IpManagementPage.colIpAddress"), t("IpManagementPage.colPurpose"), "VMID", t("IpManagementPage.colDescription"), t("IpManagementPage.colAllocatedAt")].map((col) => (
-                    <th key={col} className={styles.th}>{col}</th>
+                  {[t("IpManagementPage.colIpAddress"), t("IpManagementPage.colPurpose"), "VMID", t("IpManagementPage.colDescription"), t("IpManagementPage.colAllocatedAt")].map((col, idx) => (
+                    <th key={col} className={idx === 0 ? `${styles.th} ${styles.thName}` : styles.th}>{col}</th>
                   ))}
                 </tr>
               </thead>

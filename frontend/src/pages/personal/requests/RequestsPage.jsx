@@ -612,8 +612,8 @@ export default function RequestsPage() {
               <table className={styles.table}>
                 <thead>
                   <tr>
-                    {LIST_COLUMN_KEYS.map((columnKey) => (
-                      <th key={columnKey} className={styles.th}>{t(columnKey)}</th>
+                    {LIST_COLUMN_KEYS.map((columnKey, idx) => (
+                      <th key={columnKey} className={idx === 0 ? `${styles.th} ${styles.thName}` : styles.th}>{t(columnKey)}</th>
                     ))}
                   </tr>
                 </thead>

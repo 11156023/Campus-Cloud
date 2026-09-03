@@ -187,8 +187,8 @@ export default function JobsPage() {
             <table className={styles.table}>
               <thead>
                 <tr>
-                  {[t("JobsPage.colTask"), t("JobsPage.colKind"), t("JobsPage.colStatus"), t("JobsPage.colProgress"), t("JobsPage.colCreatedAt"), t("JobsPage.colUpdatedAt"), t("JobsPage.colApplicant")].map((col) => (
-                    <th key={col} className={styles.th}>{col}</th>
+                  {[t("JobsPage.colTask"), t("JobsPage.colKind"), t("JobsPage.colStatus"), t("JobsPage.colProgress"), t("JobsPage.colCreatedAt"), t("JobsPage.colUpdatedAt"), t("JobsPage.colApplicant")].map((col, idx) => (
+                    <th key={col} className={idx === 0 ? `${styles.th} ${styles.thName}` : styles.th}>{col}</th>
                   ))}
                 </tr>
               </thead>
