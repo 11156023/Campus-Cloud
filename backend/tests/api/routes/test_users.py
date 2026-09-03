@@ -332,7 +332,7 @@ def test_update_user_me_email_exists(
         json=data,
     )
     assert r.status_code == 409
-    assert r.json()["detail"] == "User with this email already exists"
+    assert r.json()["detail"] == "此電子郵件的使用者已存在"
 
 
 def test_update_password_me_same_password_error(
@@ -480,7 +480,7 @@ def test_update_user_email_exists(
         json=data,
     )
     assert r.status_code == 409
-    assert r.json()["detail"] == "User with this email already exists"
+    assert r.json()["detail"] == "此電子郵件的使用者已存在"
 
 
 def test_delete_user_me(client: TestClient, db: Session) -> None:
