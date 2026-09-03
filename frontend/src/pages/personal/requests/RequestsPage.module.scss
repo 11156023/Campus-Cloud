@@ -76,9 +76,9 @@
   padding-inline: 12px;
 }
 
-/* 表頭文字對齊列內主文字：欄位 padding 12 + 展開鈕 26 + gap 8 + 圖示 34 + gap 8 */
+/* 表頭文字對齊列內圖示的左緣：欄位 padding 12 + 展開鈕 26 + gap 8 */
 .thName {
-  padding-left: 12px + 26px + 8px + 34px + 8px;
+  padding-left: 12px + 26px + 8px;
 }
 
 .tr {

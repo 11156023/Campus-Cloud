@@ -287,8 +287,8 @@ export default function BatchReviewPage() {
             <table className={styles.table}>
               <thead>
                 <tr>
-                  {columns.map((c, idx) => (
-                    <th key={c} className={idx === 0 ? `${styles.th} ${styles.thName}` : styles.th}>{c}</th>
+                  {columns.map((c) => (
+                    <th key={c} className={styles.th}>{c}</th>
                   ))}
                 </tr>
               </thead>

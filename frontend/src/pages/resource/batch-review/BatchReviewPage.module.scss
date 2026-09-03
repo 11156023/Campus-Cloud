@@ -157,11 +157,6 @@
   @include table-th;
 }
 
-/* 表頭文字對齊列內主文字：欄位 padding 16 + 圖示 34 + gap 8 */
-.thName {
-  padding-left: 16px + 34px + 8px;
-}
-
 .tr {
   @include table-tr;
 }
