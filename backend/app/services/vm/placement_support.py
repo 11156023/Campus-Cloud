@@ -137,31 +137,6 @@ def provisioned_current_node(request: VMRequest) -> str | None:
     return assigned or None
 
 
-def build_placement_baseline_nodes(
-    *,
-    session: Session,
-    requests: list[VMRequest],
-    get_overcommit_ratios_fn,
-    release_request_from_capacities_fn,
-) -> list[NodeCapacity]:
-    nodes, resources = placement_advisor._load_cluster_state()
-    cpu_overcommit_ratio, disk_overcommit_ratio = get_overcommit_ratios_fn(session)
-    working_nodes = placement_advisor._build_node_capacities(
-        nodes=nodes,
-        resources=resources,
-        cpu_overcommit_ratio=cpu_overcommit_ratio,
-        disk_overcommit_ratio=disk_overcommit_ratio,
-    )
-    for request in requests:
-        if request.vmid is not None:
-            release_request_from_capacities_fn(
-                node_capacities=working_nodes,
-                db_request=request,
-                node_name=str(request.actual_node or request.assigned_node or ""),
-            )
-    return working_nodes
-
-
 def build_preview_vm_request(
     *,
     request: PlacementRequest,
@@ -683,8 +658,6 @@ def placement_sort_key(
         disk_contention_warn_share=0.7,
         disk_contention_high_share=0.9,
         disk_penalty_weight=0.75,
-        search_max_reassignments=2,
-        search_depth=3,
     )
     projected_cpu_share = placement_scorer.projected_share(
         used=max(node.total_cpu_cores - node.allocatable_cpu_cores, 0.0) + cores,

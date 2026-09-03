@@ -785,6 +785,9 @@ def get_review_context(
             session=session,
             db_request=projection_request,
             reserved_requests=overlapping_requests,
+            # 直接沿用核准路徑（rebuild_reserved_assignments）算出的落點，
+            # 讓畫面標示的選定節點與按下核准後的結果必然一致。
+            selected_node=request_selection.node,
         )
         node_score_breakdowns = [
             VMRequestReviewNodeScore(

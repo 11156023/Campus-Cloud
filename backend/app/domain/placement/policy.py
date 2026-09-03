@@ -27,8 +27,6 @@ def get_placement_tuning(*, session: Session) -> PlacementTuning:
             disk_contention_warn_share=0.7,
             disk_contention_high_share=0.9,
             disk_penalty_weight=0.75,
-            search_max_reassignments=2,
-            search_depth=3,
         )
     return PlacementTuning(
         reassignment_cost=max(float(config.placement_reassignment_cost or 0.15), 0.0),
@@ -46,8 +44,6 @@ def get_placement_tuning(*, session: Session) -> PlacementTuning:
             0.01,
         ),
         disk_penalty_weight=max(float(config.placement_disk_penalty_weight or 0.75), 0.0),
-        search_max_reassignments=max(int(config.placement_search_max_reassignments or 2), 0),
-        search_depth=max(int(config.placement_search_depth or 3), 0),
         cpu_peak_warn_share=max(
             float(config.placement_cpu_peak_warn_share or DEFAULT_CPU_PEAK_WARN_SHARE),
             0.0,
