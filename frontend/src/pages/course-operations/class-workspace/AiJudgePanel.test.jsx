@@ -3,7 +3,7 @@ import { describe, expect, test } from "vitest";
 import {
   CreateCheckChooser,
   ChatPanel,
-  RubricStats,
+  RubricTable,
   buildProposalDiff,
   getRubricDisplayName,
   getRubricCheckTitle,
@@ -14,35 +14,7 @@ import {
 } from "./AiJudgePanel";
 import { RUBRIC_POLISH_PROMPT } from "../../../services/aiJudge";
 
-describe("RubricStats", () => {
-  const items = [
-    { id: "auto", detectable: "auto" },
-    { id: "partial", detectable: "partial" },
-    { id: "manual-1", detectable: "manual" },
-    { id: "manual-2", detectable: "manual" },
-  ];
-
-  test("顯示目前可自動偵測比例與重新評估動作", () => {
-    const html = renderToStaticMarkup(
-      <RubricStats items={items} onReassess={() => {}} />,
-    );
-
-    expect(html).toContain("可自動偵測 1（25%）");
-    expect(html).toContain("部分可偵測 1（25%）");
-    expect(html).toContain("共 4 題");
-    expect(html).toContain("評估結果已更新");
-    expect(html).toContain("重新評估");
-  });
-
-  test("評分項目異動後明確標示舊結果需要重新評估", () => {
-    const html = renderToStaticMarkup(
-      <RubricStats items={items} needsReview onReassess={() => {}} />,
-    );
-
-    expect(html).toContain("需要重新評估");
-    expect(html).toContain("下方顯示上次結果");
-  });
-
+describe("ChatPanel", () => {
   test("refine 內部提示詞不會出現在聊天室，並提供清除內容按鈕", () => {
     const html = renderToStaticMarkup(
       <ChatPanel
@@ -60,6 +32,73 @@ describe("RubricStats", () => {
     expect(html).not.toContain(RUBRIC_POLISH_PROMPT);
     expect(html).toContain("已完成潤飾，請確認提案。");
     expect(html).toContain("清除內容");
+  });
+
+  test("在聊天室提供評估摘要與評分表來源入口", () => {
+    const html = renderToStaticMarkup(
+      <ChatPanel
+        messages={[]}
+        onSendMessage={() => {}}
+        onOpenDetectability={() => {}}
+        onOpenSources={() => {}}
+        isLoading={false}
+        hasRubric
+      />,
+    );
+
+    expect(html).toContain("自動偵測可用性");
+    expect(html).toContain("評分表來源");
+  });
+});
+
+describe("RubricTable", () => {
+  const items = [
+    {
+      id: "python-version",
+      title: "Python 版本檢查",
+      description: "Python 需要至少 3.11",
+      detectable: "auto",
+      detection_method: "執行 python --version",
+      fallback: "無法執行時由老師確認",
+      check_steps: [{ template_key: "python", command_key: "python_version", command_label: "Python 版本" }],
+    },
+    {
+      id: "response-quality",
+      title: "回傳內容品質",
+      description: "回傳內容符合規格",
+      detectable: "partial",
+      detection_method: null,
+      fallback: null,
+      check_steps: [],
+    },
+  ];
+
+  test("以最左側圖示提供檢查設定入口", () => {
+    const html = renderToStaticMarkup(
+      <RubricTable items={items} onChange={() => {}} onDelete={() => {}} />,
+    );
+
+    expect(html).toContain("檢查點");
+    expect(html).toContain("評分標準");
+    expect(html).toContain("自動偵測");
+    expect(html).toContain('value="Python 版本檢查"');
+    expect(html).toContain("可自動偵測");
+    expect(html).toContain("部分可偵測");
+    expect(html).toContain('aria-expanded="false"');
+    expect(html).toContain('aria-label="展開第 1 項檢查設定"');
+    expect(html.indexOf('aria-label="展開第 1 項檢查設定"')).toBeLessThan(html.indexOf('value="Python 版本檢查"'));
+    expect(html).not.toContain(">詳細</button>");
+    expect(html).not.toContain("執行 python --version");
+    expect(html).not.toContain("AI 偵測判斷（僅由 AI 更新）");
+  });
+
+  test("評分項目異動後，在每列狀態保留結果並標示待更新", () => {
+    const html = renderToStaticMarkup(
+      <RubricTable items={items} needsReview onChange={() => {}} onDelete={() => {}} />,
+    );
+
+    expect(html).toContain("待更新");
+    expect(html).toContain("可自動偵測（待重新評估）");
   });
 });
 

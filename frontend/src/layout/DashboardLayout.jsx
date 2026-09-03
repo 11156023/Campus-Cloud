@@ -1,5 +1,5 @@
 ﻿import { useCallback, useEffect, useMemo, useState } from "react";
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 import { Suspense } from "react";
 import { useTranslation } from "react-i18next";
 import MIcon from "../components/MIcon";
@@ -14,6 +14,7 @@ import useSessionWarning from "../hooks/useSessionWarning";
 import useDialogPresence from "../hooks/useDialogPresence";
 import ErrorBoundary from "../components/ErrorBoundary/ErrorBoundary";
 import UserGuide from "../components/UserGuide/UserGuide";
+import { isAiJudgePath } from "./layoutRouteVisibility";
 import { LayoutContext } from "./layoutContext";
 import styles from "./DashboardLayout.module.scss";
 
@@ -23,6 +24,7 @@ export { LayoutContext };
 const COLLAPSE_MIN_WIDTH = 1024;
 
 export default function DashboardLayout() {
+  const location = useLocation();
   const { t } = useTranslation("common");
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -36,6 +38,11 @@ export default function DashboardLayout() {
   );
   const { active: sessionWarning, dismiss, dismissPermanent } = useSessionWarning();
   const mobileOverlay = useDialogPresence(mobileOpen);
+  const hideSidebar = isAiJudgePath(location.pathname);
+
+  useEffect(() => {
+    if (hideSidebar) setMobileOpen(false);
+  }, [hideSidebar]);
 
   useEffect(() => {
     function handleResize() {
@@ -54,35 +61,39 @@ export default function DashboardLayout() {
     {/* 任務狀態全站常駐（WS + toast + 詳情 dialog）；顯示按鈕在 Sidebar 底部 */}
     <JobsProvider>
     <div className={styles.layout}>
-      {mobileOverlay.open && (
+      {!hideSidebar && mobileOverlay.open && (
         <div
           className={`${styles.overlay} ${mobileOverlay.closing ? styles.overlayOut : ""}`}
           onClick={() => setMobileOpen(false)}
         />
       )}
 
-      <Sidebar
-        collapsed={collapsed}
-        mobileOpen={mobileOpen}
-        onToggle={() => setCollapsed((c) => !c)}
-        onClose={() => setMobileOpen(false)}
-      />
+      {!hideSidebar && (
+        <Sidebar
+          collapsed={collapsed}
+          mobileOpen={mobileOpen}
+          onToggle={() => setCollapsed((c) => !c)}
+          onClose={() => setMobileOpen(false)}
+        />
+      )}
 
       <main className={styles.main}>
         {/* 教室學生層：直播橫幅 / 觀看視窗 / 接管狀態（模組 E） */}
         <ClassroomStudentLayer>
           <div className={styles.workspace}>
             <div className={styles.pageColumn}>
-              <div className={styles.mobileTopBar}>
-                <button
-                  className={styles.mobileMenuBtn}
-                  onClick={() => setMobileOpen(true)}
-                  aria-label={t("DashboardLayout.openMenuAriaLabel")}
-                  type="button"
-                >
-                  <MIcon name="segment" size={22} />
-                </button>
-              </div>
+              {!hideSidebar && (
+                <div className={styles.mobileTopBar}>
+                  <button
+                    className={styles.mobileMenuBtn}
+                    onClick={() => setMobileOpen(true)}
+                    aria-label={t("DashboardLayout.openMenuAriaLabel")}
+                    type="button"
+                  >
+                    <MIcon name="segment" size={22} />
+                  </button>
+                </div>
+              )}
               <SubnetBanner />
               <ErrorBoundary>
                 <Suspense
