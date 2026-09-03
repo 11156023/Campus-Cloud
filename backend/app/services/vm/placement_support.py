@@ -479,9 +479,7 @@ def build_plan(
     get_node_priorities_fn,
     placement_sort_key_fn,
 ) -> PlacementPlan:
-    strategy = placement_policy.normalize_strategy(
-        placement_strategy or placement_policy.get_placement_strategy(session)
-    )
+    strategy = placement_strategy or placement_policy.get_placement_strategy(session)
     priorities = node_priorities or get_node_priorities_fn(session)
     tuning = get_placement_tuning_fn(session=session)
     working_nodes = [item.model_copy(deep=True) for item in node_capacities]

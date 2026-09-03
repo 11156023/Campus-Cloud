@@ -201,6 +201,27 @@ def _gpu_mapping_nodes(mapping_id: str | None) -> set[str]:
     return {str(item.node).strip() for item in mapping.maps if str(item.node).strip()}
 
 
+def _template_node_accepts_gpu(plan: dict, template_node: str) -> bool:
+    """範本節點能否承接這次建機的 GPU 需求（退回範本節點前的最後把關）。
+
+    不需要 GPU 時一律放行。查詢 mapping 失敗時回 False —— 無法確認就不退回，
+    寧可讓建機明確失敗，也不要建出一台掛不上 GPU 的機器。
+    """
+    mapping_id = plan.get("gpu_mapping_id")
+    if not mapping_id:
+        return True
+    try:
+        return str(template_node) in _gpu_mapping_nodes(str(mapping_id))
+    except Exception as exc:
+        logger.warning(
+            "Unable to verify GPU mapping '%s' on template node %s: %s",
+            mapping_id,
+            template_node,
+            exc,
+        )
+        return False
+
+
 def _select_request_placement(
     *,
     session: Session,
@@ -995,7 +1016,19 @@ def execute_provision(plan: dict) -> tuple[int, str]:
                         **clone_config,
                     )
                     actual_node = target_node
-                except Exception:
+                except Exception as exc:
+                    # 退回範本節點會繞過 _select_request_placement 做過的 GPU
+                    # 節點相容性檢查：範本節點未必有這張卡。與其建出一台掛不上
+                    # GPU 的機器，不如讓這次建機明確失敗。
+                    if not _template_node_accepts_gpu(plan, template_node):
+                        raise ProxmoxError(
+                            t(
+                                "provisioning.gpu_fallback_node_incompatible",
+                                target_node=target_node,
+                                template_node=template_node,
+                                mapping_id=plan.get("gpu_mapping_id"),
+                            )
+                        ) from exc
                     logger.warning(
                         "Cross-node clone failed for VMID %s; falling back to template node %s",
                         new_vmid,

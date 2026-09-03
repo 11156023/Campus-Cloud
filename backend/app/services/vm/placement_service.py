@@ -1342,9 +1342,5 @@ def _placement_sort_key(
     )
 
 
-def _normalize_strategy(strategy: str | None) -> str:
-    return placement_policy.normalize_strategy(strategy)
-
-
 def _to_placement_request(db_request: VMRequest) -> PlacementRequest:
     return placement_support.to_placement_request(db_request)

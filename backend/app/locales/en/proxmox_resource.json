@@ -4,6 +4,7 @@
   "provisioning.gpu_profile_not_creatable": "vGPU profile '{profile}' cannot be created right now due to insufficient GPU memory",
   "provisioning.gpu_memory_full": "GPU {mapping_id} memory is full; no vGPU can be created right now",
   "provisioning.gpu_verification_failed": "Unable to verify GPU '{mapping_id}': {error}",
+  "provisioning.gpu_fallback_node_incompatible": "Cross-node clone to '{target_node}' failed and template node '{template_node}' does not provide GPU mapping '{mapping_id}', so falling back to the template node is not possible.",
   "provisioning.template_node_unavailable": "Node '{node}' cannot access template '{template}' (the template only exists on: {nodes}).",
   "provisioning.lxc_template_node_unavailable": "Node '{node}' cannot access LXC template '{template}' (the template only exists on: {nodes}).",
   "provisioning.no_nodes_available": "no nodes",
