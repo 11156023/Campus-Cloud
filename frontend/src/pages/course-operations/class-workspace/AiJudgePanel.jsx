@@ -178,7 +178,7 @@ function ProposalPanel({ proposal, selectedIds, onToggle, onApply, onSkip, disab
 
 /* ── 評分表統計 ─────────────────────────────────────────── */
 
-export function RubricStats({ items, needsReview = false, isReassessing = false, onReassess, readOnly = false }) {
+export function RubricStats({ items, needsReview = false, isReassessing = false, onReassess, onClose, readOnly = false }) {
   const total = items.length;
   const autoCount = items.filter((item) => item.detectable === "auto").length;
   const partialCount = items.filter((item) => item.detectable === "partial").length;
@@ -196,12 +196,15 @@ export function RubricStats({ items, needsReview = false, isReassessing = false,
           </div>
           <p aria-live="polite">{needsReview ? "評分項目已變更，請重新評估自動檢查適用程度。" : "依目前評分項目的 AI 偵測判斷，協助確認自動檢查的適用程度。"}</p>
         </div>
-        {!readOnly && onReassess && (
-          <button type="button" className={needsReview ? styles.btnPrimary : styles.btnSecondary} onClick={onReassess} disabled={isReassessing || total === 0} title={total === 0 ? "至少需要一個評估項目" : undefined}>
-            {isReassessing ? <Spinner size={15} /> : <MIcon name="refresh" size={16} />}
-            {isReassessing ? "重新評估中..." : "重新評估"}
-          </button>
-        )}
+        <div className={styles.assessmentHeadActions}>
+          {!readOnly && onReassess && (
+            <button type="button" className={needsReview ? styles.btnPrimary : styles.btnSecondary} onClick={onReassess} disabled={isReassessing || total === 0} title={total === 0 ? "至少需要一個評估項目" : undefined}>
+              {isReassessing ? <Spinner size={15} /> : <MIcon name="refresh" size={16} />}
+              {isReassessing ? "重新評估中..." : "重新評估"}
+            </button>
+          )}
+          {onClose && <button type="button" className={styles.iconBtn} aria-label="關閉自動偵測可用性" title="關閉" onClick={onClose}><MIcon name="close" size={18} /></button>}
+        </div>
       </div>
       <div className={styles.statsBar} role="img" aria-label={`共 ${total} 題：可自動偵測 ${pct(autoCount)}%、部分可偵測 ${pct(partialCount)}%、需人工評閱 ${pct(manualCount)}%`}>
         {autoCount > 0 && <span className={styles.statsSeg_auto} style={{ flexGrow: autoCount }} />}
@@ -494,6 +497,8 @@ export function ChatPanel({
   isClearing = false,
   disabled = false,
   hasRubric = false,
+  onOpenDetectability,
+  onOpenSources,
 }) {
   const [input, setInput] = useState("");
   const messagesEndRef = useRef(null);
@@ -576,6 +581,27 @@ export function ChatPanel({
             {isLoading ? <Spinner size={14} /> : <MIcon name="auto_fix_high" size={14} />}
             潤飾評分表
           </button>
+          {onOpenDetectability && <button
+            type="button"
+            className={styles.btnSecondary}
+            disabled={isLoading || isClearing || !hasRubric}
+            onClick={onOpenDetectability}
+            title={!hasRubric ? "請先選擇或建立評分表" : undefined}
+            aria-haspopup="dialog"
+          >
+            <MIcon name="monitoring" size={14} />
+            自動偵測可用性
+          </button>}
+          {onOpenSources && <button
+            type="button"
+            className={styles.btnSecondary}
+            disabled={isLoading || isClearing}
+            onClick={onOpenSources}
+            aria-haspopup="dialog"
+          >
+            <MIcon name="description" size={14} />
+            評分表來源
+          </button>}
           <button
             type="button"
             className={styles.btnSecondary}
@@ -645,6 +671,28 @@ function ConfirmModal({ title, description, actions, closing = false, onClose })
         <p>{description}</p>
         <div className={styles.modalActions}>{actions}</div>
       </div>
+    </div>
+  );
+}
+
+function InsightDialog({ label, children, onClose }) {
+  return (
+    <div
+      className={styles.modalOverlay}
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <section
+        className={`${styles.modal} ${styles.insightModal}`}
+        role="dialog"
+        aria-modal="true"
+        aria-label={label}
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        {children}
+      </section>
     </div>
   );
 }
@@ -874,7 +922,7 @@ export function resolveActiveSessionId(currentId, sessions) {
   return sessions.some((session) => session.id === currentId) ? currentId : null;
 }
 
-function RubricSourceRail({ classId, judgeSession, readOnly, onSessionUpdated, onAddSource }) {
+function RubricSourceRail({ classId, judgeSession, readOnly, onSessionUpdated, onAddSource, onClose, embedded = false }) {
   const toast = useToast();
   const sourceRailRef = useRef(null);
   const [files, setFiles] = useState([]);
@@ -973,7 +1021,7 @@ function RubricSourceRail({ classId, judgeSession, readOnly, onSessionUpdated, o
   const selectedFile = getSelectedRubricSource(files, selectedFileId);
   const visibleFiles = getVisibleRubricSources(files, selectedFileId, showOtherSources);
   return (
-    <aside ref={sourceRailRef} className={styles.sourceRail} aria-label="評分表來源">
+    <aside ref={sourceRailRef} className={`${styles.sourceRail} ${embedded ? styles.sourceRailEmbedded : ""}`} aria-label="評分表來源">
       <div className={styles.sourceRailHead}>
         <div>
           <h3>評分表來源</h3>
@@ -982,6 +1030,7 @@ function RubricSourceRail({ classId, judgeSession, readOnly, onSessionUpdated, o
         <div className={styles.sourceRailActions}>
           {!readOnly && selectedFile && activeFiles.length > 1 && <button type="button" className={styles.btnSecondary} aria-expanded={showOtherSources} onClick={() => setShowOtherSources((current) => !current)}>{showOtherSources ? "只看目前來源" : "切換來源"}</button>}
           {!readOnly && <button type="button" className={styles.iconBtn} aria-label="新增來源" title="新增來源" onClick={onAddSource}><MIcon name="add" size={19} /></button>}
+          {onClose && <button type="button" className={styles.iconBtn} aria-label="關閉評分表來源" title="關閉" onClick={onClose}><MIcon name="close" size={18} /></button>}
         </div>
       </div>
       {loading ? <p className={styles.mutedText}>載入來源中…</p> : visibleFiles.length > 0 ? (
@@ -1021,6 +1070,7 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
   const [pendingProposal, setPendingProposal] = useState(null);
   const [selectedProposalIds, setSelectedProposalIds] = useState(() => new Set());
   const [isAssistantOpen, setIsAssistantOpen] = useState(true);
+  const [openInsight, setOpenInsight] = useState(null);
   const [pendingProposalMeta, setPendingProposalMeta] = useState(null);
   const [isReassessing, setIsReassessing] = useState(false);
   const [pendingProposalIsReassessment, setPendingProposalIsReassessment] = useState(false);
@@ -1034,6 +1084,15 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
   classIdRef.current = classId;
   toastRef.current = toast;
   const readOnly = judgeSession?.status === "archived";
+
+  useEffect(() => {
+    if (!openInsight) return undefined;
+    function closeOnEscape(event) {
+      if (event.key === "Escape") setOpenInsight(null);
+    }
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [openInsight]);
 
   useEffect(() => {
     const autosave = createRubricAnalysisAutosave({
@@ -1661,16 +1720,7 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
 
            {analysis && (
             <>
-              <div className={styles.card}>
-                <RubricStats
-                  items={items}
-                  needsReview={Boolean(analysis.detectability_needs_review)}
-                  isReassessing={isReassessing}
-                  onReassess={handleReassess}
-                  readOnly={readOnly}
-                />
-                <p className={styles.mutedText}>主要評分情境：{getTemplateLabel(analysisTemplateKey)}</p>
-              </div>
+              <p className={styles.mutedText}>主要評分情境：{getTemplateLabel(analysisTemplateKey)}</p>
               {analysis.summary && (
                 <div className={styles.summaryDetails}>
                   <strong>AI 評估摘要</strong>
@@ -1716,6 +1766,8 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
               isClearing={isClearingMessages}
               disabled={readOnly}
               hasRubric={Boolean(analysis)}
+              onOpenDetectability={() => setOpenInsight("detectability")}
+              onOpenSources={judgeSession?.id && onAddSource ? () => setOpenInsight("sources") : undefined}
             />
             {pendingProposal && analysis && <ProposalPanel
               proposal={pendingProposal}
@@ -1739,16 +1791,31 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
         </div>}
       </div>
 
-      {judgeSession?.id && onAddSource && (
-        <div className={styles.sourceSection}>
+      {openInsight === "detectability" && analysis && (
+        <InsightDialog label="自動偵測可用性" onClose={() => setOpenInsight(null)}>
+          <RubricStats
+            items={items}
+            needsReview={Boolean(analysis.detectability_needs_review)}
+            isReassessing={isReassessing}
+            onReassess={handleReassess}
+            onClose={() => setOpenInsight(null)}
+            readOnly={readOnly}
+          />
+        </InsightDialog>
+      )}
+
+      {openInsight === "sources" && judgeSession?.id && onAddSource && (
+        <InsightDialog label="評分表來源" onClose={() => setOpenInsight(null)}>
           <RubricSourceRail
             classId={classId}
             judgeSession={judgeSession}
             readOnly={readOnly}
             onSessionUpdated={onSessionUpdated}
             onAddSource={onAddSource}
+            onClose={() => setOpenInsight(null)}
+            embedded
           />
-        </div>
+        </InsightDialog>
       )}
 
       {conflictDialog.open && (

@@ -33,6 +33,22 @@ describe("ChatPanel", () => {
     expect(html).toContain("已完成潤飾，請確認提案。");
     expect(html).toContain("清除內容");
   });
+
+  test("在聊天室提供評估摘要與評分表來源入口", () => {
+    const html = renderToStaticMarkup(
+      <ChatPanel
+        messages={[]}
+        onSendMessage={() => {}}
+        onOpenDetectability={() => {}}
+        onOpenSources={() => {}}
+        isLoading={false}
+        hasRubric
+      />,
+    );
+
+    expect(html).toContain("自動偵測可用性");
+    expect(html).toContain("評分表來源");
+  });
 });
 
 describe("RubricTable", () => {

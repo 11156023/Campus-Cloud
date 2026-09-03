@@ -487,6 +487,120 @@
   }
 }
 
+.assessmentSummary {
+  @include flex-column;
+  gap: $spacing-16;
+  padding: $spacing-4;
+}
+
+.assessmentHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: $spacing-16;
+
+  > div:first-child {
+    min-width: 0;
+  }
+
+  h4 {
+    margin: 0;
+    color: var(--color-text-primary);
+    font-size: $font-size-16;
+    font-weight: $font-weight-700;
+  }
+
+  p {
+    margin: 4px 0 0;
+    color: var(--color-text-secondary);
+    font-size: $font-size-12;
+    line-height: 1.5;
+  }
+}
+
+.assessmentHeadActions {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: $spacing-8;
+}
+
+.assessmentTitleRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: $spacing-8;
+}
+
+.assessmentStatus_current,
+.assessmentStatus_stale {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 2px 8px;
+  border-radius: $radius-pill;
+  font-size: $font-size-10;
+  font-weight: $font-weight-700;
+}
+
+.assessmentStatus_current {
+  color: var(--color-success);
+  background: color-mix(in srgb, var(--color-success) 12%, transparent);
+}
+
+.assessmentStatus_stale {
+  color: var(--color-pending);
+  background: color-mix(in srgb, var(--color-pending) 14%, transparent);
+}
+
+.statsBar {
+  display: flex;
+  min-height: 10px;
+  overflow: hidden;
+  border-radius: $radius-pill;
+  background: var(--color-divider);
+}
+
+.statsBar > span {
+  min-width: 2px;
+}
+
+.statsSeg_auto { background: var(--color-success); }
+.statsSeg_partial { background: var(--color-pending); }
+.statsSeg_manual { background: var(--color-danger); }
+
+.statsLegend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: $spacing-8 $spacing-16;
+  color: var(--color-text-secondary);
+  font-size: $font-size-12;
+}
+
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.legendItem i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.legendDot_auto { background: var(--color-success); }
+.legendDot_partial { background: var(--color-pending); }
+.legendDot_manual { background: var(--color-danger); }
+.legendTotal { margin-left: auto; color: var(--color-text-muted); }
+
+.insightModal {
+  width: min(720px, 100%);
+  max-height: min(760px, 88vh);
+}
+
 /* ── 評分項目表格 ── */
 .rubricTableCard {
   overflow: hidden;
@@ -777,10 +891,6 @@
     max-height: none;
     box-sizing: border-box;
   }
-}
-
-.sourceSection {
-  margin-top: $spacing-4;
 }
 
 .srOnly {
@@ -1460,6 +1570,14 @@
   padding: $spacing-16;
   @include glass-surface($shadow: var(--shadow-sm));
   border-radius: $radius-16;
+}
+
+.sourceRailEmbedded {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .sourceRailHead {
