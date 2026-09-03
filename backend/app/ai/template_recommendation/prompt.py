@@ -53,6 +53,22 @@ def build_chat_runtime_context(
 """
 
 
+def build_intake_focus_block(focus: str) -> str:
+    """配置模式：這一輪只問一件事。
+
+    問句仍由這裡的顧問語氣產生（本來就是為了「用對話問清楚需求」而寫的），
+    只是把主題固定住，避免一次問三件事或跳到不相干的細節。
+    """
+    return f"""# Intake Focus
+You are gathering requirements before producing a configuration.
+- Ask about exactly this, and nothing else: {focus}
+- One short question. Do not ask a second question in the same reply.
+- If the user already implied the answer, confirm it in one line instead of asking again.
+- Do not produce a full configuration yet; that happens after the requirements are gathered.
+- Keep it to two sentences at most.
+"""
+
+
 def build_chat_system_prompt(*, is_first_turn: bool, runtime_context: str = "") -> str:
     greeting_instruction = (
         '- **Greeting (First Turn)**: Since this is the start of the conversation, start with one short and warm greeting in Traditional Chinese (for example: "你好，我可以幫你整理這次要用 LXC 還是 VM。")'

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import rehypeSanitize from "rehype-sanitize";
+import remarkGfm from "remark-gfm";
 import MIcon from "../MIcon";
 import { useToast } from "../../hooks/useToast";
 import { AiPveLogService } from "../../services/aiPveLog";
@@ -20,14 +21,14 @@ export function sanitizeAiPveContent(value) {
 export function AiPveMarkdownContent({ content }) {
   return (
     <div className={`${styles.msgContent} ${styles.msgMarkdown}`}>
-      <ReactMarkdown rehypePlugins={[rehypeSanitize]}>
+      <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>
         {sanitizeAiPveContent(content)}
       </ReactMarkdown>
     </div>
   );
 }
 
-export default function AiPveChat({ initialPrompt = "", compact = false }) {
+export default function AiPveChat({ initialPrompt = "", compact = false, fill = false }) {
   const toast = useToast();
   const initialPromptRef = useRef(String(initialPrompt ?? "").trim());
   const initialPromptHandledRef = useRef(false);
@@ -169,12 +170,7 @@ export default function AiPveChat({ initialPrompt = "", compact = false }) {
   }
 
   return (
-    <div className={`${styles.chatCard} ${compact ? styles.compact : ""}`}>
-      <div className={styles.chatCardHead}>
-        <MIcon name="comment" size={18} />
-        對話記錄
-      </div>
-
+    <div className={`${styles.chatCard} ${compact ? styles.compact : ""} ${fill ? styles.fill : ""}`}>
       <div className={styles.chatLog} aria-live="polite">
         {messages.map((message, index) => (
           <div

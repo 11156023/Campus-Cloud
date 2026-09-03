@@ -1,4 +1,4 @@
-﻿import { createContext, useEffect, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import { Suspense } from "react";
 import MIcon from "../components/MIcon";
@@ -14,9 +14,11 @@ import useDialogPresence from "../hooks/useDialogPresence";
 import ErrorBoundary from "../components/ErrorBoundary/ErrorBoundary";
 import UserGuide from "../components/UserGuide/UserGuide";
 import { isAiJudgePath } from "./layoutRouteVisibility";
+import { LayoutContext } from "./layoutContext";
 import styles from "./DashboardLayout.module.scss";
 
-export const LayoutContext = createContext({ setCompactFooter: () => {} });
+export { LayoutContext };
+
 
 const COLLAPSE_MIN_WIDTH = 1024;
 
@@ -26,6 +28,12 @@ export default function DashboardLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [compactFooter, setCompactFooter] = useState(false);
   const [assistantOpen, setAssistantOpen] = useState(false);
+  const [requestForm, setRequestForm] = useState(null);
+  const registerRequestForm = useCallback((api) => setRequestForm(api ?? null), []);
+  const layoutValue = useMemo(
+    () => ({ setCompactFooter, registerRequestForm, requestForm }),
+    [registerRequestForm, requestForm],
+  );
   const { active: sessionWarning, dismiss, dismissPermanent } = useSessionWarning();
   const mobileOverlay = useDialogPresence(mobileOpen);
   const hideSidebar = isAiJudgePath(location.pathname);
@@ -47,7 +55,7 @@ export default function DashboardLayout() {
   }, []);
 
   return (
-    <LayoutContext.Provider value={{ setCompactFooter }}>
+    <LayoutContext.Provider value={layoutValue}>
     {/* 任務狀態全站常駐（WS + toast + 詳情 dialog）；顯示按鈕在 Sidebar 底部 */}
     <JobsProvider>
     <div className={styles.layout}>
