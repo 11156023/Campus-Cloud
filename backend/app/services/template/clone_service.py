@@ -23,13 +23,16 @@ from urllib.parse import quote
 
 from sqlmodel import Session
 
-from app.core.authorizers import require_template_manage
+from app.core.config import settings
 from app.core.db import engine
+from app.core.i18n import t
+from app.core.permissions import is_admin
 from app.core.security import decrypt_value, encrypt_value
 from app.exceptions import (
     BadRequestError,
     ConflictError,
     NotFoundError,
+    PermissionDeniedError,
 )
 from app.infrastructure.proxmox import get_proxmox_settings_for_node
 from app.infrastructure.proxmox import operations as proxmox_ops
@@ -82,22 +85,24 @@ async def request_clone(
     template_id: uuid.UUID,
     data: TemplateCloneRequest,
 ) -> list[TaskRecord]:
-    # 單機母模板是教師／管理員用來建構環境的來源。學生只能透過
-    # QuickPracticeSession 或正式班級取得固定環境，不得直接繞過環境
-    # 的期限、次數與整組生命週期規則呼叫 clone service。
-    require_template_manage(user)
     template = template_service._get_or_404(session, template_id)
     template_service._require_view(session, user, template)
     if template.status != VMTemplateStatus.ready:
         raise ConflictError(
-            f"Template is not ready to clone (now: {template.status.value})"
+            t("clone.templateNotReady", status=template.status.value)
         )
 
+    can_manage = template_service._can_manage(user)
+    if data.count > 1 and not can_manage:
+        raise PermissionDeniedError(t("clone.batchRequiresManager"))
+
     if data.login_password and not template.allow_password_change:
-        raise BadRequestError("此範本不允許自訂登入密碼")
+        raise BadRequestError(t("clone.passwordChangeNotAllowed"))
+    if template.requires_gpu and not data.gpu_mapping_id:
+        raise BadRequestError(t("clone.gpuRequired"))
     if data.gpu_mapping_id:
         if template.resource_type == "lxc":
-            raise BadRequestError("LXC 範本不支援 GPU 直通")
+            raise BadRequestError(t("clone.lxcGpuUnsupported"))
         from app.services.proxmox.provisioning_service import (  # noqa: PLC0415
             _gpu_mapping_nodes,
         )
@@ -105,8 +110,17 @@ async def request_clone(
         gpu_nodes = _gpu_mapping_nodes(data.gpu_mapping_id)
         if template.node not in gpu_nodes:
             raise BadRequestError(
-                f"所選 GPU 不在範本所在節點 {template.node} 上，"
-                "請改選其他 GPU"
+                t("clone.gpuNodeMismatch", node=template.node)
+            )
+
+    if not can_manage and not is_admin(user):
+        owned = len(
+            resource_repo.get_resources_by_user(session=session, user_id=user.id)
+        )
+        limit = settings.TEMPLATE_CLONE_STUDENT_MAX_INSTANCES
+        if owned + data.count > limit:
+            raise ConflictError(
+                t("clone.quotaExceeded", owned=owned, limit=limit)
             )
 
     hostnames = _build_hostnames(data.hostname, template.name, data.count)
@@ -317,7 +331,7 @@ def run_clone_task(task_id: uuid.UUID, payload: dict[str, Any]) -> dict[str, Any
     with Session(engine) as session:
         template = session.get(VMTemplate, template_id)
         if template is None or template.status != VMTemplateStatus.ready:
-            raise NotFoundError("Template is missing or not ready")
+            raise NotFoundError(t("clone.templateMissingOrNotReady"))
         template_vmid = template.pve_vmid
         template_name = template.name
         node = template.node

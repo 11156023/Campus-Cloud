@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import MIcon from "../../../components/MIcon";
 import { TeachingClassesService } from "../../../services/teachingClasses";
 import {
@@ -8,6 +9,16 @@ import {
 } from "../classScheduleForm";
 import styles from "../CourseOperations.module.scss";
 
+const WEEKDAY_KEYS = [
+  "ClassCreateDialog.weekdayMon",
+  "ClassCreateDialog.weekdayTue",
+  "ClassCreateDialog.weekdayWed",
+  "ClassCreateDialog.weekdayThu",
+  "ClassCreateDialog.weekdayFri",
+  "ClassCreateDialog.weekdaySat",
+  "ClassCreateDialog.weekdaySun",
+];
+
 export default function ClassCreateDialog({
   item = null,
   closing = false,
@@ -15,6 +26,7 @@ export default function ClassCreateDialog({
   onCreated,
   onUpdated,
 }) {
+  const { t } = useTranslation("teaching");
   const isEdit = Boolean(item);
   const [form, setForm] = useState(() => createClassScheduleForm(item));
   const [submitting, setSubmitting] = useState(false);
@@ -47,8 +59,8 @@ export default function ClassCreateDialog({
       setError(
         reason?.message ??
           (isEdit
-            ? "儲存班級失敗，請稍後再試。"
-            : "建立班級失敗，請稍後再試。"),
+            ? t("ClassCreateDialog.saveFailed")
+            : t("ClassCreateDialog.createFailed")),
       );
     } finally {
       setSubmitting(false);
@@ -71,12 +83,12 @@ export default function ClassCreateDialog({
       >
         <header className={styles.createDialogHeader}>
           <h2 id="create-class-title">
-            {isEdit ? "編輯班級與課表" : "建立班級"}
+            {isEdit ? t("ClassCreateDialog.editTitle") : t("ClassCreateDialog.createTitle")}
           </h2>
           <button
             type="button"
             className={styles.iconBtn}
-            aria-label="關閉"
+            aria-label={t("ClassCreateDialog.closeAria")}
             disabled={submitting}
             onClick={onClose}
           >
@@ -87,19 +99,19 @@ export default function ClassCreateDialog({
         <form onSubmit={submit}>
           <div className={styles.createDialogBody}>
             <div className={styles.compactFormSection}>
-              <h3>班級資料</h3>
+              <h3>{t("ClassCreateDialog.sectionClassInfo")}</h3>
               <div className={styles.createFormGrid}>
                 <label className={`${styles.field} ${styles.createNameField}`}>
-                  <span>班級名稱</span>
+                  <span>{t("ClassCreateDialog.fieldClassName")}</span>
                   <input
                     value={form.name}
                     onChange={(event) => update("name", event.target.value)}
-                    placeholder="Linux 系統管理｜114-1"
+                    placeholder={t("ClassCreateDialog.classNamePlaceholder")}
                     autoFocus
                   />
                 </label>
                 <label className={styles.field}>
-                  <span>班級代碼</span>
+                  <span>{t("ClassCreateDialog.fieldClassCode")}</span>
                   <input
                     value={form.code}
                     onChange={(event) => update("code", event.target.value)}
@@ -107,22 +119,22 @@ export default function ClassCreateDialog({
                   />
                 </label>
                 <label className={styles.field}>
-                  <span>學期</span>
+                  <span>{t("ClassCreateDialog.fieldTerm")}</span>
                   <input
                     value={form.term}
                     onChange={(event) => update("term", event.target.value)}
                   />
                 </label>
                 <label className={styles.field}>
-                  <span>上課地點</span>
+                  <span>{t("ClassCreateDialog.fieldLocation")}</span>
                   <input
                     value={form.location}
                     onChange={(event) => update("location", event.target.value)}
-                    placeholder="例如：電腦教室 A"
+                    placeholder={t("ClassCreateDialog.locationPlaceholder")}
                   />
                 </label>
                 <label className={styles.field}>
-                  <span>開始日期</span>
+                  <span>{t("ClassCreateDialog.fieldStartDate")}</span>
                   <input
                     type="date"
                     value={form.startDate}
@@ -132,7 +144,7 @@ export default function ClassCreateDialog({
                   />
                 </label>
                 <label className={styles.field}>
-                  <span>結束日期</span>
+                  <span>{t("ClassCreateDialog.fieldEndDate")}</span>
                   <input
                     type="date"
                     value={form.endDate}
@@ -143,33 +155,25 @@ export default function ClassCreateDialog({
             </div>
 
             <div className={styles.compactFormSection}>
-              <h3>固定上課時段</h3>
+              <h3>{t("ClassCreateDialog.sectionFixedSchedule")}</h3>
               <div className={styles.createFormGrid}>
                 <label className={styles.field}>
-                  <span>每週星期</span>
+                  <span>{t("ClassCreateDialog.fieldWeekday")}</span>
                   <select
                     value={form.weekday}
                     onChange={(event) =>
                       update("weekday", Number(event.target.value))
                     }
                   >
-                    {[
-                      "星期一",
-                      "星期二",
-                      "星期三",
-                      "星期四",
-                      "星期五",
-                      "星期六",
-                      "星期日",
-                    ].map((label, index) => (
-                      <option key={label} value={index}>
-                        {label}
+                    {WEEKDAY_KEYS.map((labelKey, index) => (
+                      <option key={labelKey} value={index}>
+                        {t(labelKey)}
                       </option>
                     ))}
                   </select>
                 </label>
                 <label className={styles.field}>
-                  <span>開始時間</span>
+                  <span>{t("ClassCreateDialog.fieldStartTime")}</span>
                   <input
                     type="time"
                     value={form.startTime}
@@ -179,7 +183,7 @@ export default function ClassCreateDialog({
                   />
                 </label>
                 <label className={styles.field}>
-                  <span>結束時間</span>
+                  <span>{t("ClassCreateDialog.fieldEndTime")}</span>
                   <input
                     type="time"
                     value={form.endTime}
@@ -187,7 +191,7 @@ export default function ClassCreateDialog({
                   />
                 </label>
                 <label className={styles.field}>
-                  <span>時區</span>
+                  <span>{t("ClassCreateDialog.fieldTimezone")}</span>
                   <select
                     value={form.timezone}
                     onChange={(event) => update("timezone", event.target.value)}
@@ -198,18 +202,18 @@ export default function ClassCreateDialog({
                   </select>
                 </label>
                 <label className={styles.field}>
-                  <span>提前開機</span>
+                  <span>{t("ClassCreateDialog.fieldBootLead")}</span>
                   <select
                     value={form.bootLeadMinutes}
                     onChange={(event) =>
                       update("bootLeadMinutes", Number(event.target.value))
                     }
                   >
-                    <option value={0}>準時開機</option>
-                    <option value={5}>提前 5 分鐘</option>
-                    <option value={10}>提前 10 分鐘</option>
-                    <option value={15}>提前 15 分鐘</option>
-                    <option value={30}>提前 30 分鐘</option>
+                    <option value={0}>{t("ClassCreateDialog.bootLeadOnTime")}</option>
+                    <option value={5}>{t("ClassCreateDialog.bootLeadMinutesOption", { minutes: 5 })}</option>
+                    <option value={10}>{t("ClassCreateDialog.bootLeadMinutesOption", { minutes: 10 })}</option>
+                    <option value={15}>{t("ClassCreateDialog.bootLeadMinutesOption", { minutes: 15 })}</option>
+                    <option value={30}>{t("ClassCreateDialog.bootLeadMinutesOption", { minutes: 30 })}</option>
                   </select>
                 </label>
               </div>
@@ -224,14 +228,14 @@ export default function ClassCreateDialog({
               disabled={submitting}
               onClick={onClose}
             >
-              取消
+              {t("ClassCreateDialog.cancelBtn")}
             </button>
             <button
               type="submit"
               className={styles.btnPrimary}
               disabled={!form.name.trim() || submitting}
             >
-              {submitting ? "儲存中…" : isEdit ? "儲存變更" : "建立班級"}
+              {submitting ? t("ClassCreateDialog.savingBtn") : isEdit ? t("ClassCreateDialog.saveChangesBtn") : t("ClassCreateDialog.createClassBtn")}
             </button>
           </footer>
         </form>

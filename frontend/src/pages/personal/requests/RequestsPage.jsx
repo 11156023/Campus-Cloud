@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "../../../contexts/AuthContext";
 import styles from "./RequestsPage.module.scss";
+import i18n from "../../../i18n";
 import { VmRequestsService } from "../../../services/vmRequests";
+import { isConsumedRequest } from "../../../services/pendingResources";
 import { useToast } from "../../../hooks/useToast";
 import useAutoRefresh from "../../../hooks/useAutoRefresh";
 import RequestFormPage from "./RequestFormPage";
@@ -12,17 +15,19 @@ import SharedEmptyState from "../../../components/EmptyState/EmptyState";
 import PageHeader from "../../../components/PageHeader/PageHeader";
 
 /* ── Constants ── */
+const defaultT = (key) => i18n.t(key, { ns: "personal" });
+
 const STATUS_MAP = {
-  pending:   { label: "審核中", color: "info"    },
-  approved:  { label: "已核准", color: "success" },
-  rejected:  { label: "已拒絕", color: "danger"  },
-  cancelled: { label: "已取消", color: "muted"   },
-  expired:   { label: "已過期", color: "muted"   },
+  pending:   { labelKey: "RequestsPage.statusPending",   color: "info"    },
+  approved:  { labelKey: "RequestsPage.statusApproved",  color: "success" },
+  rejected:  { labelKey: "RequestsPage.statusRejected",  color: "danger"  },
+  cancelled: { labelKey: "RequestsPage.statusCancelled", color: "muted"   },
+  expired:   { labelKey: "RequestsPage.statusExpired",   color: "muted"   },
 };
 
 const RESOURCE_TYPE_MAP = {
-  lxc: { label: "容器 (LXC)", icon: "terminal" },
-  vm:  { label: "虛擬機 (VM)", icon: "computer" },
+  lxc: { labelKey: "RequestsPage.typeLxc", icon: "terminal" },
+  vm:  { labelKey: "RequestsPage.typeVm", icon: "computer" },
 };
 
 /* 開通成功後 VMRequest.status 仍停留在 approved（後端只把 vmid 寫回），
@@ -52,24 +57,45 @@ function isProvisionedButFailed(req) {
     req.provisioning_status === "failed"
   );
 }
+/* 機器已建立但暫時開不了機（如 GPU 記憶體不足），排程器持續重試中 */
+function isWaitingForResources(req) {
+  return (
+    req.status === "approved" &&
+    req.vmid != null &&
+    req.provisioning_status !== "failed" &&
+    Boolean(req.resource_warning)
+  );
+}
+
 /* approved 在 UI 上再依開通進度細分（vmid 為空時 provisioning_status 反映開通流程） */
-function getDisplayStatus(req) {
+function getDisplayStatus(req, t = defaultT) {
   if (req.status === "approved") {
     if (req.vmid != null) {
-      if (req.provisioning_status === "failed") return { label: "機器異常", color: "danger" };
-      return { label: "已開通", color: "success" };
+      if (req.provisioning_status === "failed") return { label: t("RequestsPage.statusMachineError"), color: "danger" };
+      if (isWaitingForResources(req)) return { label: t("RequestsPage.statusWaitingResources"), color: "warning" };
+      return { label: t("RequestsPage.statusProvisioned"), color: "success" };
     }
-    if (req.provisioning_status === "failed") return { label: "開通失敗", color: "danger" };
-    if (req.provisioning_status === "running") return { label: "開通中", color: "info" };
-    return { label: "已核准", color: "success" };
+    if (req.provisioning_status === "failed") return { label: t("RequestsPage.statusProvisionFailed"), color: "danger" };
+    if (req.provisioning_status === "running") return { label: t("RequestsPage.statusProvisioning"), color: "info" };
+    return { label: t("RequestsPage.statusApproved"), color: "success" };
   }
-  return STATUS_MAP[req.status] ?? { label: req.status, color: "muted" };
+  const mapped = STATUS_MAP[req.status];
+  return mapped ? { label: t(mapped.labelKey), color: mapped.color } : { label: req.status, color: "muted" };
 }
 
 const VIEW_LIST   = "list";
 const VIEW_CREATE = "create";
 
-const LIST_COLUMNS = ["資源", "系統", "規格", "申請原因", "申請時間", "預約期間", "狀態", "操作"];
+const LIST_COLUMN_KEYS = [
+  "RequestsPage.colResource",
+  "RequestsPage.colOs",
+  "RequestsPage.colSpec",
+  "RequestsPage.colReason",
+  "RequestsPage.colRequestedAt",
+  "RequestsPage.colPeriod",
+  "RequestsPage.colStatus",
+  "RequestsPage.colActions",
+];
 
 /* ── Helpers ── */
 function formatDatetime(isoStr) {
@@ -96,9 +122,9 @@ function getOsDisplay(req) {
   return null;
 }
 
-function getFormInfoItems(req) {
+function getFormInfoItems(req, t = defaultT) {
   const items = [];
-  if (req.username)             items.push({ label: "帳號",   value: req.username });
+  if (req.username)             items.push({ label: t("RequestsPage.fieldAccount"),   value: req.username });
   if (req.gpu_mapping_id)       items.push({ label: "GPU",    value: req.gpu_mapping_id });
   return items;
 }
@@ -110,7 +136,8 @@ function getMemDisplay(memMB) {
 
 /* ── Primitive sub-components ── */
 function StatusBadge({ req }) {
-  const s = getDisplayStatus(req);
+  const { t } = useTranslation("personal");
+  const s = getDisplayStatus(req, t);
   return (
     <span className={`${styles.badge} ${styles[`badge_${s.color}`]}`}>
       {s.label}
@@ -131,12 +158,13 @@ function InfoRow({ icon, label, value }) {
   );
 }
 
-function getSpecDisplay(req) {
-  return `${req.cores} 核 / ${getMemDisplay(req.memory)} / ${req.storage}`;
+function getSpecDisplay(req, t = defaultT) {
+  return t("RequestsPage.specDisplay", { cores: req.cores, mem: getMemDisplay(req.memory), storage: req.storage });
 }
 
 /* ── Confirm Modal ── */
-function ConfirmModal({ title, desc, confirmLabel = "確定", danger = false, loading = false, onConfirm, onClose }) {
+function ConfirmModal({ title, desc, confirmLabel, danger = false, loading = false, onConfirm, onClose }) {
+  const { t } = useTranslation("personal");
   const [closing, setClosing] = useState(false);
 
   function close() {
@@ -161,7 +189,7 @@ function ConfirmModal({ title, desc, confirmLabel = "確定", danger = false, lo
         {desc && <p className={styles.modalDesc}>{desc}</p>}
         <div className={styles.modalActions}>
           <button type="button" className={styles.btnSecondary} onClick={close}>
-            取消
+            {t("ConfirmModal.cancel")}
           </button>
           <button
             type="button"
@@ -169,7 +197,7 @@ function ConfirmModal({ title, desc, confirmLabel = "確定", danger = false, lo
             disabled={loading}
             onClick={onConfirm}
           >
-            {loading ? "處理中…" : confirmLabel}
+            {loading ? t("ConfirmModal.processing") : (confirmLabel ?? t("ConfirmModal.confirm"))}
           </button>
         </div>
       </div>
@@ -181,6 +209,7 @@ function ConfirmModal({ title, desc, confirmLabel = "確定", danger = false, lo
 /* ── Error Log Modal ── */
 /* 管理員限定：原始開通錯誤 log 太長，不進表格也不進展開列，點狀態旁圖示開窗看 */
 function ErrorLogModal({ req, onClose }) {
+  const { t } = useTranslation("personal");
   const toast = useToast();
   const [closing, setClosing] = useState(false);
 
@@ -196,9 +225,9 @@ function ErrorLogModal({ req, onClose }) {
   async function handleCopy() {
     try {
       await navigator.clipboard.writeText(req.provisioning_error);
-      toast.success("已複製錯誤記錄");
+      toast.success(t("ErrorLogModal.copied"));
     } catch {
-      toast.error("複製失敗，請手動選取文字。");
+      toast.error(t("ErrorLogModal.copyFailed"));
     }
   }
 
@@ -210,20 +239,18 @@ function ErrorLogModal({ req, onClose }) {
       onAnimationEnd={handleAnimationEnd}
     >
       <div className={`${styles.modal} ${styles.logModal}`} onClick={(e) => e.stopPropagation()}>
-        <span className={styles.modalTitle}>錯誤記錄 — {req.hostname}</span>
+        <span className={styles.modalTitle}>{t("ErrorLogModal.title", { hostname: req.hostname })}</span>
         {isProvisionedButFailed(req) && (
-          <p className={styles.modalDesc}>
-            機器已建立，此申請無法重試；請到「我的資源」開機或刪除這台機器。
-          </p>
+          <p className={styles.modalDesc}>{t("ErrorLogModal.machineFailDesc")}</p>
         )}
         <pre className={styles.logText}>{req.provisioning_error}</pre>
         <div className={styles.modalActions}>
           <button type="button" className={styles.btnSecondary} onClick={handleCopy}>
             <MIcon name="content_copy" size={14} />
-            複製
+            {t("ErrorLogModal.copy")}
           </button>
           <button type="button" className={styles.btnPrimary} onClick={close}>
-            關閉
+            {t("ErrorLogModal.close")}
           </button>
         </div>
       </div>
@@ -234,6 +261,7 @@ function ErrorLogModal({ req, onClose }) {
 
 /* ── RequestRow ── */
 function RequestRow({ req, onUpdated }) {
+  const { t } = useTranslation("personal");
   const toast = useToast();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -249,14 +277,15 @@ function RequestRow({ req, onUpdated }) {
 
   const type      = RESOURCE_TYPE_MAP[req.resource_type] ?? { label: req.resource_type, icon: "computer" };
   const osDisplay = getOsDisplay(req);
-  const formItems = getFormInfoItems(req);
+  const formItems = getFormInfoItems(req, t);
   const startFmt  = formatDatetime(req.start_at);
   const endFmt    = formatDatetime(req.end_at);
 
   const showRejection = req.status === "rejected" && req.review_comment;
   const showFailureLog =
     isAdmin && (canRetry(req) || isProvisionedButFailed(req)) && req.provisioning_error;
-  const hasDetail = formItems.length > 0 || showRejection;
+  const showWaiting = isWaitingForResources(req);
+  const hasDetail = formItems.length > 0 || showRejection || showWaiting;
   const hasAction = canRetry(req) || canCancel(req) || isProvisionedButFailed(req);
 
   async function handleCancel() {
@@ -264,9 +293,9 @@ function RequestRow({ req, onUpdated }) {
     try {
       const updated = await VmRequestsService.cancel(req.id);
       onUpdated(updated);
-      toast.success(`已撤銷申請「${req.hostname}」`);
+      toast.success(t("RequestRow.cancelSuccess", { hostname: req.hostname }));
     } catch (err) {
-      toast.error(err?.message ?? "撤銷失敗，請稍後再試。");
+      toast.error(err?.message ?? t("RequestRow.cancelFailed"));
     } finally {
       setCancelling(false);
       setCancelConfirm(false);
@@ -278,9 +307,9 @@ function RequestRow({ req, onUpdated }) {
     try {
       const updated = await VmRequestsService.retry(req.id);
       onUpdated(updated);
-      toast.success("已重新觸發開通，進度將自動更新");
+      toast.success(t("RequestRow.retrySuccess"));
     } catch (err) {
-      toast.error(err?.message ?? "重試失敗，請稍後再試。");
+      toast.error(err?.message ?? t("RequestRow.retryFailed"));
     } finally {
       setRetrying(false);
     }
@@ -303,7 +332,7 @@ function RequestRow({ req, onUpdated }) {
                 type="button"
                 className={styles.expandBtn}
                 aria-expanded={expanded}
-                aria-label={expanded ? "收合詳細資訊" : "展開詳細資訊"}
+                aria-label={expanded ? t("RequestRow.collapseDetails") : t("RequestRow.expandDetails")}
                 onClick={() => setExpanded((v) => !v)}
               >
                 <MIcon name={expanded ? "expand_more" : "chevron_right"} size={16} />
@@ -314,8 +343,8 @@ function RequestRow({ req, onUpdated }) {
             <div className={styles.nameMeta}>
               <span className={styles.namePrimary} title={req.hostname}>{req.hostname}</span>
               <span className={styles.nameSub}>
-                {type.label}
-                {showVmid && req.vmid != null && ` · 編號 ${req.vmid}`}
+                {t(type.labelKey ?? type.label)}
+                {showVmid && req.vmid != null && t("RequestRow.numberSuffix", { vmid: req.vmid })}
               </span>
             </div>
           </div>
@@ -324,7 +353,7 @@ function RequestRow({ req, onUpdated }) {
           <span className={styles.osCell} title={osDisplay ?? undefined}>{osDisplay ?? "—"}</span>
         </td>
         <td className={styles.td}>
-          <span className={styles.specCell}>{getSpecDisplay(req)}</span>
+          <span className={styles.specCell}>{getSpecDisplay(req, t)}</span>
         </td>
         <td className={styles.td}>
           <span className={styles.reasonCell} title={req.reason || undefined}>
@@ -349,8 +378,8 @@ function RequestRow({ req, onUpdated }) {
               <button
                 type="button"
                 className={styles.logBtn}
-                title="查看錯誤記錄"
-                aria-label="查看錯誤記錄"
+                title={t("RequestRow.viewErrorLog")}
+                aria-label={t("RequestRow.viewErrorLog")}
                 onClick={() => setLogOpen(true)}
               >
                 <MIcon name="receipt_long" size={14} />
@@ -364,19 +393,19 @@ function RequestRow({ req, onUpdated }) {
             {canRetry(req) && (
               <button type="button" className={styles.retryBtn} disabled={retrying} onClick={handleRetry}>
                 <MIcon name="refresh" size={13} />
-                {retrying ? "…" : "重試"}
+                {retrying ? "…" : t("RequestRow.retry")}
               </button>
             )}
             {canCancel(req) && (
               <button type="button" className={styles.cancelBtn} onClick={() => setCancelConfirm(true)}>
                 <MIcon name="close" size={13} />
-                撤銷
+                {t("RequestRow.cancelRequest")}
               </button>
             )}
             {isProvisionedButFailed(req) && (
               <button type="button" className={styles.retryBtn} onClick={() => navigate("/my-resources")}>
                 <MIcon name="inventory_2" size={13} />
-                前往我的資源
+                {t("RequestRow.goToResources")}
               </button>
             )}
           </div>
@@ -385,7 +414,7 @@ function RequestRow({ req, onUpdated }) {
 
       {expanded && (
         <tr className={styles.detailTr}>
-          <td className={styles.detailTd} colSpan={LIST_COLUMNS.length}>
+          <td className={styles.detailTd} colSpan={LIST_COLUMN_KEYS.length}>
             <div className={styles.detailBody}>
               {formItems.map(({ label, value }) => (
                 <InfoRow key={label} icon="tune" label={label} value={value} />
@@ -394,6 +423,12 @@ function RequestRow({ req, onUpdated }) {
                 <div className={styles.reviewComment}>
                   <MIcon name="comment" size={13} />
                   <span>{req.review_comment}</span>
+                </div>
+              )}
+              {showWaiting && (
+                <div className={styles.reviewComment}>
+                  <MIcon name="hourglass_empty" size={13} />
+                  <span>{req.resource_warning}</span>
                 </div>
               )}
             </div>
@@ -405,9 +440,9 @@ function RequestRow({ req, onUpdated }) {
 
       {cancelConfirm && (
         <ConfirmModal
-          title="確定撤銷申請？"
-          desc={`申請「${req.hostname}」撤銷後無法復原。`}
-          confirmLabel="撤銷申請"
+          title={t("RequestRow.confirmCancelTitle")}
+          desc={t("RequestRow.confirmCancelDesc", { hostname: req.hostname })}
+          confirmLabel={t("RequestRow.confirmCancelLabel")}
           danger
           loading={cancelling}
           onConfirm={handleCancel}
@@ -458,14 +493,15 @@ function SkeletonRow() {
 
 /* ── Empty / Error states ── */
 function EmptyState({ onCreateClick }) {
+  const { t } = useTranslation("personal");
   return (
     <SharedEmptyState
       icon="description"
-      title="尚無申請紀錄"
+      title={t("RequestsPage.emptyTitle")}
       action={
         <button type="button" className={styles.btnPrimary} onClick={onCreateClick}>
           <MIcon name="add" size={16} />
-          立即申請
+          {t("RequestsPage.createNow")}
         </button>
       }
     />
@@ -473,14 +509,15 @@ function EmptyState({ onCreateClick }) {
 }
 
 function ErrorState({ onRetry }) {
+  const { t } = useTranslation("personal");
   return (
     <EmptyState
       icon="error_outline"
-      title="載入失敗"
+      title={t("RequestsPage.errorTitle")}
       action={
         <button type="button" className={styles.btnSecondary} onClick={onRetry}>
           <MIcon name="refresh" size={16} />
-          重試
+          {t("RequestsPage.retry")}
         </button>
       }
     />
@@ -489,6 +526,7 @@ function ErrorState({ onRetry }) {
 
 /* ── Page ── */
 export default function RequestsPage() {
+  const { t } = useTranslation("personal");
   /* 其他頁（如快速建立的「完整設定」）可用 navigate("/my-requests", { state: { create: true } }) 直接開表單 */
   const location = useLocation();
   const [requests, setRequests] = useState([]);
@@ -496,6 +534,8 @@ export default function RequestsPage() {
   const [error, setError]       = useState(false);
   const [view, setView]         = useState(location.state?.create ? VIEW_CREATE : VIEW_LIST);
   const [returning, setReturning] = useState(false);
+  /* AI 助手談完需求後會把推薦配置一起帶過來 */
+  const [pendingPrefill, setPendingPrefill] = useState(location.state?.prefill ?? null);
 
   /** silent = true 時不觸發 loading / error state，供背景自動刷新使用 */
   const fetchRequests = useCallback(async (silent = false) => {
@@ -505,11 +545,8 @@ export default function RequestsPage() {
     }
     try {
       const res = await VmRequestsService.list();
-      setRequests(
-        (res.data ?? []).filter(
-          (r) => !(r.review_comment ?? "").startsWith("Resource deleted")
-        )
-      );
+      // 機器已被刪除／轉範本的申請單只留做稽核，不顯示
+      setRequests((res.data ?? []).filter((r) => !isConsumedRequest(r)));
     } catch {
       if (!silent) setError(true);
     } finally {
@@ -520,6 +557,14 @@ export default function RequestsPage() {
   useEffect(() => {
     if (view === "list") fetchRequests();
   }, [view, fetchRequests]);
+
+  /* 已經停在本頁時 useState 的初值不會再跑一次，所以導覽助手在這頁按步驟
+     只會換掉 location.state。兩個方向都要跟：帶 create 就開表單，沒帶就回列表
+     （流程裡的「等待審核」指的就是列表，按了不能沒反應）。 */
+  useEffect(() => {
+    setView(location.state?.create ? VIEW_CREATE : VIEW_LIST);
+    if (location.state?.prefill) setPendingPrefill(location.state.prefill);
+  }, [location.key, location.state?.create, location.state?.prefill]);
 
   useAutoRefresh(() => {
     if (view === "list") fetchRequests(true);
@@ -534,7 +579,8 @@ export default function RequestsPage() {
       <RequestFormPage
         key="create"
         className={styles.animSlideInRight}
-        onBack={() => { setReturning(true); setView(VIEW_LIST); }}
+        initialPrefill={pendingPrefill}
+        onBack={() => { setReturning(true); setView(VIEW_LIST); setPendingPrefill(null); }}
       />
     );
   }
@@ -544,10 +590,10 @@ export default function RequestsPage() {
       className={`${styles.page} ${returning ? styles.animSlideInLeft : ""}`}
       onAnimationEnd={returning ? () => setReturning(false) : undefined}
     >
-      <PageHeader title="我的申請" subtitle="管理你的虛擬機與容器申請">
+      <PageHeader title={t("RequestsPage.title")} subtitle={t("RequestsPage.subtitle")}>
         <button type="button" className={styles.btnPrimary} onClick={() => setView(VIEW_CREATE)} data-guide="request-create">
           <MIcon name="add" size={16} />
-          申請資源
+          {t("RequestsPage.requestResource")}
         </button>
       </PageHeader>
 
@@ -562,8 +608,8 @@ export default function RequestsPage() {
               <table className={styles.table}>
                 <thead>
                   <tr>
-                    {LIST_COLUMNS.map((column) => (
-                      <th key={column} className={styles.th}>{column}</th>
+                    {LIST_COLUMN_KEYS.map((columnKey) => (
+                      <th key={columnKey} className={styles.th}>{t(columnKey)}</th>
                     ))}
                   </tr>
                 </thead>

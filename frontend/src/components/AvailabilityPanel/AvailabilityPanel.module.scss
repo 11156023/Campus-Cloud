@@ -343,3 +343,15 @@
   0%   { background-position: 100% 0; }
   100% { background-position: -100% 0; }
 }
+
+/* ── 背景更新（保留舊月曆，只降低透明度） ── */
+.refreshingHint {
+  margin: 0 0 $spacing-8;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.calendarRefreshing {
+  opacity: 0.6;
+  transition: opacity $transition-base;
+}

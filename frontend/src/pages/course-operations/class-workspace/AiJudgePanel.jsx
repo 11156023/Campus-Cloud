@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import styles from "./AiJudgePanel.module.scss";
 import LoadingState from "../../../components/LoadingState/LoadingState";
 import MIcon from "../../../components/MIcon";
@@ -9,6 +10,7 @@ import useAutoRefresh from "../../../hooks/useAutoRefresh";
 import useDialogPresence from "../../../hooks/useDialogPresence";
 import { downloadBlob } from "../../../services/api";
 import { createRubricAnalysisAutosave } from "./rubricAnalysisAutosave";
+import i18n from "../../../i18n";
 import {
   AiJudgeService,
   RUBRIC_POLISH_PROMPT,
@@ -30,14 +32,14 @@ function Spinner({ size = 16 }) {
 }
 
 /** 偵測方式標籤：auto=綠、partial=藍、manual=紅（不使用黃色警示色） */
-const DETECTABLE_INFO = {
-  auto: { label: "可自動偵測", className: styles.detBadge_auto },
-  partial: { label: "部分可偵測", className: styles.detBadge_partial },
-  manual: { label: "需人工評閱", className: styles.detBadge_manual },
+const DETECTABLE_INFO_KEYS = {
+  auto: { labelKey: "AiJudgePanel.detectableAuto", className: styles.detBadge_auto },
+  partial: { labelKey: "AiJudgePanel.detectablePartial", className: styles.detBadge_partial },
+  manual: { labelKey: "AiJudgePanel.detectableManual", className: styles.detBadge_manual },
 };
 
 function getDetectableInfo(detectable) {
-  return DETECTABLE_INFO[detectable] ?? DETECTABLE_INFO.manual;
+  return DETECTABLE_INFO_KEYS[detectable] ?? DETECTABLE_INFO_KEYS.manual;
 }
 
 function formatDateTime(value) {
@@ -51,7 +53,7 @@ const RUBRIC_FILE_EXTENSION = /\.(?:docx|pdf)$/i;
  * 評分表的可讀名稱不應把匯入文件的副檔名帶進工作區標題；原始檔名仍
  * 保留在 `original_filename`，供衝突判斷與下載使用。
  */
-export function getRubricDisplayName(file, fallback = "評分表") {
+export function getRubricDisplayName(file, fallback = i18n.t("AiJudgePanel.defaultRubricName", { ns: "teaching" })) {
   const rawName = typeof file === "string"
     ? file
     : [file?.name, file?.display_name, file?.original_filename]
@@ -64,7 +66,7 @@ export function getRubricDisplayName(file, fallback = "評分表") {
 }
 
 export function getRubricCheckTitle(file) {
-  return getRubricDisplayName(file, "未命名檢查").slice(0, 255);
+  return getRubricDisplayName(file, i18n.t("AiJudgePanel.unnamedCheckName", { ns: "teaching" })).slice(0, 255);
 }
 
 const SESSION_MENU_WIDTH = 220;
@@ -96,9 +98,9 @@ export function getSessionMenuPosition(anchorRect, options = {}) {
 
 function proposalOperationLabel(item) {
   const operation = item.operation ?? item.action;
-  if (operation === "delete" || operation === "remove") return "刪除";
-  if (operation === "update" || operation === "modify") return "修改";
-  return item.id ? "修改" : "新增";
+  if (operation === "delete" || operation === "remove") return i18n.t("AiJudgePanel.opDelete", { ns: "teaching" });
+  if (operation === "update" || operation === "modify") return i18n.t("AiJudgePanel.opUpdate", { ns: "teaching" });
+  return item.id ? i18n.t("AiJudgePanel.opUpdate", { ns: "teaching" }) : i18n.t("AiJudgePanel.opAdd", { ns: "teaching" });
 }
 
 function comparableItem(item) {
@@ -139,15 +141,16 @@ export function buildProposalDiff(currentItems, proposedItems) {
 }
 
 function ProposalPanel({ proposal, selectedIds, onToggle, onApply, onSkip, disabled, isReassessment = false }) {
+  const { t } = useTranslation("teaching");
   if (!proposal?.length) return null;
   return (
     <div className={styles.proposalCard}>
       <div className={styles.proposalHeading}>
         <div>
-          <strong>{isReassessment ? `重新評估完成，共 ${proposal.length} 個評分項目` : "AI 評分表提案"}</strong>
-          <p>{isReassessment ? "套用後才會更新可自動偵測比例與班級評分表。" : "逐項確認後才會套用到目前的評分表。"}</p>
+          <strong>{isReassessment ? t("AiJudgePanel.reassessCompleteTitle", { count: proposal.length }) : t("AiJudgePanel.aiProposalTitle")}</strong>
+          <p>{isReassessment ? t("AiJudgePanel.reassessApplyHint") : t("AiJudgePanel.proposalApplyHint")}</p>
         </div>
-        <span>{selectedIds.size}/{proposal.length} 項</span>
+        <span>{t("AiJudgePanel.selectedCountUnit", { selected: selectedIds.size, total: proposal.length })}</span>
       </div>
       <div className={styles.proposalList}>
         {proposal.map((item, index) => {
@@ -161,16 +164,16 @@ function ProposalPanel({ proposal, selectedIds, onToggle, onApply, onSkip, disab
                 onChange={() => onToggle(id)}
               />
               <span>
-                <b>{item.title || "未命名項目"}</b>
-                <small><em>{proposalOperationLabel(item)}</em>{item.description || "AI 建議新增或調整此評估項目"}</small>
+                <b>{item.title || t("AiJudgePanel.unnamedItemFallback")}</b>
+                <small><em>{proposalOperationLabel(item)}</em>{item.description || t("AiJudgePanel.aiSuggestDefaultDesc")}</small>
               </span>
             </label>
           );
         })}
       </div>
       <div className={styles.proposalActions}>
-        <button type="button" className={styles.btnSecondary} disabled={disabled} onClick={onSkip}>略過</button>
-        <button type="button" className={styles.btnPrimary} disabled={disabled || selectedIds.size === 0} onClick={onApply}>套用選取</button>
+        <button type="button" className={styles.btnSecondary} disabled={disabled} onClick={onSkip}>{t("AiJudgePanel.skipBtn")}</button>
+        <button type="button" className={styles.btnPrimary} disabled={disabled || selectedIds.size === 0} onClick={onApply}>{t("AiJudgePanel.applySelectedBtn")}</button>
       </div>
     </div>
   );
@@ -185,6 +188,7 @@ export function RubricStats({
   onReassess,
   readOnly = false,
 }) {
+  const { t } = useTranslation("teaching");
   const total = items.length;
   const autoCount = items.filter((item) => item.detectable === "auto").length;
   const partialCount = items.filter((item) => item.detectable === "partial").length;
@@ -196,17 +200,17 @@ export function RubricStats({
       <div className={styles.assessmentHead}>
         <div>
           <div className={styles.assessmentTitleRow}>
-            <h4>自動偵測可用性</h4>
+            <h4>{t("AiJudgePanel.autoDetectAvailability")}</h4>
             <span
               className={needsReview ? styles.assessmentStatus_stale : styles.assessmentStatus_current}
             >
-              {needsReview ? "需要重新評估" : "評估結果已更新"}
+              {needsReview ? t("AiJudgePanel.needsReassessLabel") : t("AiJudgePanel.resultsUpToDateLabel")}
             </span>
           </div>
           <p aria-live="polite">
             {needsReview
-              ? "評分項目已變更；下方顯示上次結果，請重新評估後再判斷是否適合自動檢查。"
-              : "依目前評分項目的 AI 偵測判斷，協助確認自動檢查的適用程度。"}
+              ? t("AiJudgePanel.needsReassessDesc")
+              : t("AiJudgePanel.currentDetectDesc")}
           </p>
         </div>
         {!readOnly && onReassess && (
@@ -215,17 +219,17 @@ export function RubricStats({
             className={needsReview ? styles.btnPrimary : styles.btnSecondary}
             onClick={onReassess}
             disabled={isReassessing || total === 0}
-            title={total === 0 ? "請先新增至少一個評估項目" : undefined}
+            title={total === 0 ? t("AiJudgePanel.needAtLeastOneItem") : undefined}
           >
             {isReassessing ? <Spinner size={15} /> : <MIcon name="refresh" size={16} />}
-            {isReassessing ? "重新評估中..." : "重新評估"}
+            {isReassessing ? t("AiJudgePanel.reassessingLabel") : t("AiJudgePanel.reassessBtn")}
           </button>
         )}
       </div>
       <div
         className={styles.statsBar}
         role="img"
-        aria-label={`共 ${total} 題：可自動偵測 ${pct(autoCount)}%、部分可偵測 ${pct(partialCount)}%、需人工評閱 ${pct(manualCount)}%`}
+        aria-label={t("AiJudgePanel.statsBarAria", { total, autoPct: pct(autoCount), partialPct: pct(partialCount), manualPct: pct(manualCount) })}
       >
         {autoCount > 0 && <span className={styles.statsSeg_auto} style={{ flexGrow: autoCount }} />}
         {partialCount > 0 && <span className={styles.statsSeg_partial} style={{ flexGrow: partialCount }} />}
@@ -234,17 +238,17 @@ export function RubricStats({
       <div className={styles.statsLegend}>
         <span className={styles.legendItem}>
           <i className={styles.legendDot_auto} />
-          可自動偵測 {autoCount}（{pct(autoCount)}%）
+          {t("AiJudgePanel.legendAuto", { count: autoCount, pct: pct(autoCount) })}
         </span>
         <span className={styles.legendItem}>
           <i className={styles.legendDot_partial} />
-          部分可偵測 {partialCount}（{pct(partialCount)}%）
+          {t("AiJudgePanel.legendPartial", { count: partialCount, pct: pct(partialCount) })}
         </span>
         <span className={styles.legendItem}>
           <i className={styles.legendDot_manual} />
-          需人工評閱 {manualCount}（{pct(manualCount)}%）
+          {t("AiJudgePanel.legendManual", { count: manualCount, pct: pct(manualCount) })}
         </span>
-        <span className={styles.legendTotal}>共 {total} 題</span>
+        <span className={styles.legendTotal}>{t("AiJudgePanel.legendTotal", { total })}</span>
       </div>
     </div>
   );
@@ -253,6 +257,7 @@ export function RubricStats({
 /* ── 單一評分項目卡片 ───────────────────────────────────── */
 
 function RubricCard({ item, index, onChange, onDelete, disabled }) {
+  const { t } = useTranslation("teaching");
   const detectableInfo = getDetectableInfo(item.detectable);
   const checkSteps = item.check_steps ?? [];
   const cardVariant =
@@ -268,13 +273,13 @@ function RubricCard({ item, index, onChange, onDelete, disabled }) {
         <div className={styles.rubricCardHeadMain}>
           <span className={styles.rubricIndex}>#{index + 1}</span>
           <span className={`${styles.detBadge} ${detectableInfo.className}`}>
-            {detectableInfo.label}
+            {t(detectableInfo.labelKey)}
           </span>
         </div>
         <button
           type="button"
           className={`${styles.iconBtn} ${styles.iconBtnDanger}`}
-          title="刪除項目"
+          title={t("AiJudgePanel.deleteItemTitle")}
           onClick={onDelete}
           disabled={disabled}
         >
@@ -283,21 +288,21 @@ function RubricCard({ item, index, onChange, onDelete, disabled }) {
       </div>
 
       <label className={styles.rubricField}>
-        <span>主題</span>
+        <span>{t("AiJudgePanel.fieldTopic")}</span>
         <input
           value={item.title}
           onChange={(e) => onChange({ ...item, title: e.target.value })}
-          placeholder="評分項目名稱"
+          placeholder={t("AiJudgePanel.itemNamePlaceholder")}
           disabled={disabled}
         />
       </label>
 
       <label className={styles.rubricField}>
-        <span>說明</span>
+        <span>{t("AiJudgePanel.fieldDescription")}</span>
         <input
           value={item.description}
           onChange={(e) => onChange({ ...item, description: e.target.value })}
-          placeholder="評分說明"
+          placeholder={t("AiJudgePanel.descPlaceholder")}
           disabled={disabled}
         />
       </label>
@@ -306,25 +311,25 @@ function RubricCard({ item, index, onChange, onDelete, disabled }) {
         <div className={styles.detectInfo}>
           <div className={styles.detectInfoHead}>
             <MIcon name="security" size={14} />
-            AI 偵測判斷（僅由 AI 更新）
+            {t("AiJudgePanel.aiDetectJudgeHeader")}
           </div>
           <div className={styles.detectGrid}>
             {item.detection_method && (
               <div className={styles.detectItem}>
-                <span>偵測方式</span>
+                <span>{t("AiJudgePanel.detectMethodLabel")}</span>
                 <p>{item.detection_method}</p>
               </div>
             )}
             {item.fallback && (
               <div className={styles.detectItem}>
-                <span>替代建議</span>
+                <span>{t("AiJudgePanel.fallbackSuggestionLabel")}</span>
                 <p>{item.fallback}</p>
               </div>
             )}
           </div>
           {checkSteps.length > 0 && (
             <div className={styles.detectItem}>
-              <span>評分計劃書（未執行）</span>
+              <span>{t("AiJudgePanel.checkPlanLabel")}</span>
               <div className={styles.chipRow}>
                 {checkSteps.map((step) => (
                   <span key={`${step.template_key}-${step.command_key}`} className={styles.chip}>
@@ -345,6 +350,7 @@ function RubricCard({ item, index, onChange, onDelete, disabled }) {
 /* ── 上傳區 ─────────────────────────────────────────────── */
 
 function RubricUploader({ onUpload, onInvalidFile, isLoading }) {
+  const { t } = useTranslation("teaching");
   const [isDragging, setIsDragging] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
 
@@ -352,7 +358,7 @@ function RubricUploader({ onUpload, onInvalidFile, isLoading }) {
     if (!file) return;
     const ext = file.name.split(".").pop()?.toLowerCase();
     if (ext !== "docx" && ext !== "pdf") {
-      onInvalidFile?.("只接受 .docx 或 .pdf 評分文件。");
+      onInvalidFile?.(t("AiJudgePanel.onlyDocxPdfError"));
       return;
     }
     setSelectedFile(file);
@@ -400,7 +406,7 @@ function RubricUploader({ onUpload, onInvalidFile, isLoading }) {
             <button
               type="button"
               className={styles.iconBtn}
-              aria-label="清除選擇"
+              aria-label={t("AiJudgePanel.clearSelectionAria")}
               disabled={isLoading}
               onClick={(e) => {
                 e.stopPropagation();
@@ -413,8 +419,8 @@ function RubricUploader({ onUpload, onInvalidFile, isLoading }) {
         ) : (
           <div className={styles.dropHint}>
             <MIcon name="upload" size={36} />
-            <p className={styles.dropHintTitle}>拖放評分文件到這裡</p>
-            <p className={styles.dropHintMeta}>或點擊選擇檔案（支援 .docx、.pdf）</p>
+            <p className={styles.dropHintTitle}>{t("AiJudgePanel.dropHintTitle")}</p>
+            <p className={styles.dropHintMeta}>{t("AiJudgePanel.dropHintMeta")}</p>
           </div>
         )}
       </div>
@@ -429,12 +435,12 @@ function RubricUploader({ onUpload, onInvalidFile, isLoading }) {
           {isLoading ? (
             <>
               <Spinner />
-              AI 分析中...
+              {t("AiJudgePanel.aiAnalyzingLabel")}
             </>
           ) : (
             <>
               <MIcon name="upload" size={16} />
-              上傳並分析
+              {t("AiJudgePanel.uploadAndAnalyzeBtn")}
             </>
           )}
         </button>
@@ -454,6 +460,7 @@ export function ChatPanel({
   disabled = false,
   hasRubric = false,
 }) {
+  const { t } = useTranslation("teaching");
   const [input, setInput] = useState("");
   const messagesEndRef = useRef(null);
   const visibleMessages = messages.filter(shouldDisplayChatMessage);
@@ -475,11 +482,11 @@ export function ChatPanel({
         {visibleMessages.length === 0 ? (
           <div className={styles.chatEmpty}>
             <MIcon name="smart_toy" size={32} />
-            <p>{hasRubric ? "與 AI 對話來精煉你的評分表" : "先和 AI 討論你的檢查需求"}</p>
+            <p>{hasRubric ? t("AiJudgePanel.chatEmptyWithRubric") : t("AiJudgePanel.chatEmptyNoRubric")}</p>
             <p className={styles.chatEmptyMeta}>
               {hasRubric
-                ? "可以詢問修改建議，或直接下達調整指令"
-                : "不必先上傳文件；之後再上傳評分表即可接續這段對話"}
+                ? t("AiJudgePanel.chatEmptyMetaWithRubric")
+                : t("AiJudgePanel.chatEmptyMetaNoRubric")}
             </p>
           </div>
         ) : (
@@ -533,7 +540,7 @@ export function ChatPanel({
             onClick={() => onSendMessage(RUBRIC_POLISH_PROMPT, true)}
           >
             {isLoading ? <Spinner size={14} /> : <MIcon name="auto_fix_high" size={14} />}
-            潤飾評分表
+            {t("AiJudgePanel.polishRubricBtn")}
           </button>
           <button
             type="button"
@@ -542,7 +549,7 @@ export function ChatPanel({
             onClick={onClearMessages}
           >
             {isClearing ? <Spinner size={14} /> : <MIcon name="delete_sweep" size={14} />}
-            清除內容
+            {t("AiJudgePanel.clearContentBtn")}
           </button>
         </div>
         <form
@@ -563,8 +570,8 @@ export function ChatPanel({
             }}
             placeholder={
               hasRubric
-                ? "輸入訊息...（Shift+Enter 換行）"
-                : "描述想檢查的環境或問題...（Shift+Enter 換行）"
+                ? t("AiJudgePanel.chatInputPlaceholderWithRubric")
+                : t("AiJudgePanel.chatInputPlaceholderNoRubric")
             }
             rows={1}
             disabled={isLoading || isClearing || disabled}
@@ -573,15 +580,15 @@ export function ChatPanel({
             type="submit"
             className={styles.btnPrimary}
             disabled={isLoading || isClearing || disabled || !input.trim()}
-            aria-label="送出"
+            aria-label={t("AiJudgePanel.sendAria")}
           >
             <MIcon name="send" size={16} />
           </button>
         </form>
         <p className={styles.chatHint}>
           {hasRubric
-            ? "提示：詢問問題不會修改評估表，需明確指令（如「幫我改」「新增」）才會執行變更"
-            : "提示：這是一般 AI 對話；上傳評分表後，AI 才會提出可套用的評分項目修改"}
+            ? t("AiJudgePanel.chatHintWithRubric")
+            : t("AiJudgePanel.chatHintNoRubric")}
         </p>
       </div>
     </div>
@@ -618,6 +625,7 @@ function CreateCheckForm({
   onClose,
   onCreated,
 }) {
+  const { t } = useTranslation("teaching");
   const toast = useToast();
   const requestVersionRef = useRef(0);
   const availableWeeks = weeks.filter((week) => week.title?.trim());
@@ -647,13 +655,13 @@ function CreateCheckForm({
       })
       .catch(() => {
         if (!cancelled && requestVersion === requestVersionRef.current) {
-          setError("載入已保存評分表失敗，仍可上傳新文件。");
+          setError(t("AiJudgePanel.loadSavedRubricsFailed"));
         }
       });
     return () => {
       cancelled = true;
     };
-  }, [classId]);
+  }, [classId, t]);
 
   function toggleEnvironment(key) {
     setEnvironmentKeys((current) => current.includes(key)
@@ -671,7 +679,7 @@ function CreateCheckForm({
   async function uploadFile(file, conflictStrategy = null) {
     if (!file) return;
     if (!sourceOnly && !selectedWeekId) {
-      setError("請先選擇這份檢查要放入的週任務。");
+      setError(t("AiJudgePanel.selectWeekFirst"));
       return;
     }
     const requestVersion = requestVersionRef.current;
@@ -706,7 +714,7 @@ function CreateCheckForm({
           });
           if (requestVersion === requestVersionRef.current) onCreated(created, "uploaded");
         } catch (createError) {
-          setError(`AI 分析完成，但建立檢查失敗：${createError?.message ?? "請稍後再試"}`);
+          setError(t("AiJudgePanel.analysisDoneCreateFailed", { message: createError?.message ?? t("AiJudgePanel.tryAgainLaterFallback") }));
         } finally {
           setCreating(false);
         }
@@ -715,9 +723,9 @@ function CreateCheckForm({
       if (requestVersion !== requestVersionRef.current) return;
       if (uploadError?.status === 409) {
         setConflictFile(file);
-        setError("已有同名評分文件，請選擇覆蓋原本文件或建立副本。");
+        setError(t("AiJudgePanel.duplicateFileConfirm"));
       } else {
-        setError(uploadError?.message ?? "上傳評分文件失敗。");
+        setError(uploadError?.message ?? t("AiJudgePanel.uploadRubricFailed"));
       }
     } finally {
       if (requestVersion === requestVersionRef.current) setUploading(false);
@@ -736,7 +744,7 @@ function CreateCheckForm({
         const file = mode === "blank"
           ? await AiJudgeService.createBlankFile(classId, { displayName: rubricName, environmentKeys })
           : files.find((entry) => entry.id === selectedFileId);
-        if (!file?.id) throw new Error("請選擇或建立一份評分表來源。");
+        if (!file?.id) throw new Error(t("AiJudgePanel.selectOrCreateSourceError"));
          onCreated(file, sourceOnly && mode === "blank" ? "source-blank" : "source");
       } else {
         const created = await AiJudgeService.createSession(classId, {
@@ -752,7 +760,7 @@ function CreateCheckForm({
         onCreated(created, mode);
       }
     } catch (createError) {
-      setError(createError?.message ?? "建立檢查失敗，請確認欄位後重試。");
+      setError(createError?.message ?? t("AiJudgePanel.createCheckFailedGeneric"));
     } finally {
       setCreating(false);
     }
@@ -760,26 +768,26 @@ function CreateCheckForm({
 
   const form = (
       <section className={embedded ? styles.createCheckPanel : `${styles.confirm} ${styles.createCheckDialog}`} role={embedded ? undefined : "dialog"} aria-modal={embedded ? undefined : "true"} aria-labelledby="create-check-title">
-        <div className={styles.modalHeader}><div>{embedded && <button type="button" className={styles.inlineBackButton} disabled={creating || uploading} onClick={onClose}><MIcon name="arrow_back" size={17} />返回建立方式</button>}<h2 id="create-check-title">{sourceOnly ? "新增評分表來源" : mode === "blank" ? "從零開始建立" : "使用已有評分文件"}</h2><p>{sourceOnly ? "建立或選用一份班級評分表，完成後會套用到目前檢查。" : mode === "blank" ? "建立空白評分表後，會留在 AI 檢查主頁編輯評分項目與 AI 提案。" : "選擇已保存的評分表，或上傳文件交由 AI 分析；完成後會回到 AI 檢查主頁。"}</p></div>{!embedded && <button type="button" className={styles.iconBtn} aria-label="關閉" disabled={creating || uploading} onClick={onClose}><MIcon name="close" size={18} /></button>}</div>
+        <div className={styles.modalHeader}><div>{embedded && <button type="button" className={styles.inlineBackButton} disabled={creating || uploading} onClick={onClose}><MIcon name="arrow_back" size={17} />{t("AiJudgePanel.backToCreateMode")}</button>}<h2 id="create-check-title">{sourceOnly ? t("AiJudgePanel.addSourceTitle") : mode === "blank" ? t("AiJudgePanel.fromScratchTitle") : t("AiJudgePanel.useExistingFileTitle")}</h2><p>{sourceOnly ? t("AiJudgePanel.addSourceDesc") : mode === "blank" ? t("AiJudgePanel.blankCreatedDesc") : t("AiJudgePanel.existingFileDesc")}</p></div>{!embedded && <button type="button" className={styles.iconBtn} aria-label={t("AiJudgePanel.closeAria")} disabled={creating || uploading} onClick={onClose}><MIcon name="close" size={18} /></button>}</div>
         <form onSubmit={submit}>
-          {!sourceOnly && <label className={styles.dialogField}><span>放到哪一週任務？</span><select value={selectedWeekId} onChange={(event) => setSelectedWeekId(event.target.value)} required><option value="" disabled>{availableWeeks.length ? "請選擇週任務" : "請先建立有名稱的週任務"}</option>{availableWeeks.map((week) => <option key={week.id} value={week.id}>第 {week.week ?? week.week_number} 週 · {week.title}{["published", "completed"].includes(week.status) ? "" : "（草稿）"}</option>)}</select><small>AI 檢查核准後，Checkpoint 才會顯示在學生端；草稿週次發布後才會讓學生看到。</small></label>}
-          {!embedded && <fieldset className={styles.modeFieldset}><legend>如何建立評分表？</legend><div className={styles.modeChoices}><label className={mode === "blank" ? styles.modeChoiceActive : styles.modeChoice}><input type="radio" name="creation-mode" checked={mode === "blank"} onChange={() => handleModeChange("blank")} /><span><b>從零開始建立</b><small>建立空白評分表，接著手動新增項目或請 AI 產生初稿。</small></span></label><label className={mode === "existing" ? styles.modeChoiceActive : styles.modeChoice}><input type="radio" name="creation-mode" checked={mode === "existing"} onChange={() => handleModeChange("existing")} /><span><b>使用已有評分文件</b><small>選擇班級已保存的評分表，或上傳 .docx／.pdf；檢查名稱會使用文件名稱。</small></span></label></div></fieldset>}
-           {mode === "blank" && <div className={styles.modeFields}><label className={styles.dialogField}><span>評分表名稱</span><input autoFocus={sourceOnly} value={rubricName} maxLength={255} placeholder="例如：期中 Python 評分表" onChange={(event) => setRubricName(event.target.value)} /></label><fieldset className={styles.modeFieldset}><legend>評分環境（可複選）</legend><div className={styles.dialogChips}>{TEMPLATE_OPTIONS.map((option) => <label key={option.key} className={environmentKeys.includes(option.key) ? styles.dialogChipActive : styles.dialogChip}><input type="checkbox" checked={environmentKeys.includes(option.key)} onChange={() => toggleEnvironment(option.key)} />{option.label}</label>)}</div></fieldset></div>}
+          {!sourceOnly && <label className={styles.dialogField}><span>{t("AiJudgePanel.whichWeekLabel")}</span><select value={selectedWeekId} onChange={(event) => setSelectedWeekId(event.target.value)} required><option value="" disabled>{availableWeeks.length ? t("AiJudgePanel.selectWeekOption") : t("AiJudgePanel.needNamedWeekFirst")}</option>{availableWeeks.map((week) => <option key={week.id} value={week.id}>{t("AiJudgePanel.weekOptionLabel", { week: week.week ?? week.week_number, title: week.title })}{["published", "completed"].includes(week.status) ? "" : t("AiJudgePanel.draftSuffix")}</option>)}</select><small>{t("AiJudgePanel.checkpointVisibilityHint")}</small></label>}
+          {!embedded && <fieldset className={styles.modeFieldset}><legend>{t("AiJudgePanel.howToCreateRubricLegend")}</legend><div className={styles.modeChoices}><label className={mode === "blank" ? styles.modeChoiceActive : styles.modeChoice}><input type="radio" name="creation-mode" checked={mode === "blank"} onChange={() => handleModeChange("blank")} /><span><b>{t("AiJudgePanel.fromScratchTitle")}</b><small>{t("AiJudgePanel.fromScratchDesc")}</small></span></label><label className={mode === "existing" ? styles.modeChoiceActive : styles.modeChoice}><input type="radio" name="creation-mode" checked={mode === "existing"} onChange={() => handleModeChange("existing")} /><span><b>{t("AiJudgePanel.useExistingFileTitle")}</b><small>{t("AiJudgePanel.useExistingFileDesc")}</small></span></label></div></fieldset>}
+           {mode === "blank" && <div className={styles.modeFields}><label className={styles.dialogField}><span>{t("AiJudgePanel.rubricNameLabel")}</span><input autoFocus={sourceOnly} value={rubricName} maxLength={255} placeholder={t("AiJudgePanel.rubricNamePlaceholder")} onChange={(event) => setRubricName(event.target.value)} /></label><fieldset className={styles.modeFieldset}><legend>{t("AiJudgePanel.envMultiSelectLegend")}</legend><div className={styles.dialogChips}>{TEMPLATE_OPTIONS.map((option) => <label key={option.key} className={environmentKeys.includes(option.key) ? styles.dialogChipActive : styles.dialogChip}><input type="checkbox" checked={environmentKeys.includes(option.key)} onChange={() => toggleEnvironment(option.key)} />{option.label}</label>)}</div></fieldset></div>}
            {mode === "existing" && <div className={styles.existingPicker}>
              <div className={styles.uploadSourceBlock}>
-               <div className={styles.existingPickerHead}><div><span>上傳新的評分文件</span><small>支援 .docx／.pdf；分析完成後會以文件名稱建立檢查。</small></div></div>
+               <div className={styles.existingPickerHead}><div><span>{t("AiJudgePanel.uploadNewFileLabel")}</span><small>{t("AiJudgePanel.uploadNewFileHint")}</small></div></div>
                <fieldset className={styles.modeFieldset}>
-                 <legend>評分環境（可複選）</legend>
-                 <p className={styles.uploadEnvironmentHint}>第一個選擇會作為 AI 分析的主要情境，其餘環境可提供跨環境檢查能力。</p>
+                 <legend>{t("AiJudgePanel.envMultiSelectLegend")}</legend>
+                 <p className={styles.uploadEnvironmentHint}>{t("AiJudgePanel.primaryEnvHint")}</p>
                  <div className={styles.dialogChips}>{TEMPLATE_OPTIONS.map((option) => <label key={option.key} className={environmentKeys.includes(option.key) ? styles.dialogChipActive : styles.dialogChip}><input type="checkbox" checked={environmentKeys.includes(option.key)} onChange={() => toggleEnvironment(option.key)} disabled={uploading || creating} />{option.label}</label>)}</div>
                </fieldset>
                <RubricUploader onUpload={(file) => uploadFile(file)} onInvalidFile={setError} isLoading={uploading || creating || (!sourceOnly && !selectedWeekId)} />
              </div>
-              <div className={styles.savedRubricBlock}><div className={styles.existingPickerHead}><div><span>或選擇已保存評分表</span><small>每份來源只能綁定一個檢查；若要重構，請使用「重構」。</small></div></div>{files.length ? <div className={styles.existingList}>{files.map((file) => <label key={file.id} className={selectedFileId === file.id ? styles.existingRowActive : styles.existingRow}><input type="radio" name="saved-rubric" checked={selectedFileId === file.id} onChange={() => setSelectedFileId(file.id)} /><span><b>{getRubricDisplayName(file, "未命名評分表")}</b><small>{(file.environment_keys?.length ? file.environment_keys : [file.template_key]).map(getTemplateLabel).join("、")} · {file.analysis_json?.items?.length ?? 0} 項 · {formatDateTime(file.updated_at)}</small></span></label>)}</div> : <p className={styles.mutedText}>尚未有可用的評分表。</p>}</div>
-             {conflictFile && <div className={styles.conflictActions} role="alert"><span>「{conflictFile.name}」已存在：</span><button type="button" className={styles.btnSecondary} disabled={uploading || creating} onClick={() => uploadFile(conflictFile, "copy")}>建立副本</button><button type="button" className={styles.btnDanger} disabled={uploading || creating} onClick={() => uploadFile(conflictFile, "overwrite")}>覆蓋原本</button><button type="button" className={styles.iconBtn} aria-label="取消同名處理" onClick={() => setConflictFile(null)}><MIcon name="close" size={16} /></button></div>}
+              <div className={styles.savedRubricBlock}><div className={styles.existingPickerHead}><div><span>{t("AiJudgePanel.orSelectSavedLabel")}</span><small>{t("AiJudgePanel.oneSourcePerCheckHint")}</small></div></div>{files.length ? <div className={styles.existingList}>{files.map((file) => <label key={file.id} className={selectedFileId === file.id ? styles.existingRowActive : styles.existingRow}><input type="radio" name="saved-rubric" checked={selectedFileId === file.id} onChange={() => setSelectedFileId(file.id)} /><span><b>{getRubricDisplayName(file, t("AiJudgePanel.unnamedRubricFallback"))}</b><small>{(file.environment_keys?.length ? file.environment_keys : [file.template_key]).map(getTemplateLabel).join("、")} · {t("AiJudgePanel.itemsCountUnit", { count: file.analysis_json?.items?.length ?? 0 })} · {formatDateTime(file.updated_at)}</small></span></label>)}</div> : <p className={styles.mutedText}>{t("AiJudgePanel.noSavedRubricsText")}</p>}</div>
+             {conflictFile && <div className={styles.conflictActions} role="alert"><span>{t("AiJudgePanel.alreadyExistsLabel", { name: conflictFile.name })}</span><button type="button" className={styles.btnSecondary} disabled={uploading || creating} onClick={() => uploadFile(conflictFile, "copy")}>{t("AiJudgePanel.createCopyBtn")}</button><button type="button" className={styles.btnDanger} disabled={uploading || creating} onClick={() => uploadFile(conflictFile, "overwrite")}>{t("AiJudgePanel.overwriteBtn")}</button><button type="button" className={styles.iconBtn} aria-label={t("AiJudgePanel.cancelConflictAria")} onClick={() => setConflictFile(null)}><MIcon name="close" size={16} /></button></div>}
            </div>}
           {error && <p className={styles.dialogError} role="alert">{error}</p>}
-          <div className={styles.modalActions}>{!embedded && <button type="button" className={styles.btnSecondary} disabled={creating || uploading} onClick={onClose}>取消</button>}{mode !== "existing" || sourceOnly ? <button type="submit" className={styles.btnPrimary} disabled={!mode || (!sourceOnly && !selectedWeekId) || (mode === "blank" ? !rubricName.trim() || !environmentKeys.length : !selectedFileId) || creating || uploading}>{creating ? <><Spinner size={15} />建立中…</> : sourceOnly ? "新增來源" : mode === "blank" ? "建立檢查" : "使用這份評分表"}</button> : <p className={styles.uploadAutoHint}>選擇檔案後按「上傳並分析」，完成後會回到 AI 檢查主頁。</p>}</div>
+          <div className={styles.modalActions}>{!embedded && <button type="button" className={styles.btnSecondary} disabled={creating || uploading} onClick={onClose}>{t("AiJudgePanel.cancelBtn")}</button>}{mode !== "existing" || sourceOnly ? <button type="submit" className={styles.btnPrimary} disabled={!mode || (!sourceOnly && !selectedWeekId) || (mode === "blank" ? !rubricName.trim() || !environmentKeys.length : !selectedFileId) || creating || uploading}>{creating ? <><Spinner size={15} />{t("AiJudgePanel.creatingEllipsis2")}</> : sourceOnly ? t("AiJudgePanel.addSourceBtn") : mode === "blank" ? t("AiJudgePanel.createCheckBtn") : t("AiJudgePanel.useThisRubricBtn")}</button> : <p className={styles.uploadAutoHint}>{t("AiJudgePanel.selectFileThenUploadHint")}</p>}</div>
         </form>
       </section>
   );
@@ -789,26 +797,27 @@ function CreateCheckForm({
 }
 
 export function CreateCheckChooser({ onChoose, onCancel, busy = false, error = "" }) {
+  const { t } = useTranslation("teaching");
   return (
     <section className={styles.createChooser} aria-labelledby="create-check-choice-title">
       <div className={styles.createChooserHeader}>
         <div className={styles.createChooserHeading}>
-          <h2 id="create-check-choice-title">新增檢查</h2>
-          <p>選擇後直接進入對應工作區；從零建立會立即開啟空白評分表。</p>
+          <h2 id="create-check-choice-title">{t("AiJudgePanel.addCheckTitle")}</h2>
+          <p>{t("AiJudgePanel.chooseModeDesc")}</p>
         </div>
-        <button type="button" className={styles.btnSecondary} disabled={busy} onClick={onCancel}>返回目前檢查</button>
+        <button type="button" className={styles.btnSecondary} disabled={busy} onClick={onCancel}>{t("AiJudgePanel.backToCurrentCheckBtn")}</button>
       </div>
       {error && <p className={styles.dialogError} role="alert">{error}</p>}
       <div className={styles.createChoiceGrid}>
         <button type="button" className={styles.createChoice} disabled={busy} onClick={() => onChoose("blank")}>
           <span className={styles.createChoiceIcon}><MIcon name="edit_note" size={30} /></span>
-          <span className={styles.createChoiceCopy}><strong>從零開始建立</strong><small>立即開啟空白評分表，在同一頁填寫名稱、模板與評估項目，也可以請 AI 產生初稿。</small></span>
-          <span className={styles.createChoiceAction}>{busy ? "正在開啟空白頁面…" : "開始設計"}<MIcon name={busy ? "sync" : "arrow_forward"} size={18} /></span>
+          <span className={styles.createChoiceCopy}><strong>{t("AiJudgePanel.fromScratchTitle")}</strong><small>{t("AiJudgePanel.fromScratchLongDesc")}</small></span>
+          <span className={styles.createChoiceAction}>{busy ? t("AiJudgePanel.openingBlankPage") : t("AiJudgePanel.startDesigningBtn")}<MIcon name={busy ? "sync" : "arrow_forward"} size={18} /></span>
         </button>
         <button type="button" className={styles.createChoice} disabled={busy} onClick={() => onChoose("existing")}>
           <span className={styles.createChoiceIcon}><MIcon name="upload_file" size={30} /></span>
-          <span className={styles.createChoiceCopy}><strong>使用已有評分文件</strong><small>選用尚未綁定其他檢查的來源，或上傳 .docx／.pdf；已使用來源請選擇「重構」。</small></span>
-          <span className={styles.createChoiceAction}>選擇文件<MIcon name="arrow_forward" size={18} /></span>
+          <span className={styles.createChoiceCopy}><strong>{t("AiJudgePanel.useExistingFileTitle")}</strong><small>{t("AiJudgePanel.useExistingLongDesc")}</small></span>
+          <span className={styles.createChoiceAction}>{t("AiJudgePanel.chooseFileBtn")}<MIcon name="arrow_forward" size={18} /></span>
         </button>
       </div>
     </section>
@@ -834,6 +843,7 @@ export function resolveActiveSessionId(currentId, sessions) {
 }
 
 function RubricSourceRail({ classId, judgeSession, readOnly, onSessionUpdated, onAddSource }) {
+  const { t } = useTranslation("teaching");
   const toast = useToast();
   const sourceRailRef = useRef(null);
   const [files, setFiles] = useState([]);
@@ -853,9 +863,9 @@ function RubricSourceRail({ classId, judgeSession, readOnly, onSessionUpdated, o
     }
     setLoading(true);
     try { setFiles(await AiJudgeService.listFiles(classId)); }
-    catch (error) { toast.error(error?.message ?? "載入評分表來源失敗"); }
+    catch (error) { toast.error(error?.message ?? t("AiJudgePanel.loadSourcesFailed")); }
     finally { setLoading(false); }
-  }, [classId, selectedFileId, toast]);
+  }, [classId, selectedFileId, toast, t]);
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
     setShowOtherSources(false);
@@ -906,25 +916,25 @@ function RubricSourceRail({ classId, judgeSession, readOnly, onSessionUpdated, o
       const updated = await AiJudgeService.updateSession(classId, judgeSession.id, { selected_file_id: file.id });
       onSessionUpdated(updated);
       setShowOtherSources(false);
-    } catch (error) { toast.error(error?.message ?? "切換評分表來源失敗"); }
+    } catch (error) { toast.error(error?.message ?? t("AiJudgePanel.switchSourceFailed")); }
     finally { setBusyId(null); }
   }
 
   async function download(file) {
     try { const blob = await AiJudgeService.downloadFile(classId, file.id); downloadBlob(blob, file.original_filename ?? `${getRubricDisplayName(file)}.pdf`); }
-    catch (error) { toast.error(error?.message ?? "下載評分文件失敗"); }
+    catch (error) { toast.error(error?.message ?? t("AiJudgePanel.downloadRubricFailed")); }
     finally { setOpenMenuId(null); }
   }
 
   async function remove(file) {
-    if (!window.confirm(`確定刪除「${getRubricDisplayName(file)}」？已建立的腳本不會受影響。`)) return;
+    if (!window.confirm(t("AiJudgePanel.confirmDeleteSourceMsg", { name: getRubricDisplayName(file) }))) return;
     setBusyId(file.id);
     try {
       await AiJudgeService.deleteFile(classId, file.id);
       setFiles((current) => current.filter((entry) => entry.id !== file.id));
       if (file.id === judgeSession?.selected_file_id) onSessionUpdated(await AiJudgeService.getSession(classId, judgeSession.id));
-      toast.success("評分表來源已刪除");
-    } catch (error) { toast.error(error?.message ?? "刪除評分表來源失敗"); }
+      toast.success(t("AiJudgePanel.sourceDeletedToast"));
+    } catch (error) { toast.error(error?.message ?? t("AiJudgePanel.deleteSourceFailed")); }
     finally { setBusyId(null); setOpenMenuId(null); }
   }
 
@@ -932,22 +942,22 @@ function RubricSourceRail({ classId, judgeSession, readOnly, onSessionUpdated, o
   const selectedFile = getSelectedRubricSource(files, selectedFileId);
   const visibleFiles = getVisibleRubricSources(files, selectedFileId, showOtherSources);
   return (
-    <aside ref={sourceRailRef} className={styles.sourceRail} aria-label="評分表來源">
+    <aside ref={sourceRailRef} className={styles.sourceRail} aria-label={t("AiJudgePanel.rubricSourcesLabel")}>
       <div className={styles.sourceRailHead}>
         <div>
-          <h3>評分表來源</h3>
-          <p>{loading ? "正在確認目前來源…" : selectedFile ? "目前檢查使用的來源" : "尚未選擇來源"}</p>
+          <h3>{t("AiJudgePanel.rubricSourcesLabel")}</h3>
+          <p>{loading ? t("AiJudgePanel.confirmingSourceText") : selectedFile ? t("AiJudgePanel.currentSourceUsedText") : t("AiJudgePanel.noSourceSelectedText")}</p>
         </div>
         <div className={styles.sourceRailActions}>
-          {!readOnly && selectedFile && activeFiles.length > 1 && <button type="button" className={styles.btnSecondary} aria-expanded={showOtherSources} onClick={() => setShowOtherSources((current) => !current)}>{showOtherSources ? "只看目前來源" : "切換來源"}</button>}
-          {!readOnly && <button type="button" className={styles.iconBtn} aria-label="新增來源" title="新增來源" onClick={onAddSource}><MIcon name="add" size={19} /></button>}
+          {!readOnly && selectedFile && activeFiles.length > 1 && <button type="button" className={styles.btnSecondary} aria-expanded={showOtherSources} onClick={() => setShowOtherSources((current) => !current)}>{showOtherSources ? t("AiJudgePanel.onlyCurrentSourceBtn") : t("AiJudgePanel.switchSourceBtn")}</button>}
+          {!readOnly && <button type="button" className={styles.iconBtn} aria-label={t("AiJudgePanel.addSourceAria")} title={t("AiJudgePanel.addSourceAria")} onClick={onAddSource}><MIcon name="add" size={19} /></button>}
         </div>
       </div>
-      {loading ? <p className={styles.mutedText}>載入來源中…</p> : visibleFiles.length > 0 ? (
+      {loading ? <p className={styles.mutedText}>{t("AiJudgePanel.loadingSourcesText")}</p> : visibleFiles.length > 0 ? (
         <div className={styles.sourceList}>
-           {visibleFiles.map((file) => <div key={file.id} className={`${styles.sourceRow} ${file.id === selectedFileId ? styles.sourceRowSelected : ""}`}><button type="button" className={styles.sourceSelect} disabled={readOnly || busyId === file.id} onClick={() => selectFile(file)}><span className={styles.sourceIndicator} aria-hidden="true"><MIcon name={file.id === selectedFileId ? "radio_button_checked" : "radio_button_unchecked"} size={17} /></span><span className={styles.sourceText}><b>{getRubricDisplayName(file, "未命名評分表")}</b><small>{(file.environment_keys?.length ? file.environment_keys : [file.template_key]).map(getTemplateLabel).join("、")} · {file.analysis_json?.items?.length ?? 0} 項 · {formatDateTime(file.updated_at)} · {file.source_type === "created" ? "建立於系統" : "已上傳"}</small>{file.id === selectedFileId && <em>已選用</em>}</span></button>{(file.source_type !== "created" || !readOnly) && <div className={styles.sourceActions}><button type="button" className={styles.iconBtn} aria-label={`管理 ${getRubricDisplayName(file)}`} title="管理評分表來源" aria-haspopup="menu" aria-expanded={openMenuId === file.id} onClick={(event) => { event.stopPropagation(); setOpenMenuId((current) => current === file.id ? null : file.id); }}><MIcon name="more_vert" size={18} /></button>{sourceMenuKeep.item === file.id && <div className={`${styles.sourceMenu} ${sourceMenuKeep.closing ? styles.sessionMenuOut : ""}`} role="menu">{file.source_type !== "created" && <button type="button" role="menuitem" onClick={() => download(file)}><MIcon name="download" size={15} />下載原始文件</button>}{!readOnly && <button type="button" role="menuitem" className={styles.menuDanger} disabled={busyId === file.id} onClick={() => remove(file)}><MIcon name="delete" size={15} />刪除來源</button>}</div>}</div>}</div>)}
+           {visibleFiles.map((file) => <div key={file.id} className={`${styles.sourceRow} ${file.id === selectedFileId ? styles.sourceRowSelected : ""}`}><button type="button" className={styles.sourceSelect} disabled={readOnly || busyId === file.id} onClick={() => selectFile(file)}><span className={styles.sourceIndicator} aria-hidden="true"><MIcon name={file.id === selectedFileId ? "radio_button_checked" : "radio_button_unchecked"} size={17} /></span><span className={styles.sourceText}><b>{getRubricDisplayName(file, t("AiJudgePanel.unnamedRubricFallback"))}</b><small>{(file.environment_keys?.length ? file.environment_keys : [file.template_key]).map(getTemplateLabel).join("、")} · {t("AiJudgePanel.itemsCountUnit", { count: file.analysis_json?.items?.length ?? 0 })} · {formatDateTime(file.updated_at)} · {file.source_type === "created" ? t("AiJudgePanel.createdInSystemLabel") : t("AiJudgePanel.uploadedLabel")}</small>{file.id === selectedFileId && <em>{t("AiJudgePanel.selectedInUseLabel")}</em>}</span></button>{(file.source_type !== "created" || !readOnly) && <div className={styles.sourceActions}><button type="button" className={styles.iconBtn} aria-label={t("AiJudgePanel.manageSourceAria", { name: getRubricDisplayName(file) })} title={t("AiJudgePanel.manageSourceTitle")} aria-haspopup="menu" aria-expanded={openMenuId === file.id} onClick={(event) => { event.stopPropagation(); setOpenMenuId((current) => current === file.id ? null : file.id); }}><MIcon name="more_vert" size={18} /></button>{sourceMenuKeep.item === file.id && <div className={`${styles.sourceMenu} ${sourceMenuKeep.closing ? styles.sessionMenuOut : ""}`} role="menu">{file.source_type !== "created" && <button type="button" role="menuitem" onClick={() => download(file)}><MIcon name="download" size={15} />{t("AiJudgePanel.downloadOriginalBtn")}</button>}{!readOnly && <button type="button" role="menuitem" className={styles.menuDanger} disabled={busyId === file.id} onClick={() => remove(file)}><MIcon name="delete" size={15} />{t("AiJudgePanel.deleteSourceBtn")}</button>}</div>}</div>}</div>)}
         </div>
-      ) : <div className={styles.sourceEmpty}><MIcon name="description" size={24} /><p>{selectedFileId ? "目前來源已無法使用，請重新選擇。" : "這項檢查尚未選擇評分表來源。"}</p>{!readOnly && <button type="button" className={styles.btnSecondary} onClick={onAddSource}><MIcon name="add" size={15} />新增來源</button>}</div>}
+      ) : <div className={styles.sourceEmpty}><MIcon name="description" size={24} /><p>{selectedFileId ? t("AiJudgePanel.sourceUnavailableText") : t("AiJudgePanel.noSourceForCheckText")}</p>{!readOnly && <button type="button" className={styles.btnSecondary} onClick={onAddSource}><MIcon name="add" size={15} />{t("AiJudgePanel.addSourceAria")}</button>}</div>}
     </aside>
   );
 }
@@ -955,6 +965,7 @@ function RubricSourceRail({ classId, judgeSession, readOnly, onSessionUpdated, o
 /* ── Tab 1：評分表 ──────────────────────────────────────── */
 
 function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, onAddSource, showFileLibrary = true }) {
+  const { t } = useTranslation("teaching");
   const toast = useToast();
 
   const [files, setFiles] = useState([]);
@@ -1008,7 +1019,7 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
         )));
       },
       onError(error) {
-        toastRef.current.error(error?.message ?? "更新評分表失敗");
+        toastRef.current.error(error?.message ?? i18n.t("AiJudgePanel.updateRubricFailed", { ns: "teaching" }));
       },
     });
     autosaveRef.current = autosave;
@@ -1055,12 +1066,12 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
         if (!cancelled) setMessages(rows);
       })
       .catch(() => {
-        if (!cancelled) toast.error("載入檢查對話失敗");
+        if (!cancelled) toast.error(t("AiJudgePanel.loadChatFailed"));
       });
     return () => {
       cancelled = true;
     };
-  }, [classId, judgeSession?.id, toast]);
+  }, [classId, judgeSession?.id, toast, t]);
 
   useEffect(() => {
     if (!judgeSession?.selected_file_id || files.length === 0) return;
@@ -1091,9 +1102,9 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
       setEnvironmentKeys(updated.environment_keys?.length ? updated.environment_keys : environmentKeys);
       setAnalysisTemplateKey(updated.template_key ?? environmentKeys[0]);
       setSelectedTemplateKey(updated.template_key ?? environmentKeys[0]);
-      toast.success("評分表設定已儲存");
+      toast.success(t("AiJudgePanel.rubricSettingsSavedToast"));
     } catch (error) {
-      toast.error(error?.message ?? "評分表設定儲存失敗");
+      toast.error(error?.message ?? t("AiJudgePanel.rubricSettingsSaveFailed"));
     } finally {
       setIsSavingMetadata(false);
     }
@@ -1143,7 +1154,7 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
         if (err?.status === 409) {
           setPendingConflictFile(file);
         } else {
-          toast.error(err?.message ?? "上傳失敗");
+          toast.error(err?.message ?? t("AiJudgePanel.uploadFailedGeneric"));
         }
         return;
       }
@@ -1159,7 +1170,7 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
           });
           onSessionUpdated?.(updated);
         } catch (err) {
-          toast.error(err?.message ?? "套用評分表來源失敗");
+          toast.error(err?.message ?? t("AiJudgePanel.applySourceFailed"));
           await fetchFiles();
           return;
         }
@@ -1175,10 +1186,10 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
         uploadedFile,
         ...current.filter((item) => item.id !== uploadedFile.id),
       ]);
-      toast.success(`分析完成：${response.analysis.items.length} 題評估項目`);
+      toast.success(t("AiJudgePanel.analysisCompleteToast", { count: response.analysis.items.length }));
       fetchFiles();
     } catch (err) {
-      toast.error(err?.message ?? "上傳失敗");
+      toast.error(err?.message ?? t("AiJudgePanel.uploadFailedGeneric"));
     } finally {
       setIsUploading(false);
     }
@@ -1186,7 +1197,7 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
 
   async function handleSelectFile(file) {
     if (!file.analysis_json) {
-      toast.error("這份評分表尚未有可載入的分析結果");
+      toast.error(t("AiJudgePanel.noAnalysisYetError"));
       return;
     }
     if (judgeSession?.id) {
@@ -1196,7 +1207,7 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
         });
         onSessionUpdated?.(updated);
       } catch (err) {
-        toast.error(err?.message ?? "更新檢查評分表失敗");
+        toast.error(err?.message ?? t("AiJudgePanel.updateCheckRubricFailed"));
         return;
       }
     }
@@ -1209,16 +1220,16 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
     setAnalysisTemplateKey(file.template_key);
     setSelectedTemplateKey(file.template_key);
     if (!judgeSession?.id) setMessages([]);
-    toast.success(`已載入「${getRubricDisplayName(file)}」`);
+    toast.success(t("AiJudgePanel.loadedRubricToast", { name: getRubricDisplayName(file) }));
   }
 
   async function handleDownloadFile(file) {
     if (file.source_type === "created") return;
     try {
       const blob = await AiJudgeService.downloadFile(classId, file.id);
-      downloadBlob(blob, file.original_filename ?? `${file.display_name ?? "評分表"}.pdf`);
+      downloadBlob(blob, file.original_filename ?? `${file.display_name ?? t("AiJudgePanel.defaultRubricName")}.pdf`);
     } catch (err) {
-      toast.error(err?.message ?? "下載評分表失敗");
+      toast.error(err?.message ?? t("AiJudgePanel.downloadRubricGenericFailed"));
     }
   }
 
@@ -1227,12 +1238,12 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
     setDeleting(true);
     try {
       await AiJudgeService.deleteFile(classId, deleteTarget.id);
-      toast.success("評分表已刪除");
+      toast.success(t("AiJudgePanel.rubricDeletedToast"));
       setFiles((current) => current.filter((file) => file.id !== deleteTarget.id));
       if (sourceFileId === deleteTarget.id) setSourceFileId(null);
       setDeleteTarget(null);
     } catch (err) {
-      toast.error(err?.message ?? "刪除評分表失敗");
+      toast.error(err?.message ?? t("AiJudgePanel.deleteRubricFailed"));
     } finally {
       setDeleting(false);
     }
@@ -1269,7 +1280,7 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
         setPendingProposalMeta(proposal.length ? { baseRevision: response.base_revision ?? analysisRevisionsRef.current.get(sourceFileId) } : null);
         setPendingProposalIsReassessment(Boolean(proposal.length && isReassessment));
         if (isReassessment && !response.rubric_proposal) {
-          toast.error("AI 未回傳可套用的重新評估結果，原有百分比尚未更新，請稍後再試");
+          toast.error(t("AiJudgePanel.noReassessResultError"));
         }
         return;
       }
@@ -1287,12 +1298,12 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
           detectabilityNeedsReview: false,
         });
         if (!saved) return;
-        toast.success(isReassessment ? "重新評估完成" : "評估表已更新");
+        toast.success(isReassessment ? t("AiJudgePanel.reassessCompleteToast") : t("AiJudgePanel.rubricUpdatedToast"));
       } else if (isReassessment) {
-        toast.error("AI 未回傳可套用的重新評估結果，原有百分比尚未更新，請稍後再試");
+        toast.error(t("AiJudgePanel.noReassessResultError"));
       }
     } catch (err) {
-      toast.error(err?.message ?? "對話失敗");
+      toast.error(err?.message ?? t("AiJudgePanel.chatFailedError"));
       setMessages(messages);
     } finally {
       setIsChatting(false);
@@ -1308,7 +1319,7 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
       setSelectedProposalIds(new Set());
       setPendingProposalIsReassessment(false);
       setPendingProposalMeta(null);
-      toast.error("評分表已經有新的修改，請重新請 AI 產生提案。");
+      toast.error(t("AiJudgePanel.rubricChangedConflict"));
       return;
     }
     const selected = pendingProposal.filter((item, index) => selectedProposalIds.has(item.id ?? `proposal-${index}`));
@@ -1337,7 +1348,7 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
     setSelectedProposalIds(new Set());
     setPendingProposalIsReassessment(false);
     setPendingProposalMeta(null);
-    toast.success("已套用 AI 提出的評分項目修改");
+    toast.success(t("AiJudgePanel.proposalAppliedToast"));
   }
 
   function handleItemChange(index, updatedItem) {
@@ -1360,7 +1371,7 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
   function handleAddItem() {
     const newItem = {
       id: `item-${Date.now()}`,
-      title: "新評估項目",
+      title: t("AiJudgePanel.newItemDefaultTitle"),
       description: "",
       checked: false,
       detectable: "manual",
@@ -1396,9 +1407,9 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
       setSelectedProposalIds(new Set());
       setPendingProposalMeta(null);
       setPendingProposalIsReassessment(false);
-      toast.success("對話內容已清除");
+      toast.success(t("AiJudgePanel.chatClearedToast"));
     } catch (err) {
-      toast.error(err?.message ?? "清除對話內容失敗");
+      toast.error(err?.message ?? t("AiJudgePanel.clearChatFailed"));
     } finally {
       setIsClearingMessages(false);
     }
@@ -1409,9 +1420,9 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
     try {
       const blob = await AiJudgeService.downloadExcel(analysis.items, analysis.summary);
       downloadBlob(blob, "rubric.xlsx");
-      toast.success("Excel 下載成功");
+      toast.success(t("AiJudgePanel.excelDownloadedToast"));
     } catch (err) {
-      toast.error(err?.message ?? "匯出失敗");
+      toast.error(err?.message ?? t("AiJudgePanel.exportFailedError"));
     } finally {
       setIsExporting(false);
     }
@@ -1431,12 +1442,12 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
           });
       toast.success(
         artifact.status === "reviewed"
-          ? "檢查腳本已產生並通過審查"
-          : "檢查腳本已產生，請查看審查結果",
+          ? t("AiJudgePanel.scriptGeneratedApprovedToast")
+          : t("AiJudgePanel.scriptGeneratedReviewToast"),
       );
       onScriptCreated?.();
     } catch (err) {
-      toast.error(err?.message ?? "製作檢查腳本失敗");
+      toast.error(err?.message ?? t("AiJudgePanel.createScriptFailedError"));
     } finally {
       setIsCreatingScript(false);
     }
@@ -1455,17 +1466,17 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
             disabled={isExporting}
           >
             {isExporting ? <Spinner /> : <MIcon name="download" size={16} />}
-            {isExporting ? "匯出中..." : "匯出 Excel"}
+            {isExporting ? t("AiJudgePanel.exportingLabel") : t("AiJudgePanel.exportExcelBtn")}
           </button>
           <button
             type="button"
             className={styles.btnPrimary}
             onClick={handleCreateScript}
             disabled={isCreatingScript || isChatting || readOnly || items.length === 0}
-            title={items.length === 0 ? "請先新增至少一個評估項目" : undefined}
+            title={items.length === 0 ? t("AiJudgePanel.needAtLeastOneItem") : undefined}
           >
             {isCreatingScript ? <Spinner /> : <MIcon name="auto_fix_high" size={16} />}
-            {isCreatingScript ? "製作中..." : "製作檢查腳本"}
+            {isCreatingScript ? t("AiJudgePanel.creatingScriptLabel") : t("AiJudgePanel.makeScriptBtn")}
           </button>
         </div>
       )}
@@ -1473,18 +1484,18 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
       {isCreatingScript && (
         <div className={styles.noticeInfo}>
           <p>
-             <strong>正在生成受管檢查腳本</strong>
+             <strong>{t("AiJudgePanel.generatingScriptTitle")}</strong>
           </p>
           <p>
-            AI 正在依目前評分項目產生收集腳本，完成後系統會接著進行安全規則檢查與 AI 複核。
+            {t("AiJudgePanel.generatingScriptDesc")}
           </p>
         </div>
       )}
 
       {analysis && items.length === 0 && (
         <div className={styles.noticeInfo}>
-          <p><strong>尚未新增評估項目</strong></p>
-          <p>請先新增至少一個評估項目，才能製作檢查腳本。</p>
+          <p><strong>{t("AiJudgePanel.noItemsYetTitle")}</strong></p>
+          <p>{t("AiJudgePanel.needItemForScriptDesc")}</p>
         </div>
       )}
 
@@ -1492,16 +1503,16 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
         <div className={styles.cardHead}>
           <h4 className={styles.cardTitle}>
             <MIcon name="description" size={18} />
-            已保存評分表
+            {t("AiJudgePanel.savedRubricsHeader")}
           </h4>
         </div>
         {filesLoading ? (
-          <LoadingState text="載入評分表中..." />
+          <LoadingState text={t("AiJudgePanel.loadingRubricsText")} />
         ) : filesError ? (
-          <p className={styles.dangerText}>載入評分表失敗，請稍後再試。</p>
+          <p className={styles.dangerText}>{t("AiJudgePanel.loadRubricsFailedText")}</p>
         ) : files.length === 0 ? (
           <p className={styles.mutedText}>
-            尚未保存評分表。上傳評分文件後會自動保存文件與分析結果。
+            {t("AiJudgePanel.noSavedRubricsYetText")}
           </p>
         ) : (
           <div className={styles.fileList}>
@@ -1516,10 +1527,10 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
                   onClick={() => handleSelectFile(file)}
                   disabled={readOnly}
                 >
-                  <span className={styles.fileName}>{getRubricDisplayName(file, "未命名評分表")}</span>
+                  <span className={styles.fileName}>{getRubricDisplayName(file, t("AiJudgePanel.unnamedRubricFallback"))}</span>
                   <span className={styles.fileMeta}>
                     {getTemplateLabel(file.template_key)} · {formatDateTime(file.updated_at)}
-                    {file.status === "replaced" ? " · 已取代" : ""}
+                    {file.status === "replaced" ? t("AiJudgePanel.replacedSuffix") : ""}
                   </span>
                 </button>
                 <div className={styles.fileActions}>
@@ -1529,7 +1540,7 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
                     onClick={() => handleDownloadFile(file)}
                   >
                     <MIcon name="download" size={14} />
-                    評分文件
+                    {t("AiJudgePanel.downloadFileLabel")}
                   </button>}
                   <button
                     type="button"
@@ -1538,7 +1549,7 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
                     disabled={deleting || readOnly}
                   >
                     <MIcon name="delete" size={14} />
-                    刪除
+                    {t("AiJudgePanel.deleteLabel")}
                   </button>
                 </div>
               </div>
@@ -1552,13 +1563,13 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
           {showFileLibrary && <div className={styles.card}>
              <h4 className={styles.cardTitle}>
                <MIcon name="upload" size={18} />
-               上傳評分文件（可選）
+               {t("AiJudgePanel.uploadRubricOptionalHeader")}
             </h4>
             <p className={styles.mutedText}>
-              可以先聊天再上傳；上傳後會分析並自動綁定到目前這次檢查。
+              {t("AiJudgePanel.uploadRubricOptionalDesc")}
             </p>
             <div className={styles.templateRow}>
-              <span className={styles.fieldLabel}>評分環境</span>
+              <span className={styles.fieldLabel}>{t("AiJudgePanel.envSingleLabel")}</span>
               <div className={styles.chipBtns}>
                 {TEMPLATE_OPTIONS.map((option) => (
                   <button
@@ -1581,16 +1592,16 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
            {analysis && sourceFileId && (
              <div className={styles.card}>
                <div className={styles.cardHead}>
-                 <h4 className={styles.cardTitle}><MIcon name="tune" size={18} />評分表設定</h4>
+                 <h4 className={styles.cardTitle}><MIcon name="tune" size={18} />{t("AiJudgePanel.rubricSettingsHeader")}</h4>
                  <button type="button" className={styles.btnSecondary} onClick={saveRubricMetadata} disabled={readOnly || isSavingMetadata || !rubricName.trim() || !environmentKeys.length}>
                    {isSavingMetadata ? <Spinner size={14} /> : <MIcon name="save" size={14} />}
-                   {isSavingMetadata ? "儲存中…" : "儲存設定"}
+                   {isSavingMetadata ? t("AiJudgePanel.savingEllipsis") : t("AiJudgePanel.saveSettingsBtn")}
                  </button>
                </div>
                <div className={styles.metadataGrid}>
-                 <label className={styles.rubricField}><span>評分表名稱</span><input value={rubricName} maxLength={255} disabled={readOnly || isSavingMetadata} onChange={(event) => setRubricName(event.target.value)} /></label>
+                 <label className={styles.rubricField}><span>{t("AiJudgePanel.rubricNameLabel")}</span><input value={rubricName} maxLength={255} disabled={readOnly || isSavingMetadata} onChange={(event) => setRubricName(event.target.value)} /></label>
                  <div className={styles.templateRow}>
-                   <span className={styles.fieldLabel}>評分環境（可複選）</span>
+                   <span className={styles.fieldLabel}>{t("AiJudgePanel.envMultiSelectLegend")}</span>
                    <div className={styles.chipBtns}>
                      {TEMPLATE_OPTIONS.map((option) => <button key={option.key} type="button" className={environmentKeys.includes(option.key) ? styles.chipBtnActive : styles.chipBtn} disabled={readOnly || isSavingMetadata} onClick={() => setEnvironmentKeys((current) => current.includes(option.key) ? current.filter((entry) => entry !== option.key) : [...current, option.key])}>{option.label}</button>)}
                    </div>
@@ -1610,11 +1621,11 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
                   readOnly={readOnly}
                 />
                 <p className={styles.mutedText}>
-                  主要評分情境：{getTemplateLabel(analysisTemplateKey)}
+                  {t("AiJudgePanel.primaryScenarioLabel", { label: getTemplateLabel(analysisTemplateKey) })}
                 </p>
                 {analysis.summary && (
                   <details className={styles.summaryDetails}>
-                    <summary>AI 評估摘要</summary>
+                    <summary>{t("AiJudgePanel.aiSummaryLabel")}</summary>
                     <p>{analysis.summary}</p>
                   </details>
                 )}
@@ -1622,7 +1633,7 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
 
               <div className={styles.card}>
                 <div className={styles.cardHead}>
-                  <h4 className={styles.cardTitle}>評估項目（{items.length}）</h4>
+                  <h4 className={styles.cardTitle}>{t("AiJudgePanel.itemsHeader", { count: items.length })}</h4>
                   <button
                     type="button"
                     className={styles.btnSecondary}
@@ -1630,7 +1641,7 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
                     disabled={readOnly}
                   >
                     <MIcon name="add" size={16} />
-                    新增項目
+                    {t("AiJudgePanel.addItemBtn")}
                   </button>
                 </div>
                 <div className={styles.itemsList}>
@@ -1663,7 +1674,7 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
           <div className={`${styles.card} ${styles.chatCard}`}>
             <h4 className={styles.cardTitle}>
               <MIcon name="smart_toy" size={18} />
-              AI 聊天室
+              {t("AiJudgePanel.aiChatRoomHeader")}
             </h4>
             <ChatPanel
               messages={messages}
@@ -1698,8 +1709,8 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
 
       {conflictDialog.open && (
         <ConfirmModal
-          title="已有同名評分表"
-          description={`「${conflictDialog.item.name}」已存在。請選擇覆蓋原本文件，或建立一份副本後重新分析。`}
+          title={t("AiJudgePanel.duplicateRubricTitle")}
+          description={t("AiJudgePanel.duplicateRubricDesc", { name: conflictDialog.item.name })}
           closing={conflictDialog.closing}
           onClose={() => {
             if (!isUploading) setPendingConflictFile(null);
@@ -1712,7 +1723,7 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
                 disabled={isUploading}
                 onClick={() => setPendingConflictFile(null)}
               >
-                取消
+                {t("AiJudgePanel.cancelBtn")}
               </button>
               <button
                 type="button"
@@ -1720,7 +1731,7 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
                 disabled={isUploading}
                 onClick={() => handleUpload(conflictDialog.item, "copy")}
               >
-                建立副本
+                {t("AiJudgePanel.createCopyBtn")}
               </button>
               <button
                 type="button"
@@ -1728,7 +1739,7 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
                 disabled={isUploading}
                 onClick={() => handleUpload(conflictDialog.item, "overwrite")}
               >
-                覆蓋原本
+                {t("AiJudgePanel.overwriteBtn")}
               </button>
             </>
           }
@@ -1737,8 +1748,8 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
 
       {deleteDialog.open && (
         <ConfirmModal
-          title="確認刪除評分表？"
-          description={`你即將刪除「${deleteDialog.item.original_filename}」的原始檔與保存分析。刪除後不會影響已建立的腳本。`}
+          title={t("AiJudgePanel.confirmDeleteRubricTitle")}
+          description={t("AiJudgePanel.confirmDeleteRubricDesc", { name: deleteDialog.item.original_filename })}
           closing={deleteDialog.closing}
           onClose={() => {
             if (!deleting) setDeleteTarget(null);
@@ -1751,7 +1762,7 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
                 disabled={deleting}
                 onClick={() => setDeleteTarget(null)}
               >
-                取消
+                {t("AiJudgePanel.cancelBtn")}
               </button>
               <button
                 type="button"
@@ -1759,7 +1770,7 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
                 disabled={deleting}
                 onClick={handleDeleteFile}
               >
-                {deleting ? "刪除中..." : "確認刪除"}
+                {deleting ? t("AiJudgePanel.deletingEllipsis") : t("AiJudgePanel.confirmDeleteBtn")}
               </button>
             </>
           }
@@ -1771,12 +1782,12 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
 
 /* ── Tab 2：檢查腳本 ────────────────────────────────────── */
 
-const SCRIPT_STATUS_LABELS = {
-  draft: "草稿",
-  review_failed: "審查未通過",
-  reviewed: "待老師核准",
-  approved: "已核准",
-  archived: "已停用",
+const SCRIPT_STATUS_LABEL_KEYS = {
+  draft: "AiJudgePanel.scriptStatusDraft",
+  review_failed: "AiJudgePanel.scriptStatusReviewFailed",
+  reviewed: "AiJudgePanel.scriptStatusReviewed",
+  approved: "AiJudgePanel.scriptStatusApproved",
+  archived: "AiJudgePanel.scriptStatusArchived",
 };
 
 function scriptStatusBadgeClass(status) {
@@ -1787,6 +1798,7 @@ function scriptStatusBadgeClass(status) {
 }
 
 function ReviewPanel({ title, result }) {
+  const { t } = useTranslation("teaching");
   const issues = Array.isArray(result?.issues) ? result.issues : [];
   return (
     <div className={styles.reviewPanel}>
@@ -1795,7 +1807,7 @@ function ReviewPanel({ title, result }) {
         <span
           className={`${styles.badge} ${result?.approved ? styles.badge_success : styles.badge_danger}`}
         >
-          {result?.approved ? "通過" : "阻擋"}
+          {result?.approved ? t("AiJudgePanel.reviewPassLabel") : t("AiJudgePanel.reviewBlockLabel")}
         </span>
       </div>
       {issues.length > 0 ? (
@@ -1805,16 +1817,17 @@ function ReviewPanel({ title, result }) {
           ))}
         </ul>
       ) : (
-        <p className={styles.mutedText}>沒有列出風險項目。</p>
+        <p className={styles.mutedText}>{t("AiJudgePanel.noRiskItemsText")}</p>
       )}
       {result?.suggested_fix && (
-        <p className={styles.mutedText}>建議：{String(result.suggested_fix)}</p>
+        <p className={styles.mutedText}>{t("AiJudgePanel.suggestedFixLabel", { fix: String(result.suggested_fix) })}</p>
       )}
     </div>
   );
 }
 
 function ScriptsTab({ classId, sessionId, readOnly = false, onScriptApproved }) {
+  const { t } = useTranslation("teaching");
   const toast = useToast();
   const [scripts, setScripts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -1849,11 +1862,11 @@ function ScriptsTab({ classId, sessionId, readOnly = false, onScriptApproved }) 
     setActionPending("approve");
     try {
       await AiJudgeService.approveScript(classId, selected.id);
-      toast.success("檢查腳本已核准");
+      toast.success(t("AiJudgePanel.scriptApprovedToast"));
       fetchScripts();
       onScriptApproved?.();
     } catch (err) {
-      toast.error(err?.message ?? "核准失敗");
+      toast.error(err?.message ?? t("AiJudgePanel.approveFailed"));
     } finally {
       setActionPending(null);
     }
@@ -1864,10 +1877,10 @@ function ScriptsTab({ classId, sessionId, readOnly = false, onScriptApproved }) 
     try {
       const script = await AiJudgeService.regenerateScript(classId, selected.id);
       setSelectedId(script.id);
-      toast.success("檢查腳本已重新生成");
+      toast.success(t("AiJudgePanel.scriptRegeneratedToast"));
       fetchScripts();
     } catch (err) {
-      toast.error(err?.message ?? "重新生成失敗");
+      toast.error(err?.message ?? t("AiJudgePanel.regenerateFailed"));
     } finally {
       setActionPending(null);
     }
@@ -1878,12 +1891,12 @@ function ScriptsTab({ classId, sessionId, readOnly = false, onScriptApproved }) 
     setActionPending("delete");
     try {
       await AiJudgeService.deleteScript(classId, deleteTarget.id);
-      toast.success("檢查腳本已刪除");
+      toast.success(t("AiJudgePanel.scriptDeletedToast"));
       setSelectedId(null);
       setDeleteTarget(null);
       setScripts((current) => current.filter((script) => script.id !== deleteTarget.id));
     } catch (err) {
-      toast.error(err?.message ?? "刪除失敗");
+      toast.error(err?.message ?? t("AiJudgePanel.deleteFailedGeneric"));
     } finally {
       setActionPending(null);
     }
@@ -1892,20 +1905,20 @@ function ScriptsTab({ classId, sessionId, readOnly = false, onScriptApproved }) 
   return (
     <div className={styles.tabBody}>
       {loading ? (
-        <LoadingState text="載入腳本中..." />
+        <LoadingState text={t("AiJudgePanel.loadingScriptsText")} />
       ) : error ? (
         <div className={styles.card}>
           <div className={styles.cardHead}>
-            <span className={styles.dangerText}>載入檢查腳本失敗，請稍後再試。</span>
+            <span className={styles.dangerText}>{t("AiJudgePanel.loadScriptsFailedText")}</span>
             <button type="button" className={styles.btnSecondary} onClick={fetchScripts}>
-              重新載入
+              {t("AiJudgePanel.reloadBtn")}
             </button>
           </div>
         </div>
       ) : scripts.length === 0 ? (
         <div className={styles.card}>
           <p className={styles.mutedText}>
-            尚未建立檢查腳本。請先到「評分設定」上傳評分文件並製作檢查腳本。
+            {t("AiJudgePanel.noScriptsYetText")}
           </p>
         </div>
       ) : (
@@ -1921,7 +1934,7 @@ function ScriptsTab({ classId, sessionId, readOnly = false, onScriptApproved }) 
                 <span className={styles.scriptItemHead}>
                   <span className={styles.scriptName}>{script.name}</span>
                   <span className={`${styles.badge} ${scriptStatusBadgeClass(script.status)}`}>
-                    {SCRIPT_STATUS_LABELS[script.status] ?? script.status}
+                    {SCRIPT_STATUS_LABEL_KEYS[script.status] ? t(SCRIPT_STATUS_LABEL_KEYS[script.status]) : script.status}
                   </span>
                 </span>
                 <span className={styles.fileMeta}>
@@ -1948,7 +1961,7 @@ function ScriptsTab({ classId, sessionId, readOnly = false, onScriptApproved }) 
                     }
                   >
                     <MIcon name="check_circle" size={16} />
-                    {actionPending === "approve" ? "核准中..." : "核准"}
+                    {actionPending === "approve" ? t("AiJudgePanel.approvingLabel") : t("AiJudgePanel.approveBtn")}
                   </button>
                   <button
                     type="button"
@@ -1959,7 +1972,7 @@ function ScriptsTab({ classId, sessionId, readOnly = false, onScriptApproved }) 
                     }
                   >
                     {actionPending === "regenerate" ? <Spinner /> : <MIcon name="refresh" size={16} />}
-                    {actionPending === "regenerate" ? "生成中..." : "重新生成"}
+                    {actionPending === "regenerate" ? t("AiJudgePanel.regeneratingLabel") : t("AiJudgePanel.regenerateBtn")}
                   </button>
                   <button
                     type="button"
@@ -1968,14 +1981,14 @@ function ScriptsTab({ classId, sessionId, readOnly = false, onScriptApproved }) 
                     disabled={readOnly || actionPending !== null}
                   >
                     <MIcon name="delete" size={16} />
-                    刪除腳本
+                    {t("AiJudgePanel.deleteScriptBtn")}
                   </button>
                 </div>
               </div>
 
               <div className={styles.reviewGrid}>
-                <ReviewPanel title="規則檢查（靜態）" result={selected.policy_check_result_json} />
-                <ReviewPanel title="AI 檢查" result={selected.ai_review_result_json} />
+                <ReviewPanel title={t("AiJudgePanel.ruleCheckStaticLabel")} result={selected.policy_check_result_json} />
+                <ReviewPanel title={t("AiJudgePanel.aiReviewLabel")} result={selected.ai_review_result_json} />
               </div>
 
               <pre className={styles.codeBlock}>{selected.script_content}</pre>
@@ -1986,8 +1999,8 @@ function ScriptsTab({ classId, sessionId, readOnly = false, onScriptApproved }) 
 
       {deleteScriptDialog.open && (
         <ConfirmModal
-          title="確認刪除檢查腳本？"
-          description={`你即將永久刪除「${deleteScriptDialog.item.name}」v${deleteScriptDialog.item.version}。刪除後無法再查看、核准或重新生成。`}
+          title={t("AiJudgePanel.confirmDeleteScriptTitle")}
+          description={t("AiJudgePanel.confirmDeleteScriptDesc", { name: deleteScriptDialog.item.name, version: deleteScriptDialog.item.version })}
           closing={deleteScriptDialog.closing}
           onClose={() => {
             if (actionPending !== "delete") setDeleteTarget(null);
@@ -2000,7 +2013,7 @@ function ScriptsTab({ classId, sessionId, readOnly = false, onScriptApproved }) 
                 disabled={actionPending === "delete"}
                 onClick={() => setDeleteTarget(null)}
               >
-                取消
+                {t("AiJudgePanel.cancelBtn")}
               </button>
               <button
                 type="button"
@@ -2008,7 +2021,7 @@ function ScriptsTab({ classId, sessionId, readOnly = false, onScriptApproved }) 
                 disabled={actionPending === "delete"}
                 onClick={handleDelete}
               >
-                {actionPending === "delete" ? "刪除中..." : "確認刪除"}
+                {actionPending === "delete" ? t("AiJudgePanel.deletingEllipsis") : t("AiJudgePanel.confirmDeleteBtn")}
               </button>
             </>
           }
@@ -2020,82 +2033,85 @@ function ScriptsTab({ classId, sessionId, readOnly = false, onScriptApproved }) 
 
 /* ── Tab 3：執行與結果 ──────────────────────────────────── */
 
-const REASON_LABELS = {
-  success: "成功",
-  not_running: "未運行",
-  missing_ip: "缺少 IP",
-  missing_ssh_key: "缺少 SSH 金鑰",
-  owner_mismatch: "資源擁有者不一致",
-  missing_db_resource: "找不到對應資源",
-  invalid_resource_type: "類型不可執行",
-  python_missing: "機器缺少腳本執行環境",
-  execution_nonzero: "腳本執行失敗",
-  result_too_large: "結果過大",
-  invalid_json: "JSON 格式錯誤",
-  executor_error: "執行器錯誤",
+const REASON_LABEL_KEYS = {
+  success: "AiJudgePanel.reasonSuccess",
+  not_running: "AiJudgePanel.reasonNotRunning",
+  missing_ip: "AiJudgePanel.reasonMissingIp",
+  missing_ssh_key: "AiJudgePanel.reasonMissingSshKey",
+  owner_mismatch: "AiJudgePanel.reasonOwnerMismatch",
+  missing_db_resource: "AiJudgePanel.reasonMissingDbResource",
+  invalid_resource_type: "AiJudgePanel.reasonInvalidResourceType",
+  python_missing: "AiJudgePanel.reasonPythonMissing",
+  execution_nonzero: "AiJudgePanel.reasonExecutionNonzero",
+  result_too_large: "AiJudgePanel.reasonResultTooLarge",
+  invalid_json: "AiJudgePanel.reasonInvalidJson",
+  executor_error: "AiJudgePanel.reasonExecutorError",
 };
 
 function reasonLabel(reasonCode) {
   if (!reasonCode) return null;
-  return REASON_LABELS[reasonCode] ?? reasonCode;
+  return REASON_LABEL_KEYS[reasonCode] ? i18n.t(REASON_LABEL_KEYS[reasonCode], { ns: "teaching" }) : reasonCode;
 }
 
 function runIsTerminal(status) {
   return status === "completed" || status === "failed" || status === "cancelled";
 }
 
-const RUN_STATUS = {
-  completed: { label: "已完成", className: styles.badge_success },
-  running: { label: "執行中", className: styles.badge_info },
-  failed: { label: "失敗", className: styles.badge_danger },
-  cancelled: { label: "已取消", className: styles.badge_muted },
-  pending: { label: "等待中", className: styles.badge_muted },
+const RUN_STATUS_KEYS = {
+  completed: { labelKey: "AiJudgePanel.runStatusCompleted", className: styles.badge_success },
+  running: { labelKey: "AiJudgePanel.runStatusRunning", className: styles.badge_info },
+  failed: { labelKey: "AiJudgePanel.runStatusFailed", className: styles.badge_danger },
+  cancelled: { labelKey: "AiJudgePanel.runStatusCancelled", className: styles.badge_muted },
+  pending: { labelKey: "AiJudgePanel.runStatusPending", className: styles.badge_muted },
 };
 
-const TARGET_STATUS = {
-  completed: { label: "完成", className: styles.badge_success },
-  running: { label: "執行中", className: styles.badge_info },
-  failed: { label: "失敗", className: styles.badge_danger },
-  queued: { label: "排隊中", className: styles.badge_muted },
+const TARGET_STATUS_KEYS = {
+  completed: { labelKey: "AiJudgePanel.targetStatusCompleted", className: styles.badge_success },
+  running: { labelKey: "AiJudgePanel.targetStatusRunning", className: styles.badge_info },
+  failed: { labelKey: "AiJudgePanel.targetStatusFailed", className: styles.badge_danger },
+  queued: { labelKey: "AiJudgePanel.targetStatusQueued", className: styles.badge_muted },
 };
 
 function StatusBadge({ map, status }) {
-  const info = map[status] ?? { label: status ?? "—", className: styles.badge_muted };
-  return <span className={`${styles.badge} ${info.className}`}>{info.label}</span>;
+  const { t } = useTranslation("teaching");
+  const info = map[status];
+  if (!info) return <span className={`${styles.badge} ${styles.badge_muted}`}>{status ?? "—"}</span>;
+  return <span className={`${styles.badge} ${info.className}`}>{t(info.labelKey)}</span>;
 }
 
 function AiJudgementBadge({ result }) {
-  if (!result) return <span className={`${styles.badge} ${styles.badge_muted}`}>等待回收</span>;
+  const { t } = useTranslation("teaching");
+  if (!result) return <span className={`${styles.badge} ${styles.badge_muted}`}>{t("AiJudgePanel.waitingCollectionLabel")}</span>;
   if (result.validation?.valid === false) {
-    return <span className={`${styles.badge} ${styles.badge_danger}`}>JSON 格式錯誤</span>;
+    return <span className={`${styles.badge} ${styles.badge_danger}`}>{t("AiJudgePanel.reasonInvalidJson")}</span>;
   }
   const judgement = result.ai_judgement;
-  if (!judgement) return <span className={`${styles.badge} ${styles.badge_muted}`}>分析中</span>;
+  if (!judgement) return <span className={`${styles.badge} ${styles.badge_muted}`}>{t("AiJudgePanel.analyzingLabel")}</span>;
   if (judgement.status === "completed") {
     const score = typeof judgement.score === "number" ? judgement.score : null;
     const maxScore = typeof judgement.max_score === "number" ? judgement.max_score : 5;
     return (
       <span className={`${styles.badge} ${styles.badge_success}`}>
-        {score === null ? "已分析" : `${score}/${maxScore}`}
+        {score === null ? t("AiJudgePanel.analyzedLabel") : `${score}/${maxScore}`}
       </span>
     );
   }
   if (judgement.status === "failed") {
-    return <span className={`${styles.badge} ${styles.badge_danger}`}>AI 分析失敗</span>;
+    return <span className={`${styles.badge} ${styles.badge_danger}`}>{t("AiJudgePanel.aiAnalysisFailedLabel")}</span>;
   }
   if (judgement.status === "skipped") {
-    return <span className={`${styles.badge} ${styles.badge_muted}`}>略過</span>;
+    return <span className={`${styles.badge} ${styles.badge_muted}`}>{t("AiJudgePanel.skippedLabel")}</span>;
   }
-  return <span className={`${styles.badge} ${styles.badge_info}`}>分析中</span>;
+  return <span className={`${styles.badge} ${styles.badge_info}`}>{t("AiJudgePanel.analyzingLabel")}</span>;
 }
 
 function aiJudgementSummary(result) {
   if (!result) return null;
   if (result.validation?.valid === false) {
-    return result.validation.error ?? "JSON 驗證未通過，未進入 AI 分析。";
+    return result.validation.error ?? i18n.t("AiJudgePanel.jsonValidationFailedText", { ns: "teaching" });
   }
   const judgement = result.ai_judgement;
-  if (!judgement) return "AI 分析尚未完成。";
+  if (!judgement) return i18n.t("AiJudgePanel.aiNotDoneText", { ns: "teaching" });
   return judgement.error ?? judgement.summary ?? null;
 }
 
@@ -2105,6 +2121,7 @@ function formatUsage(value) {
 }
 
 function ExecutionTab({ classId, sessionId, readOnly = false, members }) {
+  const { t } = useTranslation("teaching");
   const toast = useToast();
   const [selectedVmids, setSelectedVmids] = useState([]);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -2213,7 +2230,7 @@ function ExecutionTab({ classId, sessionId, readOnly = false, members }) {
           )
         : await AiJudgeService.createScriptRun(classId, effectiveScriptId, selectedVmids);
       toast.success(
-        `已建立腳本執行任務（${run.progress_json?.total ?? selectedVmids.length} 台）`,
+        t("AiJudgePanel.runCreatedToast", { count: run.progress_json?.total ?? selectedVmids.length }),
       );
       setActiveRun(run);
       setRunHistory((current) => [run, ...current.filter((item) => item.id !== run.id)]);
@@ -2222,7 +2239,7 @@ function ExecutionTab({ classId, sessionId, readOnly = false, members }) {
       setSelectedScriptId(null);
       setSelectedVmids([]);
     } catch (err) {
-      toast.error(err?.message ?? "建立執行任務失敗");
+      toast.error(err?.message ?? t("AiJudgePanel.createRunFailed"));
     } finally {
       setCreatingRun(false);
     }
@@ -2232,8 +2249,8 @@ function ExecutionTab({ classId, sessionId, readOnly = false, members }) {
     <div className={styles.tabBody}>
       <div className={styles.execToolbar}>
         <span className={styles.mutedText}>
-          可執行 {runningMembers.length} / 全部 {members.length} 台，已選{" "}
-          <strong>{selectedVmids.length}</strong> 台
+          {t("AiJudgePanel.execToolbarSummary", { running: runningMembers.length, total: members.length })}{" "}
+          <strong>{selectedVmids.length}</strong> {t("AiJudgePanel.machinesUnitSuffix")}
         </span>
         <div className={styles.sectionActions}>
           <button
@@ -2242,7 +2259,7 @@ function ExecutionTab({ classId, sessionId, readOnly = false, members }) {
             onClick={() => setSelectedVmids(runningMembers.map((m) => m.vmid).filter(Boolean))}
             disabled={runningMembers.length === 0}
           >
-            選取運行中
+            {t("AiJudgePanel.selectRunningBtn")}
           </button>
           <button
             type="button"
@@ -2250,7 +2267,7 @@ function ExecutionTab({ classId, sessionId, readOnly = false, members }) {
             onClick={() => setSelectedVmids([])}
             disabled={selectedVmids.length === 0}
           >
-            清除
+            {t("AiJudgePanel.clearBtn")}
           </button>
           <button
             type="button"
@@ -2261,7 +2278,7 @@ function ExecutionTab({ classId, sessionId, readOnly = false, members }) {
             }
           >
             <MIcon name="play_circle_outline" size={16} />
-            執行腳本
+            {t("AiJudgePanel.runScriptBtn")}
           </button>
         </div>
       </div>
@@ -2271,18 +2288,18 @@ function ExecutionTab({ classId, sessionId, readOnly = false, members }) {
           <thead>
             <tr>
               <th className={styles.checkCol} />
-              <th>機器編號</th>
-              <th>成員</th>
-              <th>類型</th>
-              <th>狀態</th>
-              <th>資源摘要</th>
+              <th>{t("AiJudgePanel.thVmid")}</th>
+              <th>{t("AiJudgePanel.thMember")}</th>
+              <th>{t("AiJudgePanel.thType")}</th>
+              <th>{t("AiJudgePanel.thStatus")}</th>
+              <th>{t("AiJudgePanel.thResourceSummary")}</th>
             </tr>
           </thead>
           <tbody>
             {runningMembers.length === 0 ? (
               <tr>
                 <td colSpan={6} className={styles.tableEmpty}>
-                  目前沒有可執行的運行中 VM/LXC。
+                  {t("AiJudgePanel.noRunnableVmText")}
                 </td>
               </tr>
             ) : (
@@ -2303,12 +2320,10 @@ function ExecutionTab({ classId, sessionId, readOnly = false, members }) {
                   </td>
                   <td className={styles.typeCell}>{member.vm_type ? (member.vm_type === "lxc" ? "LXC" : "VM") : "-"}</td>
                   <td>
-                    <span className={`${styles.badge} ${styles.badge_success}`}>運行中</span>
+                    <span className={`${styles.badge} ${styles.badge_success}`}>{t("AiJudgePanel.runningBadgeLabel")}</span>
                   </td>
                   <td className={styles.fileMeta}>
-                    CPU {formatUsage(member.vm_cpu_usage_pct)} · RAM{" "}
-                    {formatUsage(member.vm_ram_usage_pct)} · 碟{" "}
-                    {formatUsage(member.vm_disk_usage_pct)}
+                    {t("AiJudgePanel.resourceSummaryLabel", { cpu: formatUsage(member.vm_cpu_usage_pct), ram: formatUsage(member.vm_ram_usage_pct), disk: formatUsage(member.vm_disk_usage_pct) })}
                   </td>
                 </tr>
               ))
@@ -2322,17 +2337,16 @@ function ExecutionTab({ classId, sessionId, readOnly = false, members }) {
           <div className={styles.cardHead}>
             <div>
               <h4 className={styles.cardTitle}>
-                最近一次執行結果
-                <StatusBadge map={RUN_STATUS} status={activeRun.status} />
+                {t("AiJudgePanel.lastRunResultTitle")}
+                <StatusBadge map={RUN_STATUS_KEYS} status={activeRun.status} />
               </h4>
               <p className={styles.fileMeta}>
-                進度 {activeRun.progress_json?.done ?? 0} /{" "}
-                {activeRun.progress_json?.total ?? progressTargets.length} 台
+                {t("AiJudgePanel.progressLabel", { done: activeRun.progress_json?.done ?? 0, total: activeRun.progress_json?.total ?? progressTargets.length })}
               </p>
             </div>
             {!runIsTerminal(activeRun.status) && (
               <span className={styles.mutedText}>
-                <Spinner size={14} /> 更新中...
+                <Spinner size={14} /> {t("AiJudgePanel.updatingLabel")}
               </span>
             )}
           </div>
@@ -2341,11 +2355,11 @@ function ExecutionTab({ classId, sessionId, readOnly = false, members }) {
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th>編號</th>
-                  <th>成員</th>
-                  <th>來源節點</th>
-                  <th>執行狀態</th>
-                  <th>AI 分析</th>
+                  <th>{t("AiJudgePanel.thId")}</th>
+                  <th>{t("AiJudgePanel.thMember")}</th>
+                  <th>{t("AiJudgePanel.thSourceNode")}</th>
+                  <th>{t("AiJudgePanel.thExecStatus")}</th>
+                  <th>{t("AiJudgePanel.thAiAnalysis")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -2354,7 +2368,8 @@ function ExecutionTab({ classId, sessionId, readOnly = false, members }) {
                   const user = result?.user ?? target.user;
                   const proxmoxNode = result?.proxmox_node ?? target.proxmox_node;
                   const resourceType = result?.resource_type ?? target.resource_type;
-                  const targetReason = reasonLabel(result?.reason_code ?? target.reason_code);
+                  const reasonCode = result?.reason_code ?? target.reason_code;
+                  const targetReason = reasonLabel(reasonCode);
                   const summary = aiJudgementSummary(result);
                   const summaryIsError =
                     result?.validation?.valid === false ||
@@ -2373,8 +2388,8 @@ function ExecutionTab({ classId, sessionId, readOnly = false, members }) {
                         </div>
                       </td>
                       <td>
-                        <StatusBadge map={TARGET_STATUS} status={target.status} />
-                        {targetReason && targetReason !== "成功" && (
+                        <StatusBadge map={TARGET_STATUS_KEYS} status={target.status} />
+                        {targetReason && reasonCode !== "success" && (
                           <div className={styles.fileMeta}>{targetReason}</div>
                         )}
                       </td>
@@ -2382,7 +2397,7 @@ function ExecutionTab({ classId, sessionId, readOnly = false, members }) {
                         <AiJudgementBadge result={result} />
                         {result ? (
                           <details className={styles.judgeDetails}>
-                            <summary>查看心得</summary>
+                            <summary>{t("AiJudgePanel.viewNotesSummary")}</summary>
                             {summary && (
                               <p className={summaryIsError ? styles.dangerText : styles.mutedText}>
                                 {summary}
@@ -2391,7 +2406,7 @@ function ExecutionTab({ classId, sessionId, readOnly = false, members }) {
                             {(result.ai_judgement?.item_judgements ?? []).map((item, index) => (
                               <div key={`${item.item_id ?? "item"}-${index}`} className={styles.judgeItem}>
                                 <div className={styles.judgeItemHead}>
-                                  <span>{item.title ?? item.item_id ?? "評分項目"}</span>
+                                  <span>{item.title ?? item.item_id ?? t("AiJudgePanel.ruleItemFallback")}</span>
                                   {typeof item.score === "number" && (
                                     <span className={`${styles.badge} ${styles.badge_muted}`}>
                                       {item.score}/{item.max_score ?? 1}
@@ -2403,7 +2418,7 @@ function ExecutionTab({ classId, sessionId, readOnly = false, members }) {
                             ))}
                           </details>
                         ) : (
-                          <div className={styles.fileMeta}>等待回收</div>
+                          <div className={styles.fileMeta}>{t("AiJudgePanel.waitingCollectionLabel")}</div>
                         )}
                       </td>
                     </tr>
@@ -2417,7 +2432,7 @@ function ExecutionTab({ classId, sessionId, readOnly = false, members }) {
 
       {sessionId && runHistory.length > 0 && (
         <div className={styles.card}>
-          <h4 className={styles.cardTitle}>歷次執行</h4>
+          <h4 className={styles.cardTitle}>{t("AiJudgePanel.runHistoryTitle")}</h4>
           <div className={styles.runHistory}>
             {runHistory.map((run) => (
               <button
@@ -2438,12 +2453,12 @@ function ExecutionTab({ classId, sessionId, readOnly = false, members }) {
                         : { scriptId: run.artifact_id, runId: run.id },
                     );
                   } catch (err) {
-                    toast.error(err?.message ?? "載入執行結果失敗");
+                    toast.error(err?.message ?? t("AiJudgePanel.loadRunResultFailed"));
                   }
                 }}
               >
                 <span>{formatDateTime(run.created_at)}</span>
-                <StatusBadge map={RUN_STATUS} status={run.status} />
+                <StatusBadge map={RUN_STATUS_KEYS} status={run.status} />
               </button>
             ))}
           </div>
@@ -2458,21 +2473,21 @@ function ExecutionTab({ classId, sessionId, readOnly = false, members }) {
           <div className={styles.modal} onMouseDown={(e) => e.stopPropagation()}>
             <div className={styles.modalHeader}>
               <div>
-                <h2>確認執行腳本</h2>
-                <p>後端會在送出時再次確認這些 VM/LXC 仍屬於此班級且正在運行。</p>
+                <h2>{t("AiJudgePanel.confirmRunScriptTitle")}</h2>
+                <p>{t("AiJudgePanel.confirmRunScriptDesc")}</p>
               </div>
               <button
                 type="button"
                 className={styles.iconBtn}
                 onClick={() => setDialogOpen(false)}
-                aria-label="關閉"
+                aria-label={t("AiJudgePanel.closeAria")}
               >
                 <MIcon name="close" size={18} />
               </button>
             </div>
 
             <label className={styles.field}>
-              <span>選擇腳本</span>
+              <span>{t("AiJudgePanel.selectScriptLabel")}</span>
               <select
                 value={effectiveScriptId}
                 onChange={(e) => setSelectedScriptId(e.target.value)}
@@ -2485,13 +2500,13 @@ function ExecutionTab({ classId, sessionId, readOnly = false, members }) {
               </select>
               {approvedScripts.length === 0 && (
                 <span className={styles.fileMeta}>
-          目前沒有已核准的檢查腳本，請先到檢查腳本分頁核准。
+          {t("AiJudgePanel.noApprovedScriptsText")}
                 </span>
               )}
             </label>
 
             <div className={styles.vmidBox}>
-              <span className={styles.fieldLabel}>執行機器（{selectedVmids.length} 台）</span>
+              <span className={styles.fieldLabel}>{t("AiJudgePanel.execMachinesLabel", { count: selectedVmids.length })}</span>
               <div className={styles.chipRow}>
                 {selectedVmids.map((vmid) => (
                   <span key={vmid} className={styles.chip}>
@@ -2503,8 +2518,7 @@ function ExecutionTab({ classId, sessionId, readOnly = false, members }) {
 
             {effectiveScript && (
               <p className={styles.fileMeta}>
-                即將使用：{effectiveScript.name} v{effectiveScript.version}（
-                {getTemplateLabel(effectiveScript.template_key)}）
+                {t("AiJudgePanel.aboutToUseLabel", { name: effectiveScript.name, version: effectiveScript.version, template: getTemplateLabel(effectiveScript.template_key) })}
               </p>
             )}
 
@@ -2515,7 +2529,7 @@ function ExecutionTab({ classId, sessionId, readOnly = false, members }) {
                 onClick={() => setDialogOpen(false)}
                 disabled={creatingRun}
               >
-                取消
+                {t("AiJudgePanel.cancelBtn")}
               </button>
               <button
                 type="button"
@@ -2523,7 +2537,7 @@ function ExecutionTab({ classId, sessionId, readOnly = false, members }) {
                 onClick={handleCreateRun}
                 disabled={creatingRun || selectedVmids.length === 0 || !effectiveScriptId}
               >
-                {creatingRun ? "建立中..." : "確認執行"}
+                {creatingRun ? t("AiJudgePanel.creatingEllipsis") : t("AiJudgePanel.confirmRunBtn")}
               </button>
             </div>
           </div>
@@ -2536,12 +2550,13 @@ function ExecutionTab({ classId, sessionId, readOnly = false, members }) {
 /* ── 導師工作區 ─────────────────────────────────────────── */
 
 const TEACHER_JUDGE_TABS = [
-  { key: "rubrics", label: "評分設定", icon: "description" },
-  { key: "scripts", label: "檢查腳本", icon: "terminal" },
-  { key: "execution", label: "執行與結果", icon: "play_circle_outline" },
+  { key: "rubrics", labelKey: "AiJudgePanel.tabRubricsLabel", icon: "description" },
+  { key: "scripts", labelKey: "AiJudgePanel.tabScriptsLabel", icon: "terminal" },
+  { key: "execution", labelKey: "AiJudgePanel.tabExecutionLabel", icon: "play_circle_outline" },
 ];
 
 function TeacherWorkspacePanel({ classId, members, weeks = [] }) {
+  const { t } = useTranslation("teaching");
   const toast = useToast();
   const [searchParams] = useSearchParams();
   const requestedSessionId = searchParams.get("check");
@@ -2583,7 +2598,7 @@ function TeacherWorkspacePanel({ classId, members, weeks = [] }) {
   // 檢查名稱多半直接沿用評分表檔名；相同時 meta 列不再重複顯示一次
   const activeSessionFilePrefix = useMemo(() => {
     if (!activeSession) return "";
-    const fileLabel = getRubricDisplayName(activeSession.selected_file_name, "尚未選擇評分表");
+    const fileLabel = getRubricDisplayName(activeSession.selected_file_name, t("AiJudgePanel.noRubricSelectedFallback"));
     return fileLabel === getRubricDisplayName(activeSession.title) ? "" : `${fileLabel} · `;
   }, [activeSession]);
   const sessionMenuItemKeep = useDialogPresence(openSessionMenuItem, 130);
@@ -2605,12 +2620,12 @@ function TeacherWorkspacePanel({ classId, members, weeks = [] }) {
       if (requestVersion === requestVersionRef.current && classIdRef.current === requestClassId) {
         setSessions([]);
         setActiveSessionId(null);
-        toast.error(error?.message ?? "載入檢查失敗");
+        toast.error(error?.message ?? t("AiJudgePanel.loadSessionsFailed"));
       }
     } finally {
       if (requestVersion === requestVersionRef.current && classIdRef.current === requestClassId) setLoading(false);
     }
-  }, [classId, requestedSessionId, statusFilter, toast]);
+  }, [classId, requestedSessionId, statusFilter, toast, t]);
 
   useEffect(() => {
     classIdRef.current = classId;
@@ -2699,11 +2714,11 @@ function TeacherWorkspacePanel({ classId, members, weeks = [] }) {
          .then((updated) => {
            if (classIdRef.current !== requestClassId) return;
            updateSessionInList(updated);
-           toast.success(`已選用「${getRubricDisplayName(created)}」。`);
+           toast.success(t("AiJudgePanel.sourceSelectedToast", { name: getRubricDisplayName(created) }));
          })
         .catch((error) => {
           if (classIdRef.current === requestClassId) {
-            toast.error(error?.message ?? "套用評分表來源失敗");
+            toast.error(error?.message ?? t("AiJudgePanel.applySourceFailed"));
           }
         });
       setSourceOnly(false);
@@ -2713,7 +2728,7 @@ function TeacherWorkspacePanel({ classId, members, weeks = [] }) {
     setSessions((current) => [created, ...current.filter((item) => item.id !== created.id)]);
     setActiveSessionId(created.id);
     setActiveTab("rubrics");
-    toast.success(`已建立「${created.title}」`);
+    toast.success(t("AiJudgePanel.sessionCreatedToast", { title: created.title }));
   }
 
   async function runSessionAction(item, action) {
@@ -2735,7 +2750,7 @@ function TeacherWorkspacePanel({ classId, members, weeks = [] }) {
       return updated;
     } catch (error) {
       if (classIdRef.current === requestClassId) {
-        toast.error(error?.message ?? "檢查操作失敗");
+        toast.error(error?.message ?? t("AiJudgePanel.sessionActionFailed"));
       }
       return null;
     } finally {
@@ -2754,12 +2769,12 @@ function TeacherWorkspacePanel({ classId, members, weeks = [] }) {
 
   async function archiveSession(item) {
     const updated = await runSessionAction(item, (entry) => AiJudgeService.archiveSession(classId, entry.id));
-    if (updated) toast.success(`「${item.title}」已移至已封存。`);
+    if (updated) toast.success(t("AiJudgePanel.archivedToast", { title: item.title }));
   }
 
   async function restoreSession(item) {
     const updated = await runSessionAction(item, (entry) => AiJudgeService.updateSession(classId, entry.id, { status: "active" }));
-    if (updated) toast.success(`「${item.title}」已恢復至進行中。`);
+    if (updated) toast.success(t("AiJudgePanel.restoredToast", { title: item.title }));
   }
 
   async function forkSession(item) {
@@ -2769,7 +2784,7 @@ function TeacherWorkspacePanel({ classId, members, weeks = [] }) {
     setSessions((current) => [copy, ...current.filter((entry) => entry.id !== copy.id)]);
     setActiveSessionId(copy.id);
     setActiveTab("rubrics");
-    toast.success(`已建立「${copy.title}」，可開始調整評分表。`);
+    toast.success(t("AiJudgePanel.forkedToast", { title: copy.title }));
   }
 
   async function renameSession(event) {
@@ -2791,10 +2806,10 @@ function TeacherWorkspacePanel({ classId, members, weeks = [] }) {
       setSessions((current) => current.filter((item) => item.id !== deleteTarget.id));
       if (activeSessionId === deleteTarget.id) setActiveSessionId(null);
       setDeleteTarget(null);
-      toast.success("檢查、專屬評分表來源、對話、腳本及執行紀錄已刪除。");
+      toast.success(t("AiJudgePanel.sessionDeletedToast"));
     } catch (error) {
       if (classIdRef.current === requestClassId) {
-        toast.error(error?.message ?? "刪除檢查失敗");
+        toast.error(error?.message ?? t("AiJudgePanel.deleteSessionFailed"));
       }
     } finally {
       setDeleting(false);
@@ -2820,17 +2835,17 @@ function TeacherWorkspacePanel({ classId, members, weeks = [] }) {
         id={`check-menu-${item.id}`}
         className={`${styles.sessionMenu} ${sessionMenuPos.closing ? styles.sessionMenuOut : ""}`}
         role="menu"
-        aria-label={`「${item.title}」更多功能`}
+        aria-label={t("AiJudgePanel.moreOptionsAria", { title: item.title })}
         style={{ top: `${menuPos.top}px`, left: `${menuPos.left}px` }}
       >
         {item.status === "active" && <>
-          <button type="button" role="menuitem" disabled={busy} onClick={() => { setRenameTarget(item); setRenameTitle(item.title); closeSessionMenu(); }}><MIcon name="edit" size={16} />重新命名</button>
-          <button type="button" role="menuitem" disabled={busy} onClick={() => pinSession(item)}><MIcon name="push_pin" filled={Boolean(item.pinned_at)} size={16} />{item.pinned_at ? "取消釘選" : "釘選"}</button>
+          <button type="button" role="menuitem" disabled={busy} onClick={() => { setRenameTarget(item); setRenameTitle(item.title); closeSessionMenu(); }}><MIcon name="edit" size={16} />{t("AiJudgePanel.renameLabel")}</button>
+          <button type="button" role="menuitem" disabled={busy} onClick={() => pinSession(item)}><MIcon name="push_pin" filled={Boolean(item.pinned_at)} size={16} />{item.pinned_at ? t("AiJudgePanel.unpinLabel") : t("AiJudgePanel.pinLabel")}</button>
         </>}
-        <button type="button" role="menuitem" disabled={busy} onClick={() => forkSession(item)}><MIcon name="fork_right" size={16} />重構</button>
+        <button type="button" role="menuitem" disabled={busy} onClick={() => forkSession(item)}><MIcon name="fork_right" size={16} />{t("AiJudgePanel.forkLabel")}</button>
         <span className={styles.menuSeparator} />
-        {item.status === "active" ? <button type="button" role="menuitem" disabled={busy} onClick={() => archiveSession(item)}><MIcon name="archive" size={16} />封存</button> : <button type="button" role="menuitem" disabled={busy} onClick={() => restoreSession(item)}><MIcon name="unarchive" size={16} />還原至進行中</button>}
-        <button type="button" role="menuitem" className={styles.menuDanger} disabled={busy} onClick={() => { setDeleteTarget(item); closeSessionMenu(); }}><MIcon name="delete" size={16} />刪除</button>
+        {item.status === "active" ? <button type="button" role="menuitem" disabled={busy} onClick={() => archiveSession(item)}><MIcon name="archive" size={16} />{t("AiJudgePanel.archiveLabel")}</button> : <button type="button" role="menuitem" disabled={busy} onClick={() => restoreSession(item)}><MIcon name="unarchive" size={16} />{t("AiJudgePanel.restoreLabel")}</button>}
+        <button type="button" role="menuitem" className={styles.menuDanger} disabled={busy} onClick={() => { setDeleteTarget(item); closeSessionMenu(); }}><MIcon name="delete" size={16} />{t("AiJudgePanel.deleteLabel")}</button>
       </div>
     );
   }
@@ -2838,18 +2853,18 @@ function TeacherWorkspacePanel({ classId, members, weeks = [] }) {
   return (
     <div className={styles.panel}>
       <div className={styles.panelHeading}>
-        <h2 className={styles.panelTitle}><MIcon name="checklist" size={20} />AI 檢查</h2>
-        <p className={styles.panelDesc}>建立評分表、準備檢查腳本，並查看班級機器的執行結果。</p>
+        <h2 className={styles.panelTitle}><MIcon name="checklist" size={20} />{t("AiJudgePanel.aiCheckPageTitle")}</h2>
+        <p className={styles.panelDesc}>{t("AiJudgePanel.aiCheckPageDesc")}</p>
       </div>
 
       <div className={styles.sessionWorkspace}>
-        <aside className={styles.sessionSidebar} aria-label="檢查清單">
-           <button type="button" className={`${styles.btnPrimary} ${styles.newCheckButton}`} onClick={() => { setSourceOnly(false); setCreationView("choose"); }}><MIcon name="add" size={17} />新增檢查</button>
-          <div className={styles.sessionFilters} role="tablist" aria-label="檢查狀態">
-            {[["active", "進行中"], ["archived", "已封存"]].map(([status, label]) => <button key={status} type="button" role="tab" aria-selected={statusFilter === status} className={statusFilter === status ? styles.chipBtnActive : styles.chipBtn} onClick={() => { setCreationView(null); setStatusFilter(status); }}>{label}</button>)}
+        <aside className={styles.sessionSidebar} aria-label={t("AiJudgePanel.checkListAria")}>
+           <button type="button" className={`${styles.btnPrimary} ${styles.newCheckButton}`} onClick={() => { setSourceOnly(false); setCreationView("choose"); }}><MIcon name="add" size={17} />{t("AiJudgePanel.addCheckTitle")}</button>
+          <div className={styles.sessionFilters} role="tablist" aria-label={t("AiJudgePanel.checkStatusAria")}>
+            {[["active", t("AiJudgePanel.inProgressLabel")], ["archived", t("AiJudgePanel.archivedFilterLabel")]].map(([status, label]) => <button key={status} type="button" role="tab" aria-selected={statusFilter === status} className={statusFilter === status ? styles.chipBtnActive : styles.chipBtn} onClick={() => { setCreationView(null); setStatusFilter(status); }}>{label}</button>)}
           </div>
           <div className={styles.sessionList} role="list">
-            {loading ? <p className={styles.mutedText}>載入中…</p> : sessions.length === 0 ? <div className={styles.sidebarEmpty}><MIcon name="checklist" size={24} /><p>{statusFilter === "active" ? "尚未建立檢查。新增後可從零設計評分表，或使用已有文件。" : "目前沒有已封存的檢查。"}</p></div> : sessions.map((item) => {
+            {loading ? <p className={styles.mutedText}>{t("AiJudgePanel.loadingEllipsisGeneric")}</p> : sessions.length === 0 ? <div className={styles.sidebarEmpty}><MIcon name="checklist" size={24} /><p>{statusFilter === "active" ? t("AiJudgePanel.noActiveChecksText") : t("AiJudgePanel.noArchivedChecksText")}</p></div> : sessions.map((item) => {
               const selected = item.id === activeSessionId;
                const busy = busySessionIds.has(item.id);
                return (
@@ -2858,8 +2873,8 @@ function TeacherWorkspacePanel({ classId, members, weeks = [] }) {
                      <strong>{item.title}</strong>
                    </button>
                    <div className={styles.sessionRowActions}>
-                     {statusFilter === "active" && <button type="button" className={`${styles.iconBtn} ${item.pinned_at ? styles.pinActive : ""}`} aria-label={item.pinned_at ? `取消釘選「${item.title}」` : `釘選「${item.title}」`} aria-pressed={Boolean(item.pinned_at)} title={item.pinned_at ? "取消釘選" : "釘選"} disabled={busy} onClick={(event) => { event.stopPropagation(); pinSession(item); }}><MIcon name="push_pin" filled={Boolean(item.pinned_at)} size={17} /></button>}
-                     <button type="button" className={styles.iconBtn} aria-label={`更多「${item.title}」功能`} title="更多功能" aria-haspopup="menu" aria-expanded={openMenuId === item.id} aria-controls={`check-menu-${item.id}`} disabled={busy} onClick={(event) => toggleSessionMenu(event, item.id)}><MIcon name="more_vert" size={18} /></button>
+                     {statusFilter === "active" && <button type="button" className={`${styles.iconBtn} ${item.pinned_at ? styles.pinActive : ""}`} aria-label={item.pinned_at ? t("AiJudgePanel.unpinAria", { title: item.title }) : t("AiJudgePanel.pinAria", { title: item.title })} aria-pressed={Boolean(item.pinned_at)} title={item.pinned_at ? t("AiJudgePanel.unpinLabel") : t("AiJudgePanel.pinLabel")} disabled={busy} onClick={(event) => { event.stopPropagation(); pinSession(item); }}><MIcon name="push_pin" filled={Boolean(item.pinned_at)} size={17} /></button>}
+                     <button type="button" className={styles.iconBtn} aria-label={t("AiJudgePanel.moreFunctionsAria", { title: item.title })} title={t("AiJudgePanel.moreFunctionsTitle")} aria-haspopup="menu" aria-expanded={openMenuId === item.id} aria-controls={`check-menu-${item.id}`} disabled={busy} onClick={(event) => toggleSessionMenu(event, item.id)}><MIcon name="more_vert" size={18} /></button>
                    </div>
                  </div>
                );
@@ -2868,9 +2883,9 @@ function TeacherWorkspacePanel({ classId, members, weeks = [] }) {
         </aside>
 
         <section className={styles.sessionMain}>
-          {creationView === "choose" ? <CreateCheckChooser onChoose={handleCreationChoice} onCancel={() => setCreationView(null)} /> : creationView ? <CreateCheckForm key={creationView} classId={classId} weeks={weeks} embedded initialMode={creationView} onClose={() => setCreationView("choose")} onCreated={handleCreated} /> : !activeSession ? <div className={styles.card}><div className={styles.mainEmpty}><MIcon name="checklist" size={30} /><p>{statusFilter === "active" ? "請從左側選擇一項檢查，或新增檢查。" : "請選擇已封存的檢查查看內容與結果。"}</p><button type="button" className={styles.btnPrimary} onClick={() => statusFilter === "active" ? (setSourceOnly(false), setCreationView("choose")) : setStatusFilter("active")}>{statusFilter === "active" ? "新增檢查" : "查看進行中"}</button></div></div> : <>
-            <div className={styles.sessionHeader}><div><h3>{activeSession.title}</h3><p>{activeSessionFilePrefix}對話 {activeSession.message_count ?? 0} · 腳本 {activeSession.script_count ?? 0} · 執行 {activeSession.run_count ?? 0}</p></div>{activeSession.status === "archived" && <span className={styles.archivedNotice}><MIcon name="lock" size={14} />這項檢查已封存，只能查看或複製</span>}</div>
-            <div className={styles.subTabs} role="tablist" aria-label="檢查工作頁籤">{TEACHER_JUDGE_TABS.map((tab) => <button key={tab.key} type="button" role="tab" aria-selected={activeTab === tab.key} className={activeTab === tab.key ? styles.subTabActive : styles.subTab} onClick={() => setActiveTab(tab.key)}><MIcon name={tab.icon} size={16} />{tab.label}</button>)}</div>
+          {creationView === "choose" ? <CreateCheckChooser onChoose={handleCreationChoice} onCancel={() => setCreationView(null)} /> : creationView ? <CreateCheckForm key={creationView} classId={classId} weeks={weeks} embedded initialMode={creationView} onClose={() => setCreationView("choose")} onCreated={handleCreated} /> : !activeSession ? <div className={styles.card}><div className={styles.mainEmpty}><MIcon name="checklist" size={30} /><p>{statusFilter === "active" ? t("AiJudgePanel.selectCheckFromLeftText") : t("AiJudgePanel.selectArchivedCheckText")}</p><button type="button" className={styles.btnPrimary} onClick={() => statusFilter === "active" ? (setSourceOnly(false), setCreationView("choose")) : setStatusFilter("active")}>{statusFilter === "active" ? t("AiJudgePanel.addCheckTitle") : t("AiJudgePanel.viewActiveBtn")}</button></div></div> : <>
+            <div className={styles.sessionHeader}><div><h3>{activeSession.title}</h3><p>{t("AiJudgePanel.sessionMetaLabel", { prefix: activeSessionFilePrefix, msgCount: activeSession.message_count ?? 0, scriptCount: activeSession.script_count ?? 0, runCount: activeSession.run_count ?? 0 })}</p></div>{activeSession.status === "archived" && <span className={styles.archivedNotice}><MIcon name="lock" size={14} />{t("AiJudgePanel.archivedCheckNotice")}</span>}</div>
+            <div className={styles.subTabs} role="tablist" aria-label={t("AiJudgePanel.checkTabsAria")}>{TEACHER_JUDGE_TABS.map((tab) => <button key={tab.key} type="button" role="tab" aria-selected={activeTab === tab.key} className={activeTab === tab.key ? styles.subTabActive : styles.subTab} onClick={() => setActiveTab(tab.key)}><MIcon name={tab.icon} size={16} />{t(tab.labelKey)}</button>)}</div>
             {activeTab === "rubrics" && <RubricsTab key={activeSession.id} classId={classId} judgeSession={activeSession} onSessionUpdated={updateSessionInList} onAddSource={() => { setSourceOnly(true); setCreateOpen(true); }} onScriptCreated={() => { loadSessions(); setActiveTab("scripts"); }} showFileLibrary={false} />}
             {activeTab === "scripts" && <ScriptsTab classId={classId} sessionId={activeSession.id} readOnly={activeSession.status === "archived"} onScriptApproved={() => setActiveTab("execution")} />}
             {activeTab === "execution" && <ExecutionTab classId={classId} sessionId={activeSession.id} readOnly={activeSession.status === "archived"} members={members} />}
@@ -2881,8 +2896,8 @@ function TeacherWorkspacePanel({ classId, members, weeks = [] }) {
       {typeof document !== "undefined" && sessionMenuItemKeep.open && sessionMenuPos.item && createPortal(renderSessionMenu(sessionMenuItemKeep.item), document.body)}
 
       {createDialog.open && <CreateCheckForm classId={classId} weeks={weeks} sourceOnly={sourceOnly} closing={createDialog.closing} onClose={() => { setCreateOpen(false); setSourceOnly(false); }} onCreated={handleCreated} />}
-       {renameDialog.open && <div className={`${styles.modalOverlay} ${renameDialog.closing ? styles.modalOverlayOut : ""}`} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setRenameTarget(null); }}><form className={`${styles.confirm} ${styles.renameDialog}`} role="dialog" aria-modal="true" aria-labelledby="rename-check-title" onSubmit={renameSession}><div className={styles.modalHeader}><h2 id="rename-check-title">重新命名檢查</h2><button type="button" className={styles.iconBtn} aria-label="關閉" onClick={() => setRenameTarget(null)}><MIcon name="close" size={18} /></button></div><label className={styles.dialogField}><span>檢查名稱</span><input autoFocus value={renameTitle} maxLength={255} onChange={(event) => setRenameTitle(event.target.value)} /></label><div className={styles.modalActions}><button type="button" className={styles.btnSecondary} onClick={() => setRenameTarget(null)}>取消</button><button type="submit" className={styles.btnPrimary} disabled={!renameTitle.trim() || busySessionIds.has(renameDialog.item.id)}>儲存</button></div></form></div>}
-      {deleteCheckDialog.open && <ConfirmModal title="確認刪除檢查？" description={`「${deleteCheckDialog.item.title}」及其專屬評分表來源、對話、檢查腳本與執行紀錄將直接刪除，且無法復原；其他檢查不受影響。`} closing={deleteCheckDialog.closing} onClose={() => { if (!deleting) setDeleteTarget(null); }} actions={<><button type="button" className={styles.btnSecondary} disabled={deleting} onClick={() => setDeleteTarget(null)}>取消</button><button type="button" className={styles.btnDanger} disabled={deleting} onClick={deleteSession}>{deleting ? "刪除中…" : "確認刪除"}</button></>} />}
+       {renameDialog.open && <div className={`${styles.modalOverlay} ${renameDialog.closing ? styles.modalOverlayOut : ""}`} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setRenameTarget(null); }}><form className={`${styles.confirm} ${styles.renameDialog}`} role="dialog" aria-modal="true" aria-labelledby="rename-check-title" onSubmit={renameSession}><div className={styles.modalHeader}><h2 id="rename-check-title">{t("AiJudgePanel.renameCheckTitle")}</h2><button type="button" className={styles.iconBtn} aria-label={t("AiJudgePanel.closeAria")} onClick={() => setRenameTarget(null)}><MIcon name="close" size={18} /></button></div><label className={styles.dialogField}><span>{t("AiJudgePanel.checkNameLabel")}</span><input autoFocus value={renameTitle} maxLength={255} onChange={(event) => setRenameTitle(event.target.value)} /></label><div className={styles.modalActions}><button type="button" className={styles.btnSecondary} onClick={() => setRenameTarget(null)}>{t("AiJudgePanel.cancelBtn")}</button><button type="submit" className={styles.btnPrimary} disabled={!renameTitle.trim() || busySessionIds.has(renameDialog.item.id)}>{t("AiJudgePanel.saveBtn")}</button></div></form></div>}
+      {deleteCheckDialog.open && <ConfirmModal title={t("AiJudgePanel.confirmDeleteCheckTitle")} description={t("AiJudgePanel.confirmDeleteCheckDesc", { title: deleteCheckDialog.item.title })} closing={deleteCheckDialog.closing} onClose={() => { if (!deleting) setDeleteTarget(null); }} actions={<><button type="button" className={styles.btnSecondary} disabled={deleting} onClick={() => setDeleteTarget(null)}>{t("AiJudgePanel.cancelBtn")}</button><button type="button" className={styles.btnDanger} disabled={deleting} onClick={deleteSession}>{deleting ? t("AiJudgePanel.deletingEllipsis2") : t("AiJudgePanel.confirmDeleteBtn")}</button></>} />}
     </div>
   );
 }

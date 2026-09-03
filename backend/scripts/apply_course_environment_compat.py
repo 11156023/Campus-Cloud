@@ -64,13 +64,12 @@ def apply() -> None:
     # The environment code was removed; legacy databases keep the column but
     # must not block inserts that no longer provide a value.
     _drop_not_null("course_environments", "code")
-    # 母範本目錄旗標；requires_gpu 已移除，殘留欄位不得擋住新增
+    # 範本旗標：requires_gpu（克隆時強制選 GPU）
     _add_column(
         "vm_templates",
-        "student_requestable",
-        "student_requestable BOOLEAN NOT NULL DEFAULT FALSE",
+        "requires_gpu",
+        "requires_gpu BOOLEAN NOT NULL DEFAULT FALSE",
     )
-    _drop_not_null("vm_templates", "requires_gpu")
     _add_column(
         "course_environments",
         "max_concurrent_sessions",

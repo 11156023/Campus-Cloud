@@ -19,6 +19,7 @@ from app.ai.template_recommendation.node_service import (
 from app.ai.template_recommendation.prompt import (
     build_chat_runtime_context,
     build_chat_system_prompt,
+    build_intake_focus_block,
 )
 from app.ai.template_recommendation.recommendation_service import (
     generate_ai_plan,
@@ -32,6 +33,7 @@ from app.ai.template_recommendation.schemas import (
 )
 from app.ai.utils import apply_thinking_control, strip_think_tags
 from app.api.deps import CurrentUser, SessionDep
+from app.core.i18n import t
 from app.core.permissions import Permission, has_permission
 from app.infrastructure.ai.template_recommendation import client
 from app.repositories import vm_request as vm_request_repo
@@ -314,7 +316,7 @@ async def chat(
     if not model_name:
         raise HTTPException(
             status_code=503,
-            detail="AI model binding is missing in config/system-ai.json.",
+            detail=t("aiTemplateRecommendation.modelBindingMissing"),
         )
 
     is_first_turn = len(request.messages) <= 1
@@ -345,6 +347,11 @@ async def chat(
         is_first_turn=is_first_turn,
         runtime_context=runtime_context,
     )
+    # 配置模式：把這一輪的主題固定住，問句仍由顧問語氣產生
+    if request.focus_hint:
+        system_prompt = (
+            f"{system_prompt}\n\n{build_intake_focus_block(request.focus_hint.strip())}"
+        )
 
     messages: list[dict[str, str]] = [{"role": "system", "content": system_prompt}]
     for msg in request.messages:
@@ -422,7 +429,7 @@ async def chat(
             logger.error("vLLM upstream error: %s", exc)
             raise HTTPException(
                 status_code=502,
-                detail="上游 AI 服務錯誤，請確認 vLLM 伺服器與模型設定（VLLM_BASE_URL / VLLM_MODEL_NAME）。",
+                detail=t("aiTemplateRecommendation.upstreamError"),
             ) from exc
         raise
 
@@ -524,7 +531,7 @@ async def recommend(
             logger.error("vLLM upstream error: %s", exc)
             raise HTTPException(
                 status_code=502,
-                detail="上游 AI 服務錯誤，請確認 vLLM 伺服器與模型設定（VLLM_BASE_URL / VLLM_MODEL_NAME）。",
+                detail=t("aiTemplateRecommendation.upstreamError"),
             ) from exc
         raise
 

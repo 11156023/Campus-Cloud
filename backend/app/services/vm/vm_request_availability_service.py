@@ -10,6 +10,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from sqlmodel import Session, select
 
 from app.core.authorizers import require_vm_request_access
+from app.core.i18n import t
 from app.domain.placement import advisor as placement_advisor
 from app.domain.placement.schemas import NodeCapacity, PlacementRequest, ResourceType
 from app.domain.placement.storage import (
@@ -89,7 +90,7 @@ def assess_existing_request(
         request_id=request_id,
     )
     if not db_request:
-        raise NotFoundError("Request not found")
+        raise NotFoundError(t("availability.request_not_found"))
 
     require_vm_request_access(current_user, db_request.user_id)
 
@@ -127,9 +128,9 @@ def validate_request_window(
     start_at = _normalize_datetime(getattr(request_in, "start_at", None))
     end_at = _normalize_datetime(getattr(request_in, "end_at", None))
     if not start_at or not end_at:
-        raise BadRequestError("A scheduled request window is required.")
+        raise BadRequestError(t("availability.window_required"))
     if end_at <= start_at:
-        raise BadRequestError("end_at must be later than start_at")
+        raise BadRequestError(t("availability.end_before_start"))
 
     ostemplate, template_vmid = _template_constraints(
         resource_type=cast(str, request_in.resource_type),
@@ -163,7 +164,7 @@ def validate_request_window(
     if not selection.node or not selection.plan.feasible:
         raise BadRequestError(
             selection.plan.summary
-            or "No node is available for the requested time window."
+            or t("availability.no_node_for_window")
         )
 
 
@@ -176,9 +177,9 @@ def assess_request_window(
     start_at = _normalize_datetime(request_in.start_at)
     end_at = _normalize_datetime(request_in.end_at)
     if not start_at or not end_at:
-        raise BadRequestError("A request window is required.")
+        raise BadRequestError(t("availability.window_required_short"))
     if end_at <= start_at:
-        raise BadRequestError("end_at must be later than start_at")
+        raise BadRequestError(t("availability.end_before_start"))
 
     duration_seconds = max((end_at - start_at).total_seconds(), 0)
     duration_hours = int(duration_seconds // 3600)
@@ -323,6 +324,18 @@ def _build_availability_response(
             session=session
         )
 
+    # lite 模式的配置結果快取：key = (預約狀態, 該小時需求係數)。
+    # reserved_capacities_by_slot 全程持有那些 list，id() 在本函式內不會被重用
+    lite_fit_cache: dict[tuple[object, float], list[str]] = {}
+    reserved_key_by_id: dict[int, tuple[object, ...]] = {}
+
+    def reserved_state_key(nodes: list[NodeCapacity]) -> tuple[object, ...]:
+        key = reserved_key_by_id.get(id(nodes))
+        if key is None:
+            key = _capacity_state_key(nodes)
+            reserved_key_by_id[id(nodes)] = key
+        return key
+
     slots: list[VMRequestAvailabilitySlot] = []
     per_day: dict[date, list[VMRequestAvailabilitySlot]] = {}
 
@@ -367,14 +380,24 @@ def _build_availability_response(
                 )
             elif within_policy:
                 reserved_adjusted_nodes = reserved_capacities_by_slot.get(slot_start)
+                # lite 模式：容量狀態（預約狀態 × 該小時需求係數）相同的時段直接沿用配置結果，
+                # 90 天 × 24 小時通常只剩幾十種組合需要真的跑 fit
+                lite_key: tuple[object, float] | None = None
                 if reserved_adjusted_nodes is None:
                     reserved_adjusted_nodes = [
                         item.model_copy(deep=True) for item in baseline_capacities
                     ]
-                adjusted_nodes = _adjust_node_capacities_for_slot(
-                    baseline_capacities=reserved_adjusted_nodes,
-                    demand_ratio=demand_ratio,
-                    pending_pressure=pending_pressure,
+                elif not source_request.detail:
+                    lite_key = (reserved_state_key(reserved_adjusted_nodes), demand_ratio)
+                lite_hit = lite_key is not None and lite_key in lite_fit_cache
+                adjusted_nodes = (
+                    []
+                    if lite_hit
+                    else _adjust_node_capacities_for_slot(
+                        baseline_capacities=reserved_adjusted_nodes,
+                        demand_ratio=demand_ratio,
+                        pending_pressure=pending_pressure,
+                    )
                 )
                 if source_request.detail:
                     plan = vm_request_placement_service.build_plan(
@@ -415,6 +438,8 @@ def _build_availability_response(
                         demand_ratio=demand_ratio,
                         pending_pressure=pending_pressure,
                         placement_strategy=placement_strategy,
+                        fit_cache=lite_fit_cache,
+                        fit_key=lite_key,
                     )
             else:
                 slot = VMRequestAvailabilitySlot(
@@ -570,11 +595,12 @@ def _build_reserved_capacity_timeline(
 
     active_by_node: dict[str, list[float | int]] = {}
     capacities_by_slot: dict[datetime, list[NodeCapacity]] = {}
+    # 預約狀態沒變的連續時段共用同一份容量清單（下游只讀，要改都會先 copy），
+    # 否則 90 天 × 24 小時每一格都 deep copy 全部節點，是月曆卡住的主因之一
+    current: list[NodeCapacity] | None = None
     for index, slot_start in enumerate(slot_starts):
-        for node, cpu_delta, memory_delta, disk_delta, count_delta in events.get(
-            index,
-            [],
-        ):
+        slot_events = events.get(index, [])
+        for node, cpu_delta, memory_delta, disk_delta, count_delta in slot_events:
             active = active_by_node.setdefault(node, [0.0, 0, 0, 0])
             active[0] = float(active[0]) + cpu_delta
             active[1] = int(active[1]) + memory_delta
@@ -587,6 +613,10 @@ def _build_reserved_capacity_timeline(
                 and int(active[3]) == 0
             ):
                 active_by_node.pop(node, None)
+
+        if current is not None and not slot_events:
+            capacities_by_slot[slot_start] = current
+            continue
 
         adjusted = [item.model_copy(deep=True) for item in baseline_capacities]
         by_node = {item.node: item for item in adjusted}
@@ -617,9 +647,15 @@ def _build_reserved_capacity_timeline(
                 and node.allocatable_memory_bytes > 0
                 and node.allocatable_disk_bytes > 0
             )
+        current = adjusted
         capacities_by_slot[slot_start] = adjusted
 
     return capacities_by_slot
+
+
+def _capacity_state_key(nodes: list[NodeCapacity]) -> tuple[tuple[object, ...], ...]:
+    """把節點容量清單壓成可雜湊 key，讓容量狀態相同的時段共用配置結果。"""
+    return tuple(tuple(node.model_dump().values()) for node in nodes)
 
 
 def _lite_candidate_key(
@@ -769,17 +805,25 @@ def _lite_slot_from_capacities(
     demand_ratio: float,
     pending_pressure: float,
     placement_strategy: str,
+    fit_cache: dict[tuple[object, float], list[str]] | None = None,
+    fit_key: tuple[object, float] | None = None,
 ) -> VMRequestAvailabilitySlot:
-    placed_nodes = _lightweight_fit_nodes(
-        request=request,
-        effective_resource_type=effective_resource_type,
-        adjusted_nodes=adjusted_nodes,
-        storage_pools_by_node=storage_pools_by_node,
-        has_managed_storage=has_managed_storage,
-        disk_overcommit_ratio=disk_overcommit_ratio,
-        tuning=tuning,
-        allowed_gpu_nodes=allowed_gpu_nodes,
-    )
+    placed_nodes: list[str] | None = None
+    if fit_cache is not None and fit_key is not None:
+        placed_nodes = fit_cache.get(fit_key)
+    if placed_nodes is None:
+        placed_nodes = _lightweight_fit_nodes(
+            request=request,
+            effective_resource_type=effective_resource_type,
+            adjusted_nodes=adjusted_nodes,
+            storage_pools_by_node=storage_pools_by_node,
+            has_managed_storage=has_managed_storage,
+            disk_overcommit_ratio=disk_overcommit_ratio,
+            tuning=tuning,
+            allowed_gpu_nodes=allowed_gpu_nodes,
+        )
+        if fit_cache is not None and fit_key is not None:
+            fit_cache[fit_key] = placed_nodes
     feasible = len(placed_nodes) >= int(request.instance_count or 1)
     partial = bool(placed_nodes)
 
@@ -837,7 +881,7 @@ def _resolve_timezone(value: str) -> ZoneInfo:
     try:
         return ZoneInfo(value or "Asia/Taipei")
     except ZoneInfoNotFoundError as exc:
-        raise BadRequestError("Invalid timezone") from exc
+        raise BadRequestError(t("availability.invalid_timezone")) from exc
 
 
 def _template_constraints(

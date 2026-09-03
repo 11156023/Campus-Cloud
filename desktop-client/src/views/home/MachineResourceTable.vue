@@ -133,29 +133,42 @@ const connect = (service: "ssh" | "rdp", tunnel?: SkyLabTunnelInfo) => {
       <template #default="{ row }">
         <div class="row-actions">
           <el-button
-            v-if="tunnelFor(row, 'ssh')"
+            v-if="tunnelFor(row as SkyLabResource, 'ssh')"
             size="small"
             type="primary"
             plain
-            :disabled="!canConnect(row, tunnelFor(row, 'ssh'))"
-            @click="connect('ssh', tunnelFor(row, 'ssh'))"
+            :disabled="
+              !canConnect(
+                row as SkyLabResource,
+                tunnelFor(row as SkyLabResource, 'ssh')
+              )
+            "
+            @click="connect('ssh', tunnelFor(row as SkyLabResource, 'ssh'))"
           >
             <IconifyIconOffline icon="terminal-rounded" />
             SSH
           </el-button>
           <el-button
-            v-if="tunnelFor(row, 'rdp')"
+            v-if="tunnelFor(row as SkyLabResource, 'rdp')"
             size="small"
             type="primary"
             plain
-            :disabled="!canConnect(row, tunnelFor(row, 'rdp'))"
-            @click="connect('rdp', tunnelFor(row, 'rdp'))"
+            :disabled="
+              !canConnect(
+                row as SkyLabResource,
+                tunnelFor(row as SkyLabResource, 'rdp')
+              )
+            "
+            @click="connect('rdp', tunnelFor(row as SkyLabResource, 'rdp'))"
           >
             <IconifyIconOffline icon="desktop-windows-rounded" />
             RDP
           </el-button>
           <span
-            v-if="!tunnelFor(row, 'ssh') && !tunnelFor(row, 'rdp')"
+            v-if="
+              !tunnelFor(row as SkyLabResource, 'ssh') &&
+              !tunnelFor(row as SkyLabResource, 'rdp')
+            "
             class="action-empty"
           >
             {{ t("home.machines.unavailable") }}

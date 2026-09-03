@@ -478,7 +478,7 @@ def test_class_provision_uses_reserved_capacity_not_personal_quota(monkeypatch):
 
 
 def test_class_provision_rejects_missing_capacity_reservation():
-    with pytest.raises(BadRequestError, match="capacity reservation"):
+    with pytest.raises(BadRequestError, match="容量保留"):
         batch_provision_service._provision_one(
             session=_Session(reservation=None),
             resource_type="qemu",

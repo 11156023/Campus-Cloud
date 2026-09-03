@@ -272,6 +272,8 @@
 .badge_danger  { background: color-mix(in srgb, var(--color-danger)  12%, transparent); color: var(--color-danger); }
 .badge_info    { background: color-mix(in srgb, var(--color-info)    12%, transparent); color: var(--color-info); }
 .badge_muted   { background: var(--color-hover); color: var(--color-status-neutral); }
+/* upstream 的「等待資源」狀態用 color: "warning"，但一直沒有對應樣式，這裡補上 */
+.badge_warning { background: color-mix(in srgb, var(--color-pending) 12%, transparent); color: var(--color-pending); }
 
 /* ── Review comment ── */
 /* 駁回原因與失敗訊息是整段文字，在 .detailBody 的橫排裡各自獨佔一行。 */

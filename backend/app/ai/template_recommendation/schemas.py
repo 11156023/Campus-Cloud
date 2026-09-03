@@ -155,6 +155,11 @@ class ChatRequest(BaseModel):
     top_k: int = Field(default=5, ge=1, le=10)
     device_nodes: list[DeviceNode] = Field(default_factory=list)
     form_context: RecommendationFormContext | None = None
+    focus_hint: str | None = Field(
+        default=None,
+        max_length=200,
+        description="配置模式：這一輪只問這件事，其餘照原本的顧問語氣。",
+    )
 
 
 

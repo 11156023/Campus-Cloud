@@ -1,5 +1,6 @@
 import { lazy } from "react";
 import { Navigate, Route, Routes, useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "./contexts/AuthContext";
 import DashboardLayout from "./layout/DashboardLayout";
 import LoginPage from "./pages/login/LoginPage";
@@ -34,8 +35,6 @@ const AiMonitoringPage = lazy(() => import("./pages/ai/ai-monitoring/AiMonitorin
 const AiPvePage = lazy(() => import("./pages/system/ai-pve/AiPvePage"));
 
 // 教學
-const CoursePathsPage = lazy(() => import("./pages/courses/paths/CoursePathsPage"));
-const CourseRoomPage = lazy(() => import("./pages/courses/room/CourseRoomPage"));
 const CourseCmsPage = lazy(() => import("./pages/teaching/course-cms/CourseCmsPage"));
 const CourseTemplateManagementPage = lazy(() => import("./pages/course-operations/course-templates/CourseTemplateManagementPage"));
 const CourseTemplateEditorPage = lazy(() => import("./pages/course-operations/course-templates/CourseTemplateEditorPage"));
@@ -59,6 +58,7 @@ const GatewayPage = lazy(() => import("./pages/system/gateway/GatewayPage"));
 const ReverseProxyPage = lazy(() => import("./pages/network/reverse-proxy/ReverseProxyPage"));
 
 function AuthBootstrapState({ unavailable = false, retrying = false, onRetry }) {
+  const { t } = useTranslation("common");
   return (
     <main className={styles.authStatePage}>
       <section className={styles.authStateCard} role={unavailable ? "alert" : "status"}>
@@ -70,12 +70,12 @@ function AuthBootstrapState({ unavailable = false, retrying = false, onRetry }) 
           <LoadingSpinner size={42} />
         )}
         <h1 className={styles.authStateTitle}>
-          {unavailable ? "暫時無法連線" : "正在驗證登入狀態"}
+          {unavailable ? t("App.connectionUnavailable") : t("App.verifyingLogin")}
         </h1>
         <p className={styles.authStateDescription}>
           {unavailable
-            ? "如果問題持續發生請聯繫系統管理員。"
-            : "請稍候，系統正在確認你的登入資訊。"}
+            ? t("App.connectionUnavailableDesc")
+            : t("App.verifyingLoginDesc")}
         </p>
         {unavailable && (
           <button
@@ -87,7 +87,7 @@ function AuthBootstrapState({ unavailable = false, retrying = false, onRetry }) 
             <span aria-hidden="true">
               <MIcon name="refresh" size={18} />
             </span>
-            {retrying ? "重試中…" : "重新連線"}
+            {retrying ? t("App.retrying") : t("App.retryConnect")}
           </button>
         )}
       </section>
@@ -167,10 +167,8 @@ function App() {
               <Route path="/batch-review"   element={<BatchReviewPage />} />
             </>
           )}
-          <Route
-            path="/templates"
-            element={canTeach ? <TemplatesPage /> : <Navigate to="/dashboard" replace />}
-          />
+          {/* 機器範本頁只給老師／管理員；學生在申請表單的「資源設定」選用範本 */}
+          <Route path="/templates"      element={canTeach ? <TemplatesPage /> : <Navigate to="/my-requests" state={{ create: true }} replace />} />
 
           {/* AI */}
           <Route path="/ai-api"         element={<AiApiPage />} />
@@ -188,8 +186,6 @@ function App() {
           />
 
           {/* 教學 */}
-          <Route path="/courses"               element={<CoursePathsPage />} />
-          <Route path="/courses/rooms/:roomId" element={<CourseRoomPage />} />
           <Route path="/course-cms"            element={<CourseCmsPage />} />
 
           {/* 課務管理 */}

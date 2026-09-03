@@ -3,6 +3,9 @@
 
 .page {
   display: flex;
+  /* 超寬螢幕上整頁被拉開，一行字橫跨兩千像素很難讀 */
+  max-width: 1440px;
+  margin-inline: auto;
   width: 100%;
   flex-direction: column;
   gap: $spacing-24;
@@ -15,7 +18,7 @@
 .sectionHeading p {
   margin: 0;
   color: var(--color-text-secondary);
-  font-size: $font-size-12;
+  font-size: $font-size-14;
   line-height: 1.6;
 }
 .eyebrow {
@@ -32,14 +35,102 @@
 }
 .assistantHero {
   display: grid;
-  grid-template-columns: minmax(270px, 0.72fr) minmax(480px, 1.28fr);
-  gap: $spacing-24;
-  padding: $spacing-24;
+  grid-template-columns: minmax(280px, 0.8fr) minmax(460px, 1.2fr);
+  gap: $spacing-32;
+  padding: $spacing-32;
+  align-items: center;
 }
+/* 對話開始後這一列縮成一條窄標頭，版面全部讓給輸出 */
 .assistantSectionExpanded .assistantHero {
-  grid-template-columns: 1fr;
-  padding-bottom: $spacing-16;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: $spacing-16;
+  padding: 10px $spacing-16 10px $spacing-24;
   border-bottom: 1px solid var(--color-divider);
+}
+.assistantSectionExpanded .assistantIntro {
+  align-items: center;
+  gap: 10px;
+}
+.assistantSectionExpanded .assistantIcon {
+  /* 圖示字級固定 28，框留到 40 才不會擠邊 */
+  width: 40px;
+  height: 40px;
+  border-radius: $radius-8;
+}
+.assistantSectionExpanded .assistantIntro h2 {
+  margin: 0;
+  font-size: $font-size-16;
+}
+.assistantSectionExpanded .assistantLabel {
+  display: none;
+}
+.assistantSectionExpanded .assistantActions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: $spacing-8;
+}
+
+/* 放大模式：整頁固定成一個視窗高，剩下的高度全給對話。
+   不寫死標題列高度，交給 flex 去分。 */
+.pageFocused {
+  height: calc(100dvh - 120px);
+  min-height: 420px;
+}
+
+.assistantSectionFocused {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.assistantReset {
+  min-height: 34px;
+  padding: 0 12px;
+  font-size: $font-size-12;
+}
+
+.assistantActions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: $spacing-8;
+}
+
+/* 放大模式：整頁固定成一個視窗高，剩下的高度全給對話。
+   不寫死標題列高度，交給 flex 去分。 */
+.pageFocused {
+  height: calc(100dvh - 120px);
+  min-height: 420px;
+}
+
+.assistantSectionFocused {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.assistantReset {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: $radius-pill;
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: $font-size-14;
+  cursor: pointer;
+
+  &:hover {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+  }
 }
 .assistantIntro {
   display: flex;
@@ -74,9 +165,10 @@
 }
 .assistantIntro p {
   margin: 0;
+  max-width: 42ch;
   color: var(--color-text-secondary);
-  font-size: $font-size-12;
-  line-height: 1.65;
+  font-size: $font-size-14;
+  line-height: 1.7;
 }
 .assistantForm {
   display: flex;
@@ -86,11 +178,12 @@
 }
 .assistantInput {
   display: grid;
-  min-height: 74px;
-  padding: 10px 10px 10px $spacing-16;
+  min-height: 76px;
+  padding: 12px 12px 12px $spacing-16;
   grid-template-columns: 22px minmax(0, 1fr) auto;
+  /* 三個元素同一條中線：之前讓按鈕沉到底，中間會空出一塊 */
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   border: 1px solid var(--color-border);
   border-radius: $radius-12;
   color: var(--color-primary);
@@ -105,15 +198,16 @@
 }
 .assistantInput textarea {
   width: 100%;
-  min-height: 48px;
-  padding: 4px 0;
+  min-height: 46px;
+  padding: 2px 0;
   border: 0;
   outline: 0;
   color: var(--color-text-primary);
   background: transparent;
   font: inherit;
-  font-size: $font-size-14;
-  line-height: 1.55;
+  /* 16px：這是整頁的主要輸入，也避免手機上聚焦時自動放大 */
+  font-size: $font-size-16;
+  line-height: 1.65;
   resize: none;
 }
 .assistantInput textarea::placeholder {
@@ -121,7 +215,7 @@
 }
 .assistantInput button {
   display: inline-flex;
-  min-height: 48px;
+  min-height: 46px;
   padding: 0 $spacing-16;
   align-items: center;
   justify-content: center;
@@ -130,9 +224,11 @@
   border-radius: $radius-8;
   color: var(--color-text-on-primary);
   background: var(--color-primary);
-  font-size: $font-size-12;
+  font-size: $font-size-14;
   font-weight: $font-weight-700;
+  white-space: nowrap;
   cursor: pointer;
+  transition: background 140ms ease;
 }
 .assistantInput button:hover:not(:disabled) {
   background: var(--color-primary-dark);
@@ -145,18 +241,18 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
+  gap: $spacing-8;
   color: var(--color-text-muted);
-  font-size: $font-size-10;
+  font-size: $font-size-12;
 }
 .assistantFooter button {
-  min-height: 28px;
-  padding: 0 9px;
+  min-height: 34px;
+  padding: 0 14px;
   border: 1px solid var(--color-border);
   border-radius: $radius-pill;
   color: var(--color-text-secondary);
   background: var(--color-surface);
-  font-size: $font-size-10;
+  font-size: $font-size-12;
   cursor: pointer;
 }
 .assistantFooter button:hover:not(:disabled) {
@@ -187,15 +283,15 @@
 }
 .sectionHeading > button {
   display: inline-flex;
-  min-height: 34px;
-  padding: 0 $spacing-8;
+  min-height: 36px;
+  padding: 0 $spacing-16;
   align-items: center;
   gap: $spacing-8;
   border: 0;
   border-radius: $radius-8;
   color: var(--color-primary);
   background: transparent;
-  font-size: $font-size-12;
+  font-size: $font-size-14;
   font-weight: $font-weight-700;
   cursor: pointer;
 }
@@ -208,13 +304,13 @@
 }
 .checking {
   display: flex;
-  min-height: 86px;
+  min-height: 92px;
   padding: $spacing-24;
   align-items: center;
   justify-content: center;
   gap: $spacing-8;
   color: var(--color-text-muted);
-  font-size: $font-size-12;
+  font-size: $font-size-14;
 }
 .checking > :first-child {
   animation: spin 1s linear infinite;
@@ -225,8 +321,8 @@
 }
 .issueList > button {
   display: grid;
-  min-height: 82px;
-  padding: 13px $spacing-24;
+  min-height: 92px;
+  padding: $spacing-16 $spacing-24;
   grid-template-columns: 40px minmax(0, 1fr) auto 20px;
   align-items: center;
   gap: 12px;
@@ -262,12 +358,12 @@
 }
 .issueList strong {
   color: var(--color-text-primary);
-  font-size: $font-size-14;
+  font-size: $font-size-16;
 }
 .issueList small {
   @include text-truncate;
   color: var(--color-text-muted);
-  font-size: $font-size-10;
+  font-size: $font-size-12;
 }
 .issueList em {
   display: grid;

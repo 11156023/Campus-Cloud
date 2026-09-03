@@ -184,7 +184,7 @@
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
   animation: messageIn 150ms ease both;
 }
 
@@ -229,6 +229,78 @@
   line-height: 1.65;
 }
 
+/* 模型回的是 markdown，這裡把它排成正常的段落、清單與程式碼 */
+.markdown {
+  white-space: normal;
+
+  > :first-child { margin-top: 0; }
+  > :last-child { margin-bottom: 0; }
+
+  p { margin: 0 0 $spacing-8; }
+
+  ul, ol {
+    margin: 0 0 $spacing-8;
+    padding-left: 1.35em;
+  }
+
+  li { margin-bottom: 4px; }
+
+  h1, h2, h3, h4 {
+    margin: 14px 0 $spacing-8;
+    font-size: $font-size-14;
+    font-weight: $font-weight-700;
+    color: var(--color-text-primary);
+  }
+
+  strong { font-weight: $font-weight-700; }
+
+  code {
+    padding: 1px 5px;
+    border-radius: 4px;
+    background: var(--color-hover);
+    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: $font-size-12;
+  }
+
+  pre {
+    margin: 0 0 $spacing-8;
+    padding: 10px 12px;
+    overflow-x: auto;
+    border-radius: $radius-8;
+    background: var(--color-hover);
+
+    code {
+      padding: 0;
+      background: none;
+    }
+  }
+
+  a {
+    color: var(--color-primary);
+    text-decoration: underline;
+  }
+
+  table {
+    width: 100%;
+    margin-bottom: $spacing-8;
+    border-collapse: collapse;
+    font-size: $font-size-12;
+
+    th, td {
+      padding: 5px 8px;
+      border: 1px solid var(--color-border);
+      text-align: left;
+    }
+  }
+
+  blockquote {
+    margin: 0 0 $spacing-8;
+    padding-left: 10px;
+    border-left: 3px solid var(--color-border);
+    color: var(--color-text-secondary);
+  }
+}
+
 .actionList {
   display: flex;
   flex-direction: column;
@@ -255,6 +327,163 @@
     strong { font-size: $font-size-14; }
     small { color: var(--color-text-muted); font-size: $font-size-12; }
   }
+}
+
+/* 開場的能力說明：三種能力共用一個對話框，這裡是唯一會講出來的地方 */
+.capabilities {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-8;
+  width: 100%;
+  margin: 4px 0 16px;
+  padding: 0;
+  text-align: left;
+
+  li {
+    display: flex;
+    align-items: flex-start;
+    gap: 11px;
+    padding: 12px 14px;
+    border: 1px solid var(--color-border);
+    border-radius: $radius-12;
+    background: var(--color-surface);
+  }
+
+  span { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  strong { font-size: $font-size-14; }
+  small { color: var(--color-text-muted); font-size: $font-size-12; }
+}
+
+/* 配置模式的答案晶片：點一下就等於回答，不用打字 */
+.choiceBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.choiceRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+
+  button {
+    padding: 8px 14px;
+    border: 1px solid var(--color-border);
+    border-radius: $radius-pill;
+    background: var(--color-surface);
+    color: var(--color-text-primary);
+    font-size: $font-size-12;
+    cursor: pointer;
+
+    &:hover {
+      border-color: var(--color-primary);
+      color: var(--color-primary);
+    }
+  }
+}
+
+.choiceSkip {
+  color: var(--color-text-muted) !important;
+  border-style: dashed !important;
+}
+
+.choiceProgress {
+  color: var(--color-text-muted);
+  font-size: $font-size-12;
+}
+
+/* 推薦出來的配置 + 一鍵帶去填好的申請單 */
+.planCard {
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid var(--color-primary);
+  border-radius: $radius-12;
+  background: var(--color-surface);
+
+  button {
+    width: 100%;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-top: 12px;
+    padding: 12px 14px;
+    border: none;
+    border-radius: $radius-8;
+    background: var(--color-primary);
+    color: var(--color-text-on-primary);
+    text-align: left;
+    cursor: pointer;
+
+    &:hover { filter: brightness(1.05); }
+
+    span { display: flex; flex-direction: column; gap: 2px; }
+    strong { font-size: $font-size-14; }
+    small { opacity: 0.85; font-size: $font-size-12; }
+  }
+}
+
+.planSpec {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  font-size: $font-size-14;
+  line-height: 1.6;
+  color: var(--color-text-secondary);
+}
+
+/* 流程導覽：目前這一步高亮，已經過的那幾步壓低對比 */
+.stepList {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 14px 0 0;
+  padding: 0;
+
+  button {
+    width: 100%;
+    display: flex;
+    align-items: flex-start;
+    gap: 11px;
+    padding: 13px 14px;
+    border: 1px solid var(--color-border);
+    border-radius: $radius-12;
+    background: var(--color-surface);
+    color: var(--color-text-primary);
+    text-align: left;
+    cursor: pointer;
+
+    &:hover { border-color: var(--color-primary); }
+
+    span { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+    strong { font-size: $font-size-14; line-height: 1.45; }
+    small {
+      color: var(--color-text-muted);
+      font-size: $font-size-12;
+      line-height: 1.7;
+    }
+  }
+}
+
+.step_current button {
+  border-color: var(--color-primary);
+  box-shadow: inset 3px 0 0 var(--color-primary);
+}
+
+.step_done button {
+  opacity: 0.55;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+.step_todo button {
+  opacity: 0.9;
 }
 
 .typing {
