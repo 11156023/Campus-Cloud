@@ -22,7 +22,7 @@ import PageHeader from "../../../components/PageHeader/PageHeader";
 const UPDATE_KEYS = [
   "host", "user", "verify_ssl", "iso_storage", "data_storage",
   "api_timeout", "task_check_interval", "pool_name", "gateway_ip",
-  "local_subnet", "default_node", "placement_strategy",
+  "local_subnet", "default_node",
   "cpu_overcommit_ratio", "disk_overcommit_ratio",
   "placement_peak_cpu_margin",
   "placement_peak_memory_margin", "placement_loadavg_warn_per_core",
@@ -444,34 +444,6 @@ function SchedulerTab({ form, setField, onSave, saving }) {
   const SCHEDULER_GROUPS = useSchedulerGroups(t);
   return (
     <form className={styles.panelStack} onSubmit={onSave}>
-      <div className={styles.card}>
-        <h2 className={styles.cardTitle}>{t("SettingsPage.placementStrategyTitle")}</h2>
-        <div className={styles.strategyGrid}>
-          {[
-            {
-              value: "dominant_share_min",
-              title: "Dominant Share Min",
-              desc: t("SettingsPage.strategyDominantShareMinDesc"),
-            },
-            {
-              value: "priority_dominant_share",
-              title: "Priority Dominant Share",
-              desc: t("SettingsPage.strategyPriorityDominantShareDesc"),
-            },
-          ].map((opt) => (
-            <button
-              key={opt.value}
-              type="button"
-              className={form.placement_strategy === opt.value ? styles.strategyCardActive : styles.strategyCard}
-              onClick={() => setField("placement_strategy", opt.value)}
-            >
-              <span className={styles.strategyTitle}>{opt.title}</span>
-              <span className={styles.strategyDesc}>{opt.desc}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-
       {SCHEDULER_GROUPS.map((group) => (
         <div key={group.title} className={styles.card}>
           <h2 className={styles.cardTitle}>{group.title}</h2>

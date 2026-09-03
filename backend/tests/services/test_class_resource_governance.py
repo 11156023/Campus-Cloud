@@ -115,7 +115,7 @@ def test_class_capacity_preview_hides_caught_exception_details(monkeypatch):
                 custom_image_ref=None,
             )
         ],
-        students=[SimpleNamespace(id=uuid.uuid4())],
+        students=[SimpleNamespace(id=uuid.uuid4(), user_id=uuid.uuid4())],
         check_cluster=True,
     )
 

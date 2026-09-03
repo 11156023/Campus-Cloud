@@ -496,7 +496,11 @@ def create(
 
 
 def create_course_request(
-    *, session: Session, request_in: VMRequestCreate, user
+    *,
+    session: Session,
+    request_in: VMRequestCreate,
+    user,
+    placement_group_id: uuid.UUID | None = None,
 ) -> VMRequest:
     """Course Lab 內部專用：免審核建立課程實驗機申請。
 
@@ -522,6 +526,7 @@ def create_course_request(
         user_id=user.id,
         encrypted_password=encrypt_value(request_in.password),
         request_kind="course",
+        placement_group_id=placement_group_id,
         commit=False,
     )
     _approve_and_place(
@@ -544,7 +549,11 @@ def create_course_request(
 
 
 def create_quick_practice_request(
-    *, session: Session, request_in: VMRequestCreate, user
+    *,
+    session: Session,
+    request_in: VMRequestCreate,
+    user,
+    placement_group_id: uuid.UUID | None = None,
 ) -> VMRequest:
     """Create one machine request inside an already validated quick-practice session.
 
@@ -559,6 +568,7 @@ def create_quick_practice_request(
         user_id=user.id,
         encrypted_password=encrypt_value(request_in.password),
         request_kind="quick_template",
+        placement_group_id=placement_group_id,
         commit=False,
     )
     _approve_and_place(
@@ -785,6 +795,9 @@ def get_review_context(
             session=session,
             db_request=projection_request,
             reserved_requests=overlapping_requests,
+            # 直接沿用核准路徑（rebuild_reserved_assignments）算出的落點，
+            # 讓畫面標示的選定節點與按下核准後的結果必然一致。
+            selected_node=request_selection.node,
         )
         node_score_breakdowns = [
             VMRequestReviewNodeScore(
