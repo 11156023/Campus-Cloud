@@ -151,6 +151,7 @@
   "ResourcesPage.title": "My Resources",
   "ResourcesPage.subtitle": "View and manage your approved virtual machines and containers",
   "ResourcesPage.requestResource": "Request Resource",
+  "ResourcesPage.downloadDesktopClient": "Download Connection App",
   "ResourcesPage.colName": "Name",
   "ResourcesPage.colEnvironment": "Environment / OS",
   "ResourcesPage.colStatus": "Status",

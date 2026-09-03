@@ -151,6 +151,7 @@
   "ResourcesPage.title": "我的資源",
   "ResourcesPage.subtitle": "查看與管理申請通過的虛擬機和容器",
   "ResourcesPage.requestResource": "申請資源",
+  "ResourcesPage.downloadDesktopClient": "下載連線 App",
   "ResourcesPage.colName": "名稱",
   "ResourcesPage.colEnvironment": "環境／系統",
   "ResourcesPage.colStatus": "狀態",

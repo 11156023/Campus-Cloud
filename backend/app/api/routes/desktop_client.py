@@ -245,8 +245,11 @@ def _find_local_download_asset() -> Path | None:
 
 
 @router.get("/download")
-def download_desktop_client(session: SessionDep, current_user: CurrentUser):
+def download_desktop_client():
     """Return the desktop client installer or archive.
+
+    The installer is intentionally public so a normal browser download can
+    follow the redirect without exposing an API access token.
 
     If DESKTOP_CLIENT_DOWNLOAD_URL is set, redirects to that URL (e.g. a
     GitHub Releases asset). Otherwise serves a local file from static/downloads/

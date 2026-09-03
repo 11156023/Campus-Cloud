@@ -44,6 +44,9 @@ const TYPE_MAP = {
   qemu:  { labelKey: "ResourcesPage.typeQemu", icon: "computer" },
 };
 
+const API_BASE_URL = (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
+const DESKTOP_CLIENT_DOWNLOAD_URL = `${API_BASE_URL}/api/v1/desktop-client/download`;
+
 /* ── Helpers ── */
 function formatDate(isoStr) {
   if (!isoStr) return null;
@@ -507,14 +510,23 @@ export default function ResourcesPage() {
   return (
     <div className={styles.page}>
       <PageHeader title={t("ResourcesPage.title")} subtitle={t("ResourcesPage.subtitle")}>
-        <button
-          type="button"
-          className={styles.btnPrimary}
-          onClick={() => navigate("/my-requests", { state: { create: true } })}
-        >
-          <MIcon name="add" size={16} />
-          {t("ResourcesPage.requestResource")}
-        </button>
+        <div className={styles.pageActions}>
+          <a
+            className={styles.btnSecondary}
+            href={DESKTOP_CLIENT_DOWNLOAD_URL}
+          >
+            <MIcon name="download" size={16} />
+            {t("ResourcesPage.downloadDesktopClient")}
+          </a>
+          <button
+            type="button"
+            className={styles.btnPrimary}
+            onClick={() => navigate("/my-requests", { state: { create: true } })}
+          >
+            <MIcon name="add" size={16} />
+            {t("ResourcesPage.requestResource")}
+          </button>
+        </div>
       </PageHeader>
 
       {/* 我的配額用量（模組 E） */}
