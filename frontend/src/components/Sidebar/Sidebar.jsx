@@ -58,10 +58,8 @@ const navGroups = [
     label: "教學",
     icon: "school",
     items: [
-      { key: "class-setup", label: "一鍵建立班級", icon: "add_circle", instructorOnly: true },
       { key: "class-management", label: "班級管理", icon: "groups_2", instructorOnly: true },
       { key: "course-template-management", label: "多機環境模板", icon: "view_quilt", instructorOnly: true },
-      { key: "courses",    label: "課程學習（非正式）", icon: "flag" },
     ],
   },
   {

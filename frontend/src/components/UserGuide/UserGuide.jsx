@@ -47,12 +47,12 @@ const STUDENT_HOME_GUIDE = {
     {
       selector: '[data-guide="home-tasks"]',
       title: "完成數量看這裡",
-      text: "展開任務後，可以先查看老師上傳的任務 PDF，再依檢查項目完成操作並送出 AI Check。",
+      text: "每個任務都有自己的完成勾選框；完成時勾選，尚未完成時可以隨時取消。",
     },
     {
       selector: '[data-guide="course-ai-assignments"]',
       title: "這些是老師交給 AI 的評分項目",
-      text: "只會顯示老師已核准的檢查要求。「可自動檢查」會由系統確認；「老師人工確認」代表最後仍由老師判定。你不需要在這裡另外送出資料。",
+      text: "只會顯示老師已核准的檢查要求。這裡只記錄你的完成狀態，不會啟動 AI 檢查或直接判定對錯。",
       optional: true,
     },
   ],
