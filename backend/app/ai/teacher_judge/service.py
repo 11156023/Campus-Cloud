@@ -88,6 +88,7 @@ def _normalize_rubric_items(
     template_key: str | None = None,
     template_commands: list[TeacherJudgeTemplateCommand] | None = None,
     force_checked_false: bool = False,
+    strip_auto_fallback: bool = True,
 ) -> list[TeacherJudgeRubricItem]:
     """Best-effort normalization for AI-returned item payloads."""
     if not isinstance(raw_items, list):
@@ -128,7 +129,7 @@ def _normalize_rubric_items(
                 if detection_method is not None
                 else "目前沒有可引用的有效 command_key，缺少自動取得客觀證據的能力"
             )
-        if detectable == "auto":
+        if strip_auto_fallback and detectable == "auto":
             fallback = None
 
         normalized.append(
@@ -151,7 +152,9 @@ def _normalize_rubric_items(
 
 def normalize_items_for_export(raw_items: Any) -> list[TeacherJudgeRubricItem]:
     """Public helper for robust export parsing."""
-    return _normalize_rubric_items(raw_items)
+    # Export accepts legacy/teacher-authored payloads and must not silently
+    # discard an explicitly supplied fallback while normalizing field aliases.
+    return _normalize_rubric_items(raw_items, strip_auto_fallback=False)
 
 
 def _extract_context_item_count(rubric_context: str) -> int:
