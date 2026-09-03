@@ -330,10 +330,24 @@ def update_config(
 # ---------------------------------------------------------------------------
 
 def control(
-    node: str, vmid: int, resource_type: ResourceType, action: str
+    node: str,
+    vmid: int,
+    resource_type: ResourceType,
+    action: str,
+    *,
+    wait_timeout_seconds: float | None = None,
 ) -> None:
-    """Execute a power action on a resource."""
-    getattr(_resource_api(node, vmid, resource_type).status, action).post()
+    """Execute a power action on a resource.
+
+    ``wait_timeout_seconds`` 有值時阻塞等待 PVE 任務結束：任務失敗拋
+    ``ProxmoxError``（訊息含 task log tail，可辨識 vGPU 開機失敗等原因），
+    逾時拋 ``TimeoutError``（任務在 PVE 端照跑）。預設 fire-and-forget。
+    """
+    upid = getattr(_resource_api(node, vmid, resource_type).status, action).post()
+    if wait_timeout_seconds is not None and upid:
+        basic_blocking_task_status(
+            node, str(upid), timeout_seconds=wait_timeout_seconds
+        )
 
 
 def get_status(node: str, vmid: int, resource_type: ResourceType) -> dict:

@@ -18,6 +18,7 @@ from sqlalchemy import func as sa_func
 from sqlmodel import Session, col, select
 
 from app.core.db import engine
+from app.core.i18n import t
 from app.core.permissions import is_admin
 from app.exceptions import (
     BadRequestError,
@@ -132,7 +133,7 @@ def list_templates(*, session: Session, user: User) -> list[VMTemplatePublic]:
 def list_student_catalog(*, session: Session) -> list[TemplateCatalogItem]:
     """The application catalogue any signed-in user may request a machine from.
 
-    Only ready, explicitly opened templates appear, and each row is enriched
+    Only ready, globally visible templates appear, and each row is enriched
     with the PVE facts the request form needs (OS family and the source
     machine's own spec, which is the clone's floor).
     """
@@ -168,6 +169,7 @@ def list_student_catalog(*, session: Session) -> list[TemplateCatalogItem]:
                 # ostype 只有 VM 讀得到，而且每次查詢都會打 PVE，
                 # 所以只對目錄裡的 VM 逐筆確認
                 is_windows=(not is_lxc) and is_windows_template(template.pve_vmid),
+                requires_gpu=bool(template.requires_gpu),
                 cores=template.default_cores or (raw.get("maxcpu") or None),
                 memory_mb=template.default_memory
                 or (int(max_memory) // (1024 * 1024) if max_memory else None),
@@ -221,7 +223,7 @@ def _get_or_404(session: Session, template_id: uuid.UUID) -> VMTemplate:
         session=session, template_id=template_id
     )
     if template is None or template.status == VMTemplateStatus.deleted:
-        raise NotFoundError("Template not found")
+        raise NotFoundError(t("template.notFound"))
     return template
 
 
@@ -242,7 +244,7 @@ def _require_view(session: Session, user: User, template: VMTemplate) -> None:
     if not template_repo.is_template_visible_to_user(
         template=template, user_id=user.id
     ):
-        raise NotFoundError("Template not found")
+        raise NotFoundError(t("template.notFound"))
 
 
 def _require_owner(user: User, template: VMTemplate) -> None:
@@ -270,27 +272,30 @@ async def create_template(
     )
     if existing is not None and existing.status != VMTemplateStatus.deleted:
         raise ConflictError(
-            f"VMID {data.source_vmid} is already registered as a template"
+            t("template.vmidAlreadyRegistered", vmid=data.source_vmid)
         )
 
     try:
         pve_resource = proxmox_ops.find_resource(data.source_vmid)
     except NotFoundError:
         raise NotFoundError(
-            f"VM {data.source_vmid} not found in the managed pool"
+            t("template.sourceVmNotFound", vmid=data.source_vmid)
         )
     if pve_resource.get("template") == 1:
         raise BadRequestError(
-            f"VM {data.source_vmid} is already a PVE template"
+            t("template.sourceAlreadyPveTemplate", vmid=data.source_vmid)
         )
     resource_type = "lxc" if pve_resource.get("type") == "lxc" else "qemu"
     node = str(pve_resource["node"])
+
+    if data.requires_gpu and resource_type == "lxc":
+        raise BadRequestError(t("template.lxcGpuUnsupported"))
 
     # 母機若是平台管理的資源，僅擁有者或 admin 能轉換（轉換後原 VM 消失）
     owned = session.get(Resource, data.source_vmid)
     if owned is not None and owned.user_id != user.id and not is_admin(user):
         raise PermissionDeniedError(
-            f"VM {data.source_vmid} belongs to another user"
+            t("template.sourceVmBelongsToOther", vmid=data.source_vmid)
         )
 
     if existing is not None:
@@ -306,7 +311,7 @@ async def create_template(
             default_cores=data.default_cores,
             default_memory=data.default_memory,
             allow_password_change=data.allow_password_change,
-            student_requestable=data.student_requestable,
+            requires_gpu=data.requires_gpu,
             source_vmid=data.source_vmid,
         )
     else:
@@ -322,7 +327,7 @@ async def create_template(
             default_cores=data.default_cores,
             default_memory=data.default_memory,
             allow_password_change=data.allow_password_change,
-            student_requestable=data.student_requestable,
+            requires_gpu=data.requires_gpu,
             source_vmid=data.source_vmid,
         )
     try:
@@ -356,13 +361,13 @@ async def retry_template_conversion(
     _require_owner(user, template)
     _reconcile_failed_template_tasks(session, [template])
     if template.status != VMTemplateStatus.failed:
-        raise ConflictError("Only failed template conversions can be retried")
+        raise ConflictError(t("template.retryOnlyFailed"))
 
     try:
         pve_resource = proxmox_ops.find_resource(template.pve_vmid)
     except NotFoundError:
         raise NotFoundError(
-            f"Source VM {template.pve_vmid} no longer exists"
+            t("template.sourceVmGone", vmid=template.pve_vmid)
         )
     if pve_resource.get("template") == 1:
         template.status = VMTemplateStatus.ready
@@ -434,48 +439,15 @@ def update_template(
     updates: dict[str, Any] = data.model_dump(exclude_unset=True)
     for field, value in updates.items():
         setattr(template, field, value)
+    if template.requires_gpu and template.resource_type == "lxc":
+        raise BadRequestError(t("template.lxcGpuUnsupported"))
     template_repo.touch(session=session, template=template)
     return _to_public(template)
 
 
 # ---------------------------------------------------------------------------
-# icon 與附件（使用手冊）
+# 附件（使用手冊）
 # ---------------------------------------------------------------------------
-
-def upload_icon(
-    *,
-    session: Session,
-    user: User,
-    template_id: uuid.UUID,
-    content_type: str | None,
-    data: bytes,
-) -> VMTemplatePublic:
-    template = _get_or_404(session, template_id)
-    _require_owner(user, template)
-    ext = template_files.ICON_CONTENT_TYPES.get((content_type or "").lower())
-    if ext is None:
-        raise BadRequestError("僅支援 PNG / JPEG / WebP / SVG / GIF 圖片")
-    if len(data) > template_files.ICON_MAX_BYTES:
-        raise BadRequestError("圖片大小不可超過 2MB")
-    template_files.save_icon(template.id, ext, data)
-    # v= 時間戳讓 <img> 換圖時不吃瀏覽器快取
-    template.icon_url = (
-        f"/api/v1/templates/{template.id}/icon?v={int(time.time())}"
-    )
-    template_repo.touch(session=session, template=template)
-    return _to_public(template)
-
-
-def remove_icon(
-    *, session: Session, user: User, template_id: uuid.UUID
-) -> VMTemplatePublic:
-    template = _get_or_404(session, template_id)
-    _require_owner(user, template)
-    template_files.delete_icon(template.id)
-    template.icon_url = None
-    template_repo.touch(session=session, template=template)
-    return _to_public(template)
-
 
 def _template_attachments(
     session: Session, template_id: uuid.UUID
@@ -523,15 +495,15 @@ def get_manual_attachment_for_cloned_resource(
         session=session, vmid=vmid
     )
     if template is None:
-        raise NotFoundError("Manual not found for this resource")
+        raise NotFoundError(t("template.manualNotFound"))
     attachment = next(
         (a for a in attachments if a.id == attachment_id), None
     )
     if attachment is None:
-        raise NotFoundError("Attachment not found")
+        raise NotFoundError(t("template.attachmentNotFound"))
     path = template_files.attachment_path(template.id, attachment.id)
     if path is None:
-        raise NotFoundError("Attachment file is missing on server")
+        raise NotFoundError(t("template.attachmentFileMissing"))
     return path, attachment
 
 
@@ -549,21 +521,30 @@ def add_attachment(
 
     safe_name = Path(filename or "").name.strip()
     if not safe_name:
-        raise BadRequestError("檔名不可為空")
+        raise BadRequestError(t("template.filenameRequired"))
     ext = Path(safe_name).suffix.lower()
     if ext not in template_files.ATTACHMENT_ALLOWED_EXTENSIONS:
         allowed = "、".join(
             sorted(template_files.ATTACHMENT_ALLOWED_EXTENSIONS)
         )
-        raise BadRequestError(f"不支援的檔案類型 {ext or '(無副檔名)'}；可上傳：{allowed}")
+        raise BadRequestError(
+            t(
+                "template.attachmentTypeUnsupported",
+                ext=ext or t("template.noExtension"),
+                allowed=allowed,
+            )
+        )
     if len(data) > template_files.ATTACHMENT_MAX_BYTES:
-        raise BadRequestError("檔案大小不可超過 50MB")
+        raise BadRequestError(t("template.attachmentTooLarge"))
     existing = list_attachments(
         session=session, user=user, template_id=template_id
     )
     if len(existing) >= template_files.ATTACHMENT_MAX_COUNT:
         raise BadRequestError(
-            f"附件數量已達上限 {template_files.ATTACHMENT_MAX_COUNT} 個"
+            t(
+                "template.attachmentLimitReached",
+                limit=template_files.ATTACHMENT_MAX_COUNT,
+            )
         )
 
     attachment = TemplateAttachment(
@@ -590,10 +571,10 @@ def get_attachment_for_download(
     _require_view(session, user, template)
     attachment = session.get(TemplateAttachment, attachment_id)
     if attachment is None or attachment.template_id != template.id:
-        raise NotFoundError("Attachment not found")
+        raise NotFoundError(t("template.attachmentNotFound"))
     path = template_files.attachment_path(template.id, attachment.id)
     if path is None:
-        raise NotFoundError("Attachment file is missing on server")
+        raise NotFoundError(t("template.attachmentFileMissing"))
     return path, attachment
 
 
@@ -608,7 +589,7 @@ def remove_attachment(
     _require_owner(user, template)
     attachment = session.get(TemplateAttachment, attachment_id)
     if attachment is None or attachment.template_id != template.id:
-        raise NotFoundError("Attachment not found")
+        raise NotFoundError(t("template.attachmentNotFound"))
     session.delete(attachment)
     session.commit()
     template_files.delete_attachment(template.id, attachment_id)
@@ -651,25 +632,27 @@ async def delete_template(
     template = _get_or_404(session, template_id)
     _require_owner(user, template)
     if template.status == VMTemplateStatus.updating:
-        raise ConflictError(
-            "Template is in an update cycle; finish or cancel it first"
-        )
+        raise ConflictError(t("template.updateCycleInProgress"))
 
     children = _clone_children_vmids(session, template.pve_vmid)
     if children:
         raise ConflictError(
-            "Template still has cloned VMs: "
-            + ", ".join(str(v) for v in sorted(children))
-            + ". Delete them first."
+            t(
+                "template.hasClonedVms",
+                vmids=", ".join(str(v) for v in sorted(children)),
+            )
         )
 
     environments = _environments_referencing(session, template.id)
     if environments:
         shown = "、".join(environments[:3])
-        more = f" 等 {len(environments)} 個" if len(environments) > 3 else ""
+        more = (
+            t("template.referencedByEnvironmentsMore", count=len(environments))
+            if len(environments) > 3
+            else ""
+        )
         raise ConflictError(
-            f"多機環境「{shown}」{more}正在引用這個母範本，"
-            "請先把那些環境改用其他來源或下架後再刪除。"
+            t("template.referencedByEnvironments", shown=shown, more=more)
         )
 
     return await enqueue_task(
@@ -698,7 +681,7 @@ async def start_update_cycle(
     _require_owner(user, template)
     if template.status != VMTemplateStatus.ready:
         raise ConflictError(
-            f"Template must be ready to start an update cycle (now: {template.status.value})"
+            t("template.mustBeReadyForUpdate", status=template.status.value)
         )
 
     template.status = VMTemplateStatus.updating
@@ -726,12 +709,10 @@ async def finish_update_cycle(
     template = _get_or_404(session, template_id)
     _require_owner(user, template)
     if template.status != VMTemplateStatus.updating:
-        raise ConflictError("Template is not in an update cycle")
+        raise ConflictError(t("template.notInUpdateCycle"))
     temp_vmid = template.source_vmid
     if temp_vmid is None or temp_vmid == template.pve_vmid:
-        raise ConflictError(
-            "Update-cycle clone is not ready yet; wait for the clone task to finish"
-        )
+        raise ConflictError(t("template.updateCloneNotReady"))
 
     return await enqueue_task(
         session=session,
@@ -754,7 +735,7 @@ async def cancel_update_cycle(
     template = _get_or_404(session, template_id)
     _require_owner(user, template)
     if template.status != VMTemplateStatus.updating:
-        raise ConflictError("Template is not in an update cycle")
+        raise ConflictError(t("template.notInUpdateCycle"))
 
     return await enqueue_task(
         session=session,
@@ -1109,7 +1090,6 @@ def run_delete_task(task_id: uuid.UUID, payload: dict[str, Any]) -> dict[str, An
         if template is not None:
             template.status = VMTemplateStatus.deleted
             template.error_message = None
-            template.icon_url = None
             template_repo.touch(session=session, template=template, commit=False)
         for attachment in session.exec(
             select(TemplateAttachment).where(

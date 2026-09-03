@@ -7,22 +7,13 @@ import {
   apiPostMultipart,
 } from "./api";
 
-/** 範本 icon URL 白名單：僅接受本服務的 icon 端點或本地 blob 預覽。
- * icon_url 來自 API 資料，直接進 <img src> 前先驗證格式（防 XSS）。 */
-const ICON_URL_RE = /^\/api\/v1\/templates\/[0-9a-fA-F-]{36}\/icon(\?v=\d+)?$/;
-
-export function safeTemplateIconUrl(url) {
-  if (typeof url !== "string") return null;
-  return ICON_URL_RE.test(url) ? url : null;
-}
-
 export const TemplatesService = {
-  /** 列出可見範本（admin 全部；teacher 自有+可見）；學生無權限 */
+  /** 列出可見範本（admin 全部；teacher 自有+可見；student 僅 ready 且可見） */
   list(options) {
     return apiGet("/api/v1/templates/", options);
   },
 
-  /** 開放學生自行申請的應用範本目錄（任何登入者） */
+  /** 學生申請表單的應用範本目錄：全部可見且 ready 的範本（任何登入者） */
   catalog(options) {
     return apiGet("/api/v1/templates/catalog", options);
   },
@@ -55,18 +46,6 @@ export const TemplatesService = {
   /** 從範本克隆開通（student 單台；teacher/admin 可批量） */
   clone(templateId, body) {
     return apiPost(`/api/v1/templates/${templateId}/clone`, body);
-  },
-
-  /** 上傳範本 icon（擁有者或 admin；PNG/JPEG/WebP/SVG/GIF，2MB 內） */
-  uploadIcon(templateId, file) {
-    const form = new FormData();
-    form.append("file", file);
-    return apiPostMultipart(`/api/v1/templates/${templateId}/icon`, form);
-  },
-
-  /** 移除範本 icon */
-  removeIcon(templateId) {
-    return apiDelete(`/api/v1/templates/${templateId}/icon`);
   },
 
   /** 列出範本附件（使用手冊等） */

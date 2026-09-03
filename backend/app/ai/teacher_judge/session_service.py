@@ -26,6 +26,7 @@ from app.ai.teacher_judge.schemas import (
 )
 from app.ai.teacher_judge.service import chat_with_rubric
 from app.ai.teacher_judge.template_command_service import get_enabled_template_commands
+from app.core.i18n import t
 from app.models.teacher_judge_file import TeacherJudgeFile, TeacherJudgeFileStatus
 from app.models.teacher_judge_script_artifact import TeacherJudgeScriptArtifact
 from app.models.teacher_judge_script_run import TeacherJudgeScriptRun
@@ -68,14 +69,16 @@ def redact_message_content(value: str) -> str:
 
 def require_selected_file(db: Session, item: TeacherJudgeSession) -> TeacherJudgeFile:
     if not item.selected_file_id:
-        raise HTTPException(status_code=409, detail="這項檢查尚未選擇評分表。")
+        raise HTTPException(status_code=409, detail=t("session.no_rubric_selected"))
     file = db.get(TeacherJudgeFile, item.selected_file_id)
     if (
         not file
         or file.teaching_class_id != item.teaching_class_id
         or file.status != TeacherJudgeFileStatus.active
     ):
-        raise HTTPException(status_code=409, detail="這項檢查選定的評分表已無法使用。")
+        raise HTTPException(
+            status_code=409, detail=t("session.selected_file_unavailable")
+        )
     return file
 
 
@@ -93,7 +96,7 @@ def get_session(
 ) -> TeacherJudgeSession:
     item = db.get(TeacherJudgeSession, session_id)
     if not item or item.teaching_class_id != class_id:
-        raise HTTPException(status_code=404, detail="找不到這項檢查。")
+        raise HTTPException(status_code=404, detail=t("session.not_found"))
     return item
 
 
@@ -206,7 +209,7 @@ def ensure_selected_file_available(
         status_code=409,
         detail={
             "code": "teacher_judge_file_in_use",
-            "message": "這份評分表已被其他檢查使用；請使用「重構」建立獨立副本，或上傳新的評分表。",
+            "message": t("session.file_in_use"),
             "session_id": str(owner.id),
         },
     )
@@ -214,7 +217,7 @@ def ensure_selected_file_available(
 
 def ensure_active(item: TeacherJudgeSession) -> None:
     if item.status == TeacherJudgeSessionStatus.archived:
-        raise HTTPException(status_code=409, detail="已封存的檢查為唯讀。")
+        raise HTTPException(status_code=409, detail=t("session.archived_readonly"))
 
 
 def validate_selected_file(
@@ -230,7 +233,7 @@ def validate_selected_file(
     ):
         raise HTTPException(
             status_code=400,
-            detail="選擇的評分表來源不屬於這個班級。",
+            detail=t("session.file_not_in_class"),
         )
 
 
@@ -301,7 +304,7 @@ def _fork_title(db: Session, class_id: uuid.UUID, title: str) -> str:
         candidate = f"{title}（副本 {index}）"
         if candidate not in existing:
             return candidate
-    raise HTTPException(status_code=409, detail="無法建立檢查副本，請先重新命名原檢查。")
+    raise HTTPException(status_code=409, detail=t("session.fork_title_exhausted"))
 
 
 def fork_session_data(
@@ -321,7 +324,9 @@ def fork_session_data(
                 or source_file.teaching_class_id != source.teaching_class_id
                 or source_file.status != TeacherJudgeFileStatus.active
             ):
-                raise HTTPException(status_code=409, detail="原檢查的評分表已無法複製。")
+                raise HTTPException(
+                    status_code=409, detail=t("session.fork_file_unavailable")
+                )
             cloned_file = clone_file_asset(
                 session=db,
                 source=source_file,

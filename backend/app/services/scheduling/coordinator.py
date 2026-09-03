@@ -11,7 +11,7 @@ from sqlmodel import Session, select
 from app.core.db import engine
 from app.domain.scheduling.models import ScheduledTask
 from app.domain.scheduling.runner import run_polling_scheduler
-from app.exceptions import NotFoundError
+from app.exceptions import NotFoundError, ProxmoxError
 from app.models import (
     VMProvisioningStatus,
     VMRequest,
@@ -33,6 +33,28 @@ logger = logging.getLogger(__name__)
 # 這些名稱由此模組 re-export，測試以
 # ``app.services.scheduling.coordinator.<name>`` 引用或 monkeypatch。
 SCHEDULER_POLL_SECONDS = scheduling_policy.SCHEDULER_POLL_SECONDS
+
+# 自動開機改為阻塞等待 PVE 任務結果，才能攔截 vGPU 開不起來這類
+# 「API 接受了、QEMU 卻起不來」的失敗（qmstart 任務通常數秒內結束）
+_START_TASK_WAIT_SECONDS = 60.0
+
+# GPU 暫時開不了機時寫進 resource_warning 的訊息；開機成功後以同值比對清除
+GPU_WAIT_WARNING = (
+    "GPU 記憶體不足，機器暫時無法開機；系統會自動重試，等待 GPU 資源釋出"
+)
+
+# vGPU/passthrough 啟動失敗在 qmstart 任務 log 裡的特徵字串
+_GPU_START_ERROR_MARKERS = (
+    "nvidia-vgpu",
+    "vfio",
+    "mdev",
+    "error getting device from group",
+)
+
+
+def _is_gpu_start_failure(message: str) -> bool:
+    lower = message.lower()
+    return any(marker in lower for marker in _GPU_START_ERROR_MARKERS)
 
 
 def _utc_now() -> datetime:
@@ -431,11 +453,54 @@ def _ensure_request_running(
     request = vm_request_repo.get_vm_request_by_id(
         session=session, request_id=request.id, for_update=True,
     ) or request
+    # 鎖定後再確認一次：本 tick 撈單之後，使用者刪機流程可能已把申請單標成
+    # 已消耗（provisioning_status=failed）。這時不能再把它寫回 completed，
+    # 否則下個 tick 會把它當成活單、發現機器不見而重新 clone 出來。
+    if (
+        request.status != VMRequestStatus.approved
+        or request.provisioning_status == VMProvisioningStatus.failed
+    ):
+        logger.info(
+            "Skipping auto-start for request %s: consumed or deactivated "
+            "after this tick began",
+            request.id,
+        )
+        return False
 
     pve_status = proxmox_service.get_status(actual_node, request.vmid, resource_type)
     is_running = str(pve_status.get("status") or "").lower() == "running"
     if not is_running:
-        proxmox_service.control(actual_node, request.vmid, resource_type, "start")
+        try:
+            proxmox_service.control(
+                actual_node,
+                request.vmid,
+                resource_type,
+                "start",
+                wait_timeout_seconds=_START_TASK_WAIT_SECONDS,
+            )
+        except ProxmoxError as exc:
+            if not _is_gpu_start_failure(str(exc)):
+                raise
+            # GPU 記憶體不足屬暫時性：寫警示供前端顯示「等待 GPU 釋出」，
+            # 不標 failed——申請單留在 active 清單，之後的 tick 會繼續重試
+            request.resource_warning = GPU_WAIT_WARNING
+            session.add(request)
+            session.commit()
+            logger.warning(
+                "Auto-start blocked by GPU capacity for request %s (VMID %s): %s",
+                request.id, request.vmid, exc,
+            )
+            return False
+        except TimeoutError as exc:
+            # 任務還在 PVE 端跑（未失敗）：視為已觸發，下一個 tick 再對帳
+            logger.warning(
+                "Auto-start task still running for request %s (VMID %s): %s",
+                request.id, request.vmid, exc,
+            )
+
+    # 成功開機（或已在跑）代表 GPU 已擠得進去，清掉先前的等待警示
+    if request.resource_warning == GPU_WAIT_WARNING:
+        request.resource_warning = None
 
     vm_request_repo.update_vm_request_provisioning(
         session=session,
@@ -556,6 +621,26 @@ def process_due_request_starts() -> int:
                         continue
                 # VMID confirmed absent — clear and re-provision.
                 try:
+                    # 與「使用者刪機」的競態防護：SkyLab 刪除流程會以
+                    # mark_linked_request_consumed 把申請單標成 failed。
+                    # 本 tick 撈單在前、刪除 commit 在後時，這裡拿到的是
+                    # 舊資料——必須重讀 DB；已標 failed 或已非 approved
+                    # 代表刪除是使用者意圖，不是異常消失，不得重建。
+                    fresh = vm_request_repo.get_vm_request_by_id(
+                        session=session, request_id=request.id,
+                    )
+                    if (
+                        fresh is None
+                        or fresh.status != VMRequestStatus.approved
+                        or fresh.provisioning_status == VMProvisioningStatus.failed
+                    ):
+                        logger.info(
+                            "Skipping stale-VMID recovery for request %s: "
+                            "request was consumed or deactivated during this tick",
+                            request.id,
+                        )
+                        continue
+                    request = fresh
                     if stale_vmid is not None:
                         vm_request_repo.clear_vm_request_provisioning(
                             session=session,
@@ -613,6 +698,10 @@ def process_due_request_stops() -> int:
             session.exec(
                 select(VMRequest).where(
                     VMRequest.status == VMRequestStatus.approved,
+                    # failed = 已消耗（使用者刪機／轉範本）或機器異常，排程器
+                    # 不再接管。不排除的話，刪機後這裡會把 vmid 清掉，申請單
+                    # 在前端就變回「建立中／開通失敗」的 placeholder。
+                    VMRequest.provisioning_status != VMProvisioningStatus.failed,
                     VMRequest.vmid.is_not(None),
                     VMRequest.end_at.is_not(None),
                     VMRequest.end_at <= now,
@@ -655,12 +744,20 @@ def process_due_request_stops() -> int:
                     vmid,
                 )
             except NotFoundError:
-                logger.debug(
-                    "Scheduled shutdown skipped: resource %s not found for request %s, clearing vmid",
+                # 機器已不在 Proxmox（例如在 PVE 端被直接刪掉）。保留 vmid 供
+                # 稽核，標 failed 讓下個 tick 不再撈到；不要清 vmid——approved
+                # 且 vmid 為空在前端會被當成「建立中」placeholder。
+                logger.warning(
+                    "Scheduled shutdown skipped: resource %s not found for "
+                    "request %s; marking request failed",
                     vmid,
                     request.id,
                 )
-                request.vmid = None
+                request.provisioning_status = VMProvisioningStatus.failed
+                request.provisioning_error = (
+                    f"Resource {vmid} no longer exists on Proxmox; "
+                    "scheduled shutdown skipped"
+                )
                 session.add(request)
                 session.commit()
             except Exception:

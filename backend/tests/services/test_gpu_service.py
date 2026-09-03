@@ -372,3 +372,50 @@ class TestBuildGpuHostpci:
 
         self._patch(monkeypatch, self._detail([], available=1))
         assert _build_gpu_hostpci("TeslaM60", None) == "mapping=TeslaM60"
+
+
+class TestListGpuOptionsNodeFilter:
+    """list_gpu_options(node=...)：GPU 不可跨 PVE 連線，只回範本同叢集的 GPU。"""
+
+    @staticmethod
+    def _mapping(mapping_id: str, node: str):
+        from app.schemas.gpu import GPUMappingDetail
+
+        return GPUMappingDetail(
+            id=mapping_id,
+            description="",
+            maps=[GPUDeviceMap(node=node, path="0000:15:00.0")],
+        )
+
+    def _patch(self, monkeypatch) -> None:
+        node_to_conn = {"pve1": 1, "pve2": 1, "pve9": 2}
+        conn_to_nodes = {1: {"pve1", "pve2"}, 2: {"pve9"}}
+        monkeypatch.setattr(
+            gpu_service,
+            "list_gpu_mappings",
+            lambda: [self._mapping("gpu-a", "pve2"), self._mapping("gpu-b", "pve9")],
+        )
+        monkeypatch.setattr(
+            gpu_service, "get_connection_id_for_node", node_to_conn.get
+        )
+        monkeypatch.setattr(
+            gpu_service,
+            "get_nodes_for_connection",
+            lambda cid: set(conn_to_nodes.get(cid, set())),
+        )
+
+    def test_filters_to_template_connection(self, monkeypatch) -> None:
+        self._patch(monkeypatch)
+        options = gpu_service.list_gpu_options(node="pve1")
+        assert [o.mapping_id for o in options] == ["gpu-a"]
+
+    def test_no_node_returns_all(self, monkeypatch) -> None:
+        self._patch(monkeypatch)
+        options = gpu_service.list_gpu_options()
+        assert [o.mapping_id for o in options] == ["gpu-a", "gpu-b"]
+
+    def test_unregistered_node_fails_open(self, monkeypatch) -> None:
+        """節點沒登錄在 proxmox_nodes（舊環境）時不過濾，避免藏光所有 GPU。"""
+        self._patch(monkeypatch)
+        options = gpu_service.list_gpu_options(node="unknown-node")
+        assert [o.mapping_id for o in options] == ["gpu-a", "gpu-b"]

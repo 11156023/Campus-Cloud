@@ -26,7 +26,7 @@ def create_template(
     default_cores: int | None = None,
     default_memory: int | None = None,
     allow_password_change: bool = True,
-    student_requestable: bool = False,
+    requires_gpu: bool = False,
     source_vmid: int | None = None,
     commit: bool = True,
 ) -> VMTemplate:
@@ -42,7 +42,7 @@ def create_template(
         default_cores=default_cores,
         default_memory=default_memory,
         allow_password_change=allow_password_change,
-        student_requestable=student_requestable,
+        requires_gpu=requires_gpu,
         source_vmid=source_vmid,
     )
     session.add(template)
@@ -82,7 +82,7 @@ def revive_deleted_template(
     default_cores: int | None = None,
     default_memory: int | None = None,
     allow_password_change: bool = True,
-    student_requestable: bool = False,
+    requires_gpu: bool = False,
     source_vmid: int | None = None,
     commit: bool = True,
 ) -> VMTemplate:
@@ -104,8 +104,7 @@ def revive_deleted_template(
     template.default_memory = default_memory
     template.default_disk = None
     template.allow_password_change = allow_password_change
-    template.student_requestable = student_requestable
-    template.icon_url = None
+    template.requires_gpu = requires_gpu
     template.source_vmid = source_vmid
     template.version = 1
     template.error_message = None
@@ -153,12 +152,15 @@ def list_visible_templates(
     return list(session.exec(stmt).all())
 
 def list_student_catalog(*, session: Session) -> list[VMTemplate]:
-    """Templates a student may pick in the ordinary request form."""
+    """Templates a student may pick in the ordinary request form.
+
+    學生能不能用只看可見範圍：「全部可見」且 ready 的範本才進目錄。
+    """
     stmt = (
         select(VMTemplate)
         .where(
             VMTemplate.status == VMTemplateStatus.ready,
-            VMTemplate.student_requestable == True,  # noqa: E712
+            VMTemplate.visibility == VMTemplateVisibility.global_,
         )
         .order_by(col(VMTemplate.name))
     )

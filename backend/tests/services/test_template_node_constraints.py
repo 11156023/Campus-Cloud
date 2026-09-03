@@ -295,7 +295,7 @@ class TestPinnedNodeTemplateGuard:
             template_id=None,
         )
         request = PlacementRequest(resource_type="lxc", ostemplate=VOLID)
-        with pytest.raises(ProxmoxError, match="cannot access template"):
+        with pytest.raises(ProxmoxError, match="無法存取範本"):
             provisioning_service._select_request_placement(
                 session=None,
                 db_request=db_request,

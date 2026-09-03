@@ -58,12 +58,14 @@ def list_gpu_options(
     session: SessionDep,
     start_at: datetime | None = None,
     end_at: datetime | None = None,
+    node: str | None = None,
 ):
     """List available GPU options for VM request forms.
 
     Returns a simplified list showing model, VRAM, and availability.
+    ``node``（範本所在節點）指定時只回同一個 PVE 連線上的 GPU。
     """
-    options = gpu_service.list_gpu_options()
+    options = gpu_service.list_gpu_options(node=node)
     if not start_at or not end_at:
         return options
 

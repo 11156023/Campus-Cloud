@@ -1,3 +1,5 @@
+import i18n from "../../i18n";
+
 export const CLASS_TIMEZONES = ["Asia/Taipei", "Asia/Tokyo", "UTC"];
 
 function localDate(date) {
@@ -33,7 +35,7 @@ export function classSchedulePayload(form) {
   return {
     name: form.name.trim(),
     code: form.code.trim() || `CLASS-${Date.now().toString().slice(-8)}`,
-    term: form.term.trim() || "未指定",
+    term: form.term.trim() || i18n.t("classScheduleForm.unspecifiedTerm", { ns: "teaching" }),
     location: form.location.trim() || null,
     start_date: form.startDate,
     end_date: form.endDate,
