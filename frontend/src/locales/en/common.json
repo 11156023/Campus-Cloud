@@ -161,7 +161,7 @@
   "Sidebar.itemGpuMgmt": "GPU Management",
   "Sidebar.groupReview": "Review",
   "Sidebar.itemRequestReview": "Request Review",
-  "Sidebar.itemBatchReview": "Batch Review",
+  "Sidebar.itemBatchReview": "Class Review",
   "Sidebar.groupNetwork": "Network",
   "Sidebar.itemFirewall": "Firewall",
   "Sidebar.itemReverseProxy": "Reverse Proxy",

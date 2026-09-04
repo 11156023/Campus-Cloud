@@ -209,7 +209,8 @@ export default function RequestFormPage({ onBack, className, initialPrefill = nu
   const { user }  = useAuth();
   const toast     = useToast();
   const isPrivileged = user?.is_superuser || user?.role === "admin" || user?.role === "teacher";
-  const { setCompactFooter, registerRequestForm } = useContext(LayoutContext);
+  const { setCompactFooter, registerRequestForm, registerSurface } =
+    useContext(LayoutContext);
   useEffect(() => { setCompactFooter(true); return () => setCompactFooter(false); }, [setCompactFooter]);
 
   const [closing, setClosing]   = useState(false);
@@ -705,6 +706,54 @@ export default function RequestFormPage({ onBack, className, initialPrefill = nu
     });
     return () => registerRequestForm(null);
   }, [registerRequestForm]);
+
+  /* 畫面說明用的動態狀態：欄位當下的值與驗證錯誤。欄位的「意義」不在這裡——
+     label、說明與限制一律由後端的 surface 定義提供，這裡只回答「填了什麼」。
+     contextVersion 每次狀態變動就換一個值，助手用它丟棄過期的回答。 */
+  const surfaceState = () => ({
+    "request.hostname": { value: form.hostname, error: errors.hostname ?? null },
+    "request.os": {
+      value: resourceType === "vm" ? form.template_id : (selectedTplId || form.ostemplate),
+      error: errors.template_id ?? errors.ostemplate ?? null,
+    },
+    "request.username": { value: form.username, error: errors.username ?? null },
+    "request.password": { value: form.password, error: errors.password ?? null },
+    "request.cores": { value: String(form.cores ?? "") },
+    "request.memory": { value: String(form.memory ?? "") },
+    "request.disk": {
+      value: String(
+        (resourceType === "lxc" ? form.rootfs_size : form.disk_size) ?? "",
+      ),
+    },
+    "request.gpu": {
+      value: form.gpu_mapping_id,
+      error: errors.gpu_mapping_id ?? null,
+    },
+    "request.vgpu": { value: form.gpu_mdev_profile },
+    "request.mode": { value: mode },
+    "request.start_at": { value: form.start_at, error: errors.start_at ?? null },
+    "request.end_at": { value: form.end_at, error: errors.end_at ?? null },
+    "request.reason": { value: form.reason, error: errors.reason ?? null },
+    /* 送出鈕沒有被驗證停用——這張表單是按下去才驗證的。只有送出中才是真的停用，
+       據實回報，否則助手會解釋一個不存在的停用原因。 */
+    "request.submit": { disabled: submitting },
+  });
+  const surfaceStateRef = useRef(surfaceState);
+  surfaceStateRef.current = surfaceState;
+  /* render 期間不做副作用：版本號在 render 之後才遞增，語意一樣是「畫面又變了」。 */
+  const contextVersion = useRef(0);
+  useEffect(() => {
+    contextVersion.current += 1;
+  });
+
+  useEffect(() => {
+    if (!registerSurface) return undefined;
+    registerSurface("request-form", {
+      getState: () => surfaceStateRef.current(),
+      getVersion: () => contextVersion.current,
+    });
+    return () => registerSurface("request-form", null);
+  }, [registerSurface]);
 
   function handleBack() {
     setClosing(true);
