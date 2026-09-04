@@ -8,6 +8,10 @@ import { useAuth } from "../../contexts/AuthContext";
 import { LayoutContext } from "../../layout/layoutContext";
 import { AiNavigationService } from "../../services/aiNavigation";
 import { AiTemplateRecommendationApi } from "../../services/aiTemplateRecommendation";
+import {
+  AiContextualHelpService,
+  matchSurface,
+} from "../../services/aiContextualHelp";
 import MIcon from "../MIcon";
 import useDialogPresence from "../../hooks/useDialogPresence";
 import styles from "./AiFloatingChat.module.scss";
@@ -44,6 +48,7 @@ const CAPABILITIES = [
   { icon: "explore", titleKey: "AiFloatingChat.capabilityFindTitle", detailKey: "AiFloatingChat.capabilityFindDetail" },
   { icon: "checklist", titleKey: "AiFloatingChat.capabilityGuideTitle", detailKey: "AiFloatingChat.capabilityGuideDetail" },
   { icon: "auto_fix_high", titleKey: "AiFloatingChat.capabilityRecommendTitle", detailKey: "AiFloatingChat.capabilityRecommendDetail" },
+  { icon: "help_center", titleKey: "AiFloatingChat.capabilityExplainTitle", detailKey: "AiFloatingChat.capabilityExplainDetail" },
 ];
 
 const NAVIGATION_PATTERN = /(帶我|前往|打開|開啟|跳到|導航|在哪|哪裡|頁面)/i;
@@ -52,15 +57,76 @@ const GUIDE_PATTERN = /(怎麼|怎樣|如何|步驟|流程|我要|我想|幫我)
 /* 問規格、問選哪個 → 交給推薦規劃，回來的是一份可以直接填進申請單的配置。 */
 const RECOMMEND_PATTERN =
   /(推薦|建議|規格|配置|幾核|多少核|記憶體|多大|硬碟|該用|適合|還是|哪個|哪種|比較|差別|差異)/i;
+/* 問眼前這個畫面的事：欄位怎麼填、為什麼送不出去、這頁在做什麼。
+   要排在導覽前面——「這格要填什麼」是要說明，不是要被帶去別頁。 */
+/* 閘門刻意放寬：真正的分類在後端（intent.py），那裡認得比較多說法，而且答不
+   出來時會退回頁面說明。前端寫太窄只會把好的分類器擋在外面。 */
+const HELP_PATTERN = new RegExp(
+  [
+    // 指著畫面上的東西問
+    "這格|這欄|這個欄位|欄位|這顆|這個按鈕|按鈕|這個選項|這裡|這張表|這個狀態",
+    "這頁|這一頁|本頁|這個頁面|目前頁面",
+    // 問意義與用法
+    "是什麼|什麼意思|代表什麼|用來做什麼|做什麼用|用途|怎麼用|怎麼填|要填什麼|填什麼",
+    "怎麼選|要選什麼|有什麼限制|限制是|格式|可以做什麼|能做什麼|解釋",
+    // 問為什麼被擋
+    "為什麼不能|為什麼送不|送不出|送不了|沒反應|按不了|紅字|驗證|必填|反灰|停用|灰的",
+  ].join("|"),
+  "i",
+);
 
 /**
  * 一句話該交給哪個能力：推薦配置、導覽（含流程）、或一般問答。
  * 三者共用同一個對話框，使用者不需要知道背後是不同的服務。
  */
+/* 問的是整個平台還是眼前這一頁。兩者的答案完全不同：
+   「平台怎麼用」要的是功能清單，「這頁怎麼用」要的是這一頁的說明。 */
+const GLOBAL_SCOPE_PATTERN = /(平台|系統|全站|整個網站|這個網站|skylab)/i;
+const SCREEN_SCOPE_PATTERN =
+  /(這頁|這一頁|本頁|這個頁面|目前頁面|這格|這欄|這個欄位|這顆|這個按鈕|這裡)/i;
+/* 「有哪些功能」不是導覽——導覽只會挑一頁帶你去，答不出一張清單。 */
+const INDEX_PATTERN =
+  /(有哪些功能|有什麼功能|哪些功能|功能清單|功能列表|有哪些頁面|可以做哪些)/i;
+const GLOBAL_USAGE_PATTERN = /(可以做什麼|能做什麼|怎麼用|做什麼)/i;
+
+/** 問的是「這個平台有哪些功能」而不是某一頁。 */
+export function isFeatureIndex(text) {
+  if (SCREEN_SCOPE_PATTERN.test(text)) return false;
+  if (INDEX_PATTERN.test(text)) return true;
+  return GLOBAL_SCOPE_PATTERN.test(text) && GLOBAL_USAGE_PATTERN.test(text);
+}
+
+/* 講到流程或步驟就是要被帶著走，不管句子裡還有什麼——導覽優先於說明。 */
+const FLOW_PATTERN = /(流程|步驟)/i;
+
+/** 問的是眼前這個畫面。提到平台或系統而沒指著畫面，就不算。 */
+export function isScreenHelp(text) {
+  if (FLOW_PATTERN.test(text)) return false;
+  if (!HELP_PATTERN.test(text)) return false;
+  return !GLOBAL_SCOPE_PATTERN.test(text) || SCREEN_SCOPE_PATTERN.test(text);
+}
+
 export function routeQuestion(text) {
+  if (isFeatureIndex(text)) return "index";
+  if (isScreenHelp(text)) return "help";
   if (RECOMMEND_PATTERN.test(text)) return "recommend";
   if (NAVIGATION_PATTERN.test(text) || GUIDE_PATTERN.test(text)) return "navigate";
   return "chat";
+}
+
+/**
+ * 功能索引要列哪些畫面。
+ * 帶參數的路徑（資源詳細）進不去，同一個路徑只留一個（申請列表與申請表單
+ * 是同一個入口），避免清單裡出現點了沒用或重複的項目。
+ */
+export function indexableSurfaces(surfaces) {
+  const seen = new Set();
+  return (surfaces ?? []).filter((surface) => {
+    if (!surface?.path || surface.path.includes(":")) return false;
+    if (seen.has(surface.path)) return false;
+    seen.add(surface.path);
+    return true;
+  });
 }
 
 /**
@@ -272,7 +338,10 @@ export default function AiFloatingChat({ open = false, onOpenChange = () => {} }
   const { t } = useTranslation("components");
   /* 申請表單開著時會把自己註冊進來：規劃就地填進欄位，而且拿得到
      這張表單當下的真實候選，推薦的 GPU 與時段才不會是憑空的。 */
-  const { requestForm } = useContext(LayoutContext);
+  const { requestForm, surface } = useContext(LayoutContext);
+  /* 目前這一頁對應到哪個畫面定義。有頁面自己註冊就用它（同一個路徑可能有多個
+     畫面，例如申請列表與申請表單），否則靠路徑對照。清單只跟身分有關，載一次。 */
+  const [surfaceList, setSurfaceList] = useState([]);
   const [messages, setMessages] = useState([]);
   const [history, setHistory] = useState([]);
   const [input, setInput] = useState("");
@@ -286,6 +355,18 @@ export default function AiFloatingChat({ open = false, onOpenChange = () => {} }
   // 正在進行的流程，配置產生後要接回它的下一步，不能斷在配置卡片
   const flowRef = useRef(null);
   const pageContext = useMemo(() => pageContextFor(location.pathname), [location.pathname]);
+  const activeSurfaceId = useMemo(
+    () => surface?.id ?? matchSurface(surfaceList, location.pathname)?.id ?? null,
+    [surface, surfaceList, location.pathname],
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    AiContextualHelpService.surfaces()
+      .then((list) => { if (!cancelled) setSurfaceList(list ?? []); })
+      .catch(() => { /* 對照表載不到就只剩頁面自己註冊的那一個，不影響其他能力 */ });
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     if (open) window.setTimeout(() => inputRef.current?.focus(), 120);
@@ -491,6 +572,43 @@ export default function AiFloatingChat({ open = false, onOpenChange = () => {} }
     }
   }
 
+  /* 功能索引：使用者問「有哪些功能」。清單就是他權限內看得到的畫面，
+     不呼叫模型——列清單不需要推論，也不該有幻覺的空間。 */
+  function sendFeatureIndex() {
+    const targets = indexableSurfaces(surfaceList).map((surface) => ({
+      path: surface.path,
+      title: surface.title,
+      reason: surface.purpose ?? "",
+    }));
+    if (!targets.length) return false;
+    const content = t("AiFloatingChat.featureIndexIntro", { count: targets.length });
+    setMessages((previous) => [...previous, { role: "assistant", content, targets }]);
+    setHistory((previous) => [...previous, {
+      role: "assistant",
+      content: `${content}（${targets.map((target) => target.title).join("、")}）`,
+    }]);
+    return true;
+  }
+
+  /* 畫面說明：只問眼前這一頁。沒有對應的畫面定義就交給下一個能力，
+     不要硬答——這個助手的價值全在「講的都有依據」。 */
+  async function sendContextualHelp(text) {
+    if (!activeSurfaceId) return false;
+    const data = await AiContextualHelpService.explain({
+      question: text,
+      surfaceId: activeSurfaceId,
+      activeTarget: surface?.getActiveTarget?.() ?? null,
+      contextVersion: surface?.getVersion?.() ?? 0,
+      state: surface?.getState?.() ?? {},
+    });
+    const answer = data?.answer?.trim();
+    if (!answer) return false;
+    const assistantMessage = { role: "assistant", content: answer };
+    setMessages((previous) => [...previous, assistantMessage]);
+    setHistory((previous) => [...previous, assistantMessage]);
+    return true;
+  }
+
   async function sendChat(text, nextHistory) {
     const contextualHistory = nextHistory.map((message, index) => {
       if (index !== nextHistory.length - 1 || message.role !== "user") return message;
@@ -536,6 +654,8 @@ export default function AiFloatingChat({ open = false, onOpenChange = () => {} }
 
       let handled = false;
       if (stayInIntake || route === "recommend") handled = await advanceIntake(nextHistory);
+      else if (route === "index") handled = sendFeatureIndex();
+      else if (route === "help") handled = await sendContextualHelp(text);
       else if (route === "navigate") handled = await sendNavigation(text, nextHistory);
       if (!handled) await sendChat(text, nextHistory);
     } catch (error) {
