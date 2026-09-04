@@ -43,12 +43,12 @@ const DEFAULT_CONTEXT = {
   suggestionKeys: ["AiFloatingChat.pageDefaultSuggestion1", "AiFloatingChat.pageDefaultSuggestion2", "AiFloatingChat.pageDefaultSuggestion3"],
 };
 
-/* 同一個對話框背後有三種能力，開場就講清楚，使用者才會用到後面兩個。 */
+/* 同一個對話框背後有幾種能力，開場列出名稱，使用者才會用到後面幾個。 */
 const CAPABILITIES = [
-  { icon: "explore", titleKey: "AiFloatingChat.capabilityFindTitle", detailKey: "AiFloatingChat.capabilityFindDetail" },
-  { icon: "checklist", titleKey: "AiFloatingChat.capabilityGuideTitle", detailKey: "AiFloatingChat.capabilityGuideDetail" },
-  { icon: "auto_fix_high", titleKey: "AiFloatingChat.capabilityRecommendTitle", detailKey: "AiFloatingChat.capabilityRecommendDetail" },
-  { icon: "help_center", titleKey: "AiFloatingChat.capabilityExplainTitle", detailKey: "AiFloatingChat.capabilityExplainDetail" },
+  { icon: "explore", titleKey: "AiFloatingChat.capabilityFindTitle" },
+  { icon: "checklist", titleKey: "AiFloatingChat.capabilityGuideTitle" },
+  { icon: "auto_fix_high", titleKey: "AiFloatingChat.capabilityRecommendTitle" },
+  { icon: "help_center", titleKey: "AiFloatingChat.capabilityExplainTitle" },
 ];
 
 const NAVIGATION_PATTERN = /(帶我|前往|打開|開啟|跳到|導航|在哪|哪裡|頁面)/i;
@@ -355,10 +355,15 @@ export default function AiFloatingChat({ open = false, onOpenChange = () => {} }
   // 正在進行的流程，配置產生後要接回它的下一步，不能斷在配置卡片
   const flowRef = useRef(null);
   const pageContext = useMemo(() => pageContextFor(location.pathname), [location.pathname]);
-  const activeSurfaceId = useMemo(
-    () => surface?.id ?? matchSurface(surfaceList, location.pathname)?.id ?? null,
-    [surface, surfaceList, location.pathname],
-  );
+  const activeSurface = useMemo(() => {
+    const matched = matchSurface(surfaceList, location.pathname);
+    if (!surface?.id) return matched;
+    return surfaceList.find((item) => item.id === surface.id) ?? matched;
+  }, [surface, surfaceList, location.pathname]);
+  const activeSurfaceId = activeSurface?.id ?? surface?.id ?? null;
+  /* 頁名優先用畫面定義的標題：它涵蓋每一頁，PAGE_CONTEXTS 只列了一部分，
+     沒列到的會落到「SkyLab」，等於沒講。 */
+  const currentPageName = activeSurface?.title ?? t(pageContext.titleKey);
 
   useEffect(() => {
     let cancelled = false;
@@ -614,7 +619,7 @@ export default function AiFloatingChat({ open = false, onOpenChange = () => {} }
       if (index !== nextHistory.length - 1 || message.role !== "user") return message;
       return {
         ...message,
-        content: `目前所在頁面：${t(pageContext.titleKey)}。使用者問題：${message.content}`,
+        content: `目前所在頁面：${currentPageName}。使用者問題：${message.content}`,
       };
     });
     const data = await AiTemplateRecommendationApi.chat({
@@ -712,7 +717,7 @@ export default function AiFloatingChat({ open = false, onOpenChange = () => {} }
             ) : (
               <>
                 <MIcon name="web_asset" size={16} />
-                <span>{t("AiFloatingChat.contextViewingPage", { page: t(pageContext.titleKey) })}</span>
+                <span>{t("AiFloatingChat.contextViewingPage", { page: currentPageName })}</span>
               </>
             )}
           </div>
@@ -720,7 +725,6 @@ export default function AiFloatingChat({ open = false, onOpenChange = () => {} }
           <div className={styles.messages} ref={scrollRef}>
             {messages.length === 0 ? (
               <div className={styles.emptyState}>
-                <span className={styles.emptyIcon}><MIcon name="auto_awesome" size={30} /></span>
                 <h2>{displayName(user, t)}{t("AiFloatingChat.greetingSuffix")}</h2>
                 <p>{t("AiFloatingChat.emptyStatePrompt")}</p>
                 {/* 能力要講出來，不然沒有人知道可以叫它推薦規格、幫忙填表 */}
@@ -728,10 +732,7 @@ export default function AiFloatingChat({ open = false, onOpenChange = () => {} }
                   {CAPABILITIES.map((item) => (
                     <li key={item.titleKey}>
                       <MIcon name={item.icon} size={17} />
-                      <span>
-                        <strong>{t(item.titleKey)}</strong>
-                        <small>{t(item.detailKey)}</small>
-                      </span>
+                      <strong>{t(item.titleKey)}</strong>
                     </li>
                   ))}
                 </ul>
