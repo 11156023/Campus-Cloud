@@ -81,25 +81,6 @@
   gap: $spacing-8;
 }
 
-.btnAssistant,
-.btnAssistantActive {
-  @extend .btnSecondary;
-  position: relative;
-}
-
-.btnAssistantActive {
-  border-color: var(--color-primary);
-  color: var(--color-primary);
-  background: color-mix(in srgb, var(--color-primary) 8%, var(--color-surface));
-}
-
-.assistantPending {
-  margin-left: 2px;
-  color: var(--color-primary);
-  font-size: $font-size-12;
-  font-weight: $font-weight-700;
-}
-
 .sectionActions {
   display: flex;
   flex-wrap: wrap;
@@ -445,11 +426,9 @@
   gap: $spacing-24;
   align-items: start;
 
-  &.analysisGridAssistantOpen {
-    @include respond-to(xl) {
-      grid-template-columns: minmax(0, 1fr) 360px;
-      align-items: stretch;
-    }
+  @include respond-to(xl) {
+    grid-template-columns: minmax(0, 1fr) 440px;
+    align-items: stretch;
   }
 }
 
@@ -467,135 +446,6 @@
   align-self: stretch;
 }
 
-.summaryDetails {
-  border-radius: $radius-8;
-  background: var(--color-hover);
-  font-size: $font-size-14;
-  color: var(--color-text-secondary);
-
-  strong {
-    display: block;
-    padding: $spacing-8 $spacing-16;
-    font-weight: $font-weight-500;
-    color: var(--color-text-primary);
-  }
-
-  p {
-    margin: 0;
-    padding: 0 $spacing-16 $spacing-16;
-    line-height: $line-height-base;
-  }
-}
-
-.assessmentSummary {
-  @include flex-column;
-  gap: $spacing-16;
-  padding: $spacing-4;
-}
-
-.assessmentHead {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: $spacing-16;
-
-  > div:first-child {
-    min-width: 0;
-  }
-
-  h4 {
-    margin: 0;
-    color: var(--color-text-primary);
-    font-size: $font-size-16;
-    font-weight: $font-weight-700;
-  }
-
-  p {
-    margin: 4px 0 0;
-    color: var(--color-text-secondary);
-    font-size: $font-size-12;
-    line-height: 1.5;
-  }
-}
-
-.assessmentHeadActions {
-  display: flex;
-  align-items: center;
-  flex-shrink: 0;
-  gap: $spacing-8;
-}
-
-.assessmentTitleRow {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: $spacing-8;
-}
-
-.assessmentStatus_current,
-.assessmentStatus_stale {
-  display: inline-flex;
-  align-items: center;
-  min-height: 22px;
-  padding: 2px 8px;
-  border-radius: $radius-pill;
-  font-size: $font-size-10;
-  font-weight: $font-weight-700;
-}
-
-.assessmentStatus_current {
-  color: var(--color-success);
-  background: color-mix(in srgb, var(--color-success) 12%, transparent);
-}
-
-.assessmentStatus_stale {
-  color: var(--color-pending);
-  background: color-mix(in srgb, var(--color-pending) 14%, transparent);
-}
-
-.statsBar {
-  display: flex;
-  min-height: 10px;
-  overflow: hidden;
-  border-radius: $radius-pill;
-  background: var(--color-divider);
-}
-
-.statsBar > span {
-  min-width: 2px;
-}
-
-.statsSeg_auto { background: var(--color-success); }
-.statsSeg_partial { background: var(--color-pending); }
-.statsSeg_manual { background: var(--color-danger); }
-
-.statsLegend {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: $spacing-8 $spacing-16;
-  color: var(--color-text-secondary);
-  font-size: $font-size-12;
-}
-
-.legendItem {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.legendItem i {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-}
-
-.legendDot_auto { background: var(--color-success); }
-.legendDot_partial { background: var(--color-pending); }
-.legendDot_manual { background: var(--color-danger); }
-.legendTotal { margin-left: auto; color: var(--color-text-muted); }
-
 .insightModal {
   width: min(720px, 100%);
   max-height: min(760px, 88vh);
@@ -604,6 +454,11 @@
 /* ── 評分項目表格 ── */
 .rubricTableCard {
   overflow: hidden;
+
+  @include respond-to(xl) {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
 }
 
 .rubricTableWrap {
@@ -793,35 +648,6 @@
 .detBadge_stale { outline: 1px dashed currentColor; outline-offset: 2px; }
 .detBadge em { font-size: $font-size-10; font-style: normal; font-weight: $font-weight-700; }
 
-.rubricField {
-  @include flex-column;
-  gap: 4px;
-  font-size: $font-size-12;
-  font-weight: $font-weight-500;
-  color: var(--color-text-secondary);
-
-  input {
-    min-height: 34px;
-    padding: 6px $spacing-16;
-    border: 1px solid var(--color-border);
-    border-radius: $radius-8;
-    background: var(--color-surface);
-    color: var(--color-text-primary);
-    outline: none;
-    font-size: $font-size-14;
-
-    &:focus {
-      border-color: var(--color-primary);
-      box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 12%, transparent);
-    }
-
-    &:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-  }
-}
-
 .detectGrid {
   display: grid;
   grid-template-columns: 1fr;
@@ -888,6 +714,7 @@
     position: sticky;
     top: $spacing-24;
     height: 100%;
+    min-height: min(640px, calc(100vh - 48px));
     max-height: none;
     box-sizing: border-box;
   }
@@ -1445,14 +1272,40 @@
   color: var(--color-text-primary);
   text-align: left;
   cursor: pointer;
+}
 
-  > strong {
-    display: block;
-    width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
+.sessionTitleViewport {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.sessionTitle {
+  display: block;
+  width: max-content;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transform: translateX(0);
+  transform-origin: left center;
+  transition: transform 220ms ease-out;
+}
+
+.sessionTitleViewport:hover .sessionTitleOverflowing,
+.sessionItem:focus-visible .sessionTitleOverflowing,
+.sessionItemActive:focus-visible .sessionTitleOverflowing {
+  max-width: none;
+  overflow: visible;
+  text-overflow: clip;
+  animation: sessionTitleMarquee 8s linear 1 both;
+  will-change: transform;
+}
+
+@keyframes sessionTitleMarquee {
+  0%, 18% { transform: translateX(0); }
+  82%, 100% { transform: translateX(calc(var(--session-title-shift, 0px) * -1)); }
 }
 
 .sessionRow {
@@ -1486,6 +1339,38 @@
 
 .sessionRowActions .iconBtn { width: 36px; height: 36px; }
 .pinActive { color: var(--color-primary); }
+
+.sessionRowRenaming {
+  border-color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 8%, transparent);
+}
+
+.sessionRenameForm {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  padding: 5px 8px;
+}
+
+.sessionRenameInput {
+  width: 100%;
+  min-width: 0;
+  min-height: 32px;
+  padding: 6px 8px;
+  border: 1px solid var(--color-primary);
+  border-radius: $radius-8;
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font: inherit;
+  font-size: $font-size-12;
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 12%, transparent);
+}
+
+.sessionRenameInput:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
 
 @keyframes menuIn {
   from { opacity: 0; transform: translateY(4px); }
@@ -1559,8 +1444,6 @@
 .sidebarEmpty, .mainEmpty { display: flex; flex-direction: column; align-items: center; gap: $spacing-8; padding: $spacing-16 $spacing-8; color: var(--color-text-muted); text-align: center; }
 .sidebarEmpty p, .mainEmpty p { margin: 0; font-size: $font-size-12; line-height: 1.45; }
 .mainEmpty { min-height: 240px; }.mainEmpty > .material-icons-outlined { color: var(--color-primary); }
-.archivedNotice { @include badge-base; gap: 5px; padding: 5px 8px; color: var(--color-pending); background: color-mix(in srgb, var(--color-pending) 10%, transparent); white-space: nowrap; }
-.renameDialog { width: min(420px, calc(100vw - 28px)); }
 
 .sourceRail {
   display: flex;
@@ -1704,25 +1587,6 @@
   min-width: 0;
 }
 
-.sessionHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: $spacing-16;
-  margin-bottom: $spacing-16;
-
-  h3,
-  p {
-    margin: 0;
-  }
-
-  p {
-    margin-top: 4px;
-    color: var(--color-text-muted);
-    font-size: $font-size-12;
-  }
-}
-
 .proposalCard {
   display: grid;
   gap: $spacing-16;
@@ -1792,11 +1656,6 @@
   gap: $spacing-8;
 }
 
-.settingsBody {
-  display: grid;
-  gap: $spacing-16;
-}
-
 .runHistory {
   display: grid;
   gap: $spacing-8;
@@ -1850,6 +1709,17 @@
 @media (prefers-reduced-motion: reduce) {
   .createChoice { transition-duration: .01ms; }
   .createChoice:hover { transform: none; }
+  .sessionTitleViewport:hover .sessionTitleOverflowing,
+  .sessionItem:focus-visible .sessionTitleOverflowing,
+  .sessionItemActive:focus-visible .sessionTitleOverflowing {
+    animation: none;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transform: none;
+    transition-duration: .01ms;
+    will-change: auto;
+  }
 }
 
 /* ── 表單欄位 ── */

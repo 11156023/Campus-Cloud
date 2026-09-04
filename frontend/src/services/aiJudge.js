@@ -12,6 +12,8 @@ import i18n from "../i18n";
 // 腳本產生會依序執行 generation、policy/quality 修正與 AI reviewer，
 // 不能沿用一般 API 的 15 秒 request budget。後端每次 vLLM 呼叫仍有自己的 timeout。
 const SCRIPT_GENERATION_TIMEOUT_MS = 7 * 60 * 1000;
+// Teacher Judge 的 AI 分析／對話以 backend/config/system-ai.json 的 60 秒為準。
+export const TEACHER_JUDGE_REQUEST_TIMEOUT_MS = 60 * 1000;
 
 /** 評分環境模板選項 */
 export const TEMPLATE_OPTIONS = [
@@ -23,7 +25,7 @@ export const TEMPLATE_OPTIONS = [
 
 /** 正式工作區與獨立編輯頁共用的整表潤飾動作。 */
 export const RUBRIC_POLISH_PROMPT =
-  "請在不改變原始評分目標的前提下潤飾目前評分表：讓每個項目的成功條件與證據清楚到下一層檢查 AI 能理解。將目前評分環境視為主要情境而非硬性範圍，逐項查找平台所有已啟用的受控檢查能力；若缺少工作目錄、執行命令或成功條件，請明確向我詢問，不要改成較容易但不同的檢查目標，也不要只因單一項目跨環境就要求切換整份評分表環境";
+  "請在不改變原始評分目標的前提下潤飾目前評分表：檢查每個項目的描述與成功條件，判斷後續自動檢測支援程度為 auto、partial 或 manual，並補充偵測方式、fallback 與 check_steps，讓下一層檢查 AI 能理解。即使內容不需修改，也請回傳完整評分項目列表，以完成這次可偵測性評估。將目前評分環境視為主要情境而非硬性範圍，逐項查找平台所有已啟用的受控檢查能力；若缺少工作目錄、執行命令或成功條件，請明確向我詢問，不要改成較容易但不同的檢查目標，也不要只因單一項目跨環境就要求切換整份評分表環境";
 
 /** 評分項目異動後，重新判斷目前環境能自動檢查到什麼程度。 */
 export const RUBRIC_REASSESS_PROMPT =
@@ -155,6 +157,7 @@ export const AiJudgeService = {
     return apiPost(
       `/api/v1/teaching-classes/${classId}/judge/sessions/${sessionId}/messages`,
       payload,
+      { timeoutMs: TEACHER_JUDGE_REQUEST_TIMEOUT_MS },
     );
   },
 
@@ -205,7 +208,11 @@ export const AiJudgeService = {
       : [templateKey];
     selectedEnvironments.forEach((key) => formData.append("environment_keys", key));
     if (conflictStrategy) formData.append("conflict_strategy", conflictStrategy);
-    return apiPostMultipart(`/api/v1/teaching-classes/${classId}/judge/files/`, formData);
+    return apiPostMultipart(
+      `/api/v1/teaching-classes/${classId}/judge/files/`,
+      formData,
+      { timeoutMs: TEACHER_JUDGE_REQUEST_TIMEOUT_MS },
+    );
   },
 
   /** 更新已保存評分表的分析結果（項目編輯後持久化） */
@@ -248,12 +255,16 @@ export const AiJudgeService = {
 
   /** 與 AI 對話精煉評分表；isRefine 為全表潤飾 */
   chat({ messages, rubricContext, isRefine = false, templateKey = "linux" }) {
-    return apiPost("/api/v1/rubric/chat", {
-      messages,
-      rubric_context: rubricContext,
-      is_refine: isRefine,
-      template_key: templateKey,
-    });
+    return apiPost(
+      "/api/v1/rubric/chat",
+      {
+        messages,
+        rubric_context: rubricContext,
+        is_refine: isRefine,
+        template_key: templateKey,
+      },
+      { timeoutMs: TEACHER_JUDGE_REQUEST_TIMEOUT_MS },
+    );
   },
 
   /** 將評分項目匯出成 Excel（回傳 Blob） */

@@ -4,9 +4,12 @@ import {
   CreateCheckChooser,
   ChatPanel,
   RubricTable,
+  SessionTitle,
   buildProposalDiff,
   getRubricDisplayName,
   getRubricCheckTitle,
+  getRubricItemsValue,
+  getPendingRubricItemIds,
   getSessionMenuPosition,
   getSelectedRubricSource,
   getVisibleRubricSources,
@@ -34,20 +37,20 @@ describe("ChatPanel", () => {
     expect(html).toContain("清除內容");
   });
 
-  test("在聊天室提供評估摘要與評分表來源入口", () => {
+  test("在聊天室提供潤飾評分表與評分表來源入口，不再提供自動檢測支援按鈕", () => {
     const html = renderToStaticMarkup(
       <ChatPanel
         messages={[]}
         onSendMessage={() => {}}
-        onOpenDetectability={() => {}}
         onOpenSources={() => {}}
         isLoading={false}
         hasRubric
       />,
     );
 
-    expect(html).toContain("自動偵測可用性");
+    expect(html).toContain(">潤飾評分表</button>");
     expect(html).toContain("評分表來源");
+    expect(html).not.toContain("自動檢測支援");
   });
 });
 
@@ -71,6 +74,15 @@ describe("RubricTable", () => {
       fallback: null,
       check_steps: [],
     },
+    {
+      id: "manual-review",
+      title: "主觀設計品質",
+      description: "需要老師依作品判斷",
+      detectable: "manual",
+      detection_method: null,
+      fallback: null,
+      check_steps: [],
+    },
   ];
 
   test("以最左側圖示提供檢查設定入口", () => {
@@ -80,10 +92,11 @@ describe("RubricTable", () => {
 
     expect(html).toContain("檢查點");
     expect(html).toContain("評分標準");
-    expect(html).toContain("自動偵測");
+    expect(html).toContain("自動檢測支援");
     expect(html).toContain('value="Python 版本檢查"');
-    expect(html).toContain("可自動偵測");
-    expect(html).toContain("部分可偵測");
+    expect(html).toContain("可自動");
+    expect(html).toContain("部分自動");
+    expect(html).toContain("不行");
     expect(html).toContain('aria-expanded="false"');
     expect(html).toContain('aria-label="展開第 1 項檢查設定"');
     expect(html.indexOf('aria-label="展開第 1 項檢查設定"')).toBeLessThan(html.indexOf('value="Python 版本檢查"'));
@@ -92,13 +105,51 @@ describe("RubricTable", () => {
     expect(html).not.toContain("AI 偵測判斷（僅由 AI 更新）");
   });
 
-  test("評分項目異動後，在每列狀態保留結果並標示待更新", () => {
+  test("只在異動的評分項目列標示待更新", () => {
     const html = renderToStaticMarkup(
-      <RubricTable items={items} needsReview onChange={() => {}} onDelete={() => {}} />,
+      <RubricTable
+        items={items}
+        needsReviewIds={new Set(["python-version"])}
+        onChange={() => {}}
+        onDelete={() => {}}
+      />,
     );
 
     expect(html).toContain("待更新");
-    expect(html).toContain("可自動偵測（待重新評估）");
+    expect(html).toContain('title="可自動（待更新）"');
+    expect(html).not.toContain('title="部分自動（待更新）"');
+    expect(html).not.toContain('title="不行（待更新）"');
+  });
+});
+
+describe("rubric item change detection", () => {
+  test("相同項目內容不視為異動，實際欄位變更才產生不同快照", () => {
+    const saved = {
+      items: [{ id: "item-1", title: "檢查版本", description: "至少 3.11", detectable: "auto" }],
+      detectability_needs_review: false,
+    };
+    const same = { ...saved, detectability_needs_review: true };
+    const changed = {
+      ...saved,
+      items: [{ ...saved.items[0], title: "檢查 Python 版本" }],
+    };
+
+    expect(getRubricItemsValue(same)).toBe(getRubricItemsValue(saved));
+    expect(getRubricItemsValue(changed)).not.toBe(getRubricItemsValue(saved));
+  });
+
+  test("只回傳實際變動的項目 ID，不把整張表標成待更新", () => {
+    const savedItems = [
+      { id: "item-1", title: "檢查版本", description: "至少 3.11", detectable: "auto" },
+      { id: "item-2", title: "檢查輸出", description: "符合格式", detectable: "partial" },
+    ];
+    const currentItems = [
+      { ...savedItems[0], title: "檢查 Python 版本" },
+      savedItems[1],
+    ];
+
+    expect([...getPendingRubricItemIds(currentItems, savedItems)]).toEqual(["item-1"]);
+    expect([...getPendingRubricItemIds([savedItems[1]], savedItems)]).toEqual([]);
   });
 });
 
@@ -160,6 +211,16 @@ describe("session menu positioning", () => {
       { top: 520, right: 790, bottom: 556 },
       { width: 800, height: 600, menuWidth: 220, menuHeight: 280, margin: 12 },
     )).toEqual({ top: 228, left: 568 });
+  });
+});
+
+describe("SessionTitle", () => {
+  test("保留完整名稱作為 tooltip，並將可視區與文字分開以支援截斷動畫", () => {
+    const title = "這是一個很長的 AI 檢查 session 名稱";
+    const html = renderToStaticMarkup(<SessionTitle title={title}>{title}</SessionTitle>);
+
+    expect(html).toContain('title="這是一個很長的 AI 檢查 session 名稱"');
+    expect(html).toContain(title);
   });
 });
 
