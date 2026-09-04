@@ -6,30 +6,26 @@ import SharedEmptyState from "../../../components/EmptyState/EmptyState";
 import { useToast } from "../../../hooks/useToast";
 import useAutoRefresh from "../../../hooks/useAutoRefresh";
 import LoadingState from "../../../components/LoadingState/LoadingState";
-import { AiApiService } from "../../../services/aiApi";
 import { DeletionRequestsService } from "../../../services/deletionRequests";
 import { SpecChangeRequestsService } from "../../../services/specChangeRequests";
 import { VmRequestsService } from "../../../services/vmRequests";
-import {
-  CONSUMED_REQUEST_MARKERS,
-  isConsumedRequest,
-} from "../../../services/pendingResources";
+import { CONSUMED_REQUEST_MARKERS } from "../../../services/pendingResources";
 import PageHeader from "../../../components/PageHeader/PageHeader";
 
 function useTabs() {
   const { t } = useTranslation("resource");
-  return [
+  return useMemo(() => [
     { key: "pending", label: t("RequestReviewPage.tabPending"), icon: "pending_actions" },
     { key: "approved", label: t("RequestReviewPage.tabApproved"), icon: "task_alt" },
     { key: "rejected", label: t("RequestReviewPage.tabRejected"), icon: "block" },
     { key: "expired", label: t("RequestReviewPage.tabExpired"), icon: "hourglass_empty" },
     { key: "all", label: t("RequestReviewPage.tabAll"), icon: "view_list" },
-  ];
+  ], [t]);
 }
 
 function useStatusMeta() {
   const { t } = useTranslation("resource");
-  return {
+  return useMemo(() => ({
     pending: { label: t("RequestReviewPage.statusPending"), tone: "info" },
     approved: { label: t("RequestReviewPage.statusApproved"), tone: "success" },
     rejected: { label: t("RequestReviewPage.statusRejected"), tone: "danger" },
@@ -38,8 +34,7 @@ function useStatusMeta() {
     running: { label: t("RequestReviewPage.statusRunning"), tone: "info" },
     completed: { label: t("RequestReviewPage.statusCompleted"), tone: "muted" },
     failed: { label: t("RequestReviewPage.statusFailed"), tone: "danger" },
-    deleted_approved: { label: t("RequestReviewPage.statusDeletedApproved"), tone: "success" },
-  };
+  }), [t]);
 }
 
 
@@ -59,9 +54,6 @@ function formatRange(startAt, endAt, t) {
   if (!endAt) return t("RequestReviewPage.startingFrom", { time: formatDateTime(startAt, t) });
   return `${formatDateTime(startAt, t)} - ${formatDateTime(endAt, t)}`;
 }
-
-/* 系統刪除標記與判斷統一放在 services/pendingResources，與資源頁共用 */
-const isDeletedApprovedVm = isConsumedRequest;
 
 function vmSpecLabel(request, t) {
   if (!request) return "-";
@@ -91,38 +83,24 @@ function specChangeLabel(request, t) {
   return parts.join(" / ") || request.change_type || "-";
 }
 
+/* AI API 金鑰申請有專屬的 /ai-api-review 頁，這裡不重複列出 */
 function sourceLabel(source, t) {
   if (source === "vm") return t("RequestReviewPage.sourceCreate");
   if (source === "spec") return t("RequestReviewPage.sourceSpec");
-  if (source === "ai") return t("RequestReviewPage.sourceAi");
   return t("RequestReviewPage.sourceDeletion");
 }
 
 function sourceIcon(item) {
   if (item.source === "spec") return "tune";
   if (item.source === "deletion") return "delete_outline";
-  if (item.source === "ai") return "vpn_key";
   return item.raw?.resource_type === "vm" ? "computer" : "terminal";
 }
 
-function useAiDurationLabels() {
-  const { t } = useTranslation("resource");
-  return {
-    "1h": t("RequestReviewPage.duration1h"),
-    "1d": t("RequestReviewPage.duration1d"),
-    "7d": t("RequestReviewPage.duration7d"),
-    "30d": t("RequestReviewPage.duration30d"),
-    never: t("RequestReviewPage.durationNever"),
-  };
-}
-
+/* 審核頁只反映申請本身的狀態；機器後來被刪掉是資源的事，不在這裡呈現 */
 function normalizeVmRequest(request, t) {
-  const deletedApproved = isDeletedApprovedVm(request);
-  const reviewStatus = deletedApproved
-    ? "approved"
-    : ["pending", "approved", "rejected", "expired"].includes(request.status)
-      ? request.status
-      : "other";
+  const reviewStatus = ["pending", "approved", "rejected", "expired"].includes(request.status)
+    ? request.status
+    : "other";
 
   return {
     id: `vm:${request.id}`,
@@ -130,7 +108,7 @@ function normalizeVmRequest(request, t) {
     source: "vm",
     raw: request,
     reviewStatus,
-    status: deletedApproved ? "deleted_approved" : request.status,
+    status: request.status,
     title: request.hostname || request.name || t("RequestReviewPage.unnamedRequest"),
     user: request.user_full_name || request.user_email || t("RequestReviewPage.unknownUser"),
     userSubtext: request.user_email || request.user_id || "-",
@@ -167,32 +145,6 @@ function normalizeSpecRequest(request, t) {
     paramText: request.change_type || "-",
     gpuText: "-",
     nodeText: `VMID ${request.vmid}`,
-    createdAt: request.created_at,
-    reviewedAt: request.reviewed_at,
-  };
-}
-
-function normalizeAiRequest(request, t, aiDurationLabels) {
-  const durationText = aiDurationLabels[request.duration] ?? request.duration ?? "-";
-  return {
-    id: `ai:${request.id}`,
-    rawId: request.id,
-    source: "ai",
-    raw: request,
-    reviewStatus: ["pending", "approved", "rejected"].includes(request.status)
-      ? request.status
-      : "other",
-    status: request.status,
-    title: t("RequestReviewPage.aiKeyTitle", { name: request.api_key_name }),
-    user: request.user_full_name || request.user_email || t("RequestReviewPage.unknownUser"),
-    userSubtext: request.user_email || request.user_id || "-",
-    timeText: formatDateTime(request.created_at, t),
-    specText: t("RequestReviewPage.aiDurationSpec", { duration: durationText }),
-    reason: request.purpose,
-    paramLabel: t("RequestReviewPage.paramLabelKeyDuration"),
-    paramText: durationText,
-    gpuText: "-",
-    nodeText: "-",
     createdAt: request.created_at,
     reviewedAt: request.reviewed_at,
   };
@@ -253,7 +205,6 @@ function filterByTab(items, tab) {
 export default function RequestReviewPage() {
   const { t } = useTranslation("resource");
   const tabs = useTabs();
-  const aiDurationLabels = useAiDurationLabels();
   const toast = useToast();
   const [activeTab, setActiveTab] = useState("pending");
   const [requests, setRequests] = useState([]);
@@ -280,18 +231,15 @@ export default function RequestReviewPage() {
       setError("");
     }
     try {
-      const [vmRes, specRes, deletionRes, aiRes] = await Promise.all([
+      const [vmRes, specRes, deletionRes] = await Promise.all([
         VmRequestsService.listAll(undefined),
         SpecChangeRequestsService.listAll(),
         DeletionRequestsService.listAll(),
-        // AI API 服務未啟用時仍要能審核其他類型的申請
-        AiApiService.listAllRequests().catch(() => ({ data: [] })),
       ]);
       const items = [
         ...(vmRes.data ?? []).map((r) => normalizeVmRequest(r, t)),
         ...(specRes.data ?? []).map((r) => normalizeSpecRequest(r, t)),
         ...(deletionRes.data ?? []).map((r) => normalizeDeletionRequest(r, t)),
-        ...(aiRes.data ?? []).map((r) => normalizeAiRequest(r, t, aiDurationLabels)),
       ].sort(
         (a, b) =>
           new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime(),
@@ -314,7 +262,7 @@ export default function RequestReviewPage() {
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [activeTab, t, aiDurationLabels]);
+  }, [activeTab, t]);
 
   useEffect(() => {
     fetchRequests(activeTab);
@@ -366,8 +314,6 @@ export default function RequestReviewPage() {
         await VmRequestsService.review(selected.rawId, body);
       } else if (selected.source === "spec") {
         await SpecChangeRequestsService.review(selected.rawId, body);
-      } else if (selected.source === "ai") {
-        await AiApiService.reviewRequest(selected.rawId, body);
       } else {
         return;
       }
@@ -459,21 +405,21 @@ export default function RequestReviewPage() {
         </div>
       </div>
 
-      <div className={styles.tabs}>
-        {tabs.map((tab) => (
-          <button
-            key={tab.key}
-            type="button"
-            className={`${styles.tab} ${activeTab === tab.key ? styles.tabActive : ""}`}
-            onClick={() => setActiveTab(tab.key)}
-          >
-            <MIcon name={tab.icon} size={16} />
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      <div className={styles.tabsRow}>
+        <div className={styles.tabs}>
+          {tabs.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              className={`${styles.tab} ${activeTab === tab.key ? styles.tabActive : ""}`}
+              onClick={() => setActiveTab(tab.key)}
+            >
+              <MIcon name={tab.icon} size={16} />
+              {tab.label}
+            </button>
+          ))}
+        </div>
 
-      <div className={styles.toolbar}>
         <div className={styles.search}>
           <MIcon name="search" size={16} />
           <input
@@ -576,7 +522,7 @@ export default function RequestReviewPage() {
                 )}
 
                 {isPending && selected.source !== "deletion" ? (
-                  <>
+                  <div className={styles.reviewBar}>
                     <label className={styles.commentField}>
                       <span>{t("RequestReviewPage.commentLabel")}</span>
                       <textarea
@@ -604,7 +550,7 @@ export default function RequestReviewPage() {
                         {t("RequestReviewPage.reject")}
                       </button>
                     </div>
-                  </>
+                  </div>
                 ) : selected.source === "deletion" ? (
                   <div className={styles.rowActions}>
                     <span className={styles.doneText}>{t("RequestReviewPage.deletionOnlyNote")}</span>
