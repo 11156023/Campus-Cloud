@@ -1,7 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, test } from "vitest";
 import {
-  CreateCheckChooser,
   ChatPanel,
   RubricTable,
   SessionTitle,
@@ -12,7 +11,6 @@ import {
   getPendingRubricItemIds,
   getSessionMenuPosition,
   getSelectedRubricSource,
-  getVisibleRubricSources,
   resolveActiveSessionId,
 } from "./AiJudgePanel";
 import { RUBRIC_POLISH_PROMPT } from "../../../services/aiJudge";
@@ -37,20 +35,59 @@ describe("ChatPanel", () => {
     expect(html).toContain("清除內容");
   });
 
-  test("在聊天室提供潤飾評分表與評分表來源入口，不再提供自動檢測支援按鈕", () => {
+  test("在聊天室提供潤飾評分表與資料來源入口，不再提供自動檢測支援按鈕", () => {
     const html = renderToStaticMarkup(
       <ChatPanel
         messages={[]}
         onSendMessage={() => {}}
-        onOpenSources={() => {}}
+        onToggleSources={() => {}}
         isLoading={false}
         hasRubric
       />,
     );
 
     expect(html).toContain(">潤飾評分表</button>");
-    expect(html).toContain("評分表來源");
+    expect(html).toContain("資料來源");
+    expect(html).toContain('aria-controls="ai-chat-data-sources"');
+    expect(html).not.toContain("評分表來源");
     expect(html).not.toContain("自動檢測支援");
+  });
+
+  test("資料來源在聊天室內展開，不建立額外 dialog", () => {
+    const html = renderToStaticMarkup(
+      <ChatPanel
+        messages={[]}
+        onSendMessage={() => {}}
+        onToggleSources={() => {}}
+        sourcesOpen
+        sourcesContent={<div>目前資料來源內容</div>}
+        isLoading={false}
+        hasRubric
+      />,
+    );
+
+    expect(html).toContain('id="ai-chat-data-sources"');
+    expect(html).toContain("目前資料來源內容");
+    expect(html).toContain('aria-expanded="true"');
+    expect(html).not.toContain('role="dialog"');
+  });
+
+  test("以加號展開可拖拉的資料上傳區", () => {
+    const html = renderToStaticMarkup(
+      <ChatPanel
+        messages={[]}
+        onSendMessage={() => {}}
+        onUploadFile={() => {}}
+        onToggleUpload={() => {}}
+        uploadOpen
+        isLoading={false}
+      />,
+    );
+
+    expect(html).toContain('aria-label="關閉資料上傳"');
+    expect(html).toContain('aria-expanded="true"');
+    expect(html).toContain("拖放資料文件到這裡");
+    expect(html).toContain("上傳後會交由 AI 分析並套用到目前檢查");
   });
 });
 
@@ -173,22 +210,6 @@ describe("buildProposalDiff", () => {
   });
 });
 
-describe("CreateCheckChooser", () => {
-  test("以頁內兩個選項呈現，不使用 dialog", () => {
-    const html = renderToStaticMarkup(
-      <CreateCheckChooser onChoose={() => {}} onCancel={() => {}} />,
-    );
-
-    expect(html).toContain("從零開始建立");
-    expect(html).toContain("使用已有評分文件");
-    expect(html).toContain("重構");
-    expect(html).not.toContain("複製檢查");
-    expect(html).toContain("返回目前檢查");
-    expect(html).toContain("立即開啟空白評分表");
-    expect(html).not.toContain('role="dialog"');
-  });
-});
-
 describe("uploaded rubric naming", () => {
   test("匯入檔名移除副檔名，且檢查名稱保留檔名主體並限制長度", () => {
     expect(getRubricDisplayName({ name: "AI評分表審核系統_Python服務Running狀態檢測_簡短版.docx" }))
@@ -239,24 +260,6 @@ describe("getSelectedRubricSource", () => {
   test("沒有選用來源或來源已失效時不回傳其他班級來源", () => {
     expect(getSelectedRubricSource(files, null)).toBeNull();
     expect(getSelectedRubricSource(files, "file-replaced")).toBeNull();
-  });
-});
-
-describe("getVisibleRubricSources", () => {
-  const files = [
-    { id: "file-other", status: "active" },
-    { id: "file-selected", status: "active" },
-    { id: "file-replaced", status: "replaced" },
-  ];
-
-  test("預設只顯示目前檢查的來源，明確切換時才展開其他 active 來源", () => {
-    expect(getVisibleRubricSources(files, "file-selected")).toEqual([files[1]]);
-    expect(getVisibleRubricSources(files, "file-selected", true)).toEqual([files[0], files[1]]);
-  });
-
-  test("沒有選用來源時不列出其他來源", () => {
-    expect(getVisibleRubricSources(files, null, true)).toEqual([]);
-    expect(getVisibleRubricSources(files, "file-missing", true)).toEqual([]);
   });
 });
 

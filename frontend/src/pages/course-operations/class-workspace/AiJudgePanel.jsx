@@ -244,7 +244,7 @@ function ProposalPanel({ proposal, selectedIds, onToggle, onApply, onSkip, disab
   return (
     <div className={styles.proposalCard}>
       <div className={styles.proposalHeading}>
-        <div>
+        <div className={styles.createCheckBody}>
           <strong>{isRefine ? "AI 潤飾評分表提案" : "AI 評分表提案"}</strong>
           <p>{isRefine ? "請逐項確認評分目標、描述、成功條件與檢查設定後再套用。" : "逐項確認後才會套用到目前的評分表。"}</p>
         </div>
@@ -455,7 +455,7 @@ function RubricUploader({ onUpload, onInvalidFile, isLoading }) {
     if (!file) return;
     const ext = file.name.split(".").pop()?.toLowerCase();
     if (ext !== "docx" && ext !== "pdf") {
-      onInvalidFile?.("只接受 .docx 或 .pdf 評分文件。");
+      onInvalidFile?.("只接受 .docx 或 .pdf 資料文件。");
       return;
     }
     setSelectedFile(file);
@@ -516,7 +516,7 @@ function RubricUploader({ onUpload, onInvalidFile, isLoading }) {
         ) : (
           <div className={styles.dropHint}>
             <MIcon name="upload" size={36} />
-            <p className={styles.dropHintTitle}>拖放評分文件到這裡</p>
+            <p className={styles.dropHintTitle}>拖放資料文件到這裡</p>
             <p className={styles.dropHintMeta}>或點擊選擇檔案（支援 .docx、.pdf）</p>
           </div>
         )}
@@ -556,7 +556,14 @@ export function ChatPanel({
   isClearing = false,
   disabled = false,
   hasRubric = false,
-  onOpenSources,
+  onToggleSources,
+  sourcesOpen = false,
+  sourcesContent,
+  onUploadFile,
+  onInvalidUploadFile,
+  isUploading = false,
+  uploadOpen = false,
+  onToggleUpload,
 }) {
   const [input, setInput] = useState("");
   const messagesEndRef = useRef(null);
@@ -568,7 +575,7 @@ export function ChatPanel({
 
   function send() {
     const content = input.trim();
-    if (!content || isLoading || isClearing || disabled) return;
+    if (!content || isLoading || isClearing || isUploading || disabled) return;
     onSendMessage(content);
     setInput("");
   }
@@ -583,7 +590,7 @@ export function ChatPanel({
             <p className={styles.chatEmptyMeta}>
               {hasRubric
                 ? "可以詢問修改建議，或直接下達調整指令"
-                : "不必先上傳文件；之後再上傳評分表即可接續這段對話"}
+                : "點擊輸入框旁的＋上傳文件，完成後即可接續討論"}
             </p>
           </div>
         ) : (
@@ -633,32 +640,51 @@ export function ChatPanel({
           <button
             type="button"
             className={styles.btnSecondary}
-            disabled={isLoading || isClearing || disabled || !hasRubric}
+            disabled={isLoading || isClearing || isUploading || disabled || !hasRubric}
             onClick={() => onSendMessage(RUBRIC_POLISH_PROMPT, true)}
           >
             {isLoading ? <Spinner size={14} /> : <MIcon name="auto_fix_high" size={14} />}
             潤飾評分表
           </button>
-          {onOpenSources && <button
+          {onToggleSources && <button
             type="button"
             className={styles.btnSecondary}
-            disabled={isLoading || isClearing}
-            onClick={onOpenSources}
-            aria-haspopup="dialog"
+            disabled={isLoading || isClearing || isUploading}
+            onClick={onToggleSources}
+            aria-expanded={sourcesOpen}
+            aria-controls="ai-chat-data-sources"
           >
             <MIcon name="description" size={14} />
-            評分表來源
+            資料來源
           </button>}
           <button
             type="button"
             className={styles.btnSecondary}
-            disabled={isLoading || isClearing || disabled || messages.length === 0}
+            disabled={isLoading || isClearing || isUploading || disabled || messages.length === 0}
             onClick={onClearMessages}
           >
             {isClearing ? <Spinner size={14} /> : <MIcon name="delete_sweep" size={14} />}
             清除內容
           </button>
         </div>
+        {uploadOpen && onUploadFile && (
+          <div id="ai-chat-data-upload" className={styles.chatUploadPanel}>
+            <div className={styles.chatUploadHeading}>
+              <strong>資料上傳</strong>
+              <small>上傳後會交由 AI 分析並套用到目前檢查，再回到聊天室討論與調整。</small>
+            </div>
+            <RubricUploader
+              onUpload={onUploadFile}
+              onInvalidFile={onInvalidUploadFile}
+              isLoading={isUploading}
+            />
+          </div>
+        )}
+        {sourcesOpen && sourcesContent && (
+          <div id="ai-chat-data-sources" className={styles.chatSourcesPanel}>
+            {sourcesContent}
+          </div>
+        )}
         <form
           className={styles.chatForm}
           onSubmit={(e) => {
@@ -666,6 +692,18 @@ export function ChatPanel({
             send();
           }}
         >
+          {onUploadFile && onToggleUpload && <button
+            type="button"
+            className={`${styles.iconBtn} ${styles.chatAttachButton}`}
+            disabled={isLoading || isClearing || isUploading || disabled}
+            aria-label={uploadOpen ? "關閉資料上傳" : "新增資料"}
+            title={uploadOpen ? "關閉資料上傳" : "新增資料"}
+            aria-expanded={uploadOpen}
+            aria-controls="ai-chat-data-upload"
+            onClick={onToggleUpload}
+          >
+            <MIcon name={uploadOpen ? "close" : "add"} size={19} />
+          </button>}
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -681,12 +719,12 @@ export function ChatPanel({
                 : "描述想檢查的環境或問題...（Shift+Enter 換行）"
             }
             rows={1}
-            disabled={isLoading || isClearing || disabled}
+            disabled={isLoading || isClearing || isUploading || disabled}
           />
           <button
             type="submit"
             className={styles.btnPrimary}
-            disabled={isLoading || isClearing || disabled || !input.trim()}
+            disabled={isLoading || isClearing || isUploading || disabled || !input.trim()}
             aria-label="送出"
           >
             <MIcon name="send" size={16} />
@@ -695,7 +733,7 @@ export function ChatPanel({
         <p className={styles.chatHint}>
           {hasRubric
             ? "提示：詢問問題不會修改評估表，需明確指令（如「幫我改」「新增」）才會執行變更"
-            : "提示：這是一般 AI 對話；上傳評分表後，AI 才會提出可套用的評分項目修改"}
+            : "提示：先用＋上傳文件；分析完成後，AI 才會提出可套用的評分項目修改"}
         </p>
       </div>
     </div>
@@ -722,34 +760,10 @@ function ConfirmModal({ title, description, actions, closing = false, onClose })
   );
 }
 
-function InsightDialog({ label, children, onClose }) {
-  return (
-    <div
-      className={styles.modalOverlay}
-      role="presentation"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
-    >
-      <section
-        className={`${styles.modal} ${styles.insightModal}`}
-        role="dialog"
-        aria-modal="true"
-        aria-label={label}
-        onMouseDown={(event) => event.stopPropagation()}
-      >
-        {children}
-      </section>
-    </div>
-  );
-}
-
 function CreateCheckForm({
   classId,
   weeks = [],
-  sourceOnly = false,
   embedded = false,
-  initialMode = "",
   closing = false,
   onClose,
   onCreated,
@@ -760,35 +774,15 @@ function CreateCheckForm({
   const [selectedWeekId, setSelectedWeekId] = useState(
     availableWeeks[0]?.id ?? "",
   );
-  const [mode, setMode] = useState(initialMode);
-  const [rubricName, setRubricName] = useState("");
-  const [environmentKeys, setEnvironmentKeys] = useState(() => (
-    initialMode === "existing" ? ["linux"] : []
-  ));
-  const [files, setFiles] = useState([]);
-  const [selectedFileId, setSelectedFileId] = useState("");
+  const [environmentKeys, setEnvironmentKeys] = useState(["linux"]);
   const [uploading, setUploading] = useState(false);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
   const [conflictFile, setConflictFile] = useState(null);
 
   useEffect(() => {
-    const requestVersion = ++requestVersionRef.current;
-    let cancelled = false;
-    AiJudgeService.listFiles(classId)
-      .then((rows) => {
-        if (!cancelled && requestVersion === requestVersionRef.current) {
-          setFiles(rows.filter((file) => file.status === "active"));
-        }
-      })
-      .catch(() => {
-        if (!cancelled && requestVersion === requestVersionRef.current) {
-          setError("載入已保存評分表失敗，仍可上傳新文件。");
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
+    requestVersionRef.current += 1;
+    return () => { requestVersionRef.current += 1; };
   }, [classId]);
 
   function toggleEnvironment(key) {
@@ -797,16 +791,9 @@ function CreateCheckForm({
       : [...current, key]);
   }
 
-  function handleModeChange(nextMode) {
-    setMode(nextMode);
-    if (nextMode === "existing") {
-      setEnvironmentKeys((current) => current.length ? current : ["linux"]);
-    }
-  }
-
   async function uploadFile(file, conflictStrategy = null) {
     if (!file) return;
-    if (!sourceOnly && !selectedWeekId) {
+    if (!selectedWeekId) {
       setError("請先選擇這份檢查要放入的週任務。");
       return;
     }
@@ -823,100 +810,59 @@ function CreateCheckForm({
       );
       if (requestVersion !== requestVersionRef.current) return;
       const uploaded = result.file ?? { ...result, analysis_json: result.analysis };
-      setFiles((current) => [uploaded, ...current.filter((item) => item.id !== uploaded.id)]);
-      setSelectedFileId(uploaded.id);
       setEnvironmentKeys(uploaded.environment_keys?.length ? uploaded.environment_keys : [uploaded.template_key]);
       setConflictFile(null);
-      if (!sourceOnly) {
-        setCreating(true);
-        try {
-          const created = await AiJudgeService.createSession(classId, {
-            title: getRubricCheckTitle({
-              name: file.name,
-              original_filename: uploaded.original_filename,
-              display_name: uploaded.display_name,
-            }),
-            creationMode: "existing",
-            selectedFileId: uploaded.id,
-            teachingClassWeekId: selectedWeekId,
-          });
-          if (requestVersion === requestVersionRef.current) onCreated(created, "uploaded");
-        } catch (createError) {
-          setError(`AI 分析完成，但建立檢查失敗：${createError?.message ?? "請稍後再試"}`);
-        } finally {
-          setCreating(false);
-        }
+      setCreating(true);
+      try {
+        const created = await AiJudgeService.createSession(classId, {
+          title: getRubricCheckTitle({
+            name: file.name,
+            original_filename: uploaded.original_filename,
+            display_name: uploaded.display_name,
+          }),
+          creationMode: "existing",
+          selectedFileId: uploaded.id,
+          teachingClassWeekId: selectedWeekId,
+        });
+        if (requestVersion === requestVersionRef.current) onCreated(created);
+      } catch (createError) {
+        setError(`AI 分析完成，但建立檢查失敗：${createError?.message ?? "請稍後再試"}`);
+      } finally {
+        setCreating(false);
       }
     } catch (uploadError) {
       if (requestVersion !== requestVersionRef.current) return;
       if (uploadError?.status === 409) {
         setConflictFile(file);
-        setError("已有同名評分文件，請選擇覆蓋原本文件或建立副本。");
+        setError("已有同名資料文件，請選擇覆蓋原本文件或建立副本。");
       } else {
-        setError(uploadError?.message ?? "上傳評分文件失敗。");
+        setError(uploadError?.message ?? "上傳資料文件失敗。");
       }
     } finally {
       if (requestVersion === requestVersionRef.current) setUploading(false);
     }
   }
 
-  async function submit(event) {
-    event.preventDefault();
-    if (!mode) return;
-    if (mode === "blank" && (!rubricName.trim() || !environmentKeys.length)) return;
-    if (mode === "existing" && !selectedFileId) return;
-    setCreating(true);
-    setError("");
-    try {
-      if (sourceOnly) {
-        const file = mode === "blank"
-          ? await AiJudgeService.createBlankFile(classId, { displayName: rubricName, environmentKeys })
-          : files.find((entry) => entry.id === selectedFileId);
-        if (!file?.id) throw new Error("請選擇或建立一份評分表來源。");
-         onCreated(file, sourceOnly && mode === "blank" ? "source-blank" : "source");
-      } else {
-        const created = await AiJudgeService.createSession(classId, {
-          title: mode === "blank"
-            ? getRubricCheckTitle({ name: rubricName })
-            : getRubricCheckTitle(files.find((entry) => entry.id === selectedFileId)),
-          creationMode: mode,
-          rubricName: mode === "blank" ? rubricName : undefined,
-          environmentKeys: mode === "blank" ? environmentKeys : undefined,
-          selectedFileId: mode === "existing" ? selectedFileId : null,
-          teachingClassWeekId: selectedWeekId,
-        });
-        onCreated(created, mode);
-      }
-    } catch (createError) {
-      setError(createError?.message ?? "建立檢查失敗，請確認欄位後重試。");
-    } finally {
-      setCreating(false);
-    }
-  }
-
   const form = (
       <section className={embedded ? styles.createCheckPanel : `${styles.confirm} ${styles.createCheckDialog}`} role={embedded ? undefined : "dialog"} aria-modal={embedded ? undefined : "true"} aria-labelledby="create-check-title">
-        <div className={styles.modalHeader}><div>{embedded && <button type="button" className={styles.inlineBackButton} disabled={creating || uploading} onClick={onClose}><MIcon name="arrow_back" size={17} />返回建立方式</button>}<h2 id="create-check-title">{sourceOnly ? "新增評分表來源" : mode === "blank" ? "從零開始建立" : "使用已有評分文件"}</h2><p>{sourceOnly ? "建立或選用一份班級評分表，完成後會套用到目前檢查。" : mode === "blank" ? "建立空白評分表後，會留在 AI 檢查主頁編輯評分項目與 AI 提案。" : "選擇已保存的評分表，或上傳文件交由 AI 分析；完成後會回到 AI 檢查主頁。"}</p></div>{!embedded && <button type="button" className={styles.iconBtn} aria-label="關閉" disabled={creating || uploading} onClick={onClose}><MIcon name="close" size={18} /></button>}</div>
-        <form onSubmit={submit}>
-          {!sourceOnly && <label className={styles.dialogField}><span>放到哪一週任務？</span><select value={selectedWeekId} onChange={(event) => setSelectedWeekId(event.target.value)} required><option value="" disabled>{availableWeeks.length ? "請選擇週任務" : "請先建立有名稱的週任務"}</option>{availableWeeks.map((week) => <option key={week.id} value={week.id}>第 {week.week ?? week.week_number} 週 · {week.title}{["published", "completed"].includes(week.status) ? "" : "（草稿）"}</option>)}</select><small>AI 檢查核准後，Checkpoint 才會顯示在學生端；草稿週次發布後才會讓學生看到。</small></label>}
-          {!embedded && <fieldset className={styles.modeFieldset}><legend>如何建立評分表？</legend><div className={styles.modeChoices}><label className={mode === "blank" ? styles.modeChoiceActive : styles.modeChoice}><input type="radio" name="creation-mode" checked={mode === "blank"} onChange={() => handleModeChange("blank")} /><span><b>從零開始建立</b><small>建立空白評分表，接著手動新增項目或請 AI 產生初稿。</small></span></label><label className={mode === "existing" ? styles.modeChoiceActive : styles.modeChoice}><input type="radio" name="creation-mode" checked={mode === "existing"} onChange={() => handleModeChange("existing")} /><span><b>使用已有評分文件</b><small>選擇班級已保存的評分表，或上傳 .docx／.pdf；檢查名稱會使用文件名稱。</small></span></label></div></fieldset>}
-           {mode === "blank" && <div className={styles.modeFields}><label className={styles.dialogField}><span>評分表名稱</span><input autoFocus={sourceOnly} value={rubricName} maxLength={255} placeholder="例如：期中 Python 評分表" onChange={(event) => setRubricName(event.target.value)} /></label><fieldset className={styles.modeFieldset}><legend>評分環境（可複選）</legend><div className={styles.dialogChips}>{TEMPLATE_OPTIONS.map((option) => <label key={option.key} className={environmentKeys.includes(option.key) ? styles.dialogChipActive : styles.dialogChip}><input type="checkbox" checked={environmentKeys.includes(option.key)} onChange={() => toggleEnvironment(option.key)} />{option.label}</label>)}</div></fieldset></div>}
-           {mode === "existing" && <div className={styles.existingPicker}>
+        <div className={styles.modalHeader}><div>{embedded && <button type="button" className={styles.inlineBackButton} disabled={creating || uploading} onClick={onClose}><MIcon name="arrow_back" size={17} />返回目前檢查</button>}<h2 id="create-check-title">上傳資料文件</h2><p>上傳文件交由 AI 分析；完成後會直接進入 AI 檢查主頁繼續討論與調整。</p></div>{!embedded && <button type="button" className={styles.iconBtn} aria-label="關閉" disabled={creating || uploading} onClick={onClose}><MIcon name="close" size={18} /></button>}</div>
+        <div>
+          <label className={styles.dialogField}><span>放到哪一週任務？</span><select value={selectedWeekId} onChange={(event) => setSelectedWeekId(event.target.value)} required><option value="" disabled>{availableWeeks.length ? "請選擇週任務" : "請先建立有名稱的週任務"}</option>{availableWeeks.map((week) => <option key={week.id} value={week.id}>第 {week.week ?? week.week_number} 週 · {week.title}{["published", "completed"].includes(week.status) ? "" : "（草稿）"}</option>)}</select><small>AI 檢查核准後，Checkpoint 才會顯示在學生端；草稿週次發布後才會讓學生看到。</small></label>
+          <div className={styles.existingPicker}>
              <div className={styles.uploadSourceBlock}>
-               <div className={styles.existingPickerHead}><div><span>上傳新的評分文件</span><small>支援 .docx／.pdf；分析完成後會以文件名稱建立檢查。</small></div></div>
+               <div className={styles.existingPickerHead}><div><span>上傳資料文件</span><small>支援 .docx／.pdf；分析完成後會以文件名稱建立檢查。</small></div></div>
                <fieldset className={styles.modeFieldset}>
                  <legend>評分環境（可複選）</legend>
                  <p className={styles.uploadEnvironmentHint}>第一個選擇會作為 AI 分析的主要情境，其餘環境可提供跨環境檢查能力。</p>
                  <div className={styles.dialogChips}>{TEMPLATE_OPTIONS.map((option) => <label key={option.key} className={environmentKeys.includes(option.key) ? styles.dialogChipActive : styles.dialogChip}><input type="checkbox" checked={environmentKeys.includes(option.key)} onChange={() => toggleEnvironment(option.key)} disabled={uploading || creating} />{option.label}</label>)}</div>
                </fieldset>
-               <RubricUploader onUpload={(file) => uploadFile(file)} onInvalidFile={setError} isLoading={uploading || creating || (!sourceOnly && !selectedWeekId)} />
+               <RubricUploader onUpload={(file) => uploadFile(file)} onInvalidFile={setError} isLoading={uploading || creating || !selectedWeekId} />
              </div>
-              <div className={styles.savedRubricBlock}><div className={styles.existingPickerHead}><div><span>或選擇已保存評分表</span><small>每份來源只能綁定一個檢查；若要重構，請使用「重構」。</small></div></div>{files.length ? <div className={styles.existingList}>{files.map((file) => <label key={file.id} className={selectedFileId === file.id ? styles.existingRowActive : styles.existingRow}><input type="radio" name="saved-rubric" checked={selectedFileId === file.id} onChange={() => setSelectedFileId(file.id)} /><span><b>{getRubricDisplayName(file, "未命名評分表")}</b><small>{(file.environment_keys?.length ? file.environment_keys : [file.template_key]).map(getTemplateLabel).join("、")} · {file.analysis_json?.items?.length ?? 0} 項 · {formatDateTime(file.updated_at)}</small></span></label>)}</div> : <p className={styles.mutedText}>尚未有可用的評分表。</p>}</div>
-             {conflictFile && <div className={styles.conflictActions} role="alert"><span>「{conflictFile.name}」已存在：</span><button type="button" className={styles.btnSecondary} disabled={uploading || creating} onClick={() => uploadFile(conflictFile, "copy")}>建立副本</button><button type="button" className={styles.btnDanger} disabled={uploading || creating} onClick={() => uploadFile(conflictFile, "overwrite")}>覆蓋原本</button><button type="button" className={styles.iconBtn} aria-label="取消同名處理" onClick={() => setConflictFile(null)}><MIcon name="close" size={16} /></button></div>}
-           </div>}
-          {error && <p className={styles.dialogError} role="alert">{error}</p>}
-          <div className={styles.modalActions}>{!embedded && <button type="button" className={styles.btnSecondary} disabled={creating || uploading} onClick={onClose}>取消</button>}{mode !== "existing" || sourceOnly ? <button type="submit" className={styles.btnPrimary} disabled={!mode || (!sourceOnly && !selectedWeekId) || (mode === "blank" ? !rubricName.trim() || !environmentKeys.length : !selectedFileId) || creating || uploading}>{creating ? <><Spinner size={15} />建立中…</> : sourceOnly ? "新增來源" : mode === "blank" ? "建立檢查" : "使用這份評分表"}</button> : <p className={styles.uploadAutoHint}>選擇檔案後按「上傳並分析」，完成後會回到 AI 檢查主頁。</p>}</div>
-        </form>
+              {conflictFile && <div className={styles.conflictActions} role="alert"><span>「{conflictFile.name}」已存在：</span><button type="button" className={styles.btnSecondary} disabled={uploading || creating} onClick={() => uploadFile(conflictFile, "copy")}>建立副本</button><button type="button" className={styles.btnDanger} disabled={uploading || creating} onClick={() => uploadFile(conflictFile, "overwrite")}>覆蓋原本</button><button type="button" className={styles.iconBtn} aria-label="取消同名處理" onClick={() => setConflictFile(null)}><MIcon name="close" size={16} /></button></div>}
+          </div>
+           {error && <p className={styles.dialogError} role="alert">{error}</p>}
+           <div className={styles.modalActions}>{!embedded && <button type="button" className={styles.btnSecondary} disabled={creating || uploading} onClick={onClose}>取消</button>}<p className={styles.uploadAutoHint}>選擇檔案後按「上傳並分析」，完成後會回到 AI 檢查主頁。</p></div>
+         </div>
       </section>
   );
 
@@ -924,44 +870,9 @@ function CreateCheckForm({
   return <div className={`${styles.modalOverlay} ${closing ? styles.modalOverlayOut : ""}`} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !creating && !uploading) onClose(); }}>{form}</div>;
 }
 
-export function CreateCheckChooser({ onChoose, onCancel, busy = false, error = "" }) {
-  return (
-    <section className={styles.createChooser} aria-labelledby="create-check-choice-title">
-      <div className={styles.createChooserHeader}>
-        <div className={styles.createChooserHeading}>
-          <h2 id="create-check-choice-title">新增檢查</h2>
-          <p>選擇後直接進入對應工作區；從零建立會立即開啟空白評分表。</p>
-        </div>
-        <button type="button" className={styles.btnSecondary} disabled={busy} onClick={onCancel}>返回目前檢查</button>
-      </div>
-      {error && <p className={styles.dialogError} role="alert">{error}</p>}
-      <div className={styles.createChoiceGrid}>
-        <button type="button" className={styles.createChoice} disabled={busy} onClick={() => onChoose("blank")}>
-          <span className={styles.createChoiceIcon}><MIcon name="edit_note" size={30} /></span>
-          <span className={styles.createChoiceCopy}><strong>從零開始建立</strong><small>立即開啟空白評分表，在同一頁填寫名稱、模板與評估項目，也可以請 AI 產生初稿。</small></span>
-          <span className={styles.createChoiceAction}>{busy ? "正在開啟空白頁面…" : "開始設計"}<MIcon name={busy ? "sync" : "arrow_forward"} size={18} /></span>
-        </button>
-        <button type="button" className={styles.createChoice} disabled={busy} onClick={() => onChoose("existing")}>
-          <span className={styles.createChoiceIcon}><MIcon name="upload_file" size={30} /></span>
-          <span className={styles.createChoiceCopy}><strong>使用已有評分文件</strong><small>選用尚未綁定其他檢查的來源，或上傳 .docx／.pdf；已使用來源請選擇「重構」。</small></span>
-          <span className={styles.createChoiceAction}>選擇文件<MIcon name="arrow_forward" size={18} /></span>
-        </button>
-      </div>
-    </section>
-  );
-}
-
 export function getSelectedRubricSource(files, selectedFileId) {
   if (!selectedFileId || !Array.isArray(files)) return null;
   return files.find((file) => file.status === "active" && file.id === selectedFileId) ?? null;
-}
-
-export function getVisibleRubricSources(files, selectedFileId, showOtherSources = false) {
-  if (!selectedFileId || !Array.isArray(files)) return [];
-  const activeFiles = files.filter((file) => file.status === "active");
-  if (!activeFiles.some((file) => file.id === selectedFileId)) return [];
-  if (showOtherSources) return activeFiles;
-  return activeFiles.filter((file) => file.id === selectedFileId);
 }
 
 export function resolveActiveSessionId(currentId, sessions) {
@@ -969,7 +880,7 @@ export function resolveActiveSessionId(currentId, sessions) {
   return sessions.some((session) => session.id === currentId) ? currentId : null;
 }
 
-function RubricSourceRail({ classId, judgeSession, readOnly, onSessionUpdated, onAddSource, onClose, embedded = false }) {
+function RubricSourceRail({ classId, judgeSession, readOnly, onSessionUpdated, onClose, embedded = false }) {
   const toast = useToast();
   const sourceRailRef = useRef(null);
   const [files, setFiles] = useState([]);
@@ -978,7 +889,6 @@ function RubricSourceRail({ classId, judgeSession, readOnly, onSessionUpdated, o
   const [busyId, setBusyId] = useState(null);
   // 來源選單離場動畫：關閉時保留最後開啟的列 130ms
   const sourceMenuKeep = useDialogPresence(openMenuId, 130);
-  const [showOtherSources, setShowOtherSources] = useState(false);
   const selectedFileId = judgeSession?.selected_file_id ?? null;
 
   const load = useCallback(async () => {
@@ -989,12 +899,11 @@ function RubricSourceRail({ classId, judgeSession, readOnly, onSessionUpdated, o
     }
     setLoading(true);
     try { setFiles(await AiJudgeService.listFiles(classId)); }
-    catch (error) { toast.error(error?.message ?? "載入評分表來源失敗"); }
+    catch (error) { toast.error(error?.message ?? "載入資料來源失敗"); }
     finally { setLoading(false); }
   }, [classId, selectedFileId, toast]);
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
-    setShowOtherSources(false);
     setOpenMenuId(null);
   }, [selectedFileId]);
 
@@ -1035,20 +944,9 @@ function RubricSourceRail({ classId, judgeSession, readOnly, onSessionUpdated, o
     };
   }, [openMenuId]);
 
-  async function selectFile(file) {
-    if (readOnly || busyId || file.id === selectedFileId) return;
-    setBusyId(file.id);
-    try {
-      const updated = await AiJudgeService.updateSession(classId, judgeSession.id, { selected_file_id: file.id });
-      onSessionUpdated(updated);
-      setShowOtherSources(false);
-    } catch (error) { toast.error(error?.message ?? "切換評分表來源失敗"); }
-    finally { setBusyId(null); }
-  }
-
   async function download(file) {
     try { const blob = await AiJudgeService.downloadFile(classId, file.id); downloadBlob(blob, file.original_filename ?? `${getRubricDisplayName(file)}.pdf`); }
-    catch (error) { toast.error(error?.message ?? "下載評分文件失敗"); }
+    catch (error) { toast.error(error?.message ?? "下載資料文件失敗"); }
     finally { setOpenMenuId(null); }
   }
 
@@ -1059,64 +957,57 @@ function RubricSourceRail({ classId, judgeSession, readOnly, onSessionUpdated, o
       await AiJudgeService.deleteFile(classId, file.id);
       setFiles((current) => current.filter((entry) => entry.id !== file.id));
       if (file.id === judgeSession?.selected_file_id) onSessionUpdated(await AiJudgeService.getSession(classId, judgeSession.id));
-      toast.success("評分表來源已刪除");
-    } catch (error) { toast.error(error?.message ?? "刪除評分表來源失敗"); }
+      toast.success("資料來源已刪除");
+    } catch (error) { toast.error(error?.message ?? "刪除資料來源失敗"); }
     finally { setBusyId(null); setOpenMenuId(null); }
   }
 
-  const activeFiles = files.filter((file) => file.status === "active");
   const selectedFile = getSelectedRubricSource(files, selectedFileId);
-  const visibleFiles = getVisibleRubricSources(files, selectedFileId, showOtherSources);
+  const visibleFiles = selectedFile ? [selectedFile] : [];
   return (
-    <aside ref={sourceRailRef} className={`${styles.sourceRail} ${embedded ? styles.sourceRailEmbedded : ""}`} aria-label="評分表來源">
+    <aside ref={sourceRailRef} className={`${styles.sourceRail} ${embedded ? styles.sourceRailEmbedded : ""}`} aria-label="資料來源">
       <div className={styles.sourceRailHead}>
         <div>
-          <h3>評分表來源</h3>
+          <h3>資料來源</h3>
           <p>{loading ? "正在確認目前來源…" : selectedFile ? "目前檢查使用的來源" : "尚未選擇來源"}</p>
         </div>
         <div className={styles.sourceRailActions}>
-          {!readOnly && selectedFile && activeFiles.length > 1 && <button type="button" className={styles.btnSecondary} aria-expanded={showOtherSources} onClick={() => setShowOtherSources((current) => !current)}>{showOtherSources ? "只看目前來源" : "切換來源"}</button>}
-          {!readOnly && <button type="button" className={styles.iconBtn} aria-label="新增來源" title="新增來源" onClick={onAddSource}><MIcon name="add" size={19} /></button>}
-          {onClose && <button type="button" className={styles.iconBtn} aria-label="關閉評分表來源" title="關閉" onClick={onClose}><MIcon name="close" size={18} /></button>}
+          {onClose && <button type="button" className={styles.iconBtn} aria-label="關閉資料來源" title="關閉" onClick={onClose}><MIcon name="close" size={18} /></button>}
         </div>
       </div>
       {loading ? <p className={styles.mutedText}>載入來源中…</p> : visibleFiles.length > 0 ? (
         <div className={styles.sourceList}>
-           {visibleFiles.map((file) => <div key={file.id} className={`${styles.sourceRow} ${file.id === selectedFileId ? styles.sourceRowSelected : ""}`}><button type="button" className={styles.sourceSelect} disabled={readOnly || busyId === file.id} onClick={() => selectFile(file)}><span className={styles.sourceIndicator} aria-hidden="true"><MIcon name={file.id === selectedFileId ? "radio_button_checked" : "radio_button_unchecked"} size={17} /></span><span className={styles.sourceText}><b>{getRubricDisplayName(file, "未命名評分表")}</b><small>{(file.environment_keys?.length ? file.environment_keys : [file.template_key]).map(getTemplateLabel).join("、")} · {file.analysis_json?.items?.length ?? 0} 項 · {formatDateTime(file.updated_at)} · {file.source_type === "created" ? "建立於系統" : "已上傳"}</small>{file.id === selectedFileId && <em>已選用</em>}</span></button>{(file.source_type !== "created" || !readOnly) && <div className={styles.sourceActions}><button type="button" className={styles.iconBtn} aria-label={`管理 ${getRubricDisplayName(file)}`} title="管理評分表來源" aria-haspopup="menu" aria-expanded={openMenuId === file.id} onClick={(event) => { event.stopPropagation(); setOpenMenuId((current) => current === file.id ? null : file.id); }}><MIcon name="more_vert" size={18} /></button>{sourceMenuKeep.item === file.id && <div className={`${styles.sourceMenu} ${sourceMenuKeep.closing ? styles.sessionMenuOut : ""}`} role="menu">{file.source_type !== "created" && <button type="button" role="menuitem" onClick={() => download(file)}><MIcon name="download" size={15} />下載原始文件</button>}{!readOnly && <button type="button" role="menuitem" className={styles.menuDanger} disabled={busyId === file.id} onClick={() => remove(file)}><MIcon name="delete" size={15} />刪除來源</button>}</div>}</div>}</div>)}
+           {visibleFiles.map((file) => <div key={file.id} className={`${styles.sourceRow} ${file.id === selectedFileId ? styles.sourceRowSelected : ""}`}><div className={styles.sourceSelect} aria-current="true"><span className={styles.sourceIndicator} aria-hidden="true"><MIcon name="radio_button_checked" size={17} /></span><span className={styles.sourceText}><b>{getRubricDisplayName(file, "未命名評分表")}</b><small>{(file.environment_keys?.length ? file.environment_keys : [file.template_key]).map(getTemplateLabel).join("、")} · {file.analysis_json?.items?.length ?? 0} 項 · {formatDateTime(file.updated_at)} · {file.source_type === "created" ? "建立於系統" : "已上傳"}</small><em>已選用</em></span></div>{(file.source_type !== "created" || !readOnly) && <div className={styles.sourceActions}><button type="button" className={styles.iconBtn} aria-label={`管理 ${getRubricDisplayName(file)}`} title="管理資料來源" aria-haspopup="menu" aria-expanded={openMenuId === file.id} onClick={(event) => { event.stopPropagation(); setOpenMenuId((current) => current === file.id ? null : file.id); }}><MIcon name="more_vert" size={18} /></button>{sourceMenuKeep.item === file.id && <div className={`${styles.sourceMenu} ${sourceMenuKeep.closing ? styles.sessionMenuOut : ""}`} role="menu">{file.source_type !== "created" && <button type="button" role="menuitem" onClick={() => download(file)}><MIcon name="download" size={15} />下載原始文件</button>}{!readOnly && <button type="button" role="menuitem" className={styles.menuDanger} disabled={busyId === file.id} onClick={() => remove(file)}><MIcon name="delete" size={15} />刪除來源</button>}</div>}</div>}</div>)}
         </div>
-      ) : <div className={styles.sourceEmpty}><MIcon name="description" size={24} /><p>{selectedFileId ? "目前來源已無法使用，請重新選擇。" : "這項檢查尚未選擇評分表來源。"}</p>{!readOnly && <button type="button" className={styles.btnSecondary} onClick={onAddSource}><MIcon name="add" size={15} />新增來源</button>}</div>}
+      ) : <div className={styles.sourceEmpty}><MIcon name="description" size={24} /><p>{selectedFileId ? "目前資料來源已無法使用，請用聊天室輸入框旁的＋重新上傳。" : readOnly ? "這項檢查沒有資料來源。" : "請用聊天室輸入框旁的＋上傳文件。"}</p></div>}
     </aside>
   );
 }
 
 /* ── Tab 1：評分表 ──────────────────────────────────────── */
 
-function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, onAddSource, showFileLibrary = true }) {
+function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated }) {
   const toast = useToast();
 
   const [files, setFiles] = useState([]);
-  const [filesLoading, setFilesLoading] = useState(true);
-  const [filesError, setFilesError] = useState(false);
 
   const [analysis, setAnalysis] = useState(null);
   const [messages, setMessages] = useState([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [chatUploadOpen, setChatUploadOpen] = useState(false);
   const [isChatting, setIsChatting] = useState(false);
   const [isClearingMessages, setIsClearingMessages] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isCreatingScript, setIsCreatingScript] = useState(false);
   const [uploadedFileName, setUploadedFileName] = useState("rubric");
   const [sourceFileId, setSourceFileId] = useState(null);
-  const [deleteTarget, setDeleteTarget] = useState(null);
-  const [deleting, setDeleting] = useState(false);
-  const deleteDialog = useDialogPresence(deleteTarget);
   const [pendingConflictFile, setPendingConflictFile] = useState(null);
   const conflictDialog = useDialogPresence(pendingConflictFile);
   const [selectedTemplateKey, setSelectedTemplateKey] = useState("linux");
   const [analysisTemplateKey, setAnalysisTemplateKey] = useState("linux");
   const [pendingProposal, setPendingProposal] = useState(null);
   const [selectedProposalIds, setSelectedProposalIds] = useState(() => new Set());
-  const [openInsight, setOpenInsight] = useState(null);
+  const [sourcesOpen, setSourcesOpen] = useState(false);
   const [pendingProposalMeta, setPendingProposalMeta] = useState(null);
   const [pendingProposalIsRefine, setPendingProposalIsRefine] = useState(false);
   const [environmentKeys, setEnvironmentKeys] = useState([]);
@@ -1134,13 +1025,13 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
   const readOnly = judgeSession?.status === "archived";
 
   useEffect(() => {
-    if (!openInsight) return undefined;
+    if (!sourcesOpen) return undefined;
     function closeOnEscape(event) {
-      if (event.key === "Escape") setOpenInsight(null);
+      if (event.key === "Escape") setSourcesOpen(false);
     }
     document.addEventListener("keydown", closeOnEscape);
     return () => document.removeEventListener("keydown", closeOnEscape);
-  }, [openInsight]);
+  }, [sourcesOpen]);
 
   useEffect(() => {
     const autosave = createRubricAnalysisAutosave({
@@ -1177,18 +1068,12 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
 
   /** silent = true 時不觸發 loading / error state，供背景自動刷新使用 */
   const fetchFiles = useCallback(async (silent = false) => {
-    if (!silent) {
-      setFilesLoading(true);
-      setFilesError(false);
-    }
     try {
       setFiles(await AiJudgeService.listFiles(classId));
     } catch {
-      if (!silent) setFilesError(true);
-    } finally {
-      if (!silent) setFilesLoading(false);
+      if (!silent) toast.error("載入目前資料來源失敗，請稍後再試。");
     }
-  }, [classId]);
+  }, [classId, toast]);
 
   useEffect(() => {
     fetchFiles();
@@ -1308,7 +1193,7 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
         } else {
           toast.error(err?.message ?? "上傳失敗");
         }
-        return;
+        return false;
       }
       const uploadedFile = {
         ...response.file,
@@ -1322,9 +1207,9 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
           });
           onSessionUpdated?.(updated);
         } catch (err) {
-          toast.error(err?.message ?? "套用評分表來源失敗");
+          toast.error(err?.message ?? "套用資料來源失敗");
           await fetchFiles();
-          return;
+          return false;
         }
       }
       setAnalysis(response.analysis);
@@ -1344,72 +1229,14 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
         ...current.filter((item) => item.id !== uploadedFile.id),
       ]);
       toast.success(`分析完成：${response.analysis.items.length} 題評估項目`);
+      setChatUploadOpen(false);
       fetchFiles();
+      return true;
     } catch (err) {
       toast.error(err?.message ?? "上傳失敗");
+      return false;
     } finally {
       setIsUploading(false);
-    }
-  }
-
-  async function handleSelectFile(file) {
-    if (!file.analysis_json) {
-      toast.error("這份評分表尚未有可載入的分析結果");
-      return;
-    }
-    if (judgeSession?.id) {
-      try {
-        const updated = await AiJudgeService.updateSession(classId, judgeSession.id, {
-          selected_file_id: file.id,
-        });
-        onSessionUpdated?.(updated);
-      } catch (err) {
-        toast.error(err?.message ?? "更新檢查評分表失敗");
-        return;
-      }
-    }
-    setAnalysis(file.analysis_json);
-    setUploadedFileName(file.original_filename || "rubric");
-    setSourceFileId(file.id);
-    setEnvironmentKeys(file.environment_keys?.length ? file.environment_keys : [file.template_key]);
-    analysisRevisionsRef.current.set(file.id, file.analysis_revision);
-    lastSavedValuesRef.current.set(file.id, getRubricItemsValue(file.analysis_json));
-    lastSavedItemsRef.current.set(file.id, Array.isArray(file.analysis_json.items) ? file.analysis_json.items : []);
-    lastSavedNeedsReviewRef.current.set(file.id, Boolean(file.analysis_json.detectability_needs_review));
-    setPendingReviewIds(new Set(pendingReviewIdsByFileRef.current.get(file.id) ?? []));
-    setAnalysisTemplateKey(file.template_key);
-    setSelectedTemplateKey(file.template_key);
-    if (!judgeSession?.id) setMessages([]);
-    toast.success(`已載入「${getRubricDisplayName(file)}」`);
-  }
-
-  async function handleDownloadFile(file) {
-    if (file.source_type === "created") return;
-    try {
-      const blob = await AiJudgeService.downloadFile(classId, file.id);
-      downloadBlob(blob, file.original_filename ?? `${file.display_name ?? "評分表"}.pdf`);
-    } catch (err) {
-      toast.error(err?.message ?? "下載評分表失敗");
-    }
-  }
-
-  async function handleDeleteFile() {
-    if (!deleteTarget) return;
-    setDeleting(true);
-    try {
-      await AiJudgeService.deleteFile(classId, deleteTarget.id);
-      toast.success("評分表已刪除");
-      setFiles((current) => current.filter((file) => file.id !== deleteTarget.id));
-      pendingReviewIdsByFileRef.current.delete(deleteTarget.id);
-      if (sourceFileId === deleteTarget.id) {
-        setSourceFileId(null);
-        setPendingReviewIds(new Set());
-      }
-      setDeleteTarget(null);
-    } catch (err) {
-      toast.error(err?.message ?? "刪除評分表失敗");
-    } finally {
-      setDeleting(false);
     }
   }
 
@@ -1684,96 +1511,8 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
         </div>
       )}
 
-      {showFileLibrary && <div className={styles.card}>
-        <div className={styles.cardHead}>
-          <h4 className={styles.cardTitle}>
-            <MIcon name="description" size={18} />
-            已保存評分表
-          </h4>
-        </div>
-        {filesLoading ? (
-          <LoadingState text="載入評分表中..." />
-        ) : filesError ? (
-          <p className={styles.dangerText}>載入評分表失敗，請稍後再試。</p>
-        ) : files.length === 0 ? (
-          <p className={styles.mutedText}>
-            尚未保存評分表。上傳評分文件後會自動保存文件與分析結果。
-          </p>
-        ) : (
-          <div className={styles.fileList}>
-            {files.map((file) => (
-              <div
-                key={file.id}
-                className={`${styles.fileRow} ${sourceFileId === file.id ? styles.fileRowActive : ""}`}
-              >
-                <button
-                  type="button"
-                  className={styles.fileMain}
-                  onClick={() => handleSelectFile(file)}
-                  disabled={readOnly}
-                >
-                  <span className={styles.fileName}>{getRubricDisplayName(file, "未命名評分表")}</span>
-                  <span className={styles.fileMeta}>
-                    {getTemplateLabel(file.template_key)} · {formatDateTime(file.updated_at)}
-                    {file.status === "replaced" ? " · 已取代" : ""}
-                  </span>
-                </button>
-                <div className={styles.fileActions}>
-                  {file.source_type !== "created" && <button
-                    type="button"
-                    className={styles.btnSecondary}
-                    onClick={() => handleDownloadFile(file)}
-                  >
-                    <MIcon name="download" size={14} />
-                    評分文件
-                  </button>}
-                  <button
-                    type="button"
-                    className={styles.btnSecondary}
-                    onClick={() => setDeleteTarget(file)}
-                    disabled={deleting || readOnly}
-                  >
-                    <MIcon name="delete" size={14} />
-                    刪除
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>}
-
       <div className={styles.analysisGrid}>
         <div className={styles.analysisMain}>
-          {showFileLibrary && <div className={styles.card}>
-             <h4 className={styles.cardTitle}>
-               <MIcon name="upload" size={18} />
-               上傳評分文件（可選）
-            </h4>
-            <p className={styles.mutedText}>
-              可以先聊天再上傳；上傳後會分析並自動綁定到目前這次檢查。
-            </p>
-            <div className={styles.templateRow}>
-              <span className={styles.fieldLabel}>評分環境</span>
-              <div className={styles.chipBtns}>
-                {TEMPLATE_OPTIONS.map((option) => (
-                  <button
-                    key={option.key}
-                    type="button"
-                    className={
-                      selectedTemplateKey === option.key ? styles.chipBtnActive : styles.chipBtn
-                    }
-                    onClick={() => setSelectedTemplateKey(option.key)}
-                    disabled={isUploading || readOnly}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <RubricUploader onUpload={handleUpload} isLoading={isUploading || readOnly} />
-           </div>}
-
            {analysis && (
             <>
               <div className={`${styles.card} ${styles.rubricTableCard}`}>
@@ -1815,7 +1554,23 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
               isClearing={isClearingMessages}
               disabled={readOnly}
               hasRubric={Boolean(analysis)}
-              onOpenSources={judgeSession?.id && onAddSource ? () => setOpenInsight("sources") : undefined}
+              onToggleSources={judgeSession?.id ? () => setSourcesOpen((current) => !current) : undefined}
+              sourcesOpen={sourcesOpen}
+              sourcesContent={judgeSession?.id ? (
+                <RubricSourceRail
+                  classId={classId}
+                  judgeSession={judgeSession}
+                  readOnly={readOnly}
+                  onSessionUpdated={onSessionUpdated}
+                  onClose={() => setSourcesOpen(false)}
+                  embedded
+                />
+              ) : null}
+              onUploadFile={readOnly ? undefined : handleUpload}
+              onInvalidUploadFile={toast.error}
+              isUploading={isUploading}
+              uploadOpen={chatUploadOpen}
+              onToggleUpload={() => setChatUploadOpen((current) => !current)}
             />
             {pendingProposal && analysis && <ProposalPanel
               proposal={pendingProposal}
@@ -1838,20 +1593,6 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
           </div>
         </div>
       </div>
-
-      {openInsight === "sources" && judgeSession?.id && onAddSource && (
-        <InsightDialog label="評分表來源" onClose={() => setOpenInsight(null)}>
-          <RubricSourceRail
-            classId={classId}
-            judgeSession={judgeSession}
-            readOnly={readOnly}
-            onSessionUpdated={onSessionUpdated}
-            onAddSource={onAddSource}
-            onClose={() => setOpenInsight(null)}
-            embedded
-          />
-        </InsightDialog>
-      )}
 
       {conflictDialog.open && (
         <ConfirmModal
@@ -1892,36 +1633,6 @@ function RubricsTab({ classId, judgeSession, onSessionUpdated, onScriptCreated, 
         />
       )}
 
-      {deleteDialog.open && (
-        <ConfirmModal
-          title="確認刪除評分表？"
-          description={`你即將刪除「${deleteDialog.item.original_filename}」的原始檔與保存分析。刪除後不會影響已建立的腳本。`}
-          closing={deleteDialog.closing}
-          onClose={() => {
-            if (!deleting) setDeleteTarget(null);
-          }}
-          actions={
-            <>
-              <button
-                type="button"
-                className={styles.btnSecondary}
-                disabled={deleting}
-                onClick={() => setDeleteTarget(null)}
-              >
-                取消
-              </button>
-              <button
-                type="button"
-                className={styles.btnDanger}
-                disabled={deleting}
-                onClick={handleDeleteFile}
-              >
-                {deleting ? "刪除中..." : "確認刪除"}
-              </button>
-            </>
-          }
-        />
-      )}
     </div>
   );
 }
@@ -2062,7 +1773,7 @@ function ScriptsTab({ classId, sessionId, readOnly = false, onScriptApproved }) 
       ) : scripts.length === 0 ? (
         <div className={styles.card}>
           <p className={styles.mutedText}>
-            尚未建立檢查腳本。請先到「評分設定」上傳評分文件並製作檢查腳本。
+            尚未建立檢查腳本。請先在 AI 聊天室上傳資料文件並完成評分表調整，再製作檢查腳本。
           </p>
         </div>
       ) : (
@@ -2708,9 +2419,6 @@ function TeacherWorkspacePanel({ classId, members, weeks = [] }) {
   const [activeSessionId, setActiveSessionId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [creationView, setCreationView] = useState(null);
-  const [createOpen, setCreateOpen] = useState(false);
-  const createDialog = useDialogPresence(createOpen);
-  const [sourceOnly, setSourceOnly] = useState(false);
   const [openMenuId, setOpenMenuId] = useState(null);
   const [sessionMenuPosition, setSessionMenuPosition] = useState(null);
   // 選單離場動畫：關閉時保留最後的目標與位置 130ms
@@ -2761,9 +2469,7 @@ function TeacherWorkspacePanel({ classId, members, weeks = [] }) {
 
   useEffect(() => {
     classIdRef.current = classId;
-    setCreateOpen(false);
     setCreationView(null);
-    setSourceOnly(false);
     setRenameTarget(null);
     setRenameTitle("");
     setActiveSessionId(null);
@@ -2833,31 +2539,9 @@ function TeacherWorkspacePanel({ classId, members, weeks = [] }) {
     setSessions((current) => current.map((item) => item.id === updated.id ? updated : item));
   }
 
-  async function handleCreationChoice(mode) {
-    setCreationView(mode);
-  }
-
-  function handleCreated(created, mode) {
+  function handleCreated(created) {
     if (classIdRef.current !== classId) return;
-    setCreateOpen(false);
     setCreationView(null);
-    if (mode === "source" || mode === "source-blank") {
-      if (!activeSession) return;
-      const requestClassId = classId;
-      AiJudgeService.updateSession(classId, activeSession.id, { selected_file_id: created.id })
-         .then((updated) => {
-           if (classIdRef.current !== requestClassId) return;
-           updateSessionInList(updated);
-           toast.success(`已選用「${getRubricDisplayName(created)}」。`);
-         })
-        .catch((error) => {
-          if (classIdRef.current === requestClassId) {
-            toast.error(error?.message ?? "套用評分表來源失敗");
-          }
-        });
-      setSourceOnly(false);
-      return;
-    }
     setStatusFilter("active");
     setSessions((current) => [created, ...current.filter((item) => item.id !== created.id)]);
     setActiveSessionId(created.id);
@@ -2996,12 +2680,12 @@ function TeacherWorkspacePanel({ classId, members, weeks = [] }) {
 
       <div className={styles.sessionWorkspace}>
         <aside className={styles.sessionSidebar} aria-label="檢查清單">
-           <button type="button" className={`${styles.btnPrimary} ${styles.newCheckButton}`} onClick={() => { setSourceOnly(false); setCreationView("choose"); }}><MIcon name="add" size={17} />新增檢查</button>
+           <button type="button" className={`${styles.btnPrimary} ${styles.newCheckButton}`} onClick={() => setCreationView("upload")}><MIcon name="add" size={17} />新增檢查</button>
           <div className={styles.sessionFilters} role="tablist" aria-label="檢查狀態">
             {[["active", "進行中"], ["archived", "已封存"]].map(([status, label]) => <button key={status} type="button" role="tab" aria-selected={statusFilter === status} className={statusFilter === status ? styles.chipBtnActive : styles.chipBtn} onClick={() => { setCreationView(null); setStatusFilter(status); }}>{label}</button>)}
           </div>
           <div className={styles.sessionList} role="list">
-            {loading ? <p className={styles.mutedText}>載入中…</p> : sessions.length === 0 ? <div className={styles.sidebarEmpty}><MIcon name="checklist" size={24} /><p>{statusFilter === "active" ? "尚未建立檢查。新增後可從零設計評分表，或使用已有文件。" : "目前沒有已封存的檢查。"}</p></div> : sessions.map((item) => {
+            {loading ? <p className={styles.mutedText}>載入中…</p> : sessions.length === 0 ? <div className={styles.sidebarEmpty}><MIcon name="checklist" size={24} /><p>{statusFilter === "active" ? "尚未建立檢查。新增後請上傳資料文件，再與 AI 討論並調整評分表。" : "目前沒有已封存的檢查。"}</p></div> : sessions.map((item) => {
               const selected = item.id === activeSessionId;
                const busy = busySessionIds.has(item.id);
                const renaming = renameTarget?.id === item.id;
@@ -3043,9 +2727,9 @@ function TeacherWorkspacePanel({ classId, members, weeks = [] }) {
         </aside>
 
         <section className={styles.sessionMain}>
-          {creationView === "choose" ? <CreateCheckChooser onChoose={handleCreationChoice} onCancel={() => setCreationView(null)} /> : creationView ? <CreateCheckForm key={creationView} classId={classId} weeks={weeks} embedded initialMode={creationView} onClose={() => setCreationView("choose")} onCreated={handleCreated} /> : !activeSession ? <div className={styles.card}><div className={styles.mainEmpty}><MIcon name="checklist" size={30} /><p>{statusFilter === "active" ? "請從左側選擇一項檢查，或新增檢查。" : "請選擇已封存的檢查查看內容與結果。"}</p><button type="button" className={styles.btnPrimary} onClick={() => statusFilter === "active" ? (setSourceOnly(false), setCreationView("choose")) : setStatusFilter("active")}>{statusFilter === "active" ? "新增檢查" : "查看進行中"}</button></div></div> : <>
+          {creationView ? <CreateCheckForm classId={classId} weeks={weeks} embedded onClose={() => setCreationView(null)} onCreated={handleCreated} /> : !activeSession ? <div className={styles.card}><div className={styles.mainEmpty}><MIcon name="checklist" size={30} /><p>{statusFilter === "active" ? "請從左側選擇一項檢查，或新增檢查。" : "請選擇已封存的檢查查看內容與結果。"}</p><button type="button" className={styles.btnPrimary} onClick={() => statusFilter === "active" ? setCreationView("upload") : setStatusFilter("active")}>{statusFilter === "active" ? "新增檢查" : "查看進行中"}</button></div></div> : <>
             <div className={styles.subTabs} role="tablist" aria-label="檢查工作頁籤">{TEACHER_JUDGE_TABS.map((tab) => <button key={tab.key} type="button" role="tab" aria-selected={activeTab === tab.key} className={activeTab === tab.key ? styles.subTabActive : styles.subTab} onClick={() => setActiveTab(tab.key)}><MIcon name={tab.icon} size={16} />{tab.label}</button>)}</div>
-            {activeTab === "rubrics" && <RubricsTab key={activeSession.id} classId={classId} judgeSession={activeSession} onSessionUpdated={updateSessionInList} onAddSource={() => { setSourceOnly(true); setCreateOpen(true); }} onScriptCreated={() => { loadSessions(); setActiveTab("scripts"); }} showFileLibrary={false} />}
+            {activeTab === "rubrics" && <RubricsTab key={activeSession.id} classId={classId} judgeSession={activeSession} onSessionUpdated={updateSessionInList} onScriptCreated={() => { loadSessions(); setActiveTab("scripts"); }} />}
             {activeTab === "scripts" && <ScriptsTab classId={classId} sessionId={activeSession.id} readOnly={activeSession.status === "archived"} onScriptApproved={() => setActiveTab("execution")} />}
             {activeTab === "execution" && <ExecutionTab classId={classId} sessionId={activeSession.id} readOnly={activeSession.status === "archived"} members={members} />}
           </>}
@@ -3054,7 +2738,6 @@ function TeacherWorkspacePanel({ classId, members, weeks = [] }) {
 
       {typeof document !== "undefined" && sessionMenuItemKeep.open && sessionMenuPos.item && createPortal(renderSessionMenu(sessionMenuItemKeep.item), document.body)}
 
-      {createDialog.open && <CreateCheckForm classId={classId} weeks={weeks} sourceOnly={sourceOnly} closing={createDialog.closing} onClose={() => { setCreateOpen(false); setSourceOnly(false); }} onCreated={handleCreated} />}
     </div>
   );
 }
