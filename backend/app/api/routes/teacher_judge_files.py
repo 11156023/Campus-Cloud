@@ -120,7 +120,7 @@ async def upload_class_teacher_judge_file(
         original_filename, file_hash, raw_text = prepare_file_payload(
             filename=file.filename or "unknown",
             file_bytes=file_bytes,
-            allowed_suffixes={".docx", ".pdf"},
+            allowed_suffixes={".md", ".txt", ".doc", ".docx", ".pdf"},
             max_upload_size_bytes=settings.VLLM_MAX_UPLOAD_SIZE_MB * 1024 * 1024,
         )
     except ValueError as exc:

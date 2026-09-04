@@ -5,11 +5,19 @@ from __future__ import annotations
 import json
 import uuid
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 from sqlalchemy import case
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import col, desc, select
 
+from app.ai.teacher_judge.attachment_service import (
+    MAX_ATTACHMENT_COUNT,
+    attachment_context,
+    attachment_public,
+    create_attachment,
+    delete_attachment,
+    get_pending_attachments,
+)
 from app.ai.teacher_judge.file_service import create_blank_file
 from app.ai.teacher_judge.schemas import (
     TeacherJudgeRubricAnalysis,
@@ -17,6 +25,7 @@ from app.ai.teacher_judge.schemas import (
     TeacherJudgeScriptRunCreateRequest,
     TeacherJudgeScriptRunPublic,
     TeacherJudgeScriptRunSummary,
+    TeacherJudgeSessionAttachmentUploadResponse,
     TeacherJudgeSessionChatResponse,
     TeacherJudgeSessionCreateRequest,
     TeacherJudgeSessionForkRequest,
@@ -38,6 +47,7 @@ from app.ai.teacher_judge.session_service import (
     fork_session_data,
     get_session,
     maybe_summarize,
+    message_attachments,
     message_public,
     redact_message_content,
     require_selected_file,
@@ -51,6 +61,7 @@ from app.core.authorizers import require_teaching_access
 from app.core.i18n import t
 from app.infrastructure.worker import submit
 from app.models import TeachingClass, TeachingClassWeek
+from app.models.teacher_judge_attachment import TeacherJudgeSessionAttachment
 from app.models.teacher_judge_script_artifact import TeacherJudgeScriptArtifact
 from app.models.teacher_judge_script_run import (
     TeacherJudgeScriptRun,
@@ -295,6 +306,67 @@ def delete_session(
     delete_session_data(session, item)
 
 
+@router.post(
+    "/{session_id}/attachments",
+    response_model=TeacherJudgeSessionAttachmentUploadResponse,
+)
+async def upload_session_attachment(
+    teaching_class_id: uuid.UUID,
+    session_id: uuid.UUID,
+    session: SessionDep,
+    current_user: InstructorUser,
+    file: UploadFile = File(...),
+) -> TeacherJudgeSessionAttachmentUploadResponse:
+    _access(session, teaching_class_id, current_user)
+    item = get_session(session, teaching_class_id, session_id)
+    ensure_active(item)
+    pending_count = len(
+        session.exec(
+            select(TeacherJudgeSessionAttachment).where(
+                TeacherJudgeSessionAttachment.session_id == item.id,
+                TeacherJudgeSessionAttachment.message_id.is_(None),
+            )
+        ).all()
+    )
+    if pending_count >= MAX_ATTACHMENT_COUNT:
+        raise HTTPException(
+            status_code=400,
+            detail=f"單次最多準備 {MAX_ATTACHMENT_COUNT} 個附件。",
+        )
+    file_bytes = await file.read()
+    try:
+        attachment = create_attachment(
+            session,
+            session_id=item.id,
+            uploaded_by=current_user.id,
+            filename=file.filename,
+            media_type=file.content_type,
+            file_bytes=file_bytes,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=415, detail=str(exc)) from exc
+    return TeacherJudgeSessionAttachmentUploadResponse(
+        attachment=attachment_public(attachment)
+    )
+
+
+@router.delete("/{session_id}/attachments/{attachment_id}", status_code=204)
+def delete_session_attachment(
+    teaching_class_id: uuid.UUID,
+    session_id: uuid.UUID,
+    attachment_id: uuid.UUID,
+    session: SessionDep,
+    current_user: InstructorUser,
+) -> None:
+    _access(session, teaching_class_id, current_user)
+    item = get_session(session, teaching_class_id, session_id)
+    ensure_active(item)
+    attachment = session.get(TeacherJudgeSessionAttachment, attachment_id)
+    if not attachment or attachment.session_id != item.id:
+        raise HTTPException(status_code=404, detail="找不到附件。")
+    delete_attachment(session, attachment)
+
+
 @router.get(
     "/{session_id}/messages", response_model=list[TeacherJudgeSessionMessagePublic]
 )
@@ -333,7 +405,7 @@ def list_messages(
         )
     )
     rows.reverse()
-    return [message_public(row) for row in rows]
+    return [message_public(row, message_attachments(session, row.id)) for row in rows]
 
 
 @router.delete(
@@ -378,6 +450,9 @@ async def create_message(
                 "analysis_revision": file.analysis_revision,
             },
         )
+    if not payload.content.strip() and not payload.attachment_ids:
+        raise HTTPException(status_code=422, detail="訊息或附件至少需要一項。")
+    attachments = get_pending_attachments(session, item.id, payload.attachment_ids)
     user_message = TeacherJudgeSessionMessage(
         session_id=item.id,
         role=TeacherJudgeMessageRole.user,
@@ -386,11 +461,19 @@ async def create_message(
         created_by=current_user.id,
     )
     session.add(user_message)
+    session.flush()
+    for attachment in attachments:
+        attachment.message_id = user_message.id
+        session.add(attachment)
     session.commit()
     session.refresh(user_message)
     try:
         reply, proposal, metrics = await chat_with_rubric(
-            bounded_history(session, item.id),
+            bounded_history(
+                session,
+                item.id,
+                exclude_attachments_for_message_id=user_message.id,
+            ),
             json.dumps(file.analysis_json, ensure_ascii=False) if file else "{}",
             is_refine=payload.is_refine,
             template_key=file.template_key if file else "linux",
@@ -400,6 +483,7 @@ async def create_message(
                 include_cross_template=True,
             ),
             environment_keys=file.environment_keys if file else None,
+            attachment_context=attachment_context(attachments),
         )
         # Without a selected rubric the conversation is general assistance only;
         # do not let an unconstrained model response create an unreviewed proposal.
@@ -440,7 +524,7 @@ async def create_message(
     session.refresh(assistant)
     await maybe_summarize(session, item, file)
     return TeacherJudgeSessionChatResponse(
-        user_message=message_public(user_message),
+        user_message=message_public(user_message, attachments),
         assistant_message=message_public(assistant),
         rubric_proposal=proposal,
         base_revision=base_revision,

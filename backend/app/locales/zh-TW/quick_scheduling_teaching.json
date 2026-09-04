@@ -12,7 +12,7 @@
   "quick_practice.session_not_found": "Quick-practice session not found",
   "quick_practice.version_not_found": "Quick-practice environment version not found",
   "rubric_parser.pdfplumber_missing": "pdfplumber is required to parse PDF files. Please install pdfplumber.",
-  "rubric_parser.unsupported_format": "不支援的文件格式：{suffix}（目前支援 .docx / .pdf）",
+  "rubric_parser.unsupported_format": "不支援的文件格式：{suffix}（目前支援 .md / .txt / .doc / .docx / .pdf）",
   "mining.incident_already_closed": "Incident is already closed",
   "mining.incident_owner_missing": "Incident owner no longer exists",
   "class_capacity.version_mismatch": "班級已使用其他課程版本完成容量預留",

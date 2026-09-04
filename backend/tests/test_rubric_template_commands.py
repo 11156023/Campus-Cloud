@@ -432,6 +432,58 @@ async def test_chat_prompt_accepts_generic_cat_env_checkpoint(
     )
 
 
+@pytest.mark.asyncio
+async def test_chat_prompt_treats_attachment_as_concrete_rubric_content(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured_payload = {}
+
+    async def fake_call_vllm(payload, timeout=60.0):
+        captured_payload.update(payload)
+        return (
+            json.dumps(
+                {
+                    "reply": "已依附件整理評分項目。",
+                    "updated_items": [
+                        {
+                            "id": "item-1",
+                            "title": "服務 Port",
+                            "description": "確認預期服務 Port 正在監聽。",
+                            "checked": False,
+                            "detectable": "auto",
+                            "detection_method": "檢查 listening ports。",
+                            "fallback": None,
+                        }
+                    ],
+                }
+            ),
+            {"total_tokens": 1},
+        )
+
+    monkeypatch.setattr(teacher_judge_service, "_call_vllm", fake_call_vllm)
+    _patch_teacher_judge_vllm_settings(monkeypatch)
+
+    _reply, updated_items, _metrics = await teacher_judge_service.chat_with_rubric(
+        messages=[SimpleNamespace(role="user", content="幫我增加這些項目")],
+        rubric_context=json.dumps({"items": []}),
+        attachment_context=(
+            "--- 附件：rubric.md ---\n"
+            "| 審查重點 | AI 可以參考的線索 |\n"
+            "| 服務 Port | Listening ports |\n"
+            "--- 附件結束 ---"
+        ),
+    )
+
+    system_prompt = captured_payload["messages"][0]["content"]
+    assert "附件中的可讀文字就是老師提供的具體內容" in system_prompt
+    assert "不要因目前項目數為 0 就回覆尚未提供內容" in system_prompt
+    assert "附件表格的每一列可轉成一個評分項目" in system_prompt
+    assert captured_payload["messages"][-1]["role"] == "user"
+    assert "請從附件擷取內容並回傳完整 updated_items" in captured_payload["messages"][-1]["content"]
+    assert updated_items is not None
+    assert updated_items[0]["title"] == "服務 Port"
+
+
 def test_normalize_downgrades_auto_without_valid_check_steps() -> None:
     items = teacher_judge_service._normalize_rubric_items(
         [
