@@ -12,7 +12,7 @@
   "quick_practice.session_not_found": "Quick-practice session not found",
   "quick_practice.version_not_found": "Quick-practice environment version not found",
   "rubric_parser.pdfplumber_missing": "pdfplumber is required to parse PDF files. Please install pdfplumber.",
-  "rubric_parser.unsupported_format": "Unsupported file format: {suffix} (currently supports .docx / .pdf)",
+  "rubric_parser.unsupported_format": "Unsupported file format: {suffix} (currently supports .md / .txt / .doc / .docx / .pdf)",
   "mining.incident_already_closed": "Incident is already closed",
   "mining.incident_owner_missing": "Incident owner no longer exists",
   "class_capacity.version_mismatch": "This class has already completed a capacity reservation with a different course version",

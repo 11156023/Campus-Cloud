@@ -134,6 +134,7 @@ TeacherJudgeScriptRunStatusLiteral = Literal[
     "pending", "running", "completed", "failed", "cancelled"
 ]
 TeacherJudgeSessionStatusLiteral = Literal["active", "archived"]
+TeacherJudgeAttachmentStatusLiteral = Literal["ready", "failed"]
 TeacherJudgeMessageRoleLiteral = Literal["user", "assistant"]
 TeacherJudgeMessageTypeLiteral = Literal["chat", "rubric_proposal", "system_notice"]
 TeacherJudgeSessionCreationModeLiteral = Literal["blank", "existing"]
@@ -233,8 +234,9 @@ class TeacherJudgeSessionPublic(BaseModel):
 
 
 class TeacherJudgeSessionMessageCreateRequest(BaseModel):
-    content: str = Field(..., min_length=1, max_length=20000)
+    content: str = Field(default="", max_length=20000)
     analysis_revision: int | None = Field(default=None, ge=1)
+    attachment_ids: list[uuid.UUID] = Field(default_factory=list, max_length=5)
     is_refine: bool = Field(
         default=False,
         description="True = 以目前評分表執行整表潤飾",
@@ -248,6 +250,7 @@ class TeacherJudgeSessionMessagePublic(BaseModel):
     content: str
     message_type: TeacherJudgeMessageTypeLiteral
     metadata_json: dict[str, Any]
+    attachments: list[TeacherJudgeSessionAttachmentPublic] = Field(default_factory=list)
     created_by: str | None
     created_at: str
 
@@ -257,6 +260,23 @@ class TeacherJudgeSessionChatResponse(BaseModel):
     assistant_message: TeacherJudgeSessionMessagePublic
     rubric_proposal: list[dict[str, Any]] | None = None
     base_revision: int | None = None
+
+
+class TeacherJudgeSessionAttachmentPublic(BaseModel):
+    id: str
+    session_id: str
+    message_id: str | None = None
+    original_filename: str
+    media_type: str | None = None
+    size_bytes: int
+    file_hash: str
+    status: TeacherJudgeAttachmentStatusLiteral
+    error_message: str | None = None
+    created_at: str
+
+
+class TeacherJudgeSessionAttachmentUploadResponse(BaseModel):
+    attachment: TeacherJudgeSessionAttachmentPublic
 
 
 class TeacherJudgeScriptCreateRequest(BaseModel):

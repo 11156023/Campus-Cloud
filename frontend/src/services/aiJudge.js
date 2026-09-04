@@ -147,17 +147,34 @@ export const AiJudgeService = {
     sessionId,
     content,
     analysisRevision = null,
-    { isRefine = false } = {},
+    { isRefine = false, attachmentIds = [] } = {},
   ) {
     const payload = { content };
     if (analysisRevision !== null && analysisRevision !== undefined) {
       payload.analysis_revision = analysisRevision;
     }
     if (isRefine) payload.is_refine = true;
+    if (attachmentIds.length) payload.attachment_ids = attachmentIds;
     return apiPost(
       `/api/v1/teaching-classes/${classId}/judge/sessions/${sessionId}/messages`,
       payload,
       { timeoutMs: TEACHER_JUDGE_REQUEST_TIMEOUT_MS },
+    );
+  },
+
+  uploadSessionAttachment(classId, sessionId, file) {
+    const formData = new FormData();
+    formData.append("file", file);
+    return apiPostMultipart(
+      `/api/v1/teaching-classes/${classId}/judge/sessions/${sessionId}/attachments`,
+      formData,
+      { timeoutMs: TEACHER_JUDGE_REQUEST_TIMEOUT_MS },
+    );
+  },
+
+  deleteSessionAttachment(classId, sessionId, attachmentId) {
+    return apiDelete(
+      `/api/v1/teaching-classes/${classId}/judge/sessions/${sessionId}/attachments/${attachmentId}`,
     );
   },
 

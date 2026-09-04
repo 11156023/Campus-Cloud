@@ -162,6 +162,36 @@ describe("AiJudgeService persistent sessions", () => {
     expect(JSON.parse(init.body)).toEqual({ content: "檢查 nginx" });
   });
 
+  test("聊天室訊息可攜帶已解析附件 ID", async () => {
+    await AiJudgeService.sendSessionMessage(
+      "class-1",
+      "session-1",
+      "請依文件補充項目",
+      4,
+      { attachmentIds: ["attachment-1"] },
+    );
+
+    const [, init] = fetchMock.mock.calls[0];
+    expect(JSON.parse(init.body)).toEqual({
+      content: "請依文件補充項目",
+      analysis_revision: 4,
+      attachment_ids: ["attachment-1"],
+    });
+  });
+
+  test("聊天室附件上傳使用 session-scoped multipart endpoint", async () => {
+    const file = new File(["# requirements"], "requirements.md", { type: "text/markdown" });
+    await AiJudgeService.uploadSessionAttachment("class-1", "session-1", file);
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toContain(
+      "/api/v1/teaching-classes/class-1/judge/sessions/session-1/attachments",
+    );
+    expect(init.method).toBe("POST");
+    expect(init.body).toBeInstanceOf(FormData);
+    expect(init.body.get("file").name).toBe("requirements.md");
+  });
+
   test("AI 提案請求可攜帶目前評分表 revision", async () => {
     await AiJudgeService.sendSessionMessage("class-1", "check-1", "補充檢查步驟", 4);
 

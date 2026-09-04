@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, test } from "vitest";
 import {
   ChatPanel,
+  CreateCheckChooser,
   RubricTable,
   SessionTitle,
   buildProposalDiff,
@@ -72,22 +73,36 @@ describe("ChatPanel", () => {
     expect(html).not.toContain('role="dialog"');
   });
 
-  test("以加號展開可拖拉的資料上傳區", () => {
+  test("以加號提供聊天室附件入口並顯示待送出附件橫欄", () => {
     const html = renderToStaticMarkup(
       <ChatPanel
         messages={[]}
         onSendMessage={() => {}}
         onUploadFile={() => {}}
-        onToggleUpload={() => {}}
-        uploadOpen
+        pendingAttachments={[{
+          id: "attachment-1",
+          original_filename: "requirements.md",
+          status: "ready",
+        }]}
         isLoading={false}
       />,
     );
 
-    expect(html).toContain('aria-label="關閉資料上傳"');
-    expect(html).toContain('aria-expanded="true"');
-    expect(html).toContain("拖放資料文件到這裡");
-    expect(html).toContain("上傳後會交由 AI 分析並套用到目前檢查");
+    expect(html).toContain('aria-label="新增附件"');
+    expect(html).toContain("requirements.md");
+    expect(html).toContain("已讀取");
+  });
+});
+
+describe("CreateCheckChooser", () => {
+  test("新增檢查提供從零建立與已有文件兩條入口", () => {
+    const html = renderToStaticMarkup(
+      <CreateCheckChooser onChoose={() => {}} onCancel={() => {}} />,
+    );
+
+    expect(html).toContain("從零開始建立");
+    expect(html).toContain("使用已有評分文件");
+    expect(html).toContain("選擇文件");
   });
 });
 
