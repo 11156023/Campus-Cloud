@@ -12,7 +12,6 @@ import { useConfirm } from "../../../components/ConfirmDialog/ConfirmProvider";
 import { ClassroomService } from "../../../services/classroom";
 import { courseNodeHasUsableSource, CourseEnvironmentsService } from "../../../services/courseEnvironments";
 import { TeachingClassesService } from "../../../services/teachingClasses";
-import AiJudgePanel from "./AiJudgePanel";
 import ClassCreateDialog from "./ClassCreateDialog";
 import useDialogPresence from "../../../hooks/useDialogPresence";
 import { focusInvalidField } from "../../../utils/focusField";
@@ -657,45 +656,6 @@ function StudentMachines({ item }) {
   </div>;
 }
 
-function AiJudgeWorkspace({ item }) {
-  const { t } = useTranslation("teaching");
-  const [members, setMembers] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let active = true;
-    ClassroomService.listClassStudents(item.id)
-      .then((students) => {
-        if (!active) return;
-        setMembers(
-          students.flatMap((student) =>
-            (student.vms ?? []).map((vm) => ({
-              user_id: student.user_id,
-              email: student.email,
-              full_name: student.full_name,
-              vmid: vm.vmid,
-              vm_status: vm.status,
-              vm_type: vm.vm_type,
-              vm_cpu_usage_pct: null,
-              vm_ram_usage_pct: null,
-              vm_disk_usage_pct: null,
-            })),
-          ),
-        );
-      })
-      .catch(() => active && setMembers([]))
-      .finally(() => active && setLoading(false));
-    return () => {
-      active = false;
-    };
-  }, [item.id]);
-
-  if (loading) {
-    return <LoadingState text={t("ClassWorkspacePage.loadingClassMachinesText")} />;
-  }
-  return <AiJudgePanel classId={item.id} members={members} weeks={item.weeks} />;
-}
-
 function LockedFeature({ section }) {
   const { t } = useTranslation("teaching");
   const label = section === "ai" ? t("ClassWorkspacePage.tabAiLabel") : section === "classroom" ? t("ClassWorkspacePage.tabClassroomLabel") : t("ClassWorkspacePage.studentMachinesLabel");
@@ -840,7 +800,8 @@ export default function ClassWorkspacePage() {
       <nav className={styles.workspaceTabs}>{TABS.map(([key, icon, labelKey]) => {
         const unavailable = ["classroom", "progress", "ai"].includes(key) && item.status !== "active";
         const done = key === "students" ? item.students.length > 0 : key === "weekly" ? item.weeks.some((week) => week.title.trim()) : key === "machines" ? Boolean(item.course_environment) && item.nodes.length > 0 : false;
-        return <button type="button" key={key} disabled={unavailable} title={unavailable ? t("ClassWorkspacePage.allMachinesRequiredHint") : undefined} className={`${tab === key ? styles.workspaceTabActive : ""} ${unavailable ? styles.workspaceTabLocked : ""}`} onClick={() => navigate(key === "overview" ? `/class-management/${classId}` : `/class-management/${classId}/${key}`)}><MIcon name={unavailable ? "lock" : done ? "check" : icon} size={17} /><strong>{t(labelKey)}</strong></button>;
+        const target = key === "overview" ? `/class-management/${classId}` : key === "ai" ? `/class-management/${classId}/ai` : `/class-management/${classId}/${key}`;
+        return <button type="button" key={key} disabled={unavailable} title={unavailable ? t("ClassWorkspacePage.allMachinesRequiredHint") : undefined} className={`${tab === key ? styles.workspaceTabActive : ""} ${unavailable ? styles.workspaceTabLocked : ""}`} onClick={() => navigate(target)}><MIcon name={unavailable ? "lock" : done ? "check" : icon} size={17} /><strong>{t(labelKey)}</strong></button>;
       })}</nav>
       <div className={styles.workflowProgress}><span>{t("ClassWorkspacePage.setupProgressLabelShort")}</span><strong>{item.status === "active" ? t("ClassWorkspacePage.allReadyLabel") : t("ClassWorkspacePage.completedCountLabel", { count: completed })}</strong></div>
     </section>
@@ -852,7 +813,6 @@ export default function ClassWorkspacePage() {
       {postUnavailable && <LockedFeature section={tab} />}
       {tab === "classroom" && !postUnavailable && <ClassMonitor item={item} />}
       {tab === "progress" && !postUnavailable && <StudentMachines item={item} />}
-      {tab === "ai" && !postUnavailable && <AiJudgeWorkspace item={item} />}
       {!TABS.some(([key]) => key === tab) && <LockedFeature section={tab} />}
     </main>
     {scheduleDialog.open && <ClassCreateDialog item={item} closing={scheduleDialog.closing} onClose={() => setScheduleOpen(false)} onUpdated={(result) => { refresh(result); setScheduleOpen(false); setMessage(t("ClassWorkspacePage.scheduleUpdatedMsg")); }} />}

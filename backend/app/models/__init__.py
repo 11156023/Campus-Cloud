@@ -72,6 +72,10 @@ from .spec_change_request import (
 )
 from .subnet_config import SubnetConfig
 from .task_record import TaskRecord, TaskRecordStatus
+from .teacher_judge_attachment import (
+    TeacherJudgeAttachmentStatus,
+    TeacherJudgeSessionAttachment,
+)
 from .teacher_judge_file import TeacherJudgeFile, TeacherJudgeFileStatus
 from .teacher_judge_script_artifact import (
     TeacherJudgeScriptArtifact,
@@ -204,6 +208,8 @@ __all__ = [
     "IpAllocation",
     "TeacherJudgeFile",
     "TeacherJudgeFileStatus",
+    "TeacherJudgeAttachmentStatus",
+    "TeacherJudgeSessionAttachment",
     "TeacherJudgeMessageRole",
     "TeacherJudgeMessageType",
     "TeacherJudgeSession",

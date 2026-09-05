@@ -18,6 +18,17 @@ export function sanitizeAiPveContent(value) {
     .trim();
 }
 
+/** 將 AI 回覆以安全的 Markdown 呈現，避免格式標記以原始文字顯示。 */
+export function AiPveMarkdownContent({ content }) {
+  return (
+    <div className={`${styles.msgContent} ${styles.msgMarkdown}`}>
+      <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>
+        {sanitizeAiPveContent(content)}
+      </ReactMarkdown>
+    </div>
+  );
+}
+
 export default function AiPveChat({ initialPrompt = "", compact = false, fill = false }) {
   const { t } = useTranslation("components");
   const toast = useToast();
@@ -172,13 +183,13 @@ export default function AiPveChat({ initialPrompt = "", compact = false, fill = 
               <MIcon name={message.role === "assistant" ? "smart_toy" : "person"} size={16} />
               <span>{message.role === "assistant" ? "AI-PVE" : t("AiPveChat.you")}</span>
             </div>
-            {/* 維運回覆常是節點清單、用量表格與指令片段，直接印純文字會看到
-                一堆星號與管線符號 */}
-            <div className={styles.msgContent}>
-              <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>
+            {message.role === "assistant" ? (
+              <AiPveMarkdownContent content={message.content} />
+            ) : (
+              <p className={`${styles.msgContent} ${styles.msgPlain}`}>
                 {sanitizeAiPveContent(message.content)}
-              </ReactMarkdown>
-            </div>
+              </p>
+            )}
             {message.tools?.length > 0 && (
               <div className={styles.toolRow}>
                 <span className={styles.toolLabel}>

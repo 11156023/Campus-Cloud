@@ -161,7 +161,7 @@
   "Sidebar.itemGpuMgmt": "GPU 管理",
   "Sidebar.groupReview": "審核",
   "Sidebar.itemRequestReview": "申請審核",
-  "Sidebar.itemBatchReview": "批量審核",
+  "Sidebar.itemBatchReview": "班級審核",
   "Sidebar.groupNetwork": "網路",
   "Sidebar.itemFirewall": "防火牆",
   "Sidebar.itemReverseProxy": "反向代理",

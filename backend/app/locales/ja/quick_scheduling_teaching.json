@@ -12,7 +12,7 @@
   "quick_practice.session_not_found": "クイック練習セッションが見つかりません",
   "quick_practice.version_not_found": "クイック練習環境のバージョンが見つかりません",
   "rubric_parser.pdfplumber_missing": "PDFファイルを解析するには pdfplumber が必要です。pdfplumber をインストールしてください。",
-  "rubric_parser.unsupported_format": "サポートされていないファイル形式です：{suffix}（現在 .docx / .pdf のみ対応）",
+  "rubric_parser.unsupported_format": "サポートされていないファイル形式です：{suffix}（現在 .md / .txt / .doc / .docx / .pdf に対応）",
   "mining.incident_already_closed": "このインシデントはすでにクローズされています",
   "mining.incident_owner_missing": "インシデントの所有者はすでに存在しません",
   "class_capacity.version_mismatch": "このクラスは既に別のコースバージョンで容量予約を完了しています",

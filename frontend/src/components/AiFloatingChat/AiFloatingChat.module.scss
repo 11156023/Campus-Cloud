@@ -16,6 +16,12 @@
   width: clamp(380px, 31vw, 460px);
   flex-basis: clamp(380px, 31vw, 460px);
   margin-left: 20px;
+
+  /* 往右挪版面右側留白的四分之一。負邊距吃掉 workspace 的 padding，
+     不必為了這個面板去改共用的版面變數。 */
+  @media (min-width: $breakpoint-sidebar) {
+    margin-right: calc(var(--layout-px) * -0.25);
+  }
 }
 
 .panel {
@@ -70,8 +76,7 @@
   }
 }
 
-.brandIcon,
-.emptyIcon {
+.brandIcon {
   color: var(--color-primary);
   background: color-mix(in srgb, var(--color-primary) 11%, transparent);
   @include flex-center;
@@ -147,12 +152,6 @@
     color: var(--color-text-primary);
     font-size: 1.1rem;
   }
-}
-
-.emptyIcon {
-  width: 52px;
-  height: 52px;
-  border-radius: $radius-16;
 }
 
 .suggestions {
@@ -342,17 +341,15 @@
 
   li {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     gap: 11px;
-    padding: 12px 14px;
+    padding: 11px 14px;
     border: 1px solid var(--color-border);
     border-radius: $radius-12;
     background: var(--color-surface);
   }
 
-  span { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-  strong { font-size: $font-size-14; }
-  small { color: var(--color-text-muted); font-size: $font-size-12; }
+  strong { font-size: $font-size-14; min-width: 0; }
 }
 
 /* 配置模式的答案晶片：點一下就等於回答，不用打字 */
