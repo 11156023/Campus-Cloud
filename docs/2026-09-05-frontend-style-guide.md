@@ -1,5 +1,9 @@
 ﻿# SkyLab Frontend — 樣式規範
 
+- 日期：2026-09-05（Asia/Taipei；原 `frontend/src/assets/styles/STYLE_GUIDE.md` 移入 docs）
+- 狀態：現行規範，持續維護
+- 適用範圍：前端所有頁面與元件
+
 > 本文件說明前端樣式架構與撰寫規範，所有新頁面、元件都應遵循此指南，確保視覺與程式碼風格一致。若想自行變更_variables.scss、_themes.scss兩檔案，請事先與前端討論。
 
 ---
